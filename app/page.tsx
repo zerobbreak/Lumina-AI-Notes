@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { HeroVisual } from "@/components/home/HeroVisual";
 import { FeatureGrid } from "@/components/home/FeatureGrid";
@@ -45,17 +46,21 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center lg:justify-start">
               <div className="relative group">
                 <div className="absolute -inset-0.5 bg-linear-to-r from-pink-600 to-purple-600 rounded-lg blur opacity-60 group-hover:opacity-100 transition duration-200"></div>
-                <Button
-                  size="lg"
-                  className="relative h-12 px-8 bg-black text-white hover:bg-black/90 border border-white/10"
-                >
-                  <Mic className="mr-2 h-5 w-5 text-red-500 animate-pulse" />
-                  Start Recording
-                </Button>
+                <Link href="/dashboard">
+                  <Button
+                    size="lg"
+                    className="relative h-12 px-8 bg-black text-white hover:bg-black/90 border border-white/10"
+                  >
+                    <Mic className="mr-2 h-5 w-5 text-red-500 animate-pulse" />
+                    Start Recording
+                  </Button>
+                </Link>
               </div>
-              <Button size="lg" variant="secondary" className="h-12 px-8">
-                Start Free Today
-              </Button>
+              <Link href="/sign-up">
+                <Button size="lg" variant="secondary" className="h-12 px-8">
+                  Start Free Today
+                </Button>
+              </Link>
             </div>
 
             <div className="text-sm text-muted-foreground flex items-center gap-4">

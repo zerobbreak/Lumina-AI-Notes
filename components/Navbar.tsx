@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Mic, Sparkles } from "lucide-react";
+import { Mic, Sparkles, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 
 export function Navbar() {
   return (
@@ -39,18 +40,44 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            className="hidden text-muted-foreground hover:text-white sm:flex"
-          >
-            Sign In
-          </Button>
-          <Button
-            variant="default"
-            className="bg-indigo-600 hover:bg-indigo-700 text-white border-0 shadow-[0_0_20px_rgba(79,70,229,0.4)]"
-          >
-            <Mic className="mr-2 h-4 w-4" /> Record
-          </Button>
+          {/* Show when user is NOT signed in */}
+          <SignedOut>
+            <Link href="/sign-in">
+              <Button
+                variant="ghost"
+                className="hidden text-muted-foreground hover:text-white sm:flex"
+              >
+                Sign In
+              </Button>
+            </Link>
+            <Link href="/dashboard">
+              <Button
+                variant="default"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white border-0 shadow-[0_0_20px_rgba(79,70,229,0.4)]"
+              >
+                <Mic className="mr-2 h-4 w-4" /> Record
+              </Button>
+            </Link>
+          </SignedOut>
+
+          {/* Show when user IS signed in */}
+          <SignedIn>
+            <Link href="/dashboard">
+              <Button
+                variant="default"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white border-0 shadow-[0_0_20px_rgba(79,70,229,0.4)]"
+              >
+                <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
+              </Button>
+            </Link>
+            <UserButton
+              appearance={{
+                elements: {
+                  avatarBox: "h-9 w-9",
+                },
+              }}
+            />
+          </SignedIn>
         </div>
       </div>
     </nav>
