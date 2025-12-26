@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Sparkles, Twitter, Github, Linkedin, Mail } from "lucide-react";
+import { Twitter, Github } from "lucide-react";
 
 export function Footer() {
   return (
@@ -11,30 +11,41 @@ export function Footer() {
           {/* Brand Column */}
           <div className="col-span-2 lg:col-span-2">
             <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-400">
-                <Sparkles className="h-5 w-5" />
-              </div>
               <span className="text-xl font-bold tracking-tight text-white">
-                Lumina AI
+                <span className="text-cyan-400">Note</span>AI
               </span>
             </Link>
             <p className="text-muted-foreground text-sm leading-relaxed max-w-sm">
-              Turning chaotic lectures into structured knowledge. Built for
-              students who want to learn, not just transcribe.
+              Empowering students to learn faster and smarter with cutting-edge
+              AI technology.
             </p>
+            <div className="flex items-center gap-4 mt-6">
+              <Link
+                href="#"
+                className="text-muted-foreground hover:text-white transition-colors"
+              >
+                <Twitter className="h-5 w-5" />
+              </Link>
+              <Link
+                href="#"
+                className="text-muted-foreground hover:text-white transition-colors"
+              >
+                <Github className="h-5 w-5" />
+              </Link>
+            </div>
           </div>
 
           {/* Product Links */}
           <div className="flex flex-col gap-4">
             <h3 className="font-semibold text-white">Product</h3>
             <Link
-              href="#"
+              href="#features"
               className="text-sm text-muted-foreground hover:text-white transition-colors"
             >
               Features
             </Link>
             <Link
-              href="#"
+              href="#pricing"
               className="text-sm text-muted-foreground hover:text-white transition-colors"
             >
               Pricing
@@ -43,13 +54,42 @@ export function Footer() {
               href="#"
               className="text-sm text-muted-foreground hover:text-white transition-colors"
             >
-              Templates
+              Universities
             </Link>
             <Link
               href="#"
               className="text-sm text-muted-foreground hover:text-white transition-colors"
             >
-              Enterprise
+              Changelog
+            </Link>
+          </div>
+
+          {/* Resources Links */}
+          <div className="flex flex-col gap-4">
+            <h3 className="font-semibold text-white">Resources</h3>
+            <Link
+              href="#"
+              className="text-sm text-muted-foreground hover:text-white transition-colors"
+            >
+              Community
+            </Link>
+            <Link
+              href="#"
+              className="text-sm text-muted-foreground hover:text-white transition-colors"
+            >
+              Help Center
+            </Link>
+            <Link
+              href="#"
+              className="text-sm text-muted-foreground hover:text-white transition-colors"
+            >
+              Student Discount
+            </Link>
+            <Link
+              href="#"
+              className="text-sm text-muted-foreground hover:text-white transition-colors"
+            >
+              Blog
             </Link>
           </div>
 
@@ -66,25 +106,8 @@ export function Footer() {
               href="#"
               className="text-sm text-muted-foreground hover:text-white transition-colors"
             >
-              Blog
-            </Link>
-            <Link
-              href="#"
-              className="text-sm text-muted-foreground hover:text-white transition-colors"
-            >
               Careers
             </Link>
-            <Link
-              href="#"
-              className="text-sm text-muted-foreground hover:text-white transition-colors"
-            >
-              Contact
-            </Link>
-          </div>
-
-          {/* Legal Links */}
-          <div className="flex flex-col gap-4">
-            <h3 className="font-semibold text-white">Legal</h3>
             <Link
               href="#"
               className="text-sm text-muted-foreground hover:text-white transition-colors"
@@ -95,48 +118,20 @@ export function Footer() {
               href="#"
               className="text-sm text-muted-foreground hover:text-white transition-colors"
             >
-              Terms of Service
-            </Link>
-            <Link
-              href="#"
-              className="text-sm text-muted-foreground hover:text-white transition-colors"
-            >
-              Cookie Policy
+              Terms
             </Link>
           </div>
         </div>
 
         <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} Lumina AI Inc. All rights
-            reserved.
+            &copy; {new Date().getFullYear()} NoteAI Inc. All rights reserved.
           </p>
-
-          <div className="flex items-center gap-4">
-            <Link
-              href="#"
-              className="text-muted-foreground hover:text-white transition-colors"
-            >
-              <Twitter className="h-4 w-4" />
-            </Link>
-            <Link
-              href="#"
-              className="text-muted-foreground hover:text-white transition-colors"
-            >
-              <Github className="h-4 w-4" />
-            </Link>
-            <Link
-              href="#"
-              className="text-muted-foreground hover:text-white transition-colors"
-            >
-              <Linkedin className="h-4 w-4" />
-            </Link>
-            <Link
-              href="#"
-              className="text-muted-foreground hover:text-white transition-colors"
-            >
-              <Mail className="h-4 w-4" />
-            </Link>
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-xs text-muted-foreground">
+              All systems operational
+            </span>
           </div>
         </div>
       </div>

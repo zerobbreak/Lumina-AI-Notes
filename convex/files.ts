@@ -62,6 +62,43 @@ export const getFiles = query({
   },
 });
 
+export const getFilesByContext = query({
+  args: {
+    courseId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity || !args.courseId) return [];
+
+    // Since we don't have a direct by_courseId index on files in the schema I see,
+    // (Wait, I did see specific indexes in schema.ts: .index("by_courseId", ["courseId"]))
+    // No, wait. files index: .index("by_userId", ["userId"]).
+    // Files table DOES NOT have courseId index in lines 56-64 of schema.ts!
+    // It has a column but no index.
+    // I should probably add an index, but I cannot run `npx convex dev` easily here to migrate schema.
+    // I will use filter for now. It won't be performant for huge datasets but fine for MVP.
+
+    // Actually, I can filter by userId then filter by courseId.
+    const files = await ctx.db
+      .query("files")
+      .withIndex("by_userId", (q) => q.eq("userId", identity.tokenIdentifier))
+      .filter((q) => q.eq(q.field("courseId"), args.courseId))
+      .collect();
+
+    return Promise.all(
+      files.map(async (file) => {
+        if (file.storageId) {
+          return {
+            ...file,
+            url: await ctx.storage.getUrl(file.storageId),
+          };
+        }
+        return file;
+      })
+    );
+  },
+});
+
 export const deleteFile = mutation({
   args: { fileId: v.id("files") },
   handler: async (ctx, args) => {

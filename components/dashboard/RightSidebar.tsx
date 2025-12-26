@@ -20,11 +20,11 @@ export function RightSidebar() {
   const [isRecording, setIsRecording] = useState(true);
 
   return (
-    <div className="w-[320px] h-screen bg-black/20 backdrop-blur-xl border-l border-white/5 flex flex-col flex-shrink-0 z-50">
+    <div className="w-[320px] h-screen bg-black/20 backdrop-blur-xl border-l border-white/5 flex flex-col shrink-0 z-50">
       {/* Top: Recorder Section */}
       <div className="p-6 border-b border-white/5 relative overflow-hidden">
         {/* Glow Effect */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-500 opacity-50" />
+        <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-cyan-500 via-indigo-500 to-purple-500 opacity-50" />
 
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2.5">

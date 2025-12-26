@@ -179,21 +179,38 @@ export function Sidebar() {
                     <Button
                       variant="ghost"
                       className={cn(
-                        "w-full justify-between h-9 px-2 text-sm font-medium hover:bg-white/5 pr-8",
+                        "w-full justify-start h-9 px-2 text-sm font-medium hover:bg-white/5 pr-8 gap-0", // gap-0 to control spacing manually
                         isExpanded
                           ? "text-indigo-400"
                           : "text-gray-400 hover:text-white"
                       )}
-                      onClick={() => toggleCourse(course.id)}
                     >
-                      <div className="flex items-center gap-2.5 truncate">
+                      {/* Toggle Button */}
+                      <div
+                        className="p-1 mr-1 hover:bg-white/10 rounded cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleCourse(course.id);
+                        }}
+                      >
                         {isExpanded ? (
                           <ChevronDown className="w-3.5 h-3.5" />
                         ) : (
                           <ChevronRight className="w-3.5 h-3.5" />
                         )}
-                        <span className="truncate">{course.code}</span>
                       </div>
+
+                      {/* Title Link */}
+                      <span
+                        className="truncate flex-1 text-left cursor-pointer"
+                        onClick={() =>
+                          router.push(
+                            `/dashboard?contextId=${course.id}&contextType=course`
+                          )
+                        }
+                      >
+                        {course.code}
+                      </span>
                     </Button>
                     <div className="absolute right-1 opacity-100 lg:opacity-0 lg:group-hover/item:opacity-100 transition-opacity">
                       <ActionMenu
@@ -219,6 +236,11 @@ export function Sidebar() {
                           <Button
                             variant="ghost"
                             className="w-full justify-start h-8 px-2 text-xs text-gray-500 hover:text-white hover:bg-white/5 gap-2 pr-8"
+                            onClick={() =>
+                              router.push(
+                                `/dashboard?contextId=${mod.id}&contextType=module`
+                              )
+                            }
                           >
                             <Folder className="w-3 h-3" />
                             <span className="truncate">{mod.title}</span>
@@ -335,6 +357,7 @@ export function Sidebar() {
                 <Button
                   variant="ghost"
                   className="w-full justify-start h-8 px-2 text-xs text-gray-400 hover:text-white hover:bg-white/5 gap-2.5 pr-8"
+                  onClick={() => router.push(`/dashboard?noteId=${note._id}`)}
                 >
                   <FileText className="w-3.5 h-3.5 text-yellow-500/50" />
                   <span className="truncate">{note.title}</span>
