@@ -26,6 +26,32 @@ interface FolderViewProps {
   contextType: "course" | "module" | string;
 }
 
+import { motion } from "framer-motion";
+
+// Animation Variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: "spring" as const,
+      stiffness: 300,
+      damping: 24,
+    },
+  },
+};
+
 export default function FolderView({
   contextId,
   contextType,
@@ -117,16 +143,26 @@ export default function FolderView({
   const currentCourse = getCurrentCourse();
 
   return (
-    <div className="h-full flex flex-col relative bg-[#0A0A0A] animate-in fade-in duration-500">
+    <div className="h-full flex flex-col relative bg-[#0A0A0A]">
       {/* Header Banner */}
-      <div className="relative h-48 flex flex-col justify-end px-12 pb-8 border-b border-white/5 overflow-hidden">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6 }}
+        className="relative h-48 flex flex-col justify-end px-12 pb-8 border-b border-white/5 overflow-hidden"
+      >
         {/* Background Art */}
         <div className="absolute inset-0 bg-linear-to-r from-indigo-900/20 via-purple-900/10 to-black/0" />
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 mix-blend-overlay" />
         <div className="absolute bottom-0 left-0 w-full h-32 bg-linear-to-t from-[#0A0A0A] to-transparent" />
 
         <div className="relative z-10">
-          <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.4 }}
+            className="flex items-center gap-2 text-sm text-gray-500 mb-4"
+          >
             <span
               className="hover:text-cyan-400 cursor-pointer transition-colors"
               onClick={() => router.push("/dashboard")}
@@ -135,8 +171,13 @@ export default function FolderView({
             </span>
             <ChevronRight className="w-4 h-4" />
             <span className="text-white font-medium">{getContextName()}</span>
-          </div>
-          <div className="flex items-center justify-between">
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.4 }}
+            className="flex items-center justify-between"
+          >
             <h1 className="text-4xl font-bold text-white flex items-center gap-4 tracking-tight">
               <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-md">
                 {contextType === "course" ? (
@@ -147,9 +188,9 @@ export default function FolderView({
               </div>
               {getContextName()}
             </h1>
-          </div>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
 
       <ScrollArea className="flex-1">
         <div className="max-w-7xl mx-auto py-12 px-12 space-y-12">
@@ -172,16 +213,23 @@ export default function FolderView({
                 </Button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+              >
                 {currentCourse.modules?.map((mod: any) => (
-                  <div
+                  <motion.div
                     key={mod.id}
+                    variants={itemVariants}
                     onClick={() =>
                       router.push(
                         `/dashboard?contextId=${mod.id}&contextType=module`
                       )
                     }
-                    className="group relative flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-[#121212] hover:bg-[#18181B] hover:border-white/10 cursor-pointer transition-all hover:z-50"
+                    whileHover={{ scale: 1.02 }}
+                    className="group relative flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-[#121212] hover:bg-[#18181B] hover:border-white/10 cursor-pointer transition-colors hover:z-50"
                   >
                     <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
                       <Folder className="w-5 h-5 text-purple-400" />
@@ -207,7 +255,7 @@ export default function FolderView({
                         align="right"
                       />
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
 
                 {(!currentCourse.modules ||
@@ -216,7 +264,7 @@ export default function FolderView({
                     No modules yet. Add one to organize your notes.
                   </div>
                 )}
-              </div>
+              </motion.div>
             </section>
           )}
 
@@ -240,22 +288,32 @@ export default function FolderView({
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="show"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            >
               {/* Create New Card */}
-              <div
+              <motion.div
+                variants={itemVariants}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={handleCreateNoteInContext}
-                className="group relative aspect-4/3 rounded-2xl border border-dashed border-white/10 hover:border-cyan-500/30 hover:bg-cyan-500/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-3 text-gray-500 hover:text-cyan-400"
+                className="group relative aspect-4/3 rounded-2xl border border-dashed border-white/10 hover:border-cyan-500/30 hover:bg-cyan-500/5 transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 text-gray-500 hover:text-cyan-400"
               >
                 <div className="p-3 rounded-full bg-white/5 group-hover:bg-cyan-500/20 transition-colors">
                   <Plus className="w-6 h-6" />
                 </div>
                 <span className="text-sm font-medium">Create New</span>
-              </div>
+              </motion.div>
 
               {contextNotes?.map((n) => (
-                <div
+                <motion.div
                   key={n._id}
+                  variants={itemVariants}
                   onClick={() => router.push(`/dashboard?noteId=${n._id}`)}
+                  whileHover={{ y: -5 }}
                   className="group relative aspect-4/3 rounded-2xl border border-white/5 bg-[#121212] hover:bg-[#18181B] hover:shadow-[0_0_20px_rgba(0,0,0,0.4)] transition-all cursor-pointer p-6 flex flex-col justify-between overflow-hidden"
                 >
                   <div className="space-y-3">
@@ -282,7 +340,7 @@ export default function FolderView({
 
                   {/* Hover Ring */}
                   <div className="absolute inset-0 border-2 border-transparent group-hover:border-white/5 rounded-2xl transition-all pointer-events-none" />
-                </div>
+                </motion.div>
               ))}
 
               {(!contextNotes || contextNotes.length === 0) && (
@@ -290,7 +348,7 @@ export default function FolderView({
                   No notes yet. Create one to get started.
                 </div>
               )}
-            </div>
+            </motion.div>
           </section>
 
           <Separator className="bg-white/5" />
@@ -302,14 +360,21 @@ export default function FolderView({
               Files & Resources
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="show"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+            >
               {contextFiles?.map((f: any) => (
-                <a
+                <motion.a
                   key={f._id}
+                  variants={itemVariants}
+                  whileHover={{ scale: 1.02 }}
                   href={f.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="group flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-[#121212] hover:bg-[#18181B] hover:border-white/10 transition-all"
+                  className="group flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-[#121212] hover:bg-[#18181B] hover:border-white/10 transition-colors"
                 >
                   <div className="w-12 h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
                     <File className="w-6 h-6 text-indigo-400" />
@@ -323,7 +388,7 @@ export default function FolderView({
                     </p>
                   </div>
                   <MoreVertical className="w-4 h-4 text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </a>
+                </motion.a>
               ))}
 
               {(!contextFiles || contextFiles.length === 0) && (
@@ -331,7 +396,7 @@ export default function FolderView({
                   No files linked to this folder.
                 </div>
               )}
-            </div>
+            </motion.div>
           </section>
         </div>
       </ScrollArea>

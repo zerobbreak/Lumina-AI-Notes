@@ -23,6 +23,8 @@ import { cn } from "@/lib/utils";
 import { ActionMenu } from "@/components/dashboard/ActionMenu";
 import { RenameDialog } from "@/components/dashboard/RenameDialog";
 
+import { motion } from "framer-motion";
+
 // Helper to get a nice gradient based on course code or name
 const getGradient = (code: string) => {
   const gradients = [
@@ -48,6 +50,29 @@ const getIcon = (code: string) => {
   return BookOpen;
 };
 
+// Animation Variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: "spring" as const,
+      stiffness: 300,
+      damping: 24,
+    },
+  },
+};
 export default function SmartFolderHub() {
   const userData = useQuery(api.users.getUser);
   const createCourse = useMutation(api.users.createCourse);
@@ -81,9 +106,14 @@ export default function SmartFolderHub() {
     ) || 0;
 
   return (
-    <div className="flex-1 h-full overflow-y-auto bg-[#0A0A0A] p-8 animate-in fade-in duration-500">
+    <div className="flex-1 h-full overflow-y-auto bg-[#0A0A0A] p-8">
       {/* Hero Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4"
+      >
         <div>
           <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">
             Welcome back,{" "}
@@ -97,7 +127,12 @@ export default function SmartFolderHub() {
         </div>
 
         {/* Quick Stats Pills */}
-        <div className="flex items-center gap-3">
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+          className="flex items-center gap-3"
+        >
           <div className="px-4 py-2 rounded-full bg-white/5 border border-white/10 flex items-center gap-2 text-sm text-gray-300 backdrop-blur-md">
             <Layout className="w-4 h-4 text-cyan-400" />
             <span>
@@ -112,8 +147,8 @@ export default function SmartFolderHub() {
               Modules
             </span>
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
       {/* Courses Grid */}
       <div className="mb-12">
@@ -133,20 +168,27 @@ export default function SmartFolderHub() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+        >
           {userData.courses?.map((course: any) => {
             const Gradient = getGradient(course.code);
             const Icon = getIcon(course.code);
 
             return (
-              <div
+              <motion.div
                 key={course.id}
+                variants={itemVariants}
                 onClick={() =>
                   router.push(
                     `/dashboard?contextId=${course.id}&contextType=course`
                   )
                 }
-                className="group relative aspect-16/10 rounded-2xl border border-white/5 bg-[#121212] cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(34,211,238,0.1)] hover:border-white/10 hover:z-50"
+                whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                className="group relative aspect-16/10 rounded-2xl border border-white/5 bg-[#121212] cursor-pointer shadow-lg hover:shadow-[0_0_30px_rgba(34,211,238,0.1)] hover:border-white/10 z-0 hover:z-10"
               >
                 {/* Cover Area */}
                 {/* Added rounded-t-2xl and overflow-hidden here to contain the gradient/noise but let the parent be visible for the menu */}
@@ -161,9 +203,12 @@ export default function SmartFolderHub() {
                 {/* Content Area */}
                 <div className="p-5 relative">
                   {/* Floating Icon */}
-                  <div className="absolute -top-6 left-5 w-12 h-12 rounded-xl bg-[#18181B] border border-white/10 flex items-center justify-center shadow-xl group-hover:scale-110 group-hover:border-cyan-500/30 transition-all duration-300">
+                  <motion.div
+                    whileHover={{ scale: 1.1, rotate: 5 }}
+                    className="absolute -top-6 left-5 w-12 h-12 rounded-xl bg-[#18181B] border border-white/10 flex items-center justify-center shadow-xl group-hover:border-cyan-500/30 transition-colors duration-300"
+                  >
                     <Icon className="w-6 h-6 text-gray-200 group-hover:text-cyan-400 transition-colors" />
-                  </div>
+                  </motion.div>
 
                   <div className="mt-5 space-y-1">
                     <h3 className="font-semibold text-lg text-white truncate group-hover:text-cyan-100 transition-colors">
@@ -201,20 +246,23 @@ export default function SmartFolderHub() {
                     />
                   </div>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
           {/* Add New Card Slot */}
-          <div
+          <motion.div
+            variants={itemVariants}
             onClick={handleCreateCourse}
-            className="aspect-16/10 rounded-2xl border border-dashed border-white/10 flex flex-col items-center justify-center gap-3 text-gray-500 hover:text-cyan-400 hover:border-cyan-500/30 hover:bg-cyan-500/5 cursor-pointer transition-all duration-300 group"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="aspect-16/10 rounded-2xl border border-dashed border-white/10 flex flex-col items-center justify-center gap-3 text-gray-500 hover:text-cyan-400 hover:border-cyan-500/30 hover:bg-cyan-500/5 cursor-pointer transition-colors group"
           >
             <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
               <Plus className="w-6 h-6" />
             </div>
             <span className="text-sm font-medium">Create New Folder</span>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </div>
 
       <RenameDialog

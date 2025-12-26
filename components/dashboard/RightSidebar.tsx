@@ -20,7 +20,12 @@ export function RightSidebar() {
   const [isRecording, setIsRecording] = useState(true);
 
   return (
-    <div className="w-[320px] h-screen bg-black/20 backdrop-blur-xl border-l border-white/5 flex flex-col shrink-0 z-50">
+    <motion.div
+      initial={{ x: 320, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      className="w-[320px] h-screen bg-black/20 backdrop-blur-xl border-l border-white/5 flex flex-col shrink-0 z-50"
+    >
       {/* Top: Recorder Section */}
       <div className="p-6 border-b border-white/5 relative overflow-hidden">
         {/* Glow Effect */}
@@ -97,7 +102,12 @@ export function RightSidebar() {
         </div>
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-6">
-            <div className="group">
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+              className="group"
+            >
               <p className="text-sm text-gray-300 leading-relaxed mb-1">
                 "The time complexity of this algorithm essentially boils down to
                 how we partition the array..."
@@ -114,8 +124,13 @@ export function RightSidebar() {
                   <Pin className="w-3 h-3 mr-1" /> Pin as Block
                 </Button>
               </div>
-            </div>
-            <div className="group">
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.5 }}
+              className="group"
+            >
               <p className="text-sm text-gray-300 leading-relaxed mb-1">
                 "Remember, simpler solutions are often better for
                 maintainability, even if they aren't the absolute fastest."
@@ -132,12 +147,22 @@ export function RightSidebar() {
                   <Pin className="w-3 h-3 mr-1" /> Pin as Block
                 </Button>
               </div>
-            </div>
-            <div className="opacity-50">
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              transition={{
+                delay: 0.8,
+                duration: 1,
+                repeat: Infinity,
+                repeatType: "reverse",
+              }}
+              className="opacity-50"
+            >
               <p className="text-sm text-gray-300 leading-relaxed animate-pulse">
                 "Now let's look at the recursive approach..."
               </p>
-            </div>
+            </motion.div>
           </div>
         </ScrollArea>
       </div>
@@ -159,6 +184,6 @@ export function RightSidebar() {
           </button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
