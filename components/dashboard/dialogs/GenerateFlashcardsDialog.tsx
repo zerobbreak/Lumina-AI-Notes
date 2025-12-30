@@ -117,10 +117,10 @@ export function GenerateFlashcardsDialog({
                   <SelectItem
                     key={note._id}
                     value={note._id}
-                    className="text-white hover:bg-white/10 focus:bg-white/10"
+                    className="text-white focus:bg-indigo-600 focus:text-white cursor-pointer transition-colors my-1 group data-[state=checked]:bg-indigo-900/50 data-[state=checked]:text-indigo-200"
                   >
                     <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-yellow-500/70" />
+                      <FileText className="w-4 h-4 text-indigo-400 group-focus:text-white opacity-70 group-focus:opacity-100 transition-all" />
                       <span className="truncate">{note.title}</span>
                     </div>
                   </SelectItem>
@@ -145,7 +145,7 @@ export function GenerateFlashcardsDialog({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter deck title..."
-              className="w-full px-3 py-2 rounded-md bg-white/5 border border-white/10 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              className="w-full px-3 py-2 rounded-md bg-white/5 border border-white/10 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all hover:bg-white/10"
             />
           </div>
 
@@ -159,18 +159,15 @@ export function GenerateFlashcardsDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#0a0a12] border-white/10">
-                <SelectItem value="5" className="text-white hover:bg-white/10">
-                  5 cards
-                </SelectItem>
-                <SelectItem value="10" className="text-white hover:bg-white/10">
-                  10 cards
-                </SelectItem>
-                <SelectItem value="15" className="text-white hover:bg-white/10">
-                  15 cards
-                </SelectItem>
-                <SelectItem value="20" className="text-white hover:bg-white/10">
-                  20 cards
-                </SelectItem>
+                {[5, 10, 15, 20].map((count) => (
+                  <SelectItem
+                    key={count}
+                    value={count.toString()}
+                    className="text-white focus:bg-indigo-600 focus:text-white cursor-pointer transition-colors"
+                  >
+                    {count} cards
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

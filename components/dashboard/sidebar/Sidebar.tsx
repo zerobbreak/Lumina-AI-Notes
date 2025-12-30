@@ -1,21 +1,6 @@
 "use client";
 
-import {
-  Search,
-  Settings,
-  Library,
-  BookOpen,
-  GraduationCap,
-  FileText,
-  ChevronRight,
-  ChevronDown,
-  Command,
-  Plus,
-  Folder,
-  File,
-  Upload,
-  Layers,
-} from "lucide-react";
+import { Search, Settings, Layers, Plus, Upload } from "lucide-react";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { useMutation, useQuery, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -23,16 +8,18 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
-import { cn } from "@/lib/utils";
 import { SearchDialog } from "@/components/dashboard/search/SearchDialog";
-import { Course, Module, UserFile } from "@/lib/types";
+import { Course, UserFile } from "@/lib/types";
 import { Id } from "@/convex/_generated/dataModel";
-import { ActionMenu } from "@/components/shared/ActionMenu";
 import { UploadDialog } from "@/components/dashboard/dialogs/UploadDialog";
 import { CreateNoteDialog } from "@/components/dashboard/dialogs/CreateNoteDialog";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { useDashboard } from "@/hooks/useDashboard";
 import { DraggableDocument, DocumentStatusBadge } from "@/components/documents";
+import { SidebarCourse } from "./SidebarCourse";
+import { SidebarNote } from "./SidebarNote";
+import { ActionMenu } from "@/components/shared/ActionMenu"; // Still needed for Files
+import { File } from "lucide-react"; // Still needed for Files
 
 type RenameTarget = {
   id: string;
@@ -61,7 +48,6 @@ export function Sidebar() {
   const renameCourse = useMutation(api.users.renameCourse);
   const deleteCourse = useMutation(api.users.deleteCourse);
 
-  const addModule = useMutation(api.users.addModuleToCourse);
   const renameModule = useMutation(api.users.renameModule);
   const deleteModule = useMutation(api.users.deleteModule);
 
@@ -130,7 +116,12 @@ export function Sidebar() {
     }
   };
 
-  const openRename = (target: RenameTarget) => setRenameTarget(target);
+  const openRename = (
+    id: string,
+    type: "note" | "course" | "module" | "file",
+    name: string,
+    parentId?: string
+  ) => setRenameTarget({ id, type, name, parentId });
 
   // Notes
   const handleCreateNote = () => setIsCreateNoteOpen(true);
@@ -139,17 +130,6 @@ export function Sidebar() {
   const handleCreateCourse = async () => {
     try {
       await createCourse({ name: "New Course", code: "CSE 101" });
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  // Modules
-  const handleCreateModule = async (courseId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await addModule({ courseId, title: "New Module" });
-      setExpandedCourses((prev) => ({ ...prev, [courseId]: true }));
     } catch (e) {
       console.error(e);
     }
@@ -212,122 +192,27 @@ export function Sidebar() {
             </Button>
           </div>
           <div className="space-y-1">
-            {userData?.courses?.map((course: Course) => {
-              const isExpanded = expandedCourses[course.id];
-              return (
-                <div key={course.id} className="space-y-1 relative group/item">
-                  <div className="relative flex items-center">
-                    <Button
-                      variant="ghost"
-                      className={cn(
-                        "w-full justify-start h-9 px-2.5 text-[13px] font-medium transition-all duration-200 border-l-2 gap-2.5",
-                        isExpanded
-                          ? "bg-indigo-500/10 text-indigo-400 border-indigo-500"
-                          : "border-transparent text-gray-400 hover:text-white hover:bg-white/4"
-                      )}
-                    >
-                      {/* Toggle Button */}
-                      <div
-                        className={cn(
-                          "p-0.5 rounded-md transition-colors",
-                          isExpanded
-                            ? "text-indigo-400"
-                            : "text-gray-500 hover:bg-white/10 hover:text-gray-300"
-                        )}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleCourse(course.id);
-                        }}
-                      >
-                        {isExpanded ? (
-                          <ChevronDown className="w-3.5 h-3.5" />
-                        ) : (
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        )}
-                      </div>
-
-                      {/* Title Link */}
-                      <span
-                        className="truncate flex-1 text-left cursor-pointer"
-                        onClick={() =>
-                          router.push(
-                            `/dashboard?contextId=${course.id}&contextType=course`
-                          )
-                        }
-                      >
-                        {course.code}
-                      </span>
-                    </Button>
-                    <div className="absolute right-1 opacity-100 lg:opacity-0 lg:group-hover/item:opacity-100 transition-all duration-200">
-                      <ActionMenu
-                        onRename={() =>
-                          openRename({
-                            id: course.id,
-                            type: "course",
-                            name: course.name,
-                          })
-                        }
-                        onDelete={() => deleteCourse({ courseId: course.id })}
-                      />
-                    </div>
-                  </div>
-
-                  {isExpanded && (
-                    <div className="pl-4 space-y-0.5 ml-2 border-l border-white/5">
-                      {course.modules?.map((mod: Module) => (
-                        <div
-                          key={mod.id}
-                          className="relative group/module flex items-center"
-                        >
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start h-8 px-2 text-[12px] text-gray-500 hover:text-indigo-200 hover:bg-indigo-500/5 gap-2.5 transition-all"
-                            onClick={() =>
-                              router.push(
-                                `/dashboard?contextId=${mod.id}&contextType=module`
-                              )
-                            }
-                          >
-                            <Folder
-                              className={cn(
-                                "w-3.5 h-3.5",
-                                "text-indigo-500/50 group-hover/module:text-indigo-400"
-                              )}
-                            />
-                            <span className="truncate">{mod.title}</span>
-                          </Button>
-                          <div className="absolute right-1 opacity-100 lg:opacity-0 lg:group-hover/module:opacity-100 transition-all">
-                            <ActionMenu
-                              onRename={() =>
-                                openRename({
-                                  id: mod.id,
-                                  type: "module",
-                                  name: mod.title,
-                                  parentId: course.id,
-                                })
-                              }
-                              onDelete={() =>
-                                deleteModule({
-                                  courseId: course.id,
-                                  moduleId: mod.id,
-                                })
-                              }
-                            />
-                          </div>
-                        </div>
-                      ))}
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start h-8 px-2 text-[11px] text-gray-600 hover:text-indigo-400 hover:bg-indigo-500/5 gap-2 transition-all ml-0.5"
-                        onClick={(e) => handleCreateModule(course.id, e)}
-                      >
-                        <Plus className="w-3 h-3" /> Add Module
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {userData?.courses?.map((course: Course) => (
+              <SidebarCourse
+                key={course.id}
+                course={course}
+                isExpanded={!!expandedCourses[course.id]}
+                onToggle={() => toggleCourse(course.id)}
+                onRename={(id, name) => openRename(id, "course", name)}
+                onDelete={(id) => deleteCourse({ courseId: id })}
+                onRenameModule={(id, name, parentId) =>
+                  openRename(id, "module", name, parentId)
+                }
+                onDeleteModule={(id, parentId) =>
+                  deleteModule({ courseId: parentId, moduleId: id })
+                }
+                onRenameNote={(id, title) => openRename(id, "note", title)}
+                onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
+                onArchiveNote={(id) =>
+                  toggleArchiveNote({ noteId: id as Id<"notes"> })
+                }
+              />
+            ))}
             {(!userData?.courses || userData.courses.length === 0) && (
               <div className="px-3 py-2 text-xs text-gray-600 italic bg-white/2 rounded-lg border border-white/2">
                 No courses yet.
@@ -358,25 +243,22 @@ export function Sidebar() {
                 documentId={file._id}
                 documentName={file.name}
                 processingStatus={file.processingStatus}
+                showDragIndicator={false}
               >
                 <div className="relative group/file flex items-center">
                   <Button
                     variant="ghost"
-                    className="w-full justify-start h-9 px-2.5 text-[13px] text-gray-400 hover:text-white hover:bg-white/4 gap-2.5 transition-all"
+                    className="w-full justify-start h-9 px-2.5 text-[13px] text-gray-400 hover:text-white hover:bg-white/4 gap-3 transition-all" // Increased gap
                   >
-                    <File className="w-3.5 h-3.5 text-blue-500/70 group-hover/file:text-blue-400 transition-colors" />
-                    <span className="truncate flex-1">{file.name}</span>
+                    <File className="w-3.5 h-3.5 text-blue-500/70 group-hover/file:text-blue-400 transition-colors shrink-0" />
+                    <span className="truncate flex-1 text-left">
+                      {file.name}
+                    </span>
                     <DocumentStatusBadge status={file.processingStatus} />
                   </Button>
                   <div className="absolute right-1 opacity-100 lg:opacity-0 lg:group-hover/file:opacity-100 transition-all">
                     <ActionMenu
-                      onRename={() =>
-                        openRename({
-                          id: file._id,
-                          type: "file",
-                          name: file.name,
-                        })
-                      }
+                      onRename={() => openRename(file._id, "file", file.name)}
                       onDelete={() => deleteFile({ fileId: file._id })}
                       showRetry={file.processingStatus === "error"}
                       onRetry={async () => {
@@ -416,34 +298,19 @@ export function Sidebar() {
           </div>
           <div className="space-y-0.5">
             {recentNotes?.map((note) => (
-              <div
+              <SidebarNote
                 key={note._id}
-                className="relative group/note flex items-center"
-              >
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start h-9 px-2.5 text-[13px] text-gray-400 hover:text-white hover:bg-white/4 gap-2.5 transition-all"
-                  onClick={() => router.push(`/dashboard?noteId=${note._id}`)}
-                >
-                  <FileText className="w-3.5 h-3.5 text-amber-500/70 group-hover/note:text-amber-400 transition-colors" />
-                  <span className="truncate">{note.title}</span>
-                </Button>
-                <div className="absolute right-1 opacity-100 lg:opacity-0 lg:group-hover/note:opacity-100 transition-all">
-                  <ActionMenu
-                    onRename={() =>
-                      openRename({
-                        id: note._id,
-                        type: "note",
-                        name: note.title,
-                      })
-                    }
-                    onDelete={() => deleteNote({ noteId: note._id })}
-                    onArchive={() => toggleArchiveNote({ noteId: note._id })}
-                    isArchived={note.isArchived}
-                  />
-                </div>
-              </div>
+                note={note}
+                onRename={() => openRename(note._id, "note", note.title)}
+                onDelete={() => deleteNote({ noteId: note._id })}
+                onArchive={() => toggleArchiveNote({ noteId: note._id })}
+              />
             ))}
+            {(!recentNotes || recentNotes.length === 0) && (
+              <div className="px-3 py-2 text-xs text-gray-600 italic bg-white/2 rounded-lg border border-white/2">
+                No quick notes.
+              </div>
+            )}
           </div>
         </div>
 
@@ -456,7 +323,7 @@ export function Sidebar() {
           </div>
           <Button
             variant="ghost"
-            className="w-full justify-start h-9 px-2.5 text-[13px] text-gray-400 hover:text-white hover:bg-white/4 gap-2.5 transition-all group"
+            className="w-full justify-start h-9 px-2.5 text-[13px] text-gray-400 hover:text-white hover:bg-white/4 gap-3 transition-all group" // Increased gap
             onClick={() => router.push("/dashboard?view=flashcards")}
           >
             <div className="p-0.5 rounded bg-indigo-500/10 group-hover:bg-indigo-500/20 transition-colors">

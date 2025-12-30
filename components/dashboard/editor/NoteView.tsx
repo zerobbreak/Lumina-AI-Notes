@@ -39,6 +39,7 @@ import { useDashboard } from "@/hooks/useDashboard";
 import { usePDF } from "@/hooks/usePDF";
 import { AIBubbleMenu } from "./AIBubbleMenu";
 import { DocumentDropZone } from "@/components/documents";
+import { marked } from "marked";
 import "./editor.css";
 
 // Props for the NoteView
@@ -114,22 +115,44 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   // Track which note we've loaded content for to detect note changes
   const [loadedNoteId, setLoadedNoteId] = useState<Id<"notes"> | null>(null);
 
+  // Helper function to detect if content is markdown and convert to HTML
+  const convertMarkdownIfNeeded = async (content: string): Promise<string> => {
+    if (!content) return "";
+
+    // If content already has HTML block elements, it's already converted
+    if (/<(h[1-6]|ul|ol|pre|blockquote|hr)[^>]*>/i.test(content)) {
+      return content;
+    }
+
+    // Convert HTML to plain text while preserving line breaks
+    const textContent = content
+      .replace(/<\/p>|<\/div>|<br\s*\/?>/gi, "\n")
+      .replace(/<[^>]*>/g, "")
+      .trim();
+    // Check for markdown patterns (headers, lists, code blocks, bold/italic)
+    const markdownPatterns =
+      /^#{1,6}\s|^[-*+]\s|^\d+\.\s|```|\*\*|__|\[.*\]\(.*\)/m;
+    if (markdownPatterns.test(textContent)) {
+      // Use textContent for conversion if original had HTML wrapper
+      return await marked.parse(textContent);
+    }
+    return content;
+  };
+
   // Sync content when note loads OR when noteId changes (switching between notes)
   useEffect(() => {
-    if (note && editor && !editor.isDestroyed) {
-      // If we're viewing a different note than before, always update the content
-      if (noteId !== loadedNoteId) {
-        editor.commands.setContent(note.content || "");
-        setLoadedNoteId(noteId);
-      } else {
-        // Same note - only update if editor is empty (initial load)
-        const currentContent = editor.getHTML();
-        if (currentContent === "<p></p>" || !currentContent) {
-          editor.commands.setContent(note.content || "");
+    const loadContent = async () => {
+      if (note && editor && !editor.isDestroyed) {
+        // Only load content if we haven't loaded for this noteId yet
+        if (noteId !== loadedNoteId) {
+          const htmlContent = await convertMarkdownIfNeeded(note.content || "");
+          editor.commands.setContent(htmlContent);
+          setLoadedNoteId(noteId);
         }
       }
-    }
-  }, [note, editor, noteId, loadedNoteId]);
+    };
+    loadContent();
+  }, [note, noteId, editor, loadedNoteId]); // Note: loadedNoteId prevents re-runs after initial load
 
   // Inject structured notes from RightSidebar when pendingNotes changes
   useEffect(() => {

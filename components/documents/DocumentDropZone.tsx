@@ -189,7 +189,8 @@ export function DraggableDocument({
   processingStatus,
   children,
   className = "",
-}: DraggableDocumentProps) {
+  showDragIndicator = true,
+}: DraggableDocumentProps & { showDragIndicator?: boolean }) {
   const [isDragging, setIsDragging] = useState(false);
   const isReady = processingStatus === "done";
 
@@ -227,7 +228,7 @@ export function DraggableDocument({
       }
     >
       {children}
-      {isReady && (
+      {isReady && showDragIndicator && (
         <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Sparkles className="w-3 h-3 text-indigo-400" />
         </div>
