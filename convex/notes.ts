@@ -145,3 +145,81 @@ export const updateNote = mutation({
     await ctx.db.patch(args.noteId, patch);
   },
 });
+
+export const toggleShareNote = mutation({
+  args: { noteId: v.id("notes") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const note = await ctx.db.get(args.noteId);
+    if (!note || note.userId !== identity.tokenIdentifier) {
+      throw new Error("Unauthorized");
+    }
+
+    const currentShared = note.isShared ?? false;
+    await ctx.db.patch(args.noteId, { isShared: !currentShared });
+    return !currentShared;
+  },
+});
+
+export const getPublicNote = query({
+  args: { noteId: v.id("notes") },
+  handler: async (ctx, args) => {
+    const note = await ctx.db.get(args.noteId);
+    if (!note || !note.isShared) {
+      return null;
+    }
+    return note;
+  },
+});
+
+/**
+ * Link documents to a note for reference/citation purposes
+ */
+export const linkDocuments = mutation({
+  args: {
+    noteId: v.id("notes"),
+    documentIds: v.array(v.id("files")),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const note = await ctx.db.get(args.noteId);
+    if (!note || note.userId !== identity.tokenIdentifier) {
+      throw new Error("Unauthorized");
+    }
+
+    const existingIds = note.linkedDocumentIds || [];
+    const newIds = [...new Set([...existingIds, ...args.documentIds])];
+
+    await ctx.db.patch(args.noteId, { linkedDocumentIds: newIds });
+    return newIds;
+  },
+});
+
+/**
+ * Unlink a document from a note
+ */
+export const unlinkDocument = mutation({
+  args: {
+    noteId: v.id("notes"),
+    documentId: v.id("files"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const note = await ctx.db.get(args.noteId);
+    if (!note || note.userId !== identity.tokenIdentifier) {
+      throw new Error("Unauthorized");
+    }
+
+    const existingIds = note.linkedDocumentIds || [];
+    const newIds = existingIds.filter((id) => id !== args.documentId);
+
+    await ctx.db.patch(args.noteId, { linkedDocumentIds: newIds });
+    return newIds;
+  },
+});

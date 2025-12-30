@@ -17,8 +17,11 @@ import {
   MoreVertical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ActionMenu } from "@/components/dashboard/ActionMenu";
-import { RenameDialog } from "@/components/dashboard/RenameDialog";
+import { Course, Module } from "@/lib/types";
+import { ActionMenu } from "@/components/shared/ActionMenu";
+import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
+import { EditableTitle } from "@/components/shared/EditableTitle";
+import { DraggableDocument, DocumentStatusBadge } from "@/components/documents";
 import { useState } from "react";
 
 interface FolderViewProps {
@@ -88,7 +91,7 @@ export default function FolderView({
   // --- Helpers ---
   const getCurrentCourse = () => {
     if (!userData || contextType !== "course") return null;
-    return userData.courses?.find((c: any) => c.id === contextId);
+    return userData.courses?.find((c: Course) => c.id === contextId);
   };
 
   const getContextName = () => {
@@ -99,13 +102,25 @@ export default function FolderView({
     }
     if (contextType === "module") {
       for (const c of userData.courses || []) {
-        const mod = c.modules?.find((m: any) => m.id === contextId);
+        const mod = c.modules?.find((m: Module) => m.id === contextId);
         if (mod) return mod.title;
       }
       return "Module";
     }
     return "Smart Folder";
   };
+
+  // Get current module and its parent course ID for rename operations
+  const getCurrentModuleData = () => {
+    if (!userData || contextType !== "module") return null;
+    for (const c of userData.courses || []) {
+      const mod = c.modules?.find((m: Module) => m.id === contextId);
+      if (mod) return { module: mod, courseId: c.id };
+    }
+    return null;
+  };
+
+  const currentModuleData = getCurrentModuleData();
 
   // --- Handlers ---
   const handleCreateNoteInContext = async () => {
@@ -178,7 +193,7 @@ export default function FolderView({
             transition={{ delay: 0.3, duration: 0.4 }}
             className="flex items-center justify-between"
           >
-            <h1 className="text-4xl font-bold text-white flex items-center gap-4 tracking-tight">
+            <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-md">
                 {contextType === "course" ? (
                   <BookOpen className="w-6 h-6 text-cyan-400" />
@@ -186,8 +201,25 @@ export default function FolderView({
                   <Folder className="w-6 h-6 text-cyan-400" />
                 )}
               </div>
-              {getContextName()}
-            </h1>
+              {contextType === "module" && currentModuleData ? (
+                <EditableTitle
+                  initialValue={currentModuleData.module.title}
+                  onSave={async (newTitle) => {
+                    await renameModule({
+                      courseId: currentModuleData.courseId,
+                      moduleId: contextId,
+                      title: newTitle,
+                    });
+                  }}
+                  className="text-4xl font-bold text-white tracking-tight hover:bg-white/5 rounded px-2 -ml-2 transition-colors cursor-text"
+                  placeholder="Untitled Module"
+                />
+              ) : (
+                <h1 className="text-4xl font-bold text-white tracking-tight">
+                  {getContextName()}
+                </h1>
+              )}
+            </div>
           </motion.div>
         </div>
       </motion.div>
@@ -205,7 +237,7 @@ export default function FolderView({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="border-white/10 hover:bg-white/5 hover:text-purple-400 hover:border-purple-500/30 transition-all"
+                  className="text-gray-300 border-white/10 hover:bg-white/5 hover:text-purple-400 hover:border-purple-500/30 transition-all"
                   onClick={handleAddModule}
                 >
                   <Plus className="w-3.5 h-3.5 mr-2" />
@@ -219,7 +251,7 @@ export default function FolderView({
                 animate="show"
                 className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
               >
-                {currentCourse.modules?.map((mod: any) => (
+                {currentCourse.modules?.map((mod: Module) => (
                   <motion.div
                     key={mod.id}
                     variants={itemVariants}
@@ -280,7 +312,7 @@ export default function FolderView({
               <Button
                 size="sm"
                 variant="outline"
-                className="border-white/10 hover:bg-white/5 hover:text-cyan-400 hover:border-cyan-500/30 transition-all"
+                className="text-gray-300 border-white/10 hover:bg-white/5 hover:text-cyan-400 hover:border-cyan-500/30 transition-all"
                 onClick={handleCreateNoteInContext}
               >
                 <Plus className="w-3.5 h-3.5 mr-2" />
@@ -366,29 +398,40 @@ export default function FolderView({
               animate="show"
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
             >
-              {contextFiles?.map((f: any) => (
-                <motion.a
+              {contextFiles?.map((f) => (
+                <DraggableDocument
                   key={f._id}
-                  variants={itemVariants}
-                  whileHover={{ scale: 1.02 }}
-                  href={f.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-[#121212] hover:bg-[#18181B] hover:border-white/10 transition-colors"
+                  documentId={f._id}
+                  documentName={f.name}
+                  processingStatus={f.processingStatus}
                 >
-                  <div className="w-12 h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
-                    <File className="w-6 h-6 text-indigo-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate group-hover:text-indigo-200 transition-colors">
-                      {f.name}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {new Date(f.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <MoreVertical className="w-4 h-4 text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </motion.a>
+                  <motion.a
+                    variants={itemVariants}
+                    whileHover={{ scale: 1.02 }}
+                    href={f.url ?? undefined}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-[#121212] hover:bg-[#18181B] hover:border-white/10 transition-colors"
+                  >
+                    <div className="w-12 h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
+                      <File className="w-6 h-6 text-indigo-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-white truncate group-hover:text-indigo-200 transition-colors">
+                          {f.name}
+                        </p>
+                        <DocumentStatusBadge status={f.processingStatus} />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {f.processingStatus === "done"
+                          ? "Drag to generate notes"
+                          : new Date(f.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <MoreVertical className="w-4 h-4 text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </motion.a>
+                </DraggableDocument>
               ))}
 
               {(!contextFiles || contextFiles.length === 0) && (

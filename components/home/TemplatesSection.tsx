@@ -100,7 +100,7 @@ export function TemplatesSection() {
           <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tight mb-4">
             Notes for Any <span className="text-purple-400">Major</span>
           </h2>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">
             Whether you're solving equations or analyzing themes, Lumina adapts
             its output style to match your subject.
           </p>
@@ -116,7 +116,7 @@ export function TemplatesSection() {
                 className={`group flex items-center gap-3 p-4 rounded-xl text-left transition-all duration-300 border ${
                   activeTab === t.id
                     ? "bg-white/10 border-white/20 text-white shadow-lg"
-                    : "hover:bg-white/5 border-transparent text-muted-foreground hover:text-white"
+                    : "hover:bg-white/5 border-transparent text-gray-400 hover:text-white"
                 }`}
               >
                 <div

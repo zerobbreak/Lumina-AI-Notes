@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +34,7 @@ import {
 interface UploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  courseId?: string;
 }
 
 function formatBytes(bytes: number, decimals = 2) {
@@ -44,7 +46,11 @@ function formatBytes(bytes: number, decimals = 2) {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
 
-export function UploadDialog({ open, onOpenChange }: UploadDialogProps) {
+export function UploadDialog({
+  open,
+  onOpenChange,
+  courseId,
+}: UploadDialogProps) {
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const uploadFile = useMutation(api.files.uploadFile);
 
@@ -81,7 +87,7 @@ export function UploadDialog({ open, onOpenChange }: UploadDialogProps) {
     if (type !== "link" && !selectedFile) return;
 
     setIsUploading(true);
-    try {
+    const promise = async () => {
       let storageId: string | undefined;
 
       if (type !== "link" && selectedFile) {
@@ -107,14 +113,19 @@ export function UploadDialog({ open, onOpenChange }: UploadDialogProps) {
         type,
         url: type === "link" ? url : undefined,
         storageId,
+        courseId,
       });
 
       handleClose();
-    } catch (error) {
-      console.error("Upload failed:", error);
-    } finally {
-      setIsUploading(false);
-    }
+    };
+
+    setIsUploading(true);
+    toast.promise(promise(), {
+      loading: "Uploading resource...",
+      success: "Resource moved to library",
+      error: "Failed to upload resource",
+    });
+    setIsUploading(false);
   };
 
   return (

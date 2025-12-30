@@ -19,6 +19,10 @@ export const uploadFile = mutation({
       throw new Error("Unauthorized");
     }
 
+    // Set processingStatus to "pending" for PDFs so they can be auto-processed
+    const isPdf =
+      args.type === "pdf" || args.name.toLowerCase().endsWith(".pdf");
+
     const fileId = await ctx.db.insert("files", {
       userId: identity.tokenIdentifier,
       name: args.name,
@@ -27,6 +31,7 @@ export const uploadFile = mutation({
       storageId: args.storageId,
       courseId: args.courseId,
       createdAt: Date.now(),
+      processingStatus: isPdf ? "pending" : undefined,
     });
 
     return fileId;
@@ -114,5 +119,82 @@ export const renameFile = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
     await ctx.db.patch(args.fileId, { name: args.name });
+  },
+});
+
+/**
+ * Get a single file by ID (for document processing)
+ */
+export const getFile = query({
+  args: { fileId: v.id("files") },
+  handler: async (ctx, args) => {
+    const file = await ctx.db.get(args.fileId);
+    if (!file) return null;
+
+    // Get storage URL if applicable
+    if (file.storageId) {
+      return {
+        ...file,
+        url: await ctx.storage.getUrl(file.storageId),
+      };
+    }
+    return file;
+  },
+});
+
+/**
+ * Get files pending processing
+ */
+export const getPendingFiles = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    return await ctx.db
+      .query("files")
+      .withIndex("by_processingStatus", (q) =>
+        q.eq("processingStatus", "pending")
+      )
+      .filter((q) => q.eq(q.field("userId"), identity.tokenIdentifier))
+      .take(10);
+  },
+});
+
+/**
+ * Update file processing status
+ */
+export const updateProcessingStatus = mutation({
+  args: {
+    fileId: v.id("files"),
+    status: v.string(), // "pending" | "processing" | "done" | "error"
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.fileId, {
+      processingStatus: args.status,
+    });
+  },
+});
+
+/**
+ * Save extracted content from document processing
+ */
+export const saveExtractedContent = mutation({
+  args: {
+    fileId: v.id("files"),
+    extractedText: v.string(),
+    summary: v.string(),
+    keyTopics: v.array(v.string()),
+    embedding: v.array(v.float64()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.fileId, {
+      extractedText: args.extractedText,
+      summary: args.summary,
+      keyTopics: args.keyTopics,
+      embedding: args.embedding,
+      processingStatus: "done",
+      processedAt: Date.now(),
+    });
   },
 });

@@ -21,12 +21,12 @@ export function StatsSection() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1, duration: 0.5 }}
               viewport={{ once: true }}
-              className="flex flex-col items-center md:items-start text-center md:text-left"
+              className="flex flex-col items-center justify-center text-center"
             >
               <h3 className="text-3xl md:text-4xl font-bold text-white mb-2">
                 {stat.value}
               </h3>
-              <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">
+              <p className="text-xs uppercase tracking-widest text-gray-400 font-medium">
                 {stat.label}
               </p>
             </motion.div>

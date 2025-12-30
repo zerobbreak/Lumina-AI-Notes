@@ -1,5 +1,9 @@
-import { Sidebar } from "@/components/dashboard/Sidebar";
-import { RightSidebar } from "@/components/dashboard/RightSidebar";
+"use client";
+
+import { Sidebar } from "@/components/dashboard/sidebar/Sidebar";
+import { RightSidebar } from "@/components/dashboard/sidebar/RightSidebar";
+import { DashboardProvider } from "@/components/dashboard/DashboardContext";
+import { DocumentProcessingIndicator } from "@/components/documents";
 
 export default function DashboardLayout({
   children,
@@ -7,12 +11,17 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-screen w-full bg-linear-to-br from-[#050505] to-[#101015] overflow-hidden relative">
-      <Sidebar />
-      <main className="flex-1 h-full overflow-hidden relative z-0">
-        {children}
-      </main>
-      <RightSidebar />
-    </div>
+    <DashboardProvider>
+      <div className="flex h-screen w-full bg-linear-to-br from-[#050505] to-[#101015] overflow-hidden relative">
+        <Sidebar />
+        <main className="flex-1 h-full overflow-hidden relative z-0">
+          {children}
+        </main>
+        <RightSidebar />
+
+        {/* Document Processing Indicator - shows when PDFs are being processed */}
+        <DocumentProcessingIndicator />
+      </div>
+    </DashboardProvider>
   );
 }

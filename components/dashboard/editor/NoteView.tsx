@@ -20,6 +20,9 @@ import {
   Trash2,
   Archive,
   Loader2,
+  PanelLeft,
+  PanelRight,
+  Download,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -28,9 +31,14 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { ActionMenu } from "@/components/dashboard/ActionMenu";
-import { RenameDialog } from "@/components/dashboard/RenameDialog";
-import { AskAI } from "@/components/dashboard/AskAI";
+import { ActionMenu } from "@/components/shared/ActionMenu";
+import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
+import { EditableTitle } from "@/components/shared/EditableTitle";
+import { AskAI } from "@/components/dashboard/ai/AskAI";
+import { useDashboard } from "@/hooks/useDashboard";
+import { usePDF } from "@/hooks/usePDF";
+import { AIBubbleMenu } from "./AIBubbleMenu";
+import { DocumentDropZone } from "@/components/documents";
 import "./editor.css";
 
 // Props for the NoteView
@@ -41,6 +49,15 @@ interface NoteViewProps {
 
 export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const router = useRouter();
+  const {
+    toggleLeftSidebar,
+    toggleRightSidebar,
+    isLeftSidebarOpen,
+    isRightSidebarOpen,
+    pendingNotes,
+    clearPendingNotes,
+  } = useDashboard();
+  const { generatePDF, isLoading: isExporting } = usePDF();
 
   // Fetch data
   const note = useQuery(api.notes.getNote, { noteId });
@@ -49,6 +66,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const deleteNote = useMutation(api.notes.deleteNote);
   const toggleArchiveNote = useMutation(api.notes.toggleArchiveNote);
   const renameNote = useMutation(api.notes.renameNote);
+  const toggleShare = useMutation(api.notes.toggleShareNote);
 
   // Editor State
   const [isSaving, setIsSaving] = useState(false);
@@ -93,17 +111,82 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     },
   });
 
-  // Sync content when note loads
+  // Track which note we've loaded content for to detect note changes
+  const [loadedNoteId, setLoadedNoteId] = useState<Id<"notes"> | null>(null);
+
+  // Sync content when note loads OR when noteId changes (switching between notes)
   useEffect(() => {
     if (note && editor && !editor.isDestroyed) {
-      if (editor.getHTML() !== note.content) {
+      // If we're viewing a different note than before, always update the content
+      if (noteId !== loadedNoteId) {
+        editor.commands.setContent(note.content || "");
+        setLoadedNoteId(noteId);
+      } else {
+        // Same note - only update if editor is empty (initial load)
         const currentContent = editor.getHTML();
         if (currentContent === "<p></p>" || !currentContent) {
           editor.commands.setContent(note.content || "");
         }
       }
     }
-  }, [note, editor]);
+  }, [note, editor, noteId, loadedNoteId]);
+
+  // Inject structured notes from RightSidebar when pendingNotes changes
+  useEffect(() => {
+    if (pendingNotes && editor && !editor.isDestroyed) {
+      // Build HTML content from structured notes
+      let html = "";
+
+      // Summary
+      if (pendingNotes.summary) {
+        html += `<h2>📝 Summary</h2>`;
+        html += `<blockquote>${pendingNotes.summary}</blockquote>`;
+      }
+
+      // Cornell Notes
+      if (pendingNotes.cornellCues.length > 0) {
+        html += `<h2>📚 Cornell Notes</h2>`;
+        html += `<table><tbody>`;
+        pendingNotes.cornellCues.forEach((cue, i) => {
+          const note = pendingNotes.cornellNotes[i] || "";
+          html += `<tr><td><strong>${cue}</strong></td><td>${note}</td></tr>`;
+        });
+        html += `</tbody></table>`;
+      }
+
+      // Action Items
+      if (pendingNotes.actionItems.length > 0) {
+        html += `<h2>✅ Action Items</h2>`;
+        html += `<ul>`;
+        pendingNotes.actionItems.forEach((item) => {
+          html += `<li>☐ ${item}</li>`;
+        });
+        html += `</ul>`;
+      }
+
+      // Review Questions
+      if (pendingNotes.reviewQuestions.length > 0) {
+        html += `<h2>❓ Review Questions</h2>`;
+        html += `<ul>`;
+        pendingNotes.reviewQuestions.forEach((q) => {
+          html += `<li>${q}</li>`;
+        });
+        html += `</ul>`;
+      }
+
+      // Mermaid Graph (as code block)
+      if (pendingNotes.mermaidGraph) {
+        html += `<h2>🗺️ Mind Map</h2>`;
+        html += `<pre><code>${pendingNotes.mermaidGraph}</code></pre>`;
+      }
+
+      // Insert at current cursor position (or end if no selection)
+      editor.chain().focus().insertContent(html).run();
+
+      // Clear pending notes
+      clearPendingNotes();
+    }
+  }, [pendingNotes, editor, clearPendingNotes]);
 
   // --- Handlers ---
   const handleDelete = async () => {
@@ -138,6 +221,14 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
   const handleRenameConfirm = async (newTitle: string) => {
     await renameNote({ noteId, title: newTitle });
+  };
+
+  const handleExportPDF = async () => {
+    await generatePDF(
+      "note-content-area",
+      `${note?.title || "note"}.pdf`,
+      note?.title
+    );
   };
 
   // --- Deleting State ---
@@ -233,81 +324,133 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   return (
     <div className="h-full flex flex-col bg-[#0A0A0A] relative animate-in fade-in duration-500">
       {/* 1. Top Navigation / Breadcrumbs */}
-      <div className="h-16 flex items-center px-8 border-b border-white/5 bg-black/20 backdrop-blur top-0 z-20 sticky">
-        <div className="flex items-center text-sm font-medium text-gray-500 gap-2">
-          <span
-            onClick={onBack}
-            className="hover:text-white cursor-pointer transition-colors"
+      <div className="h-16 flex items-center px-4 lg:px-8 border-b border-white/5 bg-black/20 backdrop-blur top-0 z-20 sticky justify-between">
+        <div className="flex items-center gap-4">
+          {/* Left Sidebar Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleLeftSidebar}
+            className={`hidden md:flex ${!isLeftSidebarOpen ? "text-cyan-400 bg-cyan-500/10" : "text-gray-500"}`}
+            title="Toggle Sidebar"
           >
-            Dashboard
-          </span>
-          <ChevronRight className="w-4 h-4 text-gray-700" />
-          <span
-            onClick={() => {
-              // Navigate back to course/module context
-              if (note.moduleId) {
-                router.push(
-                  `/dashboard?contextId=${note.moduleId}&contextType=module`
-                );
-              } else if (note.courseId) {
-                router.push(
-                  `/dashboard?contextId=${note.courseId}&contextType=course`
-                );
-              } else {
-                onBack();
-              }
-            }}
-            className="hover:text-white cursor-pointer transition-colors"
-          >
-            {courseName}
-          </span>
-          <ChevronRight className="w-4 h-4 text-gray-700" />
-          <span className="text-cyan-400">
-            {note.title.length > 20
-              ? note.title.substring(0, 20) + "..."
-              : note.title}
-          </span>
+            <PanelLeft className="w-5 h-5" />
+          </Button>
+
+          <div className="h-4 w-px bg-white/10 hidden md:block" />
+
+          <div className="flex items-center text-sm font-medium text-gray-500 gap-2">
+            <span
+              onClick={onBack}
+              className="hover:text-white cursor-pointer transition-colors"
+            >
+              Dashboard
+            </span>
+            <ChevronRight className="w-4 h-4 text-gray-700" />
+            <span
+              onClick={() => {
+                // Navigate back to course/module context
+                if (note.moduleId) {
+                  router.push(
+                    `/dashboard?contextId=${note.moduleId}&contextType=module`
+                  );
+                } else if (note.courseId) {
+                  router.push(
+                    `/dashboard?contextId=${note.courseId}&contextType=course`
+                  );
+                } else {
+                  onBack();
+                }
+              }}
+              className="hover:text-white cursor-pointer transition-colors"
+            >
+              {courseName}
+            </span>
+            <ChevronRight className="w-4 h-4 text-gray-700" />
+            <span className="text-cyan-400">
+              {note.title.length > 20
+                ? note.title.substring(0, 20) + "..."
+                : note.title}
+            </span>
+          </div>
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <span className="text-xs font-mono text-gray-600 uppercase tracking-widest">
+          <span className="text-xs font-mono text-gray-600 uppercase tracking-widest hidden lg:block mr-2">
             {isSaving ? "Saving..." : "Saved"}
           </span>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleExportPDF}
+            disabled={isExporting}
+            title="Export as PDF"
+          >
+            {isExporting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-5 h-5 text-gray-400 hover:text-white" />
+            )}
+          </Button>
+
           <ActionMenu
             onRename={() => setIsRenameOpen(true)}
             onDelete={handleDelete}
             onArchive={handleArchive}
             isArchived={note.isArchived}
           />
+
+          {/* Right Sidebar Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleRightSidebar}
+            className={`hidden md:flex ${!isRightSidebarOpen ? "text-indigo-400 bg-indigo-500/10" : "text-gray-500"}`}
+            title="Toggle Assistant"
+          >
+            <PanelRight className="w-5 h-5" />
+          </Button>
         </div>
       </div>
 
       {/* 2. Main Scrollable Content */}
       <ScrollArea className="flex-1">
-        <div className="max-w-5xl mx-auto py-12 px-12">
+        <div id="note-content-area" className="max-w-5xl mx-auto py-12 px-12">
           {/* Header Section */}
           <div className="mb-8">
             {/* Title & Actions */}
             <div className="flex items-start justify-between gap-4">
-              <h1 className="text-5xl font-bold text-white leading-tight tracking-tight">
-                {note.title || "Untitled Note"}
-              </h1>
+              <div className="flex-1 min-w-0">
+                <EditableTitle
+                  initialValue={note.title || ""}
+                  onSave={handleRenameConfirm}
+                  className="text-5xl font-bold text-white leading-tight tracking-tight px-0 -ml-0.5 hover:bg-transparent hover:text-gray-200 transition-colors cursor-text"
+                  placeholder="Untitled Note"
+                />
+              </div>
 
-              {/* Actions: Share, PDF */}
+              {/* Actions: Share */}
               <div className="flex items-center gap-2 mt-2">
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-gray-400 hover:text-white hover:bg-white/10"
+                  variant={note.isShared ? "default" : "ghost"}
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      const isSharedNow = await toggleShare({ noteId });
+                      if (isSharedNow) {
+                        const url = `${window.location.origin}/share/${noteId}`;
+                        await navigator.clipboard.writeText(url);
+                        alert("Public link copied to clipboard: " + url);
+                      }
+                    } catch (e) {
+                      console.error("Failed to share", e);
+                    }
+                  }}
+                  className={`${note.isShared ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20" : "text-gray-400 hover:text-white hover:bg-white/10"}`}
                 >
-                  <Share2 className="w-5 h-5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-gray-400 hover:text-white hover:bg-white/10"
-                >
-                  <FileText className="w-5 h-5" />
+                  <Share2 className="w-4 h-4 mr-2" />
+                  {note.isShared ? "Shared" : "Share"}
                 </Button>
               </div>
             </div>
@@ -335,7 +478,11 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
           {/* Toolbar */}
           {editor && (
-            <div className="flex items-center justify-between mb-6 sticky top-0 bg-[#0A0A0A] py-4 z-10 border-b border-transparent data-[stuck=true]:border-white/10 transition-colors">
+            // Hide toolbar during export to clean up the PDF
+            <div
+              data-html2canvas-ignore
+              className="flex items-center justify-between mb-6 sticky top-0 bg-[#0A0A0A] py-4 z-10 border-b border-transparent data-[stuck=true]:border-white/10 transition-colors"
+            >
               <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1 border border-white/5">
                 <ToolbarButton
                   isActive={editor.isActive("bold")}
@@ -369,15 +516,33 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             </div>
           )}
 
-          {/* Editor Content */}
-          <div className="pb-32">
+          {/* Editor Content - Wrapped with DocumentDropZone for drag-drop note generation */}
+          <DocumentDropZone
+            onNotesGenerated={(content, title, sourceDoc) => {
+              if (editor && !editor.isDestroyed) {
+                // Insert generated notes at cursor or end
+                const sourceTag = `<p><em>[Source: ${sourceDoc.name}]</em></p>`;
+                editor
+                  .chain()
+                  .focus()
+                  .insertContent(content + sourceTag)
+                  .run();
+              }
+            }}
+            className="pb-32"
+          >
+            {editor && <AIBubbleMenu editor={editor} />}
             <EditorContent editor={editor} />
-          </div>
+          </DocumentDropZone>
         </div>
       </ScrollArea>
 
       {/* AI Assistant Bar */}
-      <AskAI />
+      <AskAI
+        context={note.content || ""}
+        contextType="note"
+        contextTitle={note.title}
+      />
 
       <RenameDialog
         open={isRenameOpen}

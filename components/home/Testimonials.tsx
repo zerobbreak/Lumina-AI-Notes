@@ -40,7 +40,7 @@ export function Testimonials() {
             <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">
               What Students Are Saying
             </h2>
-            <p className="text-lg text-muted-foreground">
+            <p className="text-lg text-gray-400">
               Join thousands of students who have transformed their grades.
             </p>
           </div>
@@ -77,7 +77,7 @@ export function Testimonials() {
                 <div className="h-10 w-10 rounded-full bg-linear-to-br from-indigo-500 to-purple-500" />
                 <div>
                   <h4 className="font-bold text-white">{t.author}</h4>
-                  <p className="text-xs text-muted-foreground">{t.role}</p>
+                  <p className="text-xs text-gray-400">{t.role}</p>
                 </div>
               </div>
             </motion.div>

@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Course, Module } from "@/lib/types";
 
 interface CreateNoteDialogProps {
   open: boolean;
@@ -42,7 +43,7 @@ export function CreateNoteDialog({
 
   const courses = userData?.courses || [];
   const modules = selectedCourse
-    ? courses.find((c: any) => c.id === selectedCourse)?.modules || []
+    ? courses.find((c: Course) => c.id === selectedCourse)?.modules || []
     : [];
 
   const handleCreate = async () => {
@@ -101,7 +102,7 @@ export function CreateNoteDialog({
                 setSelectedCourse(val);
                 setSelectedModule("");
                 if (val !== "none") {
-                  const course = courses.find((c: any) => c.id === val);
+                  const course = courses.find((c: Course) => c.id === val);
                   if (course?.defaultNoteStyle)
                     setStyle(course.defaultNoteStyle);
                 }
@@ -112,7 +113,7 @@ export function CreateNoteDialog({
               </SelectTrigger>
               <SelectContent className="bg-[#1A1A1A] border-white/10 text-white">
                 <SelectItem value="none">None</SelectItem>
-                {courses.map((course: any) => (
+                {courses.map((course: Course) => (
                   <SelectItem key={course.id} value={course.id}>
                     {course.code} - {course.name}
                   </SelectItem>
@@ -154,7 +155,7 @@ export function CreateNoteDialog({
                   </SelectTrigger>
                   <SelectContent className="bg-[#1A1A1A] border-white/10 text-white">
                     <SelectItem value="none">None</SelectItem>
-                    {modules.map((mod: any) => (
+                    {modules.map((mod: Module) => (
                       <SelectItem key={mod.id} value={mod.id}>
                         {mod.title}
                       </SelectItem>

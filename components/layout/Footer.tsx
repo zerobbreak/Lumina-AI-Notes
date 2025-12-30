@@ -15,20 +15,20 @@ export function Footer() {
                 <span className="text-cyan-400">Note</span>AI
               </span>
             </Link>
-            <p className="text-muted-foreground text-sm leading-relaxed max-w-sm">
+            <p className="text-gray-400 text-sm leading-relaxed max-w-sm">
               Empowering students to learn faster and smarter with cutting-edge
               AI technology.
             </p>
             <div className="flex items-center gap-4 mt-6">
               <Link
                 href="#"
-                className="text-muted-foreground hover:text-white transition-colors"
+                className="text-gray-400 hover:text-white transition-colors"
               >
                 <Twitter className="h-5 w-5" />
               </Link>
               <Link
                 href="#"
-                className="text-muted-foreground hover:text-white transition-colors"
+                className="text-gray-400 hover:text-white transition-colors"
               >
                 <Github className="h-5 w-5" />
               </Link>
@@ -40,25 +40,25 @@ export function Footer() {
             <h3 className="font-semibold text-white">Product</h3>
             <Link
               href="#features"
-              className="text-sm text-muted-foreground hover:text-white transition-colors"
+              className="text-sm text-gray-400 hover:text-white transition-colors"
             >
               Features
             </Link>
             <Link
               href="#pricing"
-              className="text-sm text-muted-foreground hover:text-white transition-colors"
+              className="text-sm text-gray-400 hover:text-white transition-colors"
             >
               Pricing
             </Link>
             <Link
               href="#"
-              className="text-sm text-muted-foreground hover:text-white transition-colors"
+              className="text-sm text-gray-400 hover:text-white transition-colors"
             >
               Universities
             </Link>
             <Link
               href="#"
-              className="text-sm text-muted-foreground hover:text-white transition-colors"
+              className="text-sm text-gray-400 hover:text-white transition-colors"
             >
               Changelog
             </Link>
@@ -69,25 +69,25 @@ export function Footer() {
             <h3 className="font-semibold text-white">Resources</h3>
             <Link
               href="#"
-              className="text-sm text-muted-foreground hover:text-white transition-colors"
+              className="text-sm text-gray-400 hover:text-white transition-colors"
             >
               Community
             </Link>
             <Link
               href="#"
-              className="text-sm text-muted-foreground hover:text-white transition-colors"
+              className="text-sm text-gray-400 hover:text-white transition-colors"
             >
               Help Center
             </Link>
             <Link
               href="#"
-              className="text-sm text-muted-foreground hover:text-white transition-colors"
+              className="text-sm text-gray-400 hover:text-white transition-colors"
             >
               Student Discount
             </Link>
             <Link
               href="#"
-              className="text-sm text-muted-foreground hover:text-white transition-colors"
+              className="text-sm text-gray-400 hover:text-white transition-colors"
             >
               Blog
             </Link>
@@ -98,25 +98,25 @@ export function Footer() {
             <h3 className="font-semibold text-white">Company</h3>
             <Link
               href="#"
-              className="text-sm text-muted-foreground hover:text-white transition-colors"
+              className="text-sm text-gray-400 hover:text-white transition-colors"
             >
               About Us
             </Link>
             <Link
               href="#"
-              className="text-sm text-muted-foreground hover:text-white transition-colors"
+              className="text-sm text-gray-400 hover:text-white transition-colors"
             >
               Careers
             </Link>
             <Link
               href="#"
-              className="text-sm text-muted-foreground hover:text-white transition-colors"
+              className="text-sm text-gray-400 hover:text-white transition-colors"
             >
               Privacy Policy
             </Link>
             <Link
               href="#"
-              className="text-sm text-muted-foreground hover:text-white transition-colors"
+              className="text-sm text-gray-400 hover:text-white transition-colors"
             >
               Terms
             </Link>
@@ -124,12 +124,12 @@ export function Footer() {
         </div>
 
         <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-gray-400">
             &copy; {new Date().getFullYear()} NoteAI Inc. All rights reserved.
           </p>
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-gray-400">
               All systems operational
             </span>
           </div>

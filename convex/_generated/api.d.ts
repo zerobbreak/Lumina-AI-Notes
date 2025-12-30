@@ -8,8 +8,12 @@
  * @module
  */
 
+import type * as ai from "../ai.js";
 import type * as files from "../files.js";
+import type * as flashcards from "../flashcards.js";
 import type * as notes from "../notes.js";
+import type * as recordings from "../recordings.js";
+import type * as search from "../search.js";
 import type * as users from "../users.js";
 
 import type {
@@ -19,8 +23,12 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  ai: typeof ai;
   files: typeof files;
+  flashcards: typeof flashcards;
   notes: typeof notes;
+  recordings: typeof recordings;
+  search: typeof search;
   users: typeof users;
 }>;
 

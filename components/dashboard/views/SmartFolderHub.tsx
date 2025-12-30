@@ -20,8 +20,9 @@ import {
   FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ActionMenu } from "@/components/dashboard/ActionMenu";
-import { RenameDialog } from "@/components/dashboard/RenameDialog";
+import { Course } from "@/lib/types";
+import { ActionMenu } from "@/components/shared/ActionMenu";
+import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 
 import { motion } from "framer-motion";
 
@@ -101,7 +102,7 @@ export default function SmartFolderHub() {
   const courseCount = userData.courses?.length || 0;
   const moduleCount =
     userData.courses?.reduce(
-      (acc: number, curr: any) => acc + (curr.modules?.length || 0),
+      (acc: number, curr: Course) => acc + (curr.modules?.length || 0),
       0
     ) || 0;
 
@@ -161,7 +162,7 @@ export default function SmartFolderHub() {
             variant="outline"
             size="sm"
             onClick={handleCreateCourse}
-            className="text-xs border-white/10 hover:bg-white/5 hover:text-cyan-400 transition-colors bg-transparent"
+            className="text-xs text-gray-300 border-white/10 hover:bg-white/5 hover:text-cyan-400 transition-colors bg-transparent"
           >
             <Plus className="w-3.5 h-3.5 mr-2" />
             Add Course
@@ -174,7 +175,7 @@ export default function SmartFolderHub() {
           animate="show"
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
         >
-          {userData.courses?.map((course: any) => {
+          {userData.courses?.map((course: Course) => {
             const Gradient = getGradient(course.code);
             const Icon = getIcon(course.code);
 

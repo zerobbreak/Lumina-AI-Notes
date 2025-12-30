@@ -1,0 +1,297 @@
+"use client";
+
+import React, { useState, useCallback } from "react";
+import { useDropzone, DropzoneOptions } from "react-dropzone";
+import { useAction, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
+import { FileText, Loader2, X, Sparkles, Upload } from "lucide-react";
+import { marked } from "marked";
+
+interface DocumentDropZoneProps {
+  onNotesGenerated?: (
+    content: string,
+    title: string,
+    sourceDoc: { id: string; name: string }
+  ) => void;
+  onFileUploaded?: (file: File) => void;
+  currentNoteContent?: string;
+  className?: string;
+  children?: React.ReactNode;
+  acceptedFileTypes?: Record<string, string[]>;
+}
+
+/**
+ * Document drop zone using react-dropzone
+ * Handles both file uploads and existing document drops
+ */
+export function DocumentDropZone({
+  onNotesGenerated,
+  onFileUploaded,
+  currentNoteContent,
+  className = "",
+  children,
+  acceptedFileTypes = {
+    "application/pdf": [".pdf"],
+    "image/*": [".png", ".jpg", ".jpeg", ".gif"],
+  },
+}: DocumentDropZoneProps) {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const generateNotesFromDocument = useAction(api.ai.generateNotesFromDocument);
+
+  const onDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      if (acceptedFiles.length === 0) return;
+
+      // For file uploads, call the upload callback
+      // The actual note generation happens after processing
+      acceptedFiles.forEach((file) => {
+        onFileUploaded?.(file);
+      });
+    },
+    [onFileUploaded]
+  );
+
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
+    onDrop,
+    accept: acceptedFileTypes,
+    noClick: !!children, // Don't open file dialog on click if there are children
+    noKeyboard: true,
+  });
+
+  // Handle drop of already-processed documents (from sidebar)
+  const handleDocumentDrop = useCallback(
+    async (e: React.DragEvent) => {
+      const documentId = e.dataTransfer.getData("application/document-id");
+      const documentName = e.dataTransfer.getData("application/document-name");
+
+      if (!documentId) return; // Not a document drop, let react-dropzone handle it
+
+      e.preventDefault();
+      e.stopPropagation();
+      setError(null);
+      setIsGenerating(true);
+
+      try {
+        const result = await generateNotesFromDocument({
+          fileId: documentId as Id<"files">,
+        });
+
+        if (result.success && result.content && result.sourceDocument) {
+          // Convert markdown to HTML for TipTap editor
+          const htmlContent = await marked.parse(result.content);
+          onNotesGenerated?.(
+            htmlContent,
+            result.title || `Notes from ${documentName}`,
+            result.sourceDocument
+          );
+        } else {
+          setError(result.error || "Failed to generate notes");
+        }
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to generate notes"
+        );
+      } finally {
+        setIsGenerating(false);
+      }
+    },
+    [generateNotesFromDocument, onNotesGenerated]
+  );
+
+  return (
+    <div
+      {...getRootProps()}
+      onDrop={(e) => {
+        // Check if it's a document drop first
+        if (e.dataTransfer.getData("application/document-id")) {
+          handleDocumentDrop(e);
+        }
+        // Otherwise let react-dropzone handle it
+      }}
+      className={`relative ${className} ${
+        isDragActive ? "ring-2 ring-indigo-500 bg-indigo-500/10" : ""
+      } transition-all duration-200`}
+    >
+      <input {...getInputProps()} />
+
+      {children || (
+        <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-white/20 rounded-lg hover:border-indigo-500/50 transition-colors cursor-pointer">
+          <Upload className="w-10 h-10 text-gray-400 mb-3" />
+          <p className="text-gray-300 text-center">
+            Drop files here or click to upload
+          </p>
+          <p className="text-gray-500 text-sm mt-1">PDF, images supported</p>
+        </div>
+      )}
+
+      {/* Drag overlay */}
+      {isDragActive && (
+        <div className="absolute inset-0 flex items-center justify-center bg-indigo-900/80 backdrop-blur-sm rounded-lg z-50 pointer-events-none">
+          <div className="text-center">
+            <FileText className="w-12 h-12 text-indigo-400 mx-auto mb-2" />
+            <p className="text-white font-medium">Drop to upload</p>
+            <p className="text-indigo-300 text-sm">
+              AI will process and generate notes
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Generating indicator */}
+      {isGenerating && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm rounded-lg z-50">
+          <div className="text-center">
+            <Loader2 className="w-10 h-10 text-indigo-400 mx-auto mb-2 animate-spin" />
+            <p className="text-white font-medium">Generating notes...</p>
+            <p className="text-gray-400 text-sm">
+              Extracting relevant information
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Error toast */}
+      {error && (
+        <div className="absolute bottom-4 left-4 right-4 bg-red-900/90 text-white px-4 py-3 rounded-lg flex items-center justify-between z-50">
+          <span className="text-sm">{error}</span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setError(null);
+            }}
+            className="text-white/70 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface DraggableDocumentProps {
+  documentId: string;
+  documentName: string;
+  processingStatus?: string;
+  children: React.ReactNode;
+  className?: string;
+}
+
+/**
+ * Wrapper to make a document item draggable
+ */
+export function DraggableDocument({
+  documentId,
+  documentName,
+  processingStatus,
+  children,
+  className = "",
+}: DraggableDocumentProps) {
+  const [isDragging, setIsDragging] = useState(false);
+  const isReady = processingStatus === "done";
+
+  const handleDragStart = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      if (!isReady) {
+        e.preventDefault();
+        return;
+      }
+
+      e.dataTransfer.setData("application/document-id", documentId);
+      e.dataTransfer.setData("application/document-name", documentName);
+      e.dataTransfer.effectAllowed = "copy";
+      setIsDragging(true);
+    },
+    [documentId, documentName, isReady]
+  );
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  return (
+    <div
+      draggable={isReady}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      className={`${className} ${
+        isReady
+          ? "cursor-grab active:cursor-grabbing"
+          : "cursor-not-allowed opacity-60"
+      } ${isDragging ? "opacity-50" : ""} group relative`}
+      title={
+        isReady ? "Drag to generate notes" : "Document still processing..."
+      }
+    >
+      {children}
+      {isReady && (
+        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Sparkles className="w-3 h-3 text-indigo-400" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface QuickReferenceInsertProps {
+  fileId: string;
+  currentNoteContent?: string;
+  onInsert?: (content: string) => void;
+}
+
+/**
+ * Quick insert document reference button
+ */
+export function QuickReferenceInsert({
+  fileId,
+  currentNoteContent,
+  onInsert,
+}: QuickReferenceInsertProps) {
+  const [isLoading, setIsLoading] = useState(false);
+  const getDocumentReference = useAction(api.ai.getDocumentReference);
+
+  const handleInsertReference = async () => {
+    setIsLoading(true);
+    try {
+      const result = await getDocumentReference({
+        fileId: fileId as Id<"files">,
+        currentNoteContent,
+      });
+
+      if (result.success && result.reference) {
+        const { summary, relevantExcerpts, citation } = result.reference;
+
+        const content = `
+> **From ${citation}:**
+> ${summary}
+${relevantExcerpts.length > 0 ? `\n**Key Points:**\n${relevantExcerpts.map((e) => `- ${e}`).join("\n")}` : ""}
+`;
+        // Convert markdown to HTML for TipTap editor
+        const htmlContent = await marked.parse(content.trim());
+        onInsert?.(htmlContent);
+      }
+    } catch (err) {
+      console.error("Failed to get reference:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleInsertReference}
+      disabled={isLoading}
+      className="flex items-center gap-1.5 px-2 py-1 text-xs bg-indigo-500/20 text-indigo-300 rounded hover:bg-indigo-500/30 transition-colors disabled:opacity-50"
+    >
+      {isLoading ? (
+        <Loader2 className="w-3 h-3 animate-spin" />
+      ) : (
+        <FileText className="w-3 h-3" />
+      )}
+      Insert Reference
+    </button>
+  );
+}

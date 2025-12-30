@@ -1,14 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { MoreHorizontal, Trash2, Pencil, Archive, X } from "lucide-react";
+import {
+  MoreHorizontal,
+  Trash2,
+  Pencil,
+  Archive,
+  RefreshCw,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ActionMenuProps {
   onRename?: () => void;
   onDelete?: () => void;
   onArchive?: () => void;
+  onRetry?: () => void;
   isArchived?: boolean;
+  showRetry?: boolean;
   align?: "right" | "left";
 }
 
@@ -16,7 +24,9 @@ export function ActionMenu({
   onRename,
   onDelete,
   onArchive,
+  onRetry,
   isArchived,
+  showRetry,
   align = "right",
 }: ActionMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -80,6 +90,19 @@ export function ActionMenu({
               >
                 <Archive className="w-3 h-3" />
                 {isArchived ? "Unarchive" : "Archive"}
+              </button>
+            )}
+
+            {showRetry && onRetry && (
+              <button
+                onClick={() => {
+                  onRetry();
+                  close();
+                }}
+                className="flex items-center gap-2 px-2 py-1.5 text-xs text-blue-400 hover:bg-blue-500/10 rounded-md w-full text-left"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Retry
               </button>
             )}
 

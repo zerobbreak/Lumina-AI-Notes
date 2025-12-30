@@ -85,14 +85,23 @@ export const completeOnboarding = mutation({
       )
       .unique();
 
-    if (!user) {
-      throw new Error("User not found");
+    if (user) {
+      // Existing user - update with onboarding data
+      await ctx.db.patch(user._id, {
+        ...args,
+        onboardingComplete: true,
+      });
+    } else {
+      // New user - create with onboarding data
+      await ctx.db.insert("users", {
+        tokenIdentifier: identity.tokenIdentifier,
+        email: identity.email || "",
+        name: identity.name,
+        image: identity.pictureUrl,
+        ...args,
+        onboardingComplete: true,
+      });
     }
-
-    await ctx.db.patch(user._id, {
-      ...args,
-      onboardingComplete: true,
-    });
   },
 });
 
@@ -114,8 +123,17 @@ export const createCourse = mutation({
       )
       .unique();
 
+    // Auto-create user if they don't exist yet (first action creates user)
+    let userId = user?._id;
     if (!user) {
-      throw new Error("User not found");
+      userId = await ctx.db.insert("users", {
+        tokenIdentifier: identity.tokenIdentifier,
+        email: identity.email || "",
+        name: identity.name,
+        image: identity.pictureUrl,
+        onboardingComplete: false,
+        courses: [],
+      });
     }
 
     const newCourse = {
@@ -125,9 +143,9 @@ export const createCourse = mutation({
       modules: [],
     };
 
-    const currentCourses = user.courses || [];
+    const currentCourses = user?.courses || [];
 
-    await ctx.db.patch(user._id, {
+    await ctx.db.patch(userId!, {
       courses: [...currentCourses, newCourse],
     });
 

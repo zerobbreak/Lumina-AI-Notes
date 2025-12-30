@@ -44,7 +44,7 @@ export function HowItWorks() {
               A+
             </span>
           </h2>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">
             Stop frantically typing. Start actually listening. Let Lumina handle
             the busy work.
           </p>
@@ -72,7 +72,7 @@ export function HowItWorks() {
               <h3 className="text-xl font-semibold text-white text-center mb-3">
                 {step.title}
               </h3>
-              <p className="text-muted-foreground text-center leading-relaxed">
+              <p className="text-gray-400 text-center leading-relaxed">
                 {step.description}
               </p>
 

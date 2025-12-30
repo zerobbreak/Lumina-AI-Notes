@@ -68,7 +68,7 @@ export function PricingSection() {
           <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tight">
             Invest in Your <span className="text-indigo-400">GPA</span>
           </h2>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">
             Review smarter, not harder. Choose the plan that fits your academic
             goals.
           </p>
@@ -101,7 +101,7 @@ export function PricingSection() {
                     {plan.price}
                   </span>
                   {plan.period && (
-                    <span className="text-muted-foreground text-sm">
+                    <span className="text-gray-400 text-sm">
                       {plan.period}
                     </span>
                   )}

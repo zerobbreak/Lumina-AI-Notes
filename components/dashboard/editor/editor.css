@@ -1,0 +1,119 @@
+/* Tiptap Editor Styles */
+.ProseMirror {
+    color: #d1d5db;
+}
+
+/* Override any inline black colors from AI content */
+.ProseMirror * {
+    color: inherit;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: #6b7280;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.ProseMirror h1 {
+  font-size: 2.25rem;
+  font-weight: 700;
+  margin-bottom: 0.5em;
+  color: #ffffff;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  color: #ffffff !important;
+}
+
+.ProseMirror p {
+  margin-bottom: 1em;
+  color: #d1d5db !important;
+  line-height: 1.75;
+}
+
+.ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin-bottom: 1em;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+  margin-bottom: 1em;
+}
+
+.ProseMirror blockquote {
+  border-left: 3px solid #4f46e5;
+  padding-left: 1rem;
+  color: #9ca3af !important;
+  font-style: italic;
+}
+
+.ProseMirror li {
+  color: #d1d5db !important;
+  margin-bottom: 0.5em;
+}
+
+.ProseMirror strong {
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+.ProseMirror em {
+  color: #d1d5db !important;
+}
+
+.ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-bottom: 1em;
+}
+
+.ProseMirror tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ProseMirror td {
+  color: #d1d5db !important;
+  padding: 0.75rem 1rem;
+  vertical-align: top;
+}
+
+.ProseMirror td:first-child {
+  color: #a5b4fc !important;
+  font-weight: 500;
+  width: 30%;
+}
+
+.ProseMirror pre {
+  background-color: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1em;
+  overflow-x: auto;
+}
+
+.ProseMirror code {
+  color: #a5f3fc;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+  font-size: 0.875em;
+}
+
+.ProseMirror a {
+  color: #60a5fa;
+  text-decoration: underline;
+}
+
+.ProseMirror a:hover {
+  color: #93c5fd;
+}

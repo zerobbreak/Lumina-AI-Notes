@@ -5,10 +5,13 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Sparkles } from "lucide-react";
+import { useEffect } from "react";
 
-import NoteView from "@/components/dashboard/NoteView";
-import FolderView from "@/components/dashboard/FolderView";
-import SmartFolderHub from "@/components/dashboard/SmartFolderHub";
+import NoteView from "@/components/dashboard/editor/NoteView";
+import FolderView from "@/components/dashboard/views/FolderView";
+import SmartFolderHub from "@/components/dashboard/views/SmartFolderHub";
+import { FlashcardsView } from "@/components/dashboard/flashcards/FlashcardsView";
+import { FlashcardStudy } from "@/components/dashboard/flashcards/FlashcardStudy";
 
 export default function DashboardPage() {
   const searchParams = useSearchParams();
@@ -18,9 +21,18 @@ export default function DashboardPage() {
     | "course"
     | "module"
     | null;
+  const view = searchParams.get("view");
+  const deckId = searchParams.get("deckId");
 
   const userData = useQuery(api.users.getUser);
   const router = useRouter();
+
+  // Redirect to onboarding if user doesn't exist or hasn't completed onboarding
+  useEffect(() => {
+    if (userData === null || (userData && !userData.onboardingComplete)) {
+      router.replace("/onboarding");
+    }
+  }, [userData, router]);
 
   // Loading State
   if (userData === undefined) {
@@ -29,6 +41,18 @@ export default function DashboardPage() {
         <div className="flex items-center gap-2 animate-pulse">
           <Sparkles className="w-5 h-5" />
           <span>Loading Workspace...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Waiting for redirect to onboarding
+  if (userData === null || !userData.onboardingComplete) {
+    return (
+      <div className="h-full bg-black flex items-center justify-center text-gray-500">
+        <div className="flex items-center gap-2 animate-pulse">
+          <Sparkles className="w-5 h-5" />
+          <span>Redirecting to setup...</span>
         </div>
       </div>
     );
@@ -45,13 +69,21 @@ export default function DashboardPage() {
     );
   }
 
-  // --- VIEW 2: SMART FOLDER OVERVIEW ---
+  // --- VIEW 2: FLASHCARDS ---
+  if (view === "flashcards") {
+    if (deckId) {
+      return <FlashcardStudy deckId={deckId} />;
+    }
+    return <FlashcardsView />;
+  }
+
+  // --- VIEW 3: SMART FOLDER OVERVIEW ---
   if (contextId) {
     return (
       <FolderView contextId={contextId} contextType={contextType || "course"} />
     );
   }
 
-  // --- VIEW 3: SMART FOLDER HUB (HOME) ---
+  // --- VIEW 4: SMART FOLDER HUB (HOME) ---
   return <SmartFolderHub />;
 }

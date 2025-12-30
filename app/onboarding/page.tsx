@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, ChevronLeft } from "lucide-react";
+import { ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
 
 import { StepMajor } from "@/components/onboarding/StepMajor";
 import { StepCourses } from "@/components/onboarding/StepCourses";
@@ -18,6 +18,7 @@ import Image from "next/image";
 export default function OnboardingPage() {
   const router = useRouter();
   const completeOnboarding = useMutation(api.users.completeOnboarding);
+  const userData = useQuery(api.users.getUser);
 
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -28,6 +29,13 @@ export default function OnboardingPage() {
   });
 
   const [isInitializing, setIsInitializing] = useState(false);
+
+  // Redirect to dashboard if user has already completed onboarding
+  useEffect(() => {
+    if (userData && userData.onboardingComplete) {
+      router.replace("/dashboard");
+    }
+  }, [userData, router]);
 
   const totalSteps = 5;
 
@@ -76,6 +84,30 @@ export default function OnboardingPage() {
 
   if (isInitializing) {
     return <InitializationScreen />;
+  }
+
+  // Loading state while checking user data
+  if (userData === undefined) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center text-gray-500">
+        <div className="flex items-center gap-2 animate-pulse">
+          <Sparkles className="w-5 h-5" />
+          <span>Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Waiting for redirect if already completed onboarding
+  if (userData && userData.onboardingComplete) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center text-gray-500">
+        <div className="flex items-center gap-2 animate-pulse">
+          <Sparkles className="w-5 h-5" />
+          <span>Redirecting to dashboard...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
