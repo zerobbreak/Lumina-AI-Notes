@@ -11,7 +11,7 @@ import { FileText, Calendar, Lock } from "lucide-react";
 import Link from "next/link";
 import { useEffect } from "react";
 import { useParams } from "next/navigation";
-import "@/components/dashboard/editor.css";
+import "@/components/dashboard/editor/editor.css";
 
 export default function PublicNotePage() {
   const params = useParams();

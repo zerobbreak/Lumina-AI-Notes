@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
@@ -13,11 +13,17 @@ import { StepCourses } from "@/components/onboarding/StepCourses";
 import { StepNoteStyle } from "@/components/onboarding/StepNoteStyle";
 import { StepPermissions } from "@/components/onboarding/StepPermissions";
 import { InitializationScreen } from "@/components/onboarding/InitializationScreen";
+import {
+  getEnabledBlocksForMajor,
+  getMajorTheme,
+} from "@/lib/noteStyleRecommendations";
 import Image from "next/image";
 
 export default function OnboardingPage() {
   const router = useRouter();
   const completeOnboarding = useMutation(api.users.completeOnboarding);
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const uploadFile = useMutation(api.files.uploadFile);
   const userData = useQuery(api.users.getUser);
 
   const [step, setStep] = useState(1);
@@ -30,12 +36,20 @@ export default function OnboardingPage() {
 
   const [isInitializing, setIsInitializing] = useState(false);
 
+  const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
+
   // Redirect to dashboard if user has already completed onboarding
   useEffect(() => {
     if (userData && userData.onboardingComplete) {
       router.replace("/dashboard");
     }
   }, [userData, router]);
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.replace("/sign-in");
+    }
+  }, [authLoading, isAuthenticated, router]);
 
   const totalSteps = 5;
 
@@ -53,24 +67,51 @@ export default function OnboardingPage() {
     // Simulate "Artificial Delay" for the cool animation
     setTimeout(async () => {
       try {
-        // In a real app, upload files here
-        const fakeCourses = formData.files.map((f) => ({
-          id: Math.random().toString(),
-          name: f.name.replace(".pdf", ""),
-          code: "REQ-001", // Placeholder
-        }));
+        // Upload each file to Convex storage and create courses
+        const coursePromises = formData.files.map(async (file) => {
+          // Generate upload URL
+          const postUrl = await generateUploadUrl();
 
-        // Determine blocks based on major (simple logic)
-        const blocks = ["text", "quiz"];
-        if (formData.major === "cs") blocks.push("code-sandbox");
-        if (formData.major === "engineering" || formData.major === "math")
-          blocks.push("graphing");
+          // Upload file to Convex storage
+          const result = await fetch(postUrl, {
+            method: "POST",
+            headers: { "Content-Type": file.type || "application/pdf" },
+            body: file,
+          });
+
+          if (!result.ok) throw new Error(`Failed to upload ${file.name}`);
+          const { storageId } = await result.json();
+
+          // Create course ID
+          const courseId = Math.random().toString(36).substring(7);
+
+          // Save file metadata to Convex
+          await uploadFile({
+            name: file.name,
+            type: "pdf",
+            storageId,
+            courseId,
+          });
+
+          return {
+            id: courseId,
+            name: file.name.replace(".pdf", "").replace(".PDF", ""),
+            code: "REQ-001",
+          };
+        });
+
+        const courses = await Promise.all(coursePromises);
+
+        // Use the recommendation engine for enabled blocks and theme
+        const blocks = getEnabledBlocksForMajor(formData.major);
+        const theme = getMajorTheme(formData.major);
 
         await completeOnboarding({
           major: formData.major,
           semester: "Fall 2025",
-          courses: fakeCourses,
+          courses,
           noteStyle: formData.noteStyle,
+          theme: theme.accent,
           enabledBlocks: blocks,
         });
 
@@ -87,7 +128,7 @@ export default function OnboardingPage() {
   }
 
   // Loading state while checking user data
-  if (userData === undefined) {
+  if (authLoading || userData === undefined) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center text-gray-500">
         <div className="flex items-center gap-2 animate-pulse">
@@ -177,6 +218,7 @@ export default function OnboardingPage() {
                     onChange={(val) =>
                       setFormData({ ...formData, noteStyle: val })
                     }
+                    major={formData.major}
                   />
                 )}
                 {step === 5 && (
@@ -323,9 +365,18 @@ export default function OnboardingPage() {
 
                       {formData.noteStyle && (
                         <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center">
-                          <span className="text-white font-medium bg-white/10 px-4 py-2 rounded-full border border-white/10">
-                            {formData.noteStyle} Layout
-                          </span>
+                          <div className="text-center">
+                            <span className="text-white font-medium bg-white/10 px-4 py-2 rounded-full border border-white/10 capitalize">
+                              {formData.noteStyle} Layout
+                            </span>
+                            {formData.major && (
+                              <p className="text-gray-400 text-xs mt-2">
+                                Optimized for{" "}
+                                {formData.major.charAt(0).toUpperCase() +
+                                  formData.major.slice(1)}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>

@@ -1,0 +1,26 @@
+
+> lumina-notes-ai@0.1.0 build
+> next build
+
+Ôû▓ Next.js 16.1.1 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+Ô£ô Compiled successfully in 9.2s
+  Running TypeScript ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/6) ...
+Ô¿» useSearchParams() should be wrapped in a suspense boundary at page "/dashboard". Read more: https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
+    at Q (C:\Users\uthac\OneDrive\Documents\programing\MERN\lumina-notes-ai\.next\server\chunks\ssr\node_modules_next_c73d6895._.js:2:2111)
+    at o (C:\Users\uthac\OneDrive\Documents\programing\MERN\lumina-notes-ai\.next\server\chunks\ssr\node_modules_next_c73d6895._.js:4:5284)
+    at av (C:\Users\uthac\OneDrive\Documents\programing\MERN\lumina-notes-ai\.next\server\chunks\ssr\_ffaf704f._.js:1:19258)
+    at an (C:\Users\uthac\OneDrive\Documents\programing\MERN\lumina-notes-ai\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.prod.js:2:84360)
+    at ai (C:\Users\uthac\OneDrive\Documents\programing\MERN\lumina-notes-ai\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.prod.js:2:86179)
+    at al (C:\Users\uthac\OneDrive\Documents\programing\MERN\lumina-notes-ai\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.prod.js:2:107953)
+    at as (C:\Users\uthac\OneDrive\Documents\programing\MERN\lumina-notes-ai\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.prod.js:2:105368)
+    at am (C:\Users\uthac\OneDrive\Documents\programing\MERN\lumina-notes-ai\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.prod.js:2:112882)
+    at au (C:\Users\uthac\OneDrive\Documents\programing\MERN\lumina-notes-ai\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.prod.js:2:109985)
+    at al (C:\Users\uthac\OneDrive\Documents\programing\MERN\lumina-notes-ai\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.prod.js:2:108231)
+Error occurred prerendering page "/dashboard". Read more: https://nextjs.org/docs/messages/prerender-error
+Export encountered an error on /dashboard/page: /dashboard, exiting the build.
+Ô¿» Next.js build worker exited with code: 1 and signal: null

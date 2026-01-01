@@ -1,6 +1,7 @@
 "use client";
 
-import { FileText } from "lucide-react";
+import { useState } from "react";
+import { FileText, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { useRouter } from "next/navigation";
@@ -14,8 +15,10 @@ interface SidebarNoteProps {
     isArchived?: boolean;
     isShared?: boolean;
     isPinned?: boolean;
+    noteType?: string;
   };
   isActive?: boolean;
+  isDraggable?: boolean;
   onRename: () => void;
   onDelete: () => void;
   onArchive?: () => void;
@@ -24,18 +27,45 @@ interface SidebarNoteProps {
 export function SidebarNote({
   note,
   isActive,
+  isDraggable = true,
   onRename,
   onDelete,
   onArchive,
 }: SidebarNoteProps) {
   const router = useRouter();
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData("application/lumina-note-id", note._id);
+    e.dataTransfer.setData("application/lumina-note-title", note.title);
+    e.dataTransfer.effectAllowed = "move";
+    setIsDragging(true);
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+  };
 
   return (
-    <div className="relative group/note flex items-center">
+    <div
+      className={cn(
+        "relative group/note flex items-center",
+        isDragging && "opacity-50"
+      )}
+      draggable={isDraggable}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      {isDraggable && (
+        <div className="absolute left-0 opacity-0 group-hover/note:opacity-50 cursor-grab active:cursor-grabbing transition-opacity">
+          <GripVertical className="w-3 h-3 text-gray-500" />
+        </div>
+      )}
       <Button
         variant="ghost"
         className={cn(
-          "w-full justify-start h-9 px-2.5 text-[13px] gap-3 transition-all", // Increased gap to 3 (was 2.5 or implicit)
+          "w-full justify-start h-9 px-2.5 pr-16 text-[13px] gap-3 transition-all",
+          isDraggable && "pl-5", // Extra padding for drag handle
           isActive
             ? "bg-indigo-500/10 text-indigo-400 font-medium"
             : "text-gray-400 hover:text-white hover:bg-white/4"
@@ -52,7 +82,7 @@ export function SidebarNote({
         />
         <span className="truncate">{note.title}</span>
       </Button>
-      <div className="absolute right-1 opacity-100 lg:opacity-0 lg:group-hover/note:opacity-100 transition-all">
+      <div className="absolute right-1 transition-all">
         <ActionMenu
           onRename={onRename}
           onDelete={onDelete}

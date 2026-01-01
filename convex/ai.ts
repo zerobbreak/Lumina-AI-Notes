@@ -1378,3 +1378,366 @@ Return ONLY valid JSON.`;
     }
   },
 });
+
+/**
+ * Ingest a PDF and immediately generate flashcards from its content.
+ * Used by the "Bottom 20%" drop zone for quick flashcard generation.
+ *
+ * Chain: Extract PDF text -> Generate flashcards -> Save to database
+ */
+export const ingestAndGenerateFlashcards = action({
+  args: {
+    pdfBase64: v.optional(v.string()),
+    storageId: v.optional(v.string()),
+    fileName: v.string(),
+    courseId: v.optional(v.string()),
+    cardCount: v.optional(v.number()),
+  },
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    success: boolean;
+    deckId?: string;
+    cardCount?: number;
+    error?: string;
+  }> => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY environment variable not set");
+    }
+
+    try {
+      let pdfBase64 = args.pdfBase64;
+
+      // If storageId is provided, fetch the file from storage
+      if (args.storageId) {
+        const blob = await ctx.storage.get(args.storageId as any); // cast for now as v.string used
+        if (!blob) {
+          throw new Error("Failed to retrieve file from storage");
+        }
+        const arrayBuffer = await blob.arrayBuffer();
+        pdfBase64 = Buffer.from(arrayBuffer).toString("base64");
+      }
+
+      if (!pdfBase64) {
+        throw new Error("No PDF content provided");
+      }
+
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+      // Step 1: Extract text from PDF using Gemini's native PDF processing
+      const extractionResult = await model.generateContent([
+        {
+          inlineData: {
+            mimeType: "application/pdf",
+            data: pdfBase64,
+          },
+        },
+        {
+          text: `Extract the main text content from this PDF document.
+          
+Return the extracted text as plain text, preserving the logical structure and important information.
+Focus on extractable content that would be useful for creating study flashcards.
+Return ONLY the extracted text, no JSON or formatting.`,
+        },
+      ]);
+
+      const extractedText = extractionResult.response.text().trim();
+
+      if (!extractedText || extractedText.length < 50) {
+        throw new Error("Could not extract sufficient text from PDF");
+      }
+
+      // Step 2: Generate flashcards with exam-focused prompt
+      const count = args.cardCount || 10;
+      const flashcardPrompt = `[Context: ${extractedText.substring(0, 15000)}]
+
+Generate ${count} flashcards focusing on exam-worthy definitions, key concepts, and important facts.
+
+Return a JSON array with this exact structure:
+[
+  {"front": "Question or term to test", "back": "Clear, concise answer or definition"},
+  {"front": "Question or term to test", "back": "Clear, concise answer or definition"}
+]
+
+Rules:
+- Focus on definitions and key concepts that would appear on an exam
+- Questions should be direct and test recall
+- Answers should be memorable and concise
+- Cover the most important content evenly
+- Return ONLY valid JSON, no markdown or explanation
+- IMPORTANT: Escape all newlines in string properties as \\n. Do not use literal control characters.`;
+
+      const flashcardResult = await model.generateContent(flashcardPrompt);
+      const flashcardText = flashcardResult.response.text().trim();
+
+      const jsonMatch = flashcardText.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        throw new Error("Failed to parse flashcard response from AI");
+      }
+
+      const cards = JSON.parse(jsonMatch[0]) as Array<{
+        front: string;
+        back: string;
+      }>;
+
+      if (!cards.length) {
+        throw new Error("No flashcards were generated");
+      }
+
+      // Step 3: Save flashcards with immediate review dates
+      const deckTitle = args.fileName.replace(/\.pdf$/i, "") + " - Quick Cards";
+
+      const deckId = await ctx.runMutation(
+        api.flashcards.createDeckWithCardsImmediate,
+        {
+          title: deckTitle,
+          sourceFileName: args.fileName,
+          courseId: args.courseId,
+          cards: cards,
+        }
+      );
+
+      return {
+        success: true,
+        deckId,
+        cardCount: cards.length,
+      };
+    } catch (error) {
+      console.error("ingestAndGenerateFlashcards error:", error);
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to generate flashcards from PDF",
+      };
+    }
+  },
+});
+
+/**
+ * Ask a question about a specific file's content
+ * Uses the file's extractedText to scope AI responses to that document
+ */
+export const askAboutFile = action({
+  args: {
+    fileId: v.id("files"),
+    question: v.string(),
+  },
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    success: boolean;
+    answer?: string;
+    error?: string;
+  }> => {
+    try {
+      // Fetch the file
+      const file = await ctx.runQuery(api.files.getFile, {
+        fileId: args.fileId,
+      });
+
+      if (!file) {
+        return {
+          success: false,
+          error: "File not found",
+        };
+      }
+
+      if (!file.extractedText) {
+        return {
+          success: false,
+          error:
+            "This file hasn't been processed yet. Please wait for processing to complete.",
+        };
+      }
+
+      const model = getGeminiModel();
+
+      const prompt = `You are Lumina AI, a helpful academic assistant. Answer the following question based ONLY on the provided document content.
+
+Document: "${file.name}"
+Content:
+"""
+${file.extractedText.substring(0, 15000)}
+"""
+
+Question: ${args.question}
+
+Instructions:
+- Answer based ONLY on the provided document content
+- If the document doesn't contain information to answer the question, say so clearly
+- Be concise but thorough
+- Use specific quotes or references from the document when helpful
+- Format your response with markdown for clarity`;
+
+      const result = await model.generateContent(prompt);
+      const answer = result.response.text();
+
+      return {
+        success: true,
+        answer,
+      };
+    } catch (error) {
+      console.error("askAboutFile error:", error);
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to answer question",
+      };
+    }
+  },
+});
+
+/**
+ * Ingest a PDF and immediately generate study notes from its content.
+ * Used by the "Top 80%" drop zone for quick note generation.
+ *
+ * Chain: Extract PDF text -> Generate structured notes -> Save to database
+ */
+export const ingestAndGenerateNote = action({
+  args: {
+    pdfBase64: v.optional(v.string()),
+    storageId: v.optional(v.string()),
+    fileName: v.string(),
+    courseId: v.optional(v.string()),
+  },
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    success: boolean;
+    noteId?: string;
+    title?: string;
+    error?: string;
+  }> => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return {
+        success: false,
+        error: "GEMINI_API_KEY environment variable not set",
+      };
+    }
+
+    try {
+      let pdfBase64 = args.pdfBase64;
+
+      // If storageId is provided, fetch the file from storage
+      if (args.storageId) {
+        const blob = await ctx.storage.get(args.storageId as any);
+        if (!blob) {
+          throw new Error("Failed to retrieve file from storage");
+        }
+        const arrayBuffer = await blob.arrayBuffer();
+        pdfBase64 = Buffer.from(arrayBuffer).toString("base64");
+      }
+
+      if (!pdfBase64) {
+        throw new Error("No PDF content provided");
+      }
+
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+      // Step 1: Extract text and generate notes from PDF using Gemini's native PDF processing
+      const noteGenerationResult = await model.generateContent([
+        {
+          inlineData: {
+            mimeType: "application/pdf",
+            data: pdfBase64,
+          },
+        },
+        {
+          text: `You are an expert academic note-taker. Analyze this PDF and create comprehensive study notes.
+
+Generate a JSON response with this structure:
+{
+  "title": "A descriptive title for these notes (max 10 words)",
+  "content": "Full study notes in HTML format using proper semantic tags"
+}
+
+For the content field, use proper HTML formatting:
+- Use <h2> for main sections
+- Use <h3> for subsections  
+- Use <p> for paragraphs
+- Use <ul> and <li> for bullet points
+- Use <strong> for key terms and important concepts
+- Use <em> for emphasis
+- Include all major topics, definitions, and key details from the document
+
+Rules:
+- Create thorough, well-organized study notes
+- Focus on content that would be useful for studying and exam prep
+- Include key definitions, concepts, and important facts
+- Return ONLY valid JSON, no markdown code fences or explanation
+- IMPORTANT: Escape all newlines in the "content" string as \\n. Do not use literal control characters.`,
+        },
+      ]);
+
+      const responseText = noteGenerationResult.response.text().trim();
+
+      // Strip markdown code fences if present (```json ... ```)
+      let cleanedResponse = responseText;
+      const codeBlockMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        cleanedResponse = codeBlockMatch[1].trim();
+      }
+
+      // Parse the JSON response
+      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("Failed to parse note generation response from AI");
+      }
+
+      let parsed;
+      try {
+        parsed = JSON.parse(jsonMatch[0]);
+      } catch (error) {
+        console.error("JSON parse error:", error);
+        console.error("Response text was:", responseText);
+        // Attempt to clean newlines inside strings if possible, or fail gracefully
+        throw new Error(
+          "AI generated invalid JSON (control characters). Please try again."
+        );
+      }
+      const noteTitle =
+        parsed.title || `Notes from ${args.fileName.replace(/\.pdf$/i, "")}`;
+      const noteContent = parsed.content || "";
+
+      if (!noteContent || noteContent.length < 100) {
+        throw new Error("Could not generate sufficient notes from PDF content");
+      }
+
+      // Step 2: Create the note in the database
+      const noteId = await ctx.runMutation(api.notes.createNote, {
+        title: noteTitle,
+        courseId: args.courseId,
+      });
+
+      // Step 3: Update the note with the generated content
+      await ctx.runMutation(api.notes.updateNote, {
+        noteId,
+        content: noteContent,
+      });
+
+      return {
+        success: true,
+        noteId: noteId as string,
+        title: noteTitle,
+      };
+    } catch (error) {
+      console.error("ingestAndGenerateNote error:", error);
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to generate notes from PDF",
+      };
+    }
+  },
+});

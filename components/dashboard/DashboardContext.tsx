@@ -12,6 +12,12 @@ export interface StructuredNotes {
   mermaidGraph: string;
 }
 
+export interface PinnedContext {
+  id: string;
+  name: string;
+  type: "file" | "note";
+}
+
 interface DashboardContextType {
   isLeftSidebarOpen: boolean;
   isRightSidebarOpen: boolean;
@@ -23,6 +29,9 @@ interface DashboardContextType {
   pendingNotes: StructuredNotes | null;
   setPendingNotes: (notes: StructuredNotes) => void;
   clearPendingNotes: () => void;
+  // Active context for recording
+  activeContext: PinnedContext | null;
+  setActiveContext: (context: PinnedContext | null) => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(
@@ -36,6 +45,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
   const [pendingNotes, setPendingNotesState] = useState<StructuredNotes | null>(
+    null
+  );
+  const [activeContext, setActiveContext] = useState<PinnedContext | null>(
     null
   );
 
@@ -68,6 +80,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         pendingNotes,
         setPendingNotes,
         clearPendingNotes,
+        activeContext,
+        setActiveContext,
       }}
     >
       {children}

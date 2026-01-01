@@ -139,22 +139,22 @@ export function UploadDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right text-gray-400">
+          <div className="grid gap-2">
+            <Label htmlFor="name" className="text-gray-400">
               Name
             </Label>
             <Input
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="col-span-3 bg-white/5 border-white/10 text-white focus:border-indigo-500 transition-colors"
+              className="bg-white/5 border-white/10 text-white focus:border-indigo-500 transition-colors w-full"
               placeholder={
                 type === "link" ? "My Awesome Link" : "Lecture Slides.pdf"
               }
             />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="type" className="text-right text-gray-400">
+          <div className="grid gap-2">
+            <Label htmlFor="type" className="text-gray-400">
               Type
             </Label>
             <Select
@@ -164,7 +164,7 @@ export function UploadDialog({
                 setSelectedFile(null);
               }}
             >
-              <SelectTrigger className="col-span-3 bg-white/5 border-white/10 text-white">
+              <SelectTrigger className="bg-white/5 border-white/10 text-white w-full">
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
               <SelectContent className="bg-[#1A1A1A] border-white/10 text-white">
@@ -176,22 +176,22 @@ export function UploadDialog({
           </div>
 
           {type === "link" ? (
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="url" className="text-right text-gray-400">
+            <div className="grid gap-2">
+              <Label htmlFor="url" className="text-gray-400">
                 URL
               </Label>
               <Input
                 id="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className="col-span-3 bg-white/5 border-white/10 text-white focus:border-indigo-500"
+                className="bg-white/5 border-white/10 text-white focus:border-indigo-500 w-full"
                 placeholder="https://example.com"
               />
             </div>
           ) : (
-            <div className="col-span-4">
+            <div className="min-w-0">
               {selectedFile ? (
-                <div className="flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-lg group hover:border-white/20 transition-colors">
+                <div className="flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-lg group hover:border-white/20 transition-colors w-full max-w-full overflow-hidden">
                   <div className="h-10 w-10 bg-indigo-500/10 rounded-lg flex items-center justify-center shrink-0">
                     {type === "img" ? (
                       <ImageIcon className="w-5 h-5 text-indigo-400" />

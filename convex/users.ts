@@ -67,9 +67,11 @@ export const completeOnboarding = mutation({
         id: v.string(),
         name: v.string(),
         code: v.string(),
+        defaultNoteStyle: v.optional(v.string()),
       })
     ),
     noteStyle: v.string(),
+    theme: v.optional(v.string()),
     enabledBlocks: v.array(v.string()),
   },
   handler: async (ctx, args) => {

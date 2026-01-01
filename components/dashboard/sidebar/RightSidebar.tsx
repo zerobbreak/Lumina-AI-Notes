@@ -44,6 +44,8 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { useDashboard } from "@/hooks/useDashboard";
 import { StructuredNotes } from "@/components/dashboard/DashboardContext";
+import { ContextDeck } from "@/components/dashboard/ContextDeck";
+import { useDropzone } from "react-dropzone";
 
 // Enhanced transcript chunk with AI analysis
 interface EnhancedChunk {
@@ -112,8 +114,61 @@ export function RightSidebar() {
   const deleteRecording = useMutation(api.recordings.deleteRecording);
   const pastRecordings = useQuery(api.recordings.getRecordings);
 
-  // Get dashboard context for pending notes
-  const { setPendingNotes } = useDashboard();
+  // Get dashboard context for pending notes and active context
+  const { setPendingNotes, activeContext, setActiveContext } = useDashboard();
+  const generateFromPinnedAudio = useAction(api.notes.generateFromPinnedAudio); // New Phase 2 Action
+
+  // Phase 4: Magnetic Drop Zone Logic
+  const onDrop = useCallback(
+    (acceptedFiles: File[], fileRejections: any[], event: any) => {
+      // Check for Sidebar drag data
+      const resourceId = event.dataTransfer?.getData(
+        "application/lumina-resource-id"
+      );
+      const resourceName = event.dataTransfer?.getData(
+        "application/lumina-resource-name"
+      );
+
+      if (resourceId && resourceName) {
+        setActiveContext({ id: resourceId, name: resourceName, type: "file" });
+      }
+    },
+    [setActiveContext]
+  );
+
+  const { getRootProps: getZoneProps, isDragActive: isZoneActive } =
+    useDropzone({
+      onDrop,
+      noClick: true,
+      noKeyboard: true,
+      onDragEnter: () => {}, // prevent default
+      onDragOver: (e) => {
+        e.preventDefault();
+        // Critical for drop effects
+        e.dataTransfer.dropEffect = "copy";
+      },
+      // We need to allow all types for the drop zone to be "magnetic" for the handled types
+      // But typically useDropzone handles files. For custom data transfer, we might need custom handlers on the div.
+      // Actually `useDropzone` is mainly for Files. For our sidebar drag, we use native onDrop.
+    });
+
+  // Custom native drop handler for the Sidebar integration
+  const handleNativeDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const resourceId = e.dataTransfer.getData("application/lumina-resource-id");
+    const resourceName = e.dataTransfer.getData(
+      "application/lumina-resource-name"
+    );
+
+    if (resourceId && resourceName) {
+      setActiveContext({ id: resourceId, name: resourceName, type: "file" });
+    }
+  };
+
+  const handleNativeDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
 
   const {
     transcript,
@@ -121,6 +176,26 @@ export function RightSidebar() {
     resetTranscript,
     browserSupportsSpeechRecognition,
   } = useSpeechRecognition();
+
+  // Format seconds to HH:MM:SS (moved up for hoisting)
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h.toString().padStart(2, "0")}:${m
+      .toString()
+      .padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
+
+  // Reset handler (moved up for hoisting)
+  const handleReset = () => {
+    setIsRecording(false);
+    setElapsedTime(0);
+    resetTranscript();
+    setSessionTranscript([]);
+    setGeneratedNotes(null);
+    setSelectedSession(null);
+  };
 
   const handleSaveClick = () => {
     // 1. Validate content
@@ -199,11 +274,21 @@ export function RightSidebar() {
 
     setIsGeneratingNotes(true);
     try {
-      const notes = await generateStructuredNotes({
-        transcript: JSON.stringify(finalChunks),
-        title: recordingTitle || "Recording",
-      });
-      setGeneratedNotes(notes);
+      if (activeContext && activeContext.type === "file") {
+        // Generate notes with pinned document context
+        const notes = await generateFromPinnedAudio({
+          transcript: JSON.stringify(finalChunks),
+          pinnedFileId: activeContext.id,
+        });
+        setGeneratedNotes(notes);
+      } else {
+        // Standard generation without context
+        const notes = await generateStructuredNotes({
+          transcript: JSON.stringify(finalChunks),
+          title: recordingTitle || "Recording",
+        });
+        setGeneratedNotes(notes);
+      }
     } catch (e) {
       console.error("Failed to generate notes", e);
       alert("Failed to generate notes. Please check AI configuration.");
@@ -263,16 +348,6 @@ export function RightSidebar() {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [isRecording]);
-
-  // Format seconds to HH:MM:SS
-  const formatTime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return `${h.toString().padStart(2, "0")}:${m
-      .toString()
-      .padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  };
 
   const handleToggleRecording = async () => {
     if (!isRecording) {
@@ -337,15 +412,6 @@ export function RightSidebar() {
       }
       setIsRecording(false);
     }
-  };
-
-  const handleReset = () => {
-    setIsRecording(false);
-    setElapsedTime(0);
-    resetTranscript();
-    setSessionTranscript([]);
-    setGeneratedNotes(null);
-    setSelectedSession(null);
   };
 
   // Handle file upload
@@ -597,14 +663,40 @@ export function RightSidebar() {
       initial={{ x: 320, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="w-[320px] h-screen bg-black/20 backdrop-blur-xl border-l border-white/5 flex flex-col shrink-0 z-50"
+      className="w-[320px] h-screen bg-black/20 backdrop-blur-xl border-l border-white/5 flex flex-col shrink-0 z-50 transition-all duration-300"
+      onDrop={handleNativeDrop}
+      onDragOver={handleNativeDragOver}
+      style={{
+        boxShadow: activeContext
+          ? "inset 0 0 40px rgba(59, 130, 246, 0.1)"
+          : "none",
+        borderColor: activeContext
+          ? "rgba(59, 130, 246, 0.3)"
+          : "rgba(255, 255, 255, 0.05)",
+      }}
     >
       {/* Top: Recorder Section */}
       <div className="p-6 border-b border-white/5 relative overflow-hidden">
+        {/* Context Deck */}
+        <ContextDeck />
         {/* Glow Effect */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-cyan-500 via-indigo-500 to-purple-500 opacity-50" />
+        <div
+          className={cn(
+            "absolute top-0 left-0 w-full h-1 bg-linear-to-r from-cyan-500 via-indigo-500 to-purple-500 opacity-50 transition-all duration-300",
+            isZoneActive && "h-full opacity-20" // Blue glow when dragging
+          )}
+        />
 
-        <div className="flex items-center justify-between mb-6">
+        {/* Native Drop Zone Overlay for Sidebar */}
+        <div
+          className={cn(
+            "absolute inset-0 z-10 transition-colors pointer-events-none"
+            // We use a separate state or just rely on CSS hover if we had a drag-over state tracked.
+            // Since we use native events on the parent, let's add the handlers to the parent div.
+          )}
+        />
+
+        <div className="flex items-center justify-between mb-6 relative z-20">
           <div className="flex items-center gap-2.5">
             <div className="relative">
               <div

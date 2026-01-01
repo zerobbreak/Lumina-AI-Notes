@@ -1,10 +1,56 @@
 "use client";
 
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, ReactNodeViewRenderer } from "@tiptap/react";
+import { Node, mergeAttributes } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useEffect, useState } from "react";
-import "./editor.css"; // We will create this for basic styles
+import { ResourceMentionNode } from "./ResourceMentionNode";
+import "./editor.css";
+
+const ResourceMention = Node.create({
+  name: "resourceMention",
+  group: "inline",
+  inline: true,
+  selectable: true,
+  atom: true,
+
+  addAttributes() {
+    return {
+      id: {
+        default: null,
+      },
+      label: {
+        default: null,
+      },
+    };
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: 'span[data-type="resource-mention"]',
+      },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return [
+      "span",
+      mergeAttributes(HTMLAttributes, {
+        "data-type": "resource-mention",
+        class:
+          "bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded text-sm font-medium inline-flex items-center gap-1 cursor-pointer select-none mx-1 align-middle",
+      }),
+      ["span", { class: "opacity-75" }, "📄"],
+      HTMLAttributes.label,
+    ];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(ResourceMentionNode);
+  },
+});
 
 interface EditorProps {
   initialContent?: string;
@@ -28,12 +74,48 @@ export default function Editor({
       Placeholder.configure({
         placeholder,
       }),
+      ResourceMention,
     ],
     content: initialContent,
     editable: isEditable,
     editorProps: {
       attributes: {
         class: "prose prose-invert max-w-none focus:outline-none min-h-[200px]",
+      },
+      handleDrop: (view, event, slice, moved) => {
+        if (!moved && event.dataTransfer) {
+          const resourceId = event.dataTransfer.getData(
+            "application/lumina-resource-id"
+          );
+          const resourceName = event.dataTransfer.getData(
+            "application/lumina-resource-name"
+          );
+
+          if (resourceId && resourceName) {
+            // Stop propagation to prevent global overlay/dropzone from firing
+            event.preventDefault();
+            event.stopPropagation();
+
+            const coordinates = view.posAtCoords({
+              left: event.clientX,
+              top: event.clientY,
+            });
+
+            if (coordinates) {
+              editor
+                ?.chain()
+                .focus()
+                .insertContentAt(coordinates.pos, {
+                  type: "resourceMention",
+                  attrs: { id: resourceId, label: resourceName },
+                })
+                .insertContentAt(coordinates.pos + 1, " ") // Add space after chip
+                .run();
+              return true; // Handled
+            }
+          }
+        }
+        return false;
       },
     },
     onUpdate: ({ editor }) => {

@@ -7,6 +7,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { FileText, Loader2, X, Sparkles, Upload } from "lucide-react";
 import { marked } from "marked";
+import { toast } from "sonner";
 
 interface DocumentDropZoneProps {
   onNotesGenerated?: (
@@ -64,8 +65,12 @@ export function DocumentDropZone({
   // Handle drop of already-processed documents (from sidebar)
   const handleDocumentDrop = useCallback(
     async (e: React.DragEvent) => {
-      const documentId = e.dataTransfer.getData("application/document-id");
-      const documentName = e.dataTransfer.getData("application/document-name");
+      const documentId = e.dataTransfer.getData(
+        "application/lumina-resource-id"
+      );
+      const documentName = e.dataTransfer.getData(
+        "application/lumina-resource-name"
+      );
 
       if (!documentId) return; // Not a document drop, let react-dropzone handle it
 
@@ -73,6 +78,10 @@ export function DocumentDropZone({
       e.stopPropagation();
       setError(null);
       setIsGenerating(true);
+
+      const toastId = toast.loading("Generating notes...", {
+        description: "Extracting relevant information from your document",
+      });
 
       try {
         const result = await generateNotesFromDocument({
@@ -87,13 +96,23 @@ export function DocumentDropZone({
             result.title || `Notes from ${documentName}`,
             result.sourceDocument
           );
+          toast.success("Notes generated successfully!", {
+            id: toastId,
+          });
         } else {
-          setError(result.error || "Failed to generate notes");
+          const errorMessage = result.error || "Failed to generate notes";
+          setError(errorMessage);
+          toast.error(errorMessage, {
+            id: toastId,
+          });
         }
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to generate notes"
-        );
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to generate notes";
+        setError(errorMessage);
+        toast.error(errorMessage, {
+          id: toastId,
+        });
       } finally {
         setIsGenerating(false);
       }
@@ -106,7 +125,7 @@ export function DocumentDropZone({
       {...getRootProps()}
       onDrop={(e) => {
         // Check if it's a document drop first
-        if (e.dataTransfer.getData("application/document-id")) {
+        if (e.dataTransfer.getData("application/lumina-resource-id")) {
           handleDocumentDrop(e);
         }
         // Otherwise let react-dropzone handle it
@@ -135,19 +154,6 @@ export function DocumentDropZone({
             <p className="text-white font-medium">Drop to upload</p>
             <p className="text-indigo-300 text-sm">
               AI will process and generate notes
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Generating indicator */}
-      {isGenerating && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm rounded-lg z-50">
-          <div className="text-center">
-            <Loader2 className="w-10 h-10 text-indigo-400 mx-auto mb-2 animate-spin" />
-            <p className="text-white font-medium">Generating notes...</p>
-            <p className="text-gray-400 text-sm">
-              Extracting relevant information
             </p>
           </div>
         </div>
@@ -201,8 +207,8 @@ export function DraggableDocument({
         return;
       }
 
-      e.dataTransfer.setData("application/document-id", documentId);
-      e.dataTransfer.setData("application/document-name", documentName);
+      e.dataTransfer.setData("application/lumina-resource-id", documentId);
+      e.dataTransfer.setData("application/lumina-resource-name", documentName);
       e.dataTransfer.effectAllowed = "copy";
       setIsDragging(true);
     },

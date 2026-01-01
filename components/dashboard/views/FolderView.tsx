@@ -82,10 +82,13 @@ export default function FolderView({
   const addModule = useMutation(api.users.addModuleToCourse);
   const renameModule = useMutation(api.users.renameModule);
   const deleteModule = useMutation(api.users.deleteModule);
+  const deleteFile = useMutation(api.files.deleteFile);
+  const renameFile = useMutation(api.files.renameFile);
 
   const [renameTarget, setRenameTarget] = useState<{
     id: string;
     title: string;
+    type: "module" | "file";
   } | null>(null);
 
   // --- Helpers ---
@@ -147,11 +150,18 @@ export default function FolderView({
 
   const handleRenameConfirm = async (newTitle: string) => {
     if (!renameTarget) return;
-    await renameModule({
-      courseId: contextId,
-      moduleId: renameTarget.id,
-      title: newTitle,
-    });
+    if (renameTarget.type === "module") {
+      await renameModule({
+        courseId: contextId,
+        moduleId: renameTarget.id,
+        title: newTitle,
+      });
+    } else if (renameTarget.type === "file") {
+      await renameFile({
+        fileId: renameTarget.id as any,
+        name: newTitle,
+      });
+    }
     setRenameTarget(null);
   };
 
@@ -274,7 +284,11 @@ export default function FolderView({
                     <div onClick={(e) => e.stopPropagation()}>
                       <ActionMenu
                         onRename={() =>
-                          setRenameTarget({ id: mod.id, title: mod.title })
+                          setRenameTarget({
+                            id: mod.id,
+                            title: mod.title,
+                            type: "module",
+                          })
                         }
                         onDelete={() => {
                           if (confirm("Delete this module?")) {
@@ -429,7 +443,23 @@ export default function FolderView({
                           : new Date(f.createdAt).toLocaleDateString()}
                       </p>
                     </div>
-                    <MoreVertical className="w-4 h-4 text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <ActionMenu
+                        onRename={() => {
+                          setRenameTarget({
+                            id: f._id,
+                            title: f.name,
+                            type: "file",
+                          });
+                        }}
+                        onDelete={() => {
+                          if (confirm(`Delete "${f.name}"?`)) {
+                            deleteFile({ fileId: f._id });
+                          }
+                        }}
+                        align="right"
+                      />
+                    </div>
                   </motion.a>
                 </DraggableDocument>
               ))}
@@ -448,7 +478,7 @@ export default function FolderView({
         open={!!renameTarget}
         onOpenChange={(open) => !open && setRenameTarget(null)}
         initialValue={renameTarget?.title || ""}
-        title="Module"
+        title={renameTarget?.type === "file" ? "File" : "Module"}
         onConfirm={handleRenameConfirm}
       />
     </div>

@@ -36,7 +36,7 @@ export function Sidebar() {
 
   // Queries
   const userData = useQuery(api.users.getUser);
-  const recentNotes = useQuery(api.notes.getRecentNotes);
+  const quickNotes = useQuery(api.notes.getQuickNotes);
   const recentFiles = useQuery(api.files.getFiles);
 
   // Mutations
@@ -185,7 +185,7 @@ export function Sidebar() {
             <Button
               variant="ghost"
               size="icon"
-              className="w-5 h-5 text-gray-500 hover:text-white hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-all rounded-md"
+              className="w-5 h-5 text-gray-500 hover:text-white hover:bg-white/10 opacity-40 group-hover:opacity-100 transition-all rounded-md"
               onClick={handleCreateCourse}
             >
               <Plus className="w-3.5 h-3.5" />
@@ -230,7 +230,7 @@ export function Sidebar() {
             <Button
               variant="ghost"
               size="icon"
-              className="w-5 h-5 text-gray-500 hover:text-white hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-all rounded-md"
+              className="w-5 h-5 text-gray-500 hover:text-white hover:bg-white/10 opacity-40 group-hover:opacity-100 transition-all rounded-md"
               onClick={() => setIsUploadOpen(true)}
             >
               <Upload className="w-3.5 h-3.5" />
@@ -248,7 +248,7 @@ export function Sidebar() {
                 <div className="relative group/file flex items-center">
                   <Button
                     variant="ghost"
-                    className="w-full justify-start h-9 px-2.5 text-[13px] text-gray-400 hover:text-white hover:bg-white/4 gap-3 transition-all" // Increased gap
+                    className="w-full justify-start h-9 px-2.5 pr-16 text-[13px] text-gray-400 hover:text-white hover:bg-white/4 gap-3 transition-all" // Increased gap
                   >
                     <File className="w-3.5 h-3.5 text-blue-500/70 group-hover/file:text-blue-400 transition-colors shrink-0" />
                     <span className="truncate flex-1 text-left">
@@ -256,7 +256,7 @@ export function Sidebar() {
                     </span>
                     <DocumentStatusBadge status={file.processingStatus} />
                   </Button>
-                  <div className="absolute right-1 opacity-100 lg:opacity-0 lg:group-hover/file:opacity-100 transition-all">
+                  <div className="absolute right-1 transition-all">
                     <ActionMenu
                       onRename={() => openRename(file._id, "file", file.name)}
                       onDelete={() => deleteFile({ fileId: file._id })}
@@ -290,14 +290,15 @@ export function Sidebar() {
             <Button
               variant="ghost"
               size="icon"
-              className="w-5 h-5 text-gray-500 hover:text-white hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-all rounded-md"
+              className="w-5 h-5 text-gray-400 hover:text-white hover:bg-white/10 opacity-70 group-hover:opacity-100 transition-all rounded-md"
               onClick={handleCreateNote}
+              title="Create Quick Note"
             >
               <Plus className="w-3.5 h-3.5" />
             </Button>
           </div>
           <div className="space-y-0.5">
-            {recentNotes?.map((note) => (
+            {quickNotes?.map((note) => (
               <SidebarNote
                 key={note._id}
                 note={note}
@@ -306,7 +307,7 @@ export function Sidebar() {
                 onArchive={() => toggleArchiveNote({ noteId: note._id })}
               />
             ))}
-            {(!recentNotes || recentNotes.length === 0) && (
+            {(!quickNotes || quickNotes.length === 0) && (
               <div className="px-3 py-2 text-xs text-gray-600 italic bg-white/2 rounded-lg border border-white/2">
                 No quick notes.
               </div>

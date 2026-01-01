@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import {
   MoreHorizontal,
@@ -9,6 +7,11 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface ActionMenuProps {
   onRename?: () => void;
@@ -31,96 +34,82 @@ export function ActionMenu({
 }: ActionMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const toggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsOpen(!isOpen);
-  };
-
-  const close = () => setIsOpen(false);
-
   return (
-    <div className="relative">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-6 w-6 text-gray-500 hover:text-white"
-        onClick={toggle}
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 text-gray-500 hover:text-white"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreHorizontal className="w-4 h-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align={align === "right" ? "end" : "start"}
+        side="bottom"
+        className="w-32 p-1 bg-[#0A0A0A] border-white/10 z-9999"
+        onClick={(e) => e.stopPropagation()}
       >
-        <MoreHorizontal className="w-4 h-4" />
-      </Button>
+        <div className="flex flex-col gap-0.5">
+          {onRename && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRename();
+                setIsOpen(false);
+              }}
+              className="flex items-center gap-2 px-2 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-white/10 rounded-md w-full text-left"
+            >
+              <Pencil className="w-3 h-3" />
+              Rename
+            </button>
+          )}
 
-      {isOpen && (
-        <>
-          {/* Backdrop for click outside */}
-          <div
-            className="fixed inset-0 z-40 bg-transparent"
-            onClick={(e) => {
-              e.stopPropagation();
-              close();
-            }}
-          />
+          {onArchive && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onArchive();
+                setIsOpen(false);
+              }}
+              className="flex items-center gap-2 px-2 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-white/10 rounded-md w-full text-left"
+            >
+              <Archive className="w-3 h-3" />
+              {isArchived ? "Unarchive" : "Archive"}
+            </button>
+          )}
 
-          {/* Menu */}
-          <div
-            className={`absolute ${
-              align === "right" ? "right-0" : "left-0"
-            } top-full mt-1 w-32 bg-[#0A0A0A] border border-white/10 rounded-lg shadow-xl z-50 p-1 flex flex-col gap-0.5 overflow-hidden`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {onRename && (
-              <button
-                onClick={() => {
-                  onRename();
-                  close();
-                }}
-                className="flex items-center gap-2 px-2 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-white/10 rounded-md w-full text-left"
-              >
-                <Pencil className="w-3 h-3" />
-                Rename
-              </button>
-            )}
+          {showRetry && onRetry && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRetry();
+                setIsOpen(false);
+              }}
+              className="flex items-center gap-2 px-2 py-1.5 text-xs text-blue-400 hover:bg-blue-500/10 rounded-md w-full text-left"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Retry
+            </button>
+          )}
 
-            {onArchive && (
-              <button
-                onClick={() => {
-                  onArchive();
-                  close();
-                }}
-                className="flex items-center gap-2 px-2 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-white/10 rounded-md w-full text-left"
-              >
-                <Archive className="w-3 h-3" />
-                {isArchived ? "Unarchive" : "Archive"}
-              </button>
-            )}
-
-            {showRetry && onRetry && (
-              <button
-                onClick={() => {
-                  onRetry();
-                  close();
-                }}
-                className="flex items-center gap-2 px-2 py-1.5 text-xs text-blue-400 hover:bg-blue-500/10 rounded-md w-full text-left"
-              >
-                <RefreshCw className="w-3 h-3" />
-                Retry
-              </button>
-            )}
-
-            {onDelete && (
-              <button
-                onClick={() => {
-                  onDelete();
-                  close();
-                }}
-                className="flex items-center gap-2 px-2 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-md w-full text-left"
-              >
-                <Trash2 className="w-3 h-3" />
-                Delete
-              </button>
-            )}
-          </div>
-        </>
-      )}
-    </div>
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+                setIsOpen(false);
+              }}
+              className="flex items-center gap-2 px-2 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-md w-full text-left"
+            >
+              <Trash2 className="w-3 h-3" />
+              Delete
+            </button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

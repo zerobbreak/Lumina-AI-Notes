@@ -30,6 +30,7 @@ export default defineSchema({
       )
     ),
     noteStyle: v.optional(v.string()), // "cornell" | "outline" | "mindmap"
+    theme: v.optional(v.string()), // UI accent color preference (e.g., "indigo", "amber")
     enabledBlocks: v.optional(v.array(v.string())),
   }).index("by_tokenIdentifier", ["tokenIdentifier"]),
 
@@ -37,6 +38,7 @@ export default defineSchema({
     userId: v.string(), // Storing tokenIdentifier for simplicity
     title: v.string(),
     content: v.optional(v.string()),
+    noteType: v.optional(v.string()), // "quick" | "page" - Quick Notes vs Smart Folder Pages
     major: v.optional(v.string()),
     courseId: v.optional(v.string()),
     moduleId: v.optional(v.string()),
@@ -54,6 +56,7 @@ export default defineSchema({
     .index("by_userId", ["userId"])
     .index("by_userId_and_pinned", ["userId", "isPinned"])
     .index("by_userId_and_archived", ["userId", "isArchived"])
+    .index("by_userId_and_noteType", ["userId", "noteType"])
     .index("by_courseId", ["courseId"])
     .index("by_moduleId", ["moduleId"])
     .index("by_parentNoteId", ["parentNoteId"])
@@ -128,4 +131,14 @@ export default defineSchema({
     nextReviewAt: v.optional(v.number()),
     reviewCount: v.optional(v.number()),
   }).index("by_deckId", ["deckId"]),
+  documents: defineTable({
+    storageId: v.string(),
+    courseId: v.string(), // e.g., "REQ-001"
+    text: v.string(),
+    embedding: v.array(v.float64()),
+  }).vectorIndex("by_embedding", {
+    vectorField: "embedding",
+    dimensions: 768, // Match your Gemini embedding size
+    filterFields: ["storageId", "courseId"], // <--- CRITICAL ADDITION
+  }),
 });

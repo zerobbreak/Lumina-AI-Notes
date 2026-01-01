@@ -175,3 +175,49 @@ export const renameDeck = mutation({
     await ctx.db.patch(args.deckId, { title: args.title });
   },
 });
+
+/**
+ * Create a new deck with flashcards - cards have nextReviewAt set to now
+ * for immediate appearance in the study queue.
+ * Used by the "Quick Flashcards" drop zone feature.
+ */
+export const createDeckWithCardsImmediate = mutation({
+  args: {
+    title: v.string(),
+    sourceFileName: v.optional(v.string()),
+    courseId: v.optional(v.string()),
+    cards: v.array(
+      v.object({
+        front: v.string(),
+        back: v.string(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    // Create the deck
+    const deckId = await ctx.db.insert("flashcardDecks", {
+      userId: identity.tokenIdentifier,
+      title: args.title,
+      courseId: args.courseId,
+      cardCount: args.cards.length,
+      createdAt: Date.now(),
+    });
+
+    // Create all flashcards with nextReviewAt = now for immediate study
+    const now = Date.now();
+    for (const card of args.cards) {
+      await ctx.db.insert("flashcards", {
+        deckId,
+        front: card.front,
+        back: card.back,
+        reviewCount: 0,
+        nextReviewAt: now,
+      });
+    }
+
+    return deckId;
+  },
+});

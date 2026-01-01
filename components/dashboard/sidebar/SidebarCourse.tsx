@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { Course, Module } from "@/lib/types";
 import { SidebarModule } from "./SidebarModule";
 import { SidebarNote } from "./SidebarNote";
+import { toast } from "sonner";
 
 interface SidebarCourseProps {
   course: Course;
@@ -39,24 +40,15 @@ export function SidebarCourse({
   onArchiveNote,
 }: SidebarCourseProps) {
   const router = useRouter();
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Fetch notes strictly for this course (not in a module)
-  // The API `getNotesByContext` with just `courseId` returns ALL notes in the course?
-  // Let's check api.notes.getNotesByContext behavior from my earlier read.
-  // It says:
-  // if (args.courseId) { ... .withIndex("by_courseId", ...) ... }
-  // This likely includes notes in modules if they also have courseId set.
-  // We need to filter client-side or check if `getNotesByContext` can filter by nullable moduleId.
-  // The schema says `moduleId` is optional.
-  // If a note is in a module, it has `moduleId`.
-  // If it's just in the course, `moduleId` is undefined/null.
-  // The current `getNotesByContext` does NOT filter for `moduleId` being unset when `courseId` is provided.
-  // So we should filter here for now.
   const courseNotes = useQuery(api.notes.getNotesByContext, {
     courseId: course.id,
   });
 
   const addModule = useMutation(api.users.addModuleToCourse);
+  const moveNoteToFolder = useMutation(api.notes.moveNoteToFolder);
 
   const handleCreateModule = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -68,20 +60,64 @@ export function SidebarCourse({
     }
   };
 
+  // Drop zone handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes("application/lumina-note-id")) {
+      e.dataTransfer.dropEffect = "move";
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    const noteId = e.dataTransfer.getData("application/lumina-note-id");
+    const noteTitle = e.dataTransfer.getData("application/lumina-note-title");
+
+    if (noteId) {
+      try {
+        await moveNoteToFolder({
+          noteId: noteId as Id<"notes">,
+          courseId: course.id,
+        });
+        toast.success(`Moved "${noteTitle}" to ${course.name}`);
+      } catch (error) {
+        console.error("Failed to move note:", error);
+        toast.error("Failed to move note");
+      }
+    }
+  };
+
   // Filter notes that don't belong to any module
   const rootCourseNotes = courseNotes?.filter((note) => !note.moduleId);
 
   return (
     <div className="space-y-1 relative group/item">
-      <div className="relative flex items-center">
-        <Button
-          variant="ghost"
+      <div className="relative flex items-center group/course">
+        <div
           className={cn(
-            "w-full justify-start h-9 px-2.5 text-[13px] font-medium transition-all duration-200 border-l-2 gap-3", // Increased gap
-            isExpanded
-              ? "bg-indigo-500/10 text-indigo-400 border-indigo-500 hover:bg-indigo-500/20 hover:text-indigo-300"
-              : "border-transparent text-gray-400 hover:text-white hover:bg-white/4"
+            "flex-1 flex items-center h-9 px-2.5 text-[13px] font-medium transition-all duration-200 border-l-2 gap-2 cursor-pointer",
+            isDragOver
+              ? "bg-indigo-500/30 text-indigo-300 border-indigo-400 ring-1 ring-indigo-400/50"
+              : isExpanded
+                ? "bg-indigo-500/10 text-indigo-400 border-indigo-500 hover:bg-indigo-500/20 hover:text-indigo-300"
+                : "border-transparent text-gray-400 hover:text-white hover:bg-white/4"
           )}
+          onClick={() =>
+            router.push(`/dashboard?contextId=${course.id}&contextType=course`)
+          }
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
         >
           {/* Toggle Button */}
           <div
@@ -103,19 +139,19 @@ export function SidebarCourse({
             )}
           </div>
 
-          {/* Title Link */}
-          <span
-            className="truncate flex-1 text-left cursor-pointer"
-            onClick={() =>
-              router.push(
-                `/dashboard?contextId=${course.id}&contextType=course`
-              )
-            }
-          >
-            {course.code}
-          </span>
-        </Button>
-        <div className="absolute right-1 opacity-100 lg:opacity-0 lg:group-hover/item:opacity-100 transition-all duration-200">
+          {/* Title Text */}
+          <span className="truncate flex-1">{course.code}</span>
+
+          {/* Drop indicator */}
+          {isDragOver && (
+            <span className="text-[10px] bg-indigo-500/30 px-1.5 py-0.5 rounded text-indigo-200">
+              Drop here
+            </span>
+          )}
+        </div>
+
+        {/* Action Menu - Absolute Positioned */}
+        <div className="absolute right-1 opacity-0 group-hover/course:opacity-100 transition-opacity">
           <ActionMenu
             onRename={() => onRename(course.id, course.name)}
             onDelete={() => onDelete(course.id)}
@@ -144,6 +180,7 @@ export function SidebarCourse({
             <SidebarNote
               key={note._id}
               note={note}
+              isDraggable={false}
               onRename={() => onRenameNote(note._id, note.title)}
               onDelete={() => onDeleteNote(note._id)}
               onArchive={() => onArchiveNote(note._id)}
