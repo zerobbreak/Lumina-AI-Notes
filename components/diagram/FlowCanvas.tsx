@@ -34,10 +34,12 @@ function FlowCanvasInner({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Sync changes back to parent
+  // Sync changes back to parent - use queueMicrotask to avoid flushSync error
   useEffect(() => {
     if (onChange) {
-      onChange({ nodes, edges });
+      queueMicrotask(() => {
+        onChange({ nodes, edges });
+      });
     }
   }, [nodes, edges, onChange]);
 

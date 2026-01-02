@@ -362,47 +362,72 @@ Instructions:
 
 Generate a JSON response with this EXACT structure:
 {
-  "summary": "Start with a bold statement identifying the MAIN TOPIC (e.g., 'This lecture covers...'). Then provide a 2-3 sentence overview of key takeaways.",
-  "cornellCues": ["Major Concept 1", "Key Question 2", "Term Definition"],
-  "cornellNotes": ["Detailed explanation of Concept 1...", "Answer to Question 2...", "Definition and context..."],
-  "actionItems": ["Homework: ...", "Read: ...", "Due date: ..."],
-  "reviewQuestions": ["What is...?", "How does...?", "Why is...?"],
-  "diagramData": {
-    "nodes": [
-      { "id": "1", "type": "input", "data": { "label": "Main Topic" }, "position": { "x": 0, "y": 0 } },
-      { "id": "2", "data": { "label": "Subconcept" }, "position": { "x": 100, "y": 100 } }
-    ],
-    "edges": [
-      { "id": "e1-2", "source": "1", "target": "2" }
-    ]
-  }
+  "summary": "Start with the MAIN TOPIC. Then provide a 2-3 sentence overview.",
+  "cornellCues": ["Concept 1", "Concept 2", "Concept 3"],
+  "cornellNotes": ["Explanation 1", "Explanation 2", "Explanation 3"],
+  "actionItems": ["Task 1", "Task 2"],
+  "reviewQuestions": ["Question 1?", "Question 2?"],
+  "diagramNodes": ["Main Topic", "Subtopic A", "Subtopic B", "Subtopic C"],
+  "diagramEdges": ["0-1", "0-2", "1-3"]
 }
 
 Rules:
 - cornellCues and cornellNotes arrays must have the same length
-- cornellCues should be short (1-5 words) and impactful
-- actionItems should only include explicitly mentioned tasks/deadlines (empty array if none)
-- diagramData should form a logical concept map of the lecture
-- Use "type": "input" for the Central Topic node
-- Generate reasonable (x, y) positions to minimize overlap (simulated layout)
-- If context was provided, integrate relevant information from the document
-- Return ONLY valid JSON, no markdown code fences or explanation`;
+- diagramNodes is an array of node labels (strings). First item is the central topic.
+- diagramEdges is an array of connections in format "sourceIndex-targetIndex" (e.g., "0-1" means node 0 connects to node 1)
+- actionItems should only include explicitly mentioned tasks (empty array if none)
+- Return ONLY valid JSON, no markdown code fences`;
 
     try {
       const result = await model.generateContent(prompt);
-      const responseText = result.response.text().trim();
+      let responseText = result.response.text().trim();
+
+      // Remove markdown code fences if present
+      responseText = responseText
+        .replace(/^```json?\s*/i, "")
+        .replace(/```\s*$/i, "");
 
       // Parse JSON response
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
+
+        // Convert simplified diagram format to ReactFlow format
+        let diagramData = undefined;
+        if (
+          parsed.diagramNodes &&
+          Array.isArray(parsed.diagramNodes) &&
+          parsed.diagramNodes.length > 0
+        ) {
+          const nodes = parsed.diagramNodes.map(
+            (label: string, index: number) => ({
+              id: String(index),
+              type: index === 0 ? "input" : "default",
+              data: { label },
+              position: {
+                x: index === 0 ? 200 : 100 + (index % 3) * 150,
+                y: index === 0 ? 0 : Math.floor(index / 3) * 100 + 100,
+              },
+            })
+          );
+
+          const edges = (parsed.diagramEdges || []).map(
+            (edge: string, index: number) => {
+              const [source, target] = edge.split("-");
+              return { id: `e${index}`, source, target };
+            }
+          );
+
+          diagramData = { nodes, edges };
+        }
+
         return {
           summary: parsed.summary || "",
           cornellCues: parsed.cornellCues || [],
           cornellNotes: parsed.cornellNotes || [],
           actionItems: parsed.actionItems || [],
           reviewQuestions: parsed.reviewQuestions || [],
-          mermaidGraph: parsed.mermaidGraph || "",
+          diagramData,
         };
       }
 
@@ -413,7 +438,7 @@ Rules:
         cornellNotes: [],
         actionItems: [],
         reviewQuestions: [],
-        mermaidGraph: "",
+        diagramData: undefined,
       };
     } catch (error) {
       console.error("generateFromPinnedAudio error:", error);
@@ -423,7 +448,7 @@ Rules:
         cornellNotes: [],
         actionItems: [],
         reviewQuestions: [],
-        mermaidGraph: "",
+        diagramData: undefined,
       };
     }
   },

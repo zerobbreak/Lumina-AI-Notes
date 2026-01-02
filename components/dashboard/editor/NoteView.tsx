@@ -199,22 +199,23 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         html += `</ul>`;
       }
 
-      // Interactive Mind Map
-      if (pendingNotes.diagramData && pendingNotes.diagramData.nodes) {
+      // Interactive Mind Map (ReactFlow)
+      if (
+        pendingNotes.diagramData &&
+        pendingNotes.diagramData.nodes &&
+        pendingNotes.diagramData.nodes.length > 0
+      ) {
         // We inject the HTML that matches the DiagramExtension parseHTML rule
         html += `<h2>🗺️ Mind Map</h2>`;
         html += `<div data-type="diagram" data-nodes='${JSON.stringify(pendingNotes.diagramData.nodes)}' data-edges='${JSON.stringify(pendingNotes.diagramData.edges || [])}'></div>`;
-      } else if (pendingNotes.mermaidGraph) {
-        // Fallback for old style (shouldn't happen with new prompts, but good for safety)
-        html += `<h2>🗺️ Mind Map</h2>`;
-        html += `<pre><code>${pendingNotes.mermaidGraph}</code></pre>`;
       }
 
       // Insert at current cursor position (or end if no selection)
-      editor.chain().focus().insertContent(html).run();
-
-      // Clear pending notes
-      clearPendingNotes();
+      // Use queueMicrotask to avoid flushSync error during React render
+      queueMicrotask(() => {
+        editor.chain().focus().insertContent(html).run();
+        clearPendingNotes();
+      });
     }
   }, [pendingNotes, editor, clearPendingNotes]);
 
