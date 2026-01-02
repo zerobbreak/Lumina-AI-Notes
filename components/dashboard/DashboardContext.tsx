@@ -9,7 +9,10 @@ export interface StructuredNotes {
   cornellNotes: string[];
   actionItems: string[];
   reviewQuestions: string[];
-  mermaidGraph: string;
+  diagramData?: {
+    nodes: any[];
+    edges: any[];
+  };
 }
 
 export interface PinnedContext {

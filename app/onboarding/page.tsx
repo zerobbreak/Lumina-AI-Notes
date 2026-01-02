@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery, useConvexAuth } from "convex/react";
+import { useMutation, useQuery, useConvexAuth, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
@@ -24,6 +24,9 @@ export default function OnboardingPage() {
   const completeOnboarding = useMutation(api.users.completeOnboarding);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const uploadFile = useMutation(api.files.uploadFile);
+  const createNote = useMutation(api.notes.createNote); // NEW
+  const updateNote = useMutation(api.notes.updateNote); // NEW
+  const generateCourseRoadmap = useAction(api.ai.generateCourseRoadmap); // NEW
   const userData = useQuery(api.users.getUser);
 
   const [step, setStep] = useState(1);
@@ -114,6 +117,39 @@ export default function OnboardingPage() {
           theme: theme.accent,
           enabledBlocks: blocks,
         });
+
+        // SPECIAL: If Visual Mode (Mind Map) is selected, generate a Course Roadmap
+        if (formData.noteStyle === "mindmap") {
+          try {
+            const courseNames = courses.map((c) => c.name);
+            // 1. Generate Diagram Data
+            const roadmapData = await generateCourseRoadmap({
+              major: formData.major,
+              courses: courseNames,
+            });
+
+            // 2. Create the Roadmap Note
+            // Format specifically for the Diagram Node
+            const diagramHtml = `<div data-type="diagram" data-nodes='${JSON.stringify(roadmapData.nodes)}' data-edges='${JSON.stringify(roadmapData.edges)}'></div>`;
+
+            const roadmapNoteId = await createNote({
+              title: "My Course Roadmap",
+              noteType: "page",
+            });
+
+            await updateNote({
+              noteId: roadmapNoteId,
+              content: `
+                  <h2>🎓 '${formData.major}' Learning Path</h2>
+                  <p>Here is your personalized roadmap generated based on your major and enrolled courses.</p>
+                  ${diagramHtml}
+                  <p><em>Use this map to track your progress and see connections between subjects.</em></p>
+                `,
+            });
+          } catch (e) {
+            console.error("Failed to generate roadmap", e);
+          }
+        }
 
         router.push("/dashboard");
       } catch (error) {

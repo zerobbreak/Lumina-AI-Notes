@@ -12,6 +12,7 @@ import FolderView from "@/components/dashboard/views/FolderView";
 import SmartFolderHub from "@/components/dashboard/views/SmartFolderHub";
 import { FlashcardsView } from "@/components/dashboard/flashcards/FlashcardsView";
 import { FlashcardStudy } from "@/components/dashboard/flashcards/FlashcardStudy";
+import ArchiveView from "@/components/dashboard/views/ArchiveView";
 
 export default function DashboardPage() {
   const searchParams = useSearchParams();
@@ -77,7 +78,12 @@ export default function DashboardPage() {
     return <FlashcardsView />;
   }
 
-  // --- VIEW 3: SMART FOLDER OVERVIEW ---
+  // --- VIEW 3: ARCHIVE ---
+  if (view === "archive") {
+    return <ArchiveView />;
+  }
+
+  // --- VIEW 4: SMART FOLDER OVERVIEW ---
   if (contextId) {
     return (
       <FolderView contextId={contextId} contextType={contextType || "course"} />

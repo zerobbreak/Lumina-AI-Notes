@@ -8,6 +8,7 @@ import SpeechRecognition, {
 import { useMutation, useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { toast } from "sonner";
 import {
   Mic,
   Clock,
@@ -25,6 +26,7 @@ import {
   History,
   Trash2,
   FileAudio,
+  FileText,
 } from "lucide-react";
 import {
   Dialog,
@@ -97,6 +99,8 @@ export function RightSidebar() {
   const [showPastSessions, setShowPastSessions] = useState(false);
   const [selectedSession, setSelectedSession] =
     useState<Id<"recordings"> | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [usedContextName, setUsedContextName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // API Hooks
@@ -116,7 +120,15 @@ export function RightSidebar() {
 
   // Get dashboard context for pending notes and active context
   const { setPendingNotes, activeContext, setActiveContext } = useDashboard();
-  const generateFromPinnedAudio = useAction(api.notes.generateFromPinnedAudio); // New Phase 2 Action
+  const generateFromPinnedAudio = useAction(api.notes.generateFromPinnedAudio);
+
+  // Validate active context file still exists
+  const contextFile = useQuery(
+    api.files.getFile,
+    activeContext && activeContext.type === "file"
+      ? { fileId: activeContext.id as Id<"files"> }
+      : "skip"
+  ); // New Phase 2 Action
 
   // Phase 4: Magnetic Drop Zone Logic
   const onDrop = useCallback(
@@ -188,13 +200,18 @@ export function RightSidebar() {
   };
 
   // Reset handler (moved up for hoisting)
-  const handleReset = () => {
+  const handleReset = (showToast = false) => {
     setIsRecording(false);
     setElapsedTime(0);
     resetTranscript();
     setSessionTranscript([]);
     setGeneratedNotes(null);
     setSelectedSession(null);
+    setActiveContext(null);
+    setUsedContextName(null);
+    if (showToast) {
+      toast.success("Session reset", { duration: 2000 });
+    }
   };
 
   const handleSaveClick = () => {
@@ -203,9 +220,9 @@ export function RightSidebar() {
     const hasExistingChunks = sessionTranscript.length > 0;
 
     if (!currentText && !hasExistingChunks) {
-      alert(
-        "Cannot save empty recording. Please speak to record something first."
-      );
+      toast.warning("Cannot save empty recording", {
+        description: "Please speak to record something first.",
+      });
       return;
     }
 
@@ -244,12 +261,14 @@ export function RightSidebar() {
         transcript: JSON.stringify(finalChunks),
       });
 
+      toast.success("Session saved successfully!");
       handleReset();
       setIsSaveModalOpen(false);
-      // Optional: Toast success here
     } catch (e) {
       console.error("Failed to save transcript", e);
-      alert("Failed to save session. Please try again.");
+      toast.error("Failed to save session", {
+        description: "Please check your connection and try again.",
+      });
     }
   };
 
@@ -266,21 +285,37 @@ export function RightSidebar() {
     }
 
     if (finalChunks.length === 0) {
-      alert(
-        "No transcript to generate notes from. Please record something first."
-      );
+      toast.warning("No transcript available", {
+        description: "Please record something first to generate notes.",
+      });
       return;
     }
 
     setIsGeneratingNotes(true);
+
+    // Track if we're using context for this generation
+    const usingContext = activeContext && activeContext.type === "file";
+
     try {
-      if (activeContext && activeContext.type === "file") {
+      if (usingContext) {
+        // Validate context file exists before generating
+        if (contextFile === null) {
+          toast.error("Context file not found", {
+            description:
+              "The pinned document no longer exists. Please select another.",
+          });
+          setActiveContext(null);
+          setIsGeneratingNotes(false);
+          return;
+        }
+
         // Generate notes with pinned document context
         const notes = await generateFromPinnedAudio({
           transcript: JSON.stringify(finalChunks),
           pinnedFileId: activeContext.id,
         });
         setGeneratedNotes(notes);
+        setUsedContextName(activeContext.name);
       } else {
         // Standard generation without context
         const notes = await generateStructuredNotes({
@@ -288,10 +323,24 @@ export function RightSidebar() {
           title: recordingTitle || "Recording",
         });
         setGeneratedNotes(notes);
+        setUsedContextName(null);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to generate notes", e);
-      alert("Failed to generate notes. Please check AI configuration.");
+
+      const errorMessage = e?.message || "";
+      if (
+        usingContext &&
+        (errorMessage.includes("not found") || errorMessage.includes("File"))
+      ) {
+        toast.error("Context file error", {
+          description: "There was an issue accessing the pinned document.",
+        });
+      } else {
+        toast.error("Failed to generate notes", {
+          description: "Please check your AI configuration and try again.",
+        });
+      }
     } finally {
       setIsGeneratingNotes(false);
     }
@@ -348,6 +397,20 @@ export function RightSidebar() {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [isRecording]);
+
+  // Clear context if file no longer exists
+  useEffect(() => {
+    if (
+      activeContext &&
+      activeContext.type === "file" &&
+      contextFile === null
+    ) {
+      toast.warning("Context file no longer exists", {
+        description: `"${activeContext.name}" was removed. Context cleared.`,
+      });
+      setActiveContext(null);
+    }
+  }, [contextFile, activeContext, setActiveContext]);
 
   const handleToggleRecording = async () => {
     if (!isRecording) {
@@ -777,7 +840,7 @@ export function RightSidebar() {
                 size="icon"
                 variant="ghost"
                 className="text-gray-400 hover:text-white"
-                onClick={handleReset}
+                onClick={() => handleReset(true)}
                 title="Reset"
               >
                 <RotateCcw className="w-4 h-4" />
@@ -1073,6 +1136,19 @@ export function RightSidebar() {
                     Dismiss
                   </Button>
                 </div>
+
+                {/* Context Attribution */}
+                {usedContextName && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                    <FileText className="w-4 h-4 text-blue-400 shrink-0" />
+                    <span className="text-xs text-blue-300">
+                      Generated with context:{" "}
+                      <span className="font-medium text-blue-200">
+                        {usedContextName}
+                      </span>
+                    </span>
+                  </div>
+                )}
 
                 {/* Summary */}
                 <div className="bg-black/20 p-3 rounded-lg border-l-2 border-purple-500">

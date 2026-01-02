@@ -28,6 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
+import { DiagramExtension } from "./extensions/DiagramExtension";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -100,6 +101,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       Placeholder.configure({
         placeholder: "Start writing your notes...",
       }),
+      DiagramExtension,
     ],
     editorProps: {
       attributes: {
@@ -169,12 +171,12 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       // Cornell Notes
       if (pendingNotes.cornellCues.length > 0) {
         html += `<h2>📚 Cornell Notes</h2>`;
-        html += `<table><tbody>`;
         pendingNotes.cornellCues.forEach((cue, i) => {
           const note = pendingNotes.cornellNotes[i] || "";
-          html += `<tr><td><strong>${cue}</strong></td><td>${note}</td></tr>`;
+          html += `<h4>${cue}</h4>`;
+          html += `<blockquote>${note}</blockquote>`;
+          html += `<hr/>`;
         });
-        html += `</tbody></table>`;
       }
 
       // Action Items
@@ -197,8 +199,13 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         html += `</ul>`;
       }
 
-      // Mermaid Graph (as code block)
-      if (pendingNotes.mermaidGraph) {
+      // Interactive Mind Map
+      if (pendingNotes.diagramData && pendingNotes.diagramData.nodes) {
+        // We inject the HTML that matches the DiagramExtension parseHTML rule
+        html += `<h2>🗺️ Mind Map</h2>`;
+        html += `<div data-type="diagram" data-nodes='${JSON.stringify(pendingNotes.diagramData.nodes)}' data-edges='${JSON.stringify(pendingNotes.diagramData.edges || [])}'></div>`;
+      } else if (pendingNotes.mermaidGraph) {
+        // Fallback for old style (shouldn't happen with new prompts, but good for safety)
         html += `<h2>🗺️ Mind Map</h2>`;
         html += `<pre><code>${pendingNotes.mermaidGraph}</code></pre>`;
       }

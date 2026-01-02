@@ -1,7 +1,7 @@
 "use client";
 
 import { useDocumentProcessor } from "@/components/documents";
-import { Loader2, FileText, CheckCircle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 /**

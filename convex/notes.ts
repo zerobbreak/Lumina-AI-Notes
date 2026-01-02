@@ -94,6 +94,25 @@ export const getRecentNotes = query({
   },
 });
 
+export const getArchivedNotes = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return [];
+    }
+
+    const notes = await ctx.db
+      .query("notes")
+      .withIndex("by_userId", (q) => q.eq("userId", identity.tokenIdentifier))
+      .filter((q) => q.eq(q.field("isArchived"), true))
+      .order("desc")
+      .collect();
+
+    return notes;
+  },
+});
+
 export const getNotesByContext = query({
   args: {
     courseId: v.optional(v.string()),
@@ -329,30 +348,45 @@ export const generateFromPinnedAudio = action({
       ? `\n\nRelevant Context from Pinned Document:\n"""\n${contextText}\n"""\n\nUse this context to enhance your notes. Reference specific information from the document when relevant.`
       : "";
 
-    const prompt = `You are an expert academic note-taker. Convert the following lecture transcript into structured study notes.${contextSection}
+    const prompt = `You are an expert academic note-taker. Your goal is to convert the following lecture transcript into clear, structured, and visually distinct study notes.${contextSection}
 
 Transcript:
 """
 ${args.transcript}
 """
 
+Instructions:
+1. **Analyze the Core Topic**: Identify the main subject of the lecture immediately.
+2. **Structure**: Organize the output into the EXACT JSON format below.
+3. **Clarity**: Ensure cues are distinct questions or keywords, and notes are detailed explanations.
+
 Generate a JSON response with this EXACT structure:
 {
-  "summary": "A 2-3 sentence overview of the main topic and key takeaways",
-  "cornellCues": ["Question or keyword 1", "Question or keyword 2", "...up to 5-7 cues"],
-  "cornellNotes": ["Corresponding detailed note for cue 1", "Corresponding detailed note for cue 2", "...matching notes"],
+  "summary": "Start with a bold statement identifying the MAIN TOPIC (e.g., 'This lecture covers...'). Then provide a 2-3 sentence overview of key takeaways.",
+  "cornellCues": ["Major Concept 1", "Key Question 2", "Term Definition"],
+  "cornellNotes": ["Detailed explanation of Concept 1...", "Answer to Question 2...", "Definition and context..."],
   "actionItems": ["Homework: ...", "Read: ...", "Due date: ..."],
   "reviewQuestions": ["What is...?", "How does...?", "Why is...?"],
-  "mermaidGraph": "graph TD\\n    A[Main Topic] --> B[Subtopic 1]\\n    A --> C[Subtopic 2]"
+  "diagramData": {
+    "nodes": [
+      { "id": "1", "type": "input", "data": { "label": "Main Topic" }, "position": { "x": 0, "y": 0 } },
+      { "id": "2", "data": { "label": "Subconcept" }, "position": { "x": 100, "y": 100 } }
+    ],
+    "edges": [
+      { "id": "e1-2", "source": "1", "target": "2" }
+    ]
+  }
 }
 
 Rules:
 - cornellCues and cornellNotes arrays must have the same length
+- cornellCues should be short (1-5 words) and impactful
 - actionItems should only include explicitly mentioned tasks/deadlines (empty array if none)
-- mermaidGraph should visualize the lecture hierarchy (use proper Mermaid.js syntax)
+- diagramData should form a logical concept map of the lecture
+- Use "type": "input" for the Central Topic node
+- Generate reasonable (x, y) positions to minimize overlap (simulated layout)
 - If context was provided, integrate relevant information from the document
-- Return ONLY valid JSON, no markdown code fences or explanation
-- Escape newlines in mermaidGraph as \\n`;
+- Return ONLY valid JSON, no markdown code fences or explanation`;
 
     try {
       const result = await model.generateContent(prompt);

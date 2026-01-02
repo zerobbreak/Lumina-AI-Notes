@@ -1,6 +1,15 @@
 "use client";
 
-import { Search, Settings, Layers, Plus, Upload } from "lucide-react";
+import {
+  Search,
+  Settings,
+  Layers,
+  Plus,
+  Upload,
+  Loader2,
+  Archive,
+} from "lucide-react";
+import { toast } from "sonner";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { useMutation, useQuery, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -12,7 +21,7 @@ import { SearchDialog } from "@/components/dashboard/search/SearchDialog";
 import { Course, UserFile } from "@/lib/types";
 import { Id } from "@/convex/_generated/dataModel";
 import { UploadDialog } from "@/components/dashboard/dialogs/UploadDialog";
-import { CreateNoteDialog } from "@/components/dashboard/dialogs/CreateNoteDialog";
+
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { useDashboard } from "@/hooks/useDashboard";
 import { DraggableDocument, DocumentStatusBadge } from "@/components/documents";
@@ -36,6 +45,7 @@ export function Sidebar() {
 
   // Queries
   const userData = useQuery(api.users.getUser);
+  const createNote = useMutation(api.notes.createNote);
   const quickNotes = useQuery(api.notes.getQuickNotes);
   const recentFiles = useQuery(api.files.getFiles);
 
@@ -61,7 +71,7 @@ export function Sidebar() {
     Record<string, boolean>
   >({});
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [isCreateNoteOpen, setIsCreateNoteOpen] = useState(false);
+  const [isCreatingNote, setIsCreatingNote] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
 
@@ -124,7 +134,24 @@ export function Sidebar() {
   ) => setRenameTarget({ id, type, name, parentId });
 
   // Notes
-  const handleCreateNote = () => setIsCreateNoteOpen(true);
+  // Notes
+  const handleCreateNote = async () => {
+    try {
+      setIsCreatingNote(true);
+      const noteId = await createNote({
+        title: "Untitled Note",
+        major: userData?.major || "general",
+        style: "standard",
+      });
+      router.push(`/dashboard?noteId=${noteId}`);
+      toast.success("New note created");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to create note");
+    } finally {
+      setIsCreatingNote(false);
+    }
+  };
 
   // Courses
   const handleCreateCourse = async () => {
@@ -138,7 +165,7 @@ export function Sidebar() {
   if (!isLeftSidebarOpen) return null;
 
   return (
-    <div className="w-[280px] h-screen bg-[#050505]/80 backdrop-blur-2xl border-r border-white/6 flex flex-col shrink-0 z-50 relative group/sidebar shadow-2xl shadow-black/50">
+    <div className="w-[280px] h-screen bg-[#050505]/80 backdrop-blur-2xl border-r border-white/6 flex flex-col shrink-0 z-50 relative group/sidebar shadow-2xl shadow-black/50 overflow-hidden">
       {/* Header */}
       <div className="p-4 space-y-4">
         {/* Profile Card */}
@@ -175,10 +202,10 @@ export function Sidebar() {
           </span>
         </Button>
       </div>
-      <ScrollArea className="flex-1 px-3 py-3">
+      <ScrollArea className="flex-1 px-3 py-3 min-w-0">
         {/* COURSES */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between px-2 mb-2 group">
+        <div className="mb-6 min-w-0">
+          <div className="flex items-center justify-between px-2 mb-2 group min-w-0">
             <h3 className="text-[10px] font-bold text-gray-500/80 uppercase tracking-[0.2em] transition-colors group-hover:text-gray-400">
               Smart Folders
             </h3>
@@ -222,8 +249,8 @@ export function Sidebar() {
         </div>
 
         {/* FILES */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between px-2 mb-2 group">
+        <div className="mb-6 min-w-0">
+          <div className="flex items-center justify-between px-2 mb-2 group min-w-0">
             <h3 className="text-[10px] font-bold text-gray-500/80 uppercase tracking-[0.2em] transition-colors group-hover:text-gray-400">
               Resource Library
             </h3>
@@ -282,8 +309,8 @@ export function Sidebar() {
         </div>
 
         {/* NOTES */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between px-2 mb-2 group">
+        <div className="mb-6 min-w-0">
+          <div className="flex items-center justify-between px-2 mb-2 group min-w-0">
             <h3 className="text-[10px] font-bold text-gray-500/80 uppercase tracking-[0.2em] transition-colors group-hover:text-gray-400">
               Quick Notes
             </h3>
@@ -294,7 +321,11 @@ export function Sidebar() {
               onClick={handleCreateNote}
               title="Create Quick Note"
             >
-              <Plus className="w-3.5 h-3.5" />
+              {isCreatingNote ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Plus className="w-3.5 h-3.5" />
+              )}
             </Button>
           </div>
           <div className="space-y-0.5">
@@ -332,6 +363,16 @@ export function Sidebar() {
             </div>
             <span>Flashcards</span>
           </Button>
+          <Button
+            variant="ghost"
+            className="w-full justify-start h-9 px-2.5 text-[13px] text-gray-400 hover:text-white hover:bg-white/4 gap-3 transition-all group mt-1"
+            onClick={() => router.push("/dashboard?view=archive")}
+          >
+            <div className="p-0.5 rounded bg-orange-500/10 group-hover:bg-orange-500/20 transition-colors">
+              <Archive className="w-3.5 h-3.5 text-orange-400 group-hover:text-orange-300" />
+            </div>
+            <span>Trash & Archive</span>
+          </Button>
         </div>
       </ScrollArea>
       <div className="p-4 border-t border-white/6 bg-black/20 backdrop-blur-md">
@@ -365,10 +406,6 @@ export function Sidebar() {
             ? (searchParams.get("contextId") ?? undefined)
             : undefined
         }
-      />
-      <CreateNoteDialog
-        open={isCreateNoteOpen}
-        onOpenChange={setIsCreateNoteOpen}
       />
 
       {renameTarget && (

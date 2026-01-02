@@ -93,6 +93,73 @@ Format the output as clean markdown suitable for studying.`;
 /**
  * Answer questions about provided context (notes or transcripts)
  */
+/**
+ * Generate a visual course roadmap (Mind Map)
+ */
+export const generateCourseRoadmap = action({
+  args: {
+    major: v.string(),
+    courses: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const model = getGeminiModel();
+
+    const prompt = `You are an academic advisor. Create a visual learning roadmap (mind map) for a student majoring in "${args.major}".
+    
+    Courses: ${args.courses.join(", ")}
+
+    Generate a node-graph JSON structure representing the relationships between these courses and key concepts they cover.
+
+    Return EXACTLY this JSON structure:
+    {
+      "nodes": [
+        { "id": "1", "type": "input", "data": { "label": "${args.major}" }, "position": { "x": 0, "y": 0 } },
+        { "id": "2", "data": { "label": "Course Name" }, "position": { "x": 100, "y": 100 } }
+      ],
+      "edges": [
+        { "id": "e1-2", "source": "1", "target": "2", "animated": true }
+      ]
+    }
+
+    Rules:
+    - The central node should be the Major.
+    - Branch out to Semesters or Core Areas, then to specific Courses.
+    - Add "Concept" nodes for key topics within courses if relevant.
+    - Use "animated": true for edges showing progression.
+    - Generate reasonable (x, y) positions to minimize overlap (simulated layout).
+    - Return ONLY valid JSON.
+    `;
+
+    try {
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+
+      // Extract JSON
+      const match = text.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error("Failed to generate roadmap JSON");
+
+      return JSON.parse(match[0]);
+    } catch (e) {
+      console.error("Roadmap generation failed", e);
+      // Return a basic fallback structure
+      return {
+        nodes: [
+          {
+            id: "1",
+            type: "input",
+            data: { label: args.major },
+            position: { x: 0, y: 0 },
+          },
+        ],
+        edges: [],
+      };
+    }
+  },
+});
+
+/**
+ * Answer questions about provided context (notes or transcripts)
+ */
 export const askAboutContext = action({
   args: {
     question: v.string(),
@@ -159,15 +226,25 @@ Generate a JSON response with this EXACT structure:
   "cornellNotes": ["Corresponding detailed note for cue 1", "Corresponding detailed note for cue 2", "...matching notes"],
   "actionItems": ["Homework: ...", "Read: ...", "Due date: ..."],
   "reviewQuestions": ["What is...?", "How does...?", "Why is...?"],
-  "mermaidGraph": "graph TD\\n    A[Main Topic] --> B[Subtopic 1]\\n    A --> C[Subtopic 2]"
+  "diagramData": {
+    "nodes": [
+      { "id": "1", "type": "input", "data": { "label": "Main Topic" }, "position": { "x": 0, "y": 0 } },
+      { "id": "2", "data": { "label": "Subconcept" }, "position": { "x": 100, "y": 100 } }
+    ],
+    "edges": [
+      { "id": "e1-2", "source": "1", "target": "2" }
+    ]
+  }
 }
 
 Rules:
 - cornellCues and cornellNotes arrays must have the same length
+- cornellCues should be short (1-5 words) and impactful
 - actionItems should only include explicitly mentioned tasks/deadlines (empty array if none)
-- mermaidGraph should visualize the lecture hierarchy (use proper Mermaid.js syntax)
-- Return ONLY valid JSON, no markdown code fences or explanation
-- Escape newlines in mermaidGraph as \\n`;
+- diagramData should form a logical concept map of the lecture
+- Use "type": "input" for the Central Topic node
+- Generate reasonable (x, y) positions to minimize overlap (simulated layout)
+- Return ONLY valid JSON, no markdown code fences or explanation`;
 
     try {
       const result = await model.generateContent(prompt);
