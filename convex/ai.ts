@@ -3,6 +3,7 @@
 import { action } from "./_generated/server";
 import { api } from "./_generated/api";
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Initialize Gemini client
@@ -210,7 +211,7 @@ export const generateStructuredNotes = action({
   handler: async (ctx, args) => {
     const model = getGeminiModel();
 
-    const prompt = `You are an expert academic note-taker. Convert the following lecture transcript into structured study notes.
+    const prompt = `You are an expert academic note-taker with years of experience creating comprehensive study materials. Your goal is to transform this lecture transcript into detailed, exam-ready study notes.
 
 Transcript:
 """
@@ -221,20 +222,35 @@ ${args.title ? `Lecture Title: ${args.title}` : ""}
 
 Generate a JSON response with this EXACT structure:
 {
-  "summary": "Start with the MAIN TOPIC. Then provide a 2-3 sentence overview.",
-  "cornellCues": ["Concept 1", "Concept 2", "Concept 3"],
-  "cornellNotes": ["Explanation 1", "Explanation 2", "Explanation 3"],
-  "actionItems": ["Task 1", "Task 2"],
-  "reviewQuestions": ["Question 1?", "Question 2?"],
-  "diagramNodes": ["Main Topic", "Subtopic A", "Subtopic B", "Subtopic C"],
-  "diagramEdges": ["0-1", "0-2", "1-3"]
+  "summary": "A comprehensive 4-6 sentence summary that: 1) States the main topic clearly, 2) Explains WHY this topic matters, 3) Lists the key themes covered, 4) Mentions any important conclusions or takeaways.",
+  "cornellCues": ["Concept/Term 1", "Concept/Term 2", "Concept/Term 3", "Concept/Term 4", "Concept/Term 5"],
+  "cornellNotes": [
+    "Detailed explanation with definition, examples, and context. Include specific facts, figures, or formulas mentioned.",
+    "Thorough explanation covering what it is, how it works, and why it's important. Add any relationships to other concepts.",
+    "Complete explanation with real-world applications or examples from the lecture.",
+    "In-depth coverage including any exceptions, edge cases, or important nuances mentioned.",
+    "Comprehensive notes including comparisons, contrasts, or connections to prior knowledge."
+  ],
+  "actionItems": ["Specific task 1 with deadline if mentioned", "Task 2"],
+  "reviewQuestions": [
+    "Conceptual question that tests understanding of the main idea?",
+    "Application question: How would you apply [concept] to [scenario]?",
+    "Comparison question: What is the difference between X and Y?",
+    "Analysis question that requires deeper thinking?",
+    "Synthesis question connecting multiple concepts?"
+  ],
+  "diagramNodes": ["Central Topic", "Key Concept A", "Key Concept B", "Sub-concept A1", "Sub-concept B1", "Related Idea"],
+  "diagramEdges": ["0-1", "0-2", "1-3", "2-4", "0-5"]
 }
 
-Rules:
-- cornellCues and cornellNotes arrays must have the same length
-- diagramNodes is an array of node labels (strings). First item is the central topic.
-- diagramEdges is an array of connections in format "sourceIndex-targetIndex"
-- actionItems should only include explicitly mentioned tasks (empty array if none)
+IMPORTANT RULES:
+- cornellCues: Extract 5-8 key terms, concepts, or questions from the lecture
+- cornellNotes: Each note should be 2-4 sentences with SPECIFIC details, not generic descriptions
+- Include actual examples, numbers, dates, names, or formulas mentioned in the lecture
+- reviewQuestions: Create 5 varied questions (recall, application, analysis, synthesis, evaluation)
+- diagramNodes: Create 5-8 nodes showing the hierarchical relationship between concepts
+- diagramEdges: Connect nodes logically (format: "sourceIndex-targetIndex")
+- actionItems: Only include if explicitly mentioned (homework, readings, deadlines)
 - Return ONLY valid JSON, no markdown code fences`;
 
     try {
@@ -586,7 +602,7 @@ export const semanticSearch = action({
     const results = await ctx.vectorSearch("notes", "by_embedding", {
       vector: queryEmbedding,
       limit,
-      filter: (q: any) => q.eq("userId", args.userId),
+      filter: (q) => q.eq("userId", args.userId),
     });
 
     // Get the actual note content for found results
@@ -596,26 +612,17 @@ export const semanticSearch = action({
       content: string;
       score: number;
     }> = await Promise.all(
-      results.map(
-        async (
-          result: any
-        ): Promise<{
-          id: string;
-          title: string;
-          content: string;
-          score: number;
-        }> => {
-          const note = await ctx.runQuery(api.notes.getNote, {
-            noteId: result._id,
-          });
-          return {
-            id: result._id,
-            title: note?.title || "Untitled",
-            content: note?.content?.substring(0, 500) || "",
-            score: result._score,
-          };
-        }
-      )
+      results.map(async (result) => {
+        const note = await ctx.runQuery(api.notes.getNote, {
+          noteId: result._id,
+        });
+        return {
+          id: result._id as string,
+          title: note?.title || "Untitled",
+          content: note?.content?.substring(0, 500) || "",
+          score: result._score,
+        };
+      })
     );
 
     // Synthesize answer using found context
@@ -667,11 +674,11 @@ Instructions:
 /**
  * Transcribe an audio file using Gemini
  * Supports MP3, WAV, M4A, OGG, FLAC formats
- * Accepts base64 audio data directly
+ * Fetches audio from Convex storage to avoid argument size limits
  */
 export const transcribeAudio = action({
   args: {
-    audioBase64: v.string(),
+    storageId: v.id("_storage"),
     mimeType: v.string(),
   },
   handler: async (ctx, args) => {
@@ -681,6 +688,21 @@ export const transcribeAudio = action({
     }
 
     try {
+      // Fetch the audio file from Convex storage
+      const audioBlob = await ctx.storage.get(args.storageId);
+      if (!audioBlob) {
+        throw new Error("Audio file not found in storage");
+      }
+
+      // Convert blob to base64
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let i = 0; i < uint8Array.length; i++) {
+        binary += String.fromCharCode(uint8Array[i]);
+      }
+      const audioBase64 = btoa(binary);
+
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
@@ -688,7 +710,7 @@ export const transcribeAudio = action({
         {
           inlineData: {
             mimeType: args.mimeType,
-            data: args.audioBase64,
+            data: audioBase64,
           },
         },
         {
@@ -954,7 +976,7 @@ Rules:
           extractedText = parsed.extractedText || "";
           summary = parsed.summary || summary;
           keyTopics = parsed.keyTopics || [];
-        } catch (parseError) {
+        } catch {
           // If JSON parsing fails, use the raw text as extracted content
           extractedText = extractionText;
         }
@@ -1047,26 +1069,26 @@ export const unifiedSemanticSearch = action({
     const noteResults = await ctx.vectorSearch("notes", "by_embedding", {
       vector: queryEmbedding,
       limit,
-      filter: (q: any) => q.eq("userId", args.userId),
+      filter: (q) => q.eq("userId", args.userId),
     });
 
     // Search documents
     const docResults = await ctx.vectorSearch("files", "by_embedding", {
       vector: queryEmbedding,
       limit,
-      filter: (q: any) => q.eq("userId", args.userId),
+      filter: (q) => q.eq("userId", args.userId),
     });
 
     // Fetch note details
     const noteSources = await Promise.all(
-      noteResults.map(async (result: any) => {
+      noteResults.map(async (result) => {
         const note = await ctx.runQuery(api.notes.getNote, {
           noteId: result._id,
         });
         const content =
           note?.content?.replace(/<[^>]*>/g, " ").substring(0, 200) || "";
         return {
-          id: result._id,
+          id: result._id as string,
           type: "note" as const,
           title: note?.title || "Untitled Note",
           score: result._score,
@@ -1079,12 +1101,12 @@ export const unifiedSemanticSearch = action({
 
     // Fetch document details
     const docSources = await Promise.all(
-      docResults.map(async (result: any) => {
+      docResults.map(async (result) => {
         const file = await ctx.runQuery(api.files.getFile, {
           fileId: result._id,
         });
         return {
-          id: result._id,
+          id: result._id as string,
           type: "document" as const,
           title: file?.name || "Unknown Document",
           score: result._score,
@@ -1407,7 +1429,8 @@ export const getDocumentReference = action({
       const documentContent = file.extractedText;
       const currentContext =
         args.currentNoteContent?.replace(/<[^>]*>/g, " ") || "";
-      const maxLength = args.maxLength || 1000;
+      // maxLength could be used for future truncation of responses
+      const _maxLength = args.maxLength || 1000;
 
       const model = getGeminiModel();
 
@@ -1515,7 +1538,7 @@ export const ingestAndGenerateFlashcards = action({
 
       // If storageId is provided, fetch the file from storage
       if (args.storageId) {
-        const blob = await ctx.storage.get(args.storageId as any); // cast for now as v.string used
+        const blob = await ctx.storage.get(args.storageId as Id<"_storage">);
         if (!blob) {
           throw new Error("Failed to retrieve file from storage");
         }
@@ -1731,7 +1754,7 @@ export const ingestAndGenerateNote = action({
 
       // If storageId is provided, fetch the file from storage
       if (args.storageId) {
-        const blob = await ctx.storage.get(args.storageId as any);
+        const blob = await ctx.storage.get(args.storageId as Id<"_storage">);
         if (!blob) {
           throw new Error("Failed to retrieve file from storage");
         }
@@ -1755,29 +1778,55 @@ export const ingestAndGenerateNote = action({
           },
         },
         {
-          text: `You are an expert academic note-taker. Analyze this PDF and create comprehensive study notes.
+          text: `You are an expert academic note-taker with extensive experience creating comprehensive study materials. Analyze this PDF document thoroughly and create detailed, exam-ready study notes.
 
 Generate a JSON response with this structure:
 {
-  "title": "A descriptive title for these notes (max 10 words)",
-  "content": "Full study notes in HTML format using proper semantic tags"
+  "title": "A clear, descriptive title that captures the main topic (max 10 words)",
+  "content": "Comprehensive study notes in HTML format"
 }
 
-For the content field, use proper HTML formatting:
-- Use <h2> for main sections
-- Use <h3> for subsections  
-- Use <p> for paragraphs
-- Use <ul> and <li> for bullet points
-- Use <strong> for key terms and important concepts
-- Use <em> for emphasis
-- Include all major topics, definitions, and key details from the document
+For the content field, create DETAILED notes using this HTML structure:
 
-Rules:
-- Create thorough, well-organized study notes
-- Focus on content that would be useful for studying and exam prep
-- Include key definitions, concepts, and important facts
-- Return ONLY valid JSON, no markdown code fences or explanation
-- IMPORTANT: Escape all newlines in the "content" string as \\n. Do not use literal control characters.`,
+<h2>📋 Executive Summary</h2>
+<p>A 3-4 sentence overview explaining what this document covers and why it matters.</p>
+
+<h2>🎯 Key Concepts & Definitions</h2>
+<ul>
+<li><strong>Term 1</strong>: Complete definition with context and examples</li>
+<li><strong>Term 2</strong>: Full explanation including how it relates to other concepts</li>
+</ul>
+
+<h2>📚 Main Content</h2>
+<h3>Section Title</h3>
+<p>Detailed explanation of the topic with specific facts, figures, and examples from the document.</p>
+<ul>
+<li>Important point with supporting details</li>
+<li>Another key point with examples or evidence</li>
+</ul>
+
+<h2>💡 Important Takeaways</h2>
+<ul>
+<li>Key insight 1 - why it matters</li>
+<li>Key insight 2 - practical application</li>
+</ul>
+
+<h2>❓ Review Questions</h2>
+<ul>
+<li>What is the main purpose of [concept]?</li>
+<li>How does [X] relate to [Y]?</li>
+<li>Why is [topic] significant?</li>
+</ul>
+
+CRITICAL REQUIREMENTS:
+- Extract SPECIFIC information: names, dates, numbers, formulas, examples
+- Include ALL major topics and subtopics from the document
+- Provide thorough explanations, not just surface-level summaries
+- Add context and connections between ideas
+- Create 3-5 review questions based on the content
+- Use <strong> for key terms and <em> for emphasis
+- Return ONLY valid JSON, no markdown code fences
+- IMPORTANT: Escape all newlines in the "content" string as \\n`,
         },
       ]);
 

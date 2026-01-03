@@ -5,6 +5,8 @@ import {
   Pencil,
   Archive,
   RefreshCw,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,8 +19,10 @@ interface ActionMenuProps {
   onRename?: () => void;
   onDelete?: () => void;
   onArchive?: () => void;
+  onPin?: () => void;
   onRetry?: () => void;
   isArchived?: boolean;
+  isPinned?: boolean;
   showRetry?: boolean;
   align?: "right" | "left";
 }
@@ -27,8 +31,10 @@ export function ActionMenu({
   onRename,
   onDelete,
   onArchive,
+  onPin,
   onRetry,
   isArchived,
+  isPinned,
   showRetry,
   align = "right",
 }: ActionMenuProps) {
@@ -64,6 +70,29 @@ export function ActionMenu({
             >
               <Pencil className="w-3 h-3" />
               Rename
+            </button>
+          )}
+
+          {onPin && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onPin();
+                setIsOpen(false);
+              }}
+              className="flex items-center gap-2 px-2 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-white/10 rounded-md w-full text-left"
+            >
+              {isPinned ? (
+                <>
+                  <PinOff className="w-3 h-3" />
+                  Unpin
+                </>
+              ) : (
+                <>
+                  <Pin className="w-3 h-3" />
+                  Pin
+                </>
+              )}
             </button>
           )}
 

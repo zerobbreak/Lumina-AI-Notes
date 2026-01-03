@@ -22,6 +22,7 @@ import { ActionMenu } from "@/components/shared/ActionMenu";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { EditableTitle } from "@/components/shared/EditableTitle";
 import { DraggableDocument, DocumentStatusBadge } from "@/components/documents";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { useState } from "react";
 
 interface FolderViewProps {
@@ -84,6 +85,8 @@ export default function FolderView({
   const deleteModule = useMutation(api.users.deleteModule);
   const deleteFile = useMutation(api.files.deleteFile);
   const renameFile = useMutation(api.files.renameFile);
+  const togglePinNote = useMutation(api.notes.togglePinNote);
+  const deleteNote = useMutation(api.notes.deleteNote);
 
   const [renameTarget, setRenameTarget] = useState<{
     id: string;
@@ -306,8 +309,16 @@ export default function FolderView({
 
                 {(!currentCourse.modules ||
                   currentCourse.modules.length === 0) && (
-                  <div className="text-gray-600 text-sm italic col-span-full">
-                    No modules yet. Add one to organize your notes.
+                  <div className="col-span-full">
+                    <EmptyState
+                      icon={<Folder className="w-8 h-8 text-purple-400" />}
+                      title="No modules yet"
+                      description="Create modules to organize your notes into topics or chapters"
+                      action={{
+                        label: "Add Module",
+                        onClick: handleAddModule,
+                      }}
+                    />
                   </div>
                 )}
               </motion.div>
@@ -354,7 +365,15 @@ export default function FolderView({
                 <span className="text-sm font-medium">Create New</span>
               </motion.div>
 
-              {contextNotes?.map((n) => (
+              {contextNotes
+                ?.sort((a, b) => {
+                  // Pinned notes first
+                  if (a.isPinned && !b.isPinned) return -1;
+                  if (!a.isPinned && b.isPinned) return 1;
+                  // Then by creation date (newest first)
+                  return b.createdAt - a.createdAt;
+                })
+                .map((n) => (
                 <motion.div
                   key={n._id}
                   variants={itemVariants}
@@ -364,9 +383,33 @@ export default function FolderView({
                 >
                   <div className="space-y-3">
                     <div className="flex justify-between items-start">
-                      <span className="text-[10px] font-mono text-cyan-500/70 bg-cyan-950/30 px-2 py-0.5 rounded border border-cyan-500/10">
-                        {n.style || "NOTE"}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {n.isPinned && (
+                          <Pin className="w-3 h-3 text-amber-400" />
+                        )}
+                        <span className="text-[10px] font-mono text-cyan-500/70 bg-cyan-950/30 px-2 py-0.5 rounded border border-cyan-500/10">
+                          {n.style || "NOTE"}
+                        </span>
+                      </div>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <ActionMenu
+                          onPin={() => togglePinNote({ noteId: n._id })}
+                          isPinned={n.isPinned}
+                          onRename={() =>
+                            setRenameTarget({
+                              id: n._id,
+                              title: n.title,
+                              type: "note",
+                            })
+                          }
+                          onDelete={() => {
+                            if (confirm("Delete this note?")) {
+                              deleteNote({ noteId: n._id });
+                            }
+                          }}
+                          align="right"
+                        />
+                      </div>
                     </div>
                     <h3 className="font-semibold text-xl text-white line-clamp-2 group-hover:text-cyan-100 transition-colors">
                       {n.title}
@@ -390,8 +433,16 @@ export default function FolderView({
               ))}
 
               {(!contextNotes || contextNotes.length === 0) && (
-                <div className="col-span-2 text-gray-600 text-sm flex items-center p-4 italic">
-                  No notes yet. Create one to get started.
+                <div className="col-span-full">
+                  <EmptyState
+                    icon={<FileText className="w-8 h-8 text-cyan-400" />}
+                    title="No notes yet"
+                    description="Create your first note to start organizing your thoughts and ideas"
+                    action={{
+                      label: "Create Note",
+                      onClick: handleCreateNoteInContext,
+                    }}
+                  />
                 </div>
               )}
             </motion.div>
@@ -465,9 +516,12 @@ export default function FolderView({
               ))}
 
               {(!contextFiles || contextFiles.length === 0) && (
-                <div className="text-gray-600 text-sm italic">
-                  No files linked to this folder.
-                </div>
+                <EmptyState
+                  icon={<File className="w-8 h-8 text-indigo-400" />}
+                  title="No files yet"
+                  description="Upload files to enhance your notes with additional resources"
+                  className="py-8"
+                />
               )}
             </motion.div>
           </section>

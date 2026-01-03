@@ -14,6 +14,7 @@ export type SearchResult = {
 export const search = query({
   args: {
     query: v.string(),
+    type: v.optional(v.union(v.literal("note"), v.literal("file"), v.literal("deck"), v.literal("all"))),
   },
   handler: async (ctx, args) => {
     const userId = (await ctx.auth.getUserIdentity())?.tokenIdentifier;
@@ -26,61 +27,68 @@ export const search = query({
       return [];
     }
 
-    // Parallel search across multiple tables
-    const [notes, files, decks] = await Promise.all([
-      ctx.db
+    const searchType = args.type || "all";
+    const results: SearchResult[] = [];
+
+    // Search Notes
+    if (searchType === "all" || searchType === "note") {
+      const notes = await ctx.db
         .query("notes")
         .withSearchIndex("search_title", (q) =>
           q.search("title", args.query).eq("userId", userId)
         )
-        .take(5),
-      ctx.db
+        .filter((q) => q.neq(q.field("isArchived"), true))
+        .take(10);
+
+      for (const note of notes) {
+        results.push({
+          type: "note",
+          id: note._id,
+          title: note.title,
+          subtitle: note.isPinned ? "📌 Pinned Note" : "Note",
+          url: `/dashboard?noteId=${note._id}`,
+        });
+      }
+    }
+
+    // Search Files
+    if (searchType === "all" || searchType === "file") {
+      const files = await ctx.db
         .query("files")
         .withSearchIndex("search_name", (q) =>
           q.search("name", args.query).eq("userId", userId)
         )
-        .take(5),
-      ctx.db
+        .take(10);
+
+      for (const file of files) {
+        results.push({
+          type: "file",
+          id: file._id,
+          title: file.name,
+          subtitle: file.type.toUpperCase(),
+          url: file.url || "#",
+        });
+      }
+    }
+
+    // Search Decks
+    if (searchType === "all" || searchType === "deck") {
+      const decks = await ctx.db
         .query("flashcardDecks")
         .withSearchIndex("search_title", (q) =>
           q.search("title", args.query).eq("userId", userId)
         )
-        .take(5),
-    ]);
+        .take(10);
 
-    const results: SearchResult[] = [];
-
-    // Format Notes
-    for (const note of notes) {
-      results.push({
-        type: "note",
-        id: note._id,
-        title: note.title,
-        subtitle: "Note",
-        url: `/dashboard?noteId=${note._id}`,
-      });
-    }
-
-    // Format Files
-    for (const file of files) {
-      results.push({
-        type: "file",
-        id: file._id,
-        title: file.name,
-        subtitle: file.type.toUpperCase(),
-        url: file.url || "#",
-      });
-    }
-
-    // Format Decks
-    for (const deck of decks) {
-      results.push({
-        type: "deck",
-        id: deck._id,
-        title: deck.title,
-        subtitle: `Flashcards • ${deck.cardCount} cards`,
-        url: `/dashboard?view=flashcards&deckId=${deck._id}`,
-      });
+      for (const deck of decks) {
+        results.push({
+          type: "deck",
+          id: deck._id,
+          title: deck.title,
+          subtitle: `Flashcards • ${deck.cardCount} cards`,
+          url: `/dashboard?view=flashcards&deckId=${deck._id}`,
+        });
+      }
     }
 
     return results;

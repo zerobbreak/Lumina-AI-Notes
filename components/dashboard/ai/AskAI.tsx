@@ -9,12 +9,14 @@ interface AskAIProps {
   context?: string;
   contextType?: "note" | "transcript" | "general";
   contextTitle?: string;
+  onInsertToNote?: (content: string) => void;
 }
 
 export function AskAI({
   context,
   contextType = "general",
   contextTitle,
+  onInsertToNote,
 }: AskAIProps) {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const { isRightSidebarOpen } = useDashboard();
@@ -33,6 +35,7 @@ export function AskAI({
           context={context}
           contextType={contextType}
           contextTitle={contextTitle}
+          onInsertToNote={onInsertToNote}
         />
 
         <button

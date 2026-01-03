@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, memo, useMemo } from "react";
 import { ChevronRight, ChevronDown, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActionMenu } from "@/components/shared/ActionMenu";
@@ -27,7 +27,7 @@ interface SidebarCourseProps {
   onArchiveNote: (id: string) => void;
 }
 
-export function SidebarCourse({
+function SidebarCourseComponent({
   course,
   isExpanded,
   onToggle,
@@ -50,7 +50,7 @@ export function SidebarCourse({
   const addModule = useMutation(api.users.addModuleToCourse);
   const moveNoteToFolder = useMutation(api.notes.moveNoteToFolder);
 
-  const handleCreateModule = async (e: React.MouseEvent) => {
+  const handleCreateModule = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
       await addModule({ courseId: course.id, title: "New Module" });
@@ -58,24 +58,24 @@ export function SidebarCourse({
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [addModule, course.id, isExpanded, onToggle]);
 
   // Drop zone handlers
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (e.dataTransfer.types.includes("application/lumina-note-id")) {
       e.dataTransfer.dropEffect = "move";
       setIsDragOver(true);
     }
-  };
+  }, []);
 
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-  };
+  }, []);
 
-  const handleDrop = async (e: React.DragEvent) => {
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
@@ -95,10 +95,30 @@ export function SidebarCourse({
         toast.error("Failed to move note");
       }
     }
-  };
+  }, [moveNoteToFolder, course.id, course.name]);
 
-  // Filter notes that don't belong to any module
-  const rootCourseNotes = courseNotes?.filter((note) => !note.moduleId);
+  const handleCourseClick = useCallback(() => {
+    router.push(`/dashboard?contextId=${course.id}&contextType=course`);
+  }, [router, course.id]);
+
+  const handleToggleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggle();
+  }, [onToggle]);
+
+  const handleRename = useCallback(() => {
+    onRename(course.id, course.name);
+  }, [onRename, course.id, course.name]);
+
+  const handleDelete = useCallback(() => {
+    onDelete(course.id);
+  }, [onDelete, course.id]);
+
+  // Filter notes that don't belong to any module - memoized
+  const rootCourseNotes = useMemo(() => 
+    courseNotes?.filter((note) => !note.moduleId),
+    [courseNotes]
+  );
 
   return (
     <div className="space-y-1 relative group/item">
@@ -112,9 +132,7 @@ export function SidebarCourse({
                 ? "bg-indigo-500/10 text-indigo-400 border-indigo-500 hover:bg-indigo-500/20 hover:text-indigo-300"
                 : "border-transparent text-gray-400 hover:text-white hover:bg-white/4"
           )}
-          onClick={() =>
-            router.push(`/dashboard?contextId=${course.id}&contextType=course`)
-          }
+          onClick={handleCourseClick}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
@@ -127,10 +145,7 @@ export function SidebarCourse({
                 ? "text-indigo-400"
                 : "text-gray-500 hover:bg-white/10 hover:text-gray-300"
             )}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggle();
-            }}
+            onClick={handleToggleClick}
           >
             {isExpanded ? (
               <ChevronDown className="w-3.5 h-3.5" />
@@ -153,8 +168,8 @@ export function SidebarCourse({
         {/* Action Menu - Absolute Positioned */}
         <div className="absolute right-1 opacity-0 group-hover/course:opacity-100 transition-opacity">
           <ActionMenu
-            onRename={() => onRename(course.id, course.name)}
-            onDelete={() => onDelete(course.id)}
+            onRename={handleRename}
+            onDelete={handleDelete}
           />
         </div>
       </div>
@@ -200,3 +215,6 @@ export function SidebarCourse({
     </div>
   );
 }
+
+// Memoize to prevent unnecessary re-renders
+export const SidebarCourse = memo(SidebarCourseComponent);

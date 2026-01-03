@@ -16,7 +16,7 @@ import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { SearchDialog } from "@/components/dashboard/search/SearchDialog";
 import { Course, UserFile } from "@/lib/types";
 import { Id } from "@/convex/_generated/dataModel";
@@ -28,7 +28,9 @@ import { DraggableDocument, DocumentStatusBadge } from "@/components/documents";
 import { SidebarCourse } from "./SidebarCourse";
 import { SidebarNote } from "./SidebarNote";
 import { ActionMenu } from "@/components/shared/ActionMenu"; // Still needed for Files
-import { File } from "lucide-react"; // Still needed for Files
+import { File, FolderOpen, FileText } from "lucide-react"; // Still needed for Files
+import { useKeyboardShortcut, formatShortcut } from "@/hooks/useKeyboardShortcut";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 type RenameTarget = {
   id: string;
@@ -75,28 +77,6 @@ export function Sidebar() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
 
-  // Keyboard shortcut for search
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if ((e.key === "k" && (e.metaKey || e.ctrlKey)) || e.key === "/") {
-        if (
-          (e.target instanceof HTMLElement && e.target.isContentEditable) ||
-          e.target instanceof HTMLInputElement ||
-          e.target instanceof HTMLTextAreaElement ||
-          e.target instanceof HTMLSelectElement
-        ) {
-          return;
-        }
-
-        e.preventDefault();
-        setIsSearchOpen((open) => !open);
-      }
-    };
-
-    document.addEventListener("keydown", down);
-    return () => document.removeEventListener("keydown", down);
-  }, []);
-
   const toggleCourse = (courseId: string) => {
     setExpandedCourses((prev) => ({ ...prev, [courseId]: !prev[courseId] }));
   };
@@ -134,8 +114,7 @@ export function Sidebar() {
   ) => setRenameTarget({ id, type, name, parentId });
 
   // Notes
-  // Notes
-  const handleCreateNote = async () => {
+  const handleCreateNote = useCallback(async () => {
     try {
       setIsCreatingNote(true);
       const noteId = await createNote({
@@ -151,7 +130,30 @@ export function Sidebar() {
     } finally {
       setIsCreatingNote(false);
     }
-  };
+  }, [createNote, userData?.major, router]);
+
+  // Keyboard shortcuts
+  useKeyboardShortcut(
+    "cmd+k",
+    useCallback(() => {
+      setIsSearchOpen((open) => !open);
+    }, []),
+    { preventDefault: true }
+  );
+
+  useKeyboardShortcut(
+    "/",
+    useCallback(() => {
+      setIsSearchOpen((open) => !open);
+    }, []),
+    { preventDefault: true }
+  );
+
+  useKeyboardShortcut(
+    "cmd+n",
+    handleCreateNote,
+    { preventDefault: true }
+  );
 
   // Courses
   const handleCreateCourse = async () => {
@@ -198,7 +200,7 @@ export function Sidebar() {
             <span className="opacity-80">Search notes...</span>
           </span>
           <span className="text-[10px] font-bold bg-white/10 px-1.5 py-0.5 rounded-[4px] border border-white/5 text-gray-300">
-            ⌘K
+            {formatShortcut("cmd+k")}
           </span>
         </Button>
       </div>
@@ -241,9 +243,16 @@ export function Sidebar() {
               />
             ))}
             {(!userData?.courses || userData.courses.length === 0) && (
-              <div className="px-3 py-2 text-xs text-gray-600 italic bg-white/2 rounded-lg border border-white/2">
-                No courses yet.
-              </div>
+              <EmptyState
+                icon={<FolderOpen className="w-5 h-5 text-indigo-400" />}
+                title="No Smart Folders yet"
+                description="Create a smart folder to organize your notes by course or topic"
+                action={{
+                  label: "Create Smart Folder",
+                  onClick: handleCreateCourse,
+                }}
+                className="py-6 px-2"
+              />
             )}
           </div>
         </div>
@@ -301,9 +310,16 @@ export function Sidebar() {
               </DraggableDocument>
             ))}
             {(!recentFiles || recentFiles.length === 0) && (
-              <div className="px-3 py-2 text-xs text-gray-600 italic bg-white/2 rounded-lg border border-white/2">
-                No files uploaded.
-              </div>
+              <EmptyState
+                icon={<File className="w-5 h-5 text-blue-400" />}
+                title="No files yet"
+                description="Upload PDFs, documents, or audio files to enhance your notes"
+                action={{
+                  label: "Upload File",
+                  onClick: () => setIsUploadOpen(true),
+                }}
+                className="py-6 px-2"
+              />
             )}
           </div>
         </div>
@@ -339,9 +355,16 @@ export function Sidebar() {
               />
             ))}
             {(!quickNotes || quickNotes.length === 0) && (
-              <div className="px-3 py-2 text-xs text-gray-600 italic bg-white/2 rounded-lg border border-white/2">
-                No quick notes.
-              </div>
+              <EmptyState
+                icon={<FileText className="w-5 h-5 text-amber-400" />}
+                title="No quick notes"
+                description="Create a quick note for ideas, reminders, or quick thoughts"
+                action={{
+                  label: "Create Note",
+                  onClick: handleCreateNote,
+                }}
+                className="py-6 px-2"
+              />
             )}
           </div>
         </div>

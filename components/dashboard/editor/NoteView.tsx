@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -16,13 +16,12 @@ import {
   Strikethrough,
   List,
   Image as ImageIcon,
-  Bot,
-  Trash2,
-  Archive,
   Loader2,
   PanelLeft,
   PanelRight,
   Download,
+  Clock,
+  Type,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -78,8 +77,29 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
   // Parse context (Course / Module)
   const courseName =
-    userData?.courses?.find((c: any) => c.id === note?.courseId)?.name ||
+    userData?.courses?.find((c: { id: string; name: string }) => c.id === note?.courseId)?.name ||
     "General";
+
+  // Calculate word count and reading time
+  const noteContent = note?.content;
+  const { wordCount, readingTime } = useMemo(() => {
+    if (!noteContent) return { wordCount: 0, readingTime: "< 1 min" };
+    
+    // Strip HTML tags and count words
+    const plainText = noteContent
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    
+    const words = plainText.split(/\s+/).filter(word => word.length > 0);
+    const count = words.length;
+    
+    // Average reading speed: 200-250 words per minute
+    const minutes = Math.ceil(count / 225);
+    const time = minutes < 1 ? "< 1 min" : `${minutes} min read`;
+    
+    return { wordCount: count, readingTime: time };
+  }, [noteContent]);
 
   // Debounce Save Effect
   useEffect(() => {
@@ -116,6 +136,11 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
   // Track which note we've loaded content for to detect note changes
   const [loadedNoteId, setLoadedNoteId] = useState<Id<"notes"> | null>(null);
+  // Use ref to track current noteId without causing dependency array issues
+  const noteIdRef = useRef(noteId);
+  useEffect(() => {
+    noteIdRef.current = noteId;
+  }, [noteId]);
 
   // Helper function to detect if content is markdown and convert to HTML
   const convertMarkdownIfNeeded = async (content: string): Promise<string> => {
@@ -157,67 +182,81 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   }, [note, noteId, editor, loadedNoteId]); // Note: loadedNoteId prevents re-runs after initial load
 
   // Inject structured notes from RightSidebar when pendingNotes changes
+  // Wait for note to be loaded (loadedNoteId === noteId) to avoid conflicts
   useEffect(() => {
-    if (pendingNotes && editor && !editor.isDestroyed) {
-      // Build HTML content from structured notes
-      let html = "";
+    if (!pendingNotes || !editor || editor.isDestroyed) return;
+    // Wait for the note content to be loaded first (important for new notes)
+    if (loadedNoteId !== noteIdRef.current) return;
 
-      // Summary
-      if (pendingNotes.summary) {
-        html += `<h2>📝 Summary</h2>`;
-        html += `<blockquote>${pendingNotes.summary}</blockquote>`;
-      }
+    // Build HTML content from structured notes
+    let html = "";
 
-      // Cornell Notes
-      if (pendingNotes.cornellCues.length > 0) {
-        html += `<h2>📚 Cornell Notes</h2>`;
-        pendingNotes.cornellCues.forEach((cue, i) => {
-          const note = pendingNotes.cornellNotes[i] || "";
-          html += `<h4>${cue}</h4>`;
-          html += `<blockquote>${note}</blockquote>`;
-          html += `<hr/>`;
-        });
-      }
+    // Summary
+    if (pendingNotes.summary) {
+      html += `<h2>📝 Summary</h2>`;
+      html += `<blockquote>${pendingNotes.summary}</blockquote>`;
+    }
 
-      // Action Items
-      if (pendingNotes.actionItems.length > 0) {
-        html += `<h2>✅ Action Items</h2>`;
-        html += `<ul>`;
-        pendingNotes.actionItems.forEach((item) => {
-          html += `<li>☐ ${item}</li>`;
-        });
-        html += `</ul>`;
-      }
-
-      // Review Questions
-      if (pendingNotes.reviewQuestions.length > 0) {
-        html += `<h2>❓ Review Questions</h2>`;
-        html += `<ul>`;
-        pendingNotes.reviewQuestions.forEach((q) => {
-          html += `<li>${q}</li>`;
-        });
-        html += `</ul>`;
-      }
-
-      // Interactive Mind Map (ReactFlow)
-      if (
-        pendingNotes.diagramData &&
-        pendingNotes.diagramData.nodes &&
-        pendingNotes.diagramData.nodes.length > 0
-      ) {
-        // We inject the HTML that matches the DiagramExtension parseHTML rule
-        html += `<h2>🗺️ Mind Map</h2>`;
-        html += `<div data-type="diagram" data-nodes='${JSON.stringify(pendingNotes.diagramData.nodes)}' data-edges='${JSON.stringify(pendingNotes.diagramData.edges || [])}'></div>`;
-      }
-
-      // Insert at current cursor position (or end if no selection)
-      // Use queueMicrotask to avoid flushSync error during React render
-      queueMicrotask(() => {
-        editor.chain().focus().insertContent(html).run();
-        clearPendingNotes();
+    // Cornell Notes
+    if (pendingNotes.cornellCues.length > 0) {
+      html += `<h2>📚 Cornell Notes</h2>`;
+      pendingNotes.cornellCues.forEach((cue, i) => {
+        const note = pendingNotes.cornellNotes[i] || "";
+        html += `<h4>${cue}</h4>`;
+        html += `<blockquote>${note}</blockquote>`;
+        html += `<hr/>`;
       });
     }
-  }, [pendingNotes, editor, clearPendingNotes]);
+
+    // Action Items
+    if (pendingNotes.actionItems.length > 0) {
+      html += `<h2>✅ Action Items</h2>`;
+      html += `<ul>`;
+      pendingNotes.actionItems.forEach((item) => {
+        html += `<li>☐ ${item}</li>`;
+      });
+      html += `</ul>`;
+    }
+
+    // Review Questions
+    if (pendingNotes.reviewQuestions.length > 0) {
+      html += `<h2>❓ Review Questions</h2>`;
+      html += `<ul>`;
+      pendingNotes.reviewQuestions.forEach((q) => {
+        html += `<li>${q}</li>`;
+      });
+      html += `</ul>`;
+    }
+
+    // Interactive Mind Map (ReactFlow)
+    if (
+      pendingNotes.diagramData &&
+      pendingNotes.diagramData.nodes &&
+      pendingNotes.diagramData.nodes.length > 0
+    ) {
+      // We inject the HTML that matches the DiagramExtension parseHTML rule
+      html += `<h2>🗺️ Mind Map</h2>`;
+      html += `<div data-type="diagram" data-nodes='${JSON.stringify(pendingNotes.diagramData.nodes)}' data-edges='${JSON.stringify(pendingNotes.diagramData.edges || [])}'></div>`;
+    }
+
+    // Insert at current cursor position (or end if no selection)
+    // Use setTimeout to avoid flushSync error during React render
+    // Delay ensures editor is fully initialized and React rendering cycle is complete
+    const timeoutId = setTimeout(() => {
+      if (editor && !editor.isDestroyed && editor.view) {
+        try {
+          editor.chain().focus().insertContent(html).run();
+          clearPendingNotes();
+        } catch (error) {
+          console.error("Failed to insert pending notes:", error);
+          clearPendingNotes();
+        }
+      }
+    }, 200);
+
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingNotes, editor, clearPendingNotes, loadedNoteId]);
 
   // --- Handlers ---
   const handleDelete = async () => {
@@ -261,6 +300,37 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       note?.title
     );
   };
+
+  // Handle inserting AI-generated content into the note
+  const handleInsertFromAI = useCallback((content: string) => {
+    if (!editor || editor.isDestroyed) return;
+    
+    // Convert markdown to HTML for the editor
+    // Simple conversion for common markdown patterns
+    let htmlContent = content
+      .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+      .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+      .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/^\- (.*$)/gim, '<li>$1</li>')
+      .replace(/^\* (.*$)/gim, '<li>$1</li>')
+      .replace(/\n/g, '<br>');
+    
+    // Wrap consecutive <li> elements in <ul>
+    htmlContent = htmlContent.replace(/(<li>.*?<\/li>(<br>)?)+/g, (match) => {
+      const items = match.replace(/<br>/g, '');
+      return `<ul>${items}</ul>`;
+    });
+    
+    // Insert at the end of the document with a separator
+    editor.chain()
+      .focus('end')
+      .insertContent('<hr><p></p>')
+      .insertContent(htmlContent)
+      .insertContent('<p></p>')
+      .run();
+  }, [editor]);
 
   // --- Deleting State ---
   if (isDeleting) {
@@ -407,6 +477,18 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
+          {/* Word count and reading time */}
+          <div className="hidden lg:flex items-center gap-3 text-xs text-gray-500 mr-3">
+            <span className="flex items-center gap-1" title="Word count">
+              <Type className="w-3 h-3" />
+              {wordCount.toLocaleString()} words
+            </span>
+            <span className="flex items-center gap-1" title="Estimated reading time">
+              <Clock className="w-3 h-3" />
+              {readingTime}
+            </span>
+          </div>
+          
           <span className="text-xs font-mono text-gray-600 uppercase tracking-widest hidden lg:block mr-2">
             {isSaving ? "Saving..." : "Saved"}
           </span>
@@ -573,6 +655,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         context={note.content || ""}
         contextType="note"
         contextTitle={note.title}
+        onInsertToNote={handleInsertFromAI}
       />
 
       <RenameDialog

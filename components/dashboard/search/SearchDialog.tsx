@@ -13,6 +13,7 @@ import {
   File,
   Layers,
   CornerDownLeft,
+  Filter,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
@@ -24,8 +25,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-// Removed invalid import, using inline hook
+import { useDebounce } from "@/hooks/useDebounce";
 
 export function SearchDialog({
   open,
@@ -36,14 +44,21 @@ export function SearchDialog({
 }) {
   const router = useRouter();
   const [query, setQuery] = React.useState("");
-  const [debouncedQuery] = useDebounceValue(query, 300); // Custom hook needed if not present
+  const [filterType, setFilterType] = React.useState<"all" | "note" | "file" | "deck">("all");
+  const debouncedQuery = useDebounce(query, 300);
 
   // Conditionally fetch results only when query exists
-  const results = useQuery(api.search.search, { query: debouncedQuery });
+  const results = useQuery(
+    api.search.search,
+    debouncedQuery.trim()
+      ? { query: debouncedQuery, type: filterType }
+      : "skip"
+  );
 
   React.useEffect(() => {
     if (!open) {
       setQuery("");
+      setFilterType("all");
     }
   }, [open]);
 
@@ -56,8 +71,8 @@ export function SearchDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="p-0 gap-0 max-w-[550px] bg-[#0a0a0a] border border-white/10 shadow-2xl overflow-hidden rounded-xl">
         <DialogTitle className="sr-only">Search</DialogTitle>
-        <div className="flex items-center px-4 py-3 border-b border-white/5">
-          <Search className="w-5 h-5 text-gray-500 mr-3" />
+        <div className="flex items-center px-4 py-3 border-b border-white/5 gap-2">
+          <Search className="w-5 h-5 text-gray-500 shrink-0" />
           <input
             className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-gray-600 text-[15px] h-6"
             placeholder="Search notes, files, or flashcards..."
@@ -65,7 +80,18 @@ export function SearchDialog({
             onChange={(e) => setQuery(e.target.value)}
             autoFocus
           />
-          <div className="text-[10px] bg-white/5 border border-white/5 px-1.5 py-0.5 rounded text-gray-500 font-mono">
+          <Select value={filterType} onValueChange={(value) => setFilterType(value as typeof filterType)}>
+            <SelectTrigger className="h-8 w-24 border-white/10 bg-white/5 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-[#0a0a0a] border-white/10">
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="note">Notes</SelectItem>
+              <SelectItem value="file">Files</SelectItem>
+              <SelectItem value="deck">Decks</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="text-[10px] bg-white/5 border border-white/5 px-1.5 py-0.5 rounded text-gray-500 font-mono shrink-0">
             ESC
           </div>
         </div>
@@ -133,21 +159,4 @@ export function SearchDialog({
       </DialogContent>
     </Dialog>
   );
-}
-
-// Simple debounce hook implementation inline for now if utility doesn't exist
-function useDebounceValue<T>(value: T, delay: number): [T] {
-  const [debouncedValue, setDebouncedValue] = React.useState(value);
-
-  React.useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return [debouncedValue];
 }

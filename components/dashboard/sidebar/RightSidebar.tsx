@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import SpeechRecognition, {
   useSpeechRecognition,
@@ -9,6 +9,7 @@ import { useMutation, useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Mic,
   Clock,
@@ -22,11 +23,13 @@ import {
   Pin,
   Upload,
   ChevronDown,
-  ChevronUp,
   History,
   Trash2,
   FileAudio,
   FileText,
+  Waves,
+  Radio,
+  Volume2,
 } from "lucide-react";
 import {
   Dialog,
@@ -99,9 +102,12 @@ export function RightSidebar() {
   const [showPastSessions, setShowPastSessions] = useState(false);
   const [selectedSession, setSelectedSession] =
     useState<Id<"recordings"> | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
   const [usedContextName, setUsedContextName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Router and Search Params
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   // API Hooks
   const saveRecording = useMutation(api.recordings.saveRecording);
@@ -117,6 +123,8 @@ export function RightSidebar() {
   const transcribeAudio = useAction(api.ai.transcribeAudio);
   const deleteRecording = useMutation(api.recordings.deleteRecording);
   const pastRecordings = useQuery(api.recordings.getRecordings);
+  const userData = useQuery(api.users.getUser);
+  const createNote = useMutation(api.notes.createNote);
 
   // Get dashboard context for pending notes and active context
   const { setPendingNotes, activeContext, setActiveContext } = useDashboard();
@@ -131,38 +139,16 @@ export function RightSidebar() {
   ); // New Phase 2 Action
 
   // Phase 4: Magnetic Drop Zone Logic
-  const onDrop = useCallback(
-    (acceptedFiles: File[], fileRejections: any[], event: any) => {
-      // Check for Sidebar drag data
-      const resourceId = event.dataTransfer?.getData(
-        "application/lumina-resource-id"
-      );
-      const resourceName = event.dataTransfer?.getData(
-        "application/lumina-resource-name"
-      );
-
-      if (resourceId && resourceName) {
-        setActiveContext({ id: resourceId, name: resourceName, type: "file" });
-      }
+  // Note: useDropzone is primarily for file drops. For sidebar drag integration, we use native handlers.
+  useDropzone({
+    noClick: true,
+    noKeyboard: true,
+    onDragEnter: () => {},
+    onDragOver: (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
     },
-    [setActiveContext]
-  );
-
-  const { getRootProps: getZoneProps, isDragActive: isZoneActive } =
-    useDropzone({
-      onDrop,
-      noClick: true,
-      noKeyboard: true,
-      onDragEnter: () => {}, // prevent default
-      onDragOver: (e) => {
-        e.preventDefault();
-        // Critical for drop effects
-        e.dataTransfer.dropEffect = "copy";
-      },
-      // We need to allow all types for the drop zone to be "magnetic" for the handled types
-      // But typically useDropzone handles files. For custom data transfer, we might need custom handlers on the div.
-      // Actually `useDropzone` is mainly for Files. For our sidebar drag, we use native onDrop.
-    });
+  });
 
   // Custom native drop handler for the Sidebar integration
   const handleNativeDrop = (e: React.DragEvent) => {
@@ -325,10 +311,10 @@ export function RightSidebar() {
         setGeneratedNotes(notes);
         setUsedContextName(null);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Failed to generate notes", e);
 
-      const errorMessage = e?.message || "";
+      const errorMessage = e instanceof Error ? e.message : "";
       if (
         usingContext &&
         (errorMessage.includes("not found") || errorMessage.includes("File"))
@@ -514,14 +500,6 @@ export function RightSidebar() {
     try {
       // Step 1: Read file as base64 for transcription
       setUploadProgress(10);
-      const arrayBuffer = await file.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      let binary = "";
-      for (let i = 0; i < uint8Array.length; i++) {
-        binary += String.fromCharCode(uint8Array[i]);
-      }
-      const base64Data = btoa(binary);
-      setUploadProgress(25);
 
       // Determine mime type
       let mimeType = file.type || "audio/mpeg";
@@ -561,12 +539,12 @@ export function RightSidebar() {
       });
       setUploadProgress(60);
 
-      // Step 4: Transcribe using AI (with base64 data)
+      // Step 4: Transcribe using AI (fetches audio from storage server-side)
       setIsTranscribing(true);
       setUploadProgress(70);
 
       const transcriptionResult = await transcribeAudio({
-        audioBase64: base64Data,
+        storageId: storageId as Id<"_storage">,
         mimeType,
       });
 
@@ -593,7 +571,7 @@ export function RightSidebar() {
         setSelectedSession(recordingId);
         alert("Recording uploaded and transcribed successfully!");
       } else {
-        const errorMsg = (transcriptionResult as any).error || "Unknown error";
+        const errorMsg = "error" in transcriptionResult ? transcriptionResult.error : "Unknown error";
         alert(`Upload successful but transcription failed: ${errorMsg}`);
       }
 
@@ -652,28 +630,6 @@ export function RightSidebar() {
     setSessionTranscript(chunks);
     setGeneratedNotes(null);
     setShowPastSessions(false);
-  };
-
-  // Generate notes from a past session
-  const handleGenerateNotesFromSession = async () => {
-    if (sessionTranscript.length === 0) {
-      alert("No transcript loaded. Please load a past session first.");
-      return;
-    }
-
-    setIsGeneratingNotes(true);
-    try {
-      const notes = await generateStructuredNotes({
-        transcript: JSON.stringify(sessionTranscript),
-        title: "Past Recording",
-      });
-      setGeneratedNotes(notes);
-    } catch (e) {
-      console.error("Failed to generate notes", e);
-      alert("Failed to generate notes. Please try again.");
-    } finally {
-      setIsGeneratingNotes(false);
-    }
   };
 
   // Delete a recording
@@ -739,141 +695,171 @@ export function RightSidebar() {
       }}
     >
       {/* Top: Recorder Section */}
-      <div className="p-6 border-b border-white/5 relative overflow-hidden">
+      <div className="p-4 border-b border-white/5 relative overflow-hidden">
         {/* Context Deck */}
         <ContextDeck />
-        {/* Glow Effect */}
+        
+        {/* Animated gradient border when recording */}
         <div
           className={cn(
-            "absolute top-0 left-0 w-full h-1 bg-linear-to-r from-cyan-500 via-indigo-500 to-purple-500 opacity-50 transition-all duration-300",
-            isZoneActive && "h-full opacity-20" // Blue glow when dragging
+            "absolute top-0 left-0 w-full h-1 transition-all duration-500",
+            listening 
+              ? "bg-gradient-to-r from-red-500 via-orange-500 to-red-500 bg-[length:200%_100%] animate-gradient-x opacity-100"
+              : "bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-500 opacity-30"
           )}
         />
 
-        {/* Native Drop Zone Overlay for Sidebar */}
-        <div
-          className={cn(
-            "absolute inset-0 z-10 transition-colors pointer-events-none"
-            // We use a separate state or just rely on CSS hover if we had a drag-over state tracked.
-            // Since we use native events on the parent, let's add the handlers to the parent div.
-          )}
-        />
-
-        <div className="flex items-center justify-between mb-6 relative z-20">
-          <div className="flex items-center gap-2.5">
-            <div className="relative">
-              <div
-                className={cn(
-                  "w-2.5 h-2.5 rounded-full z-10 relative transition-colors",
-                  listening ? "bg-red-500" : "bg-gray-500"
+        {/* Recording Status Card */}
+        <div className={cn(
+          "relative rounded-2xl p-4 mb-4 transition-all duration-300",
+          listening 
+            ? "bg-gradient-to-br from-red-500/10 via-orange-500/5 to-transparent border border-red-500/20"
+            : "bg-gradient-to-br from-white/5 via-transparent to-transparent border border-white/5"
+        )}>
+          {/* Status Header */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "relative w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300",
+                listening 
+                  ? "bg-red-500/20 shadow-lg shadow-red-500/20"
+                  : "bg-white/5"
+              )}>
+                {listening ? (
+                  <>
+                    <Radio className="w-6 h-6 text-red-400" />
+                    <div className="absolute inset-0 rounded-xl bg-red-500/20 animate-ping" />
+                  </>
+                ) : (
+                  <Mic className="w-6 h-6 text-gray-400" />
                 )}
-              />
-              {listening && (
-                <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-75" />
-              )}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    "text-sm font-bold tracking-wide transition-colors",
+                    listening ? "text-red-400" : "text-gray-400"
+                  )}>
+                    {listening ? "RECORDING" : "READY"}
+                  </span>
+                  {listening && (
+                    <span className="flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <Clock className="w-3 h-3 text-gray-500" />
+                  <span className="font-mono text-lg font-bold text-white tabular-nums">
+                    {formatTime(elapsedTime)}
+                  </span>
+                </div>
+              </div>
             </div>
-            <span
-              className={cn(
-                "text-sm font-medium tracking-wide transition-colors",
-                listening ? "text-white" : "text-gray-500"
-              )}
-            >
-              {listening ? "REC" : "READY"}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 font-mono text-sm text-gray-400">
-            <Clock className="w-3.5 h-3.5" />
-            <span>{formatTime(elapsedTime)}</span>
-          </div>
-        </div>
-
-        {/* Waveform Visualization */}
-        <div className="h-16 flex items-end justify-between gap-1 mb-6 opacity-80">
-          {[40, 70, 30, 80, 50, 90, 30, 60, 40, 70, 50, 80, 40, 60, 30].map(
-            (h, i) => (
-              <motion.div
-                key={i}
-                animate={
-                  listening
-                    ? { height: [h + "%", h * 0.5 + "%", h + "%"] }
-                    : { height: "20%" }
-                }
-                transition={{
-                  duration: 0.5,
-                  repeat: Infinity,
-                  delay: i * 0.05,
-                  ease: "easeInOut",
-                  repeatType: "reverse",
-                }}
-                className={cn(
-                  "w-3 rounded-full opacity-60 transition-colors",
-                  listening ? "bg-indigo-500" : "bg-gray-700"
-                )}
-                style={{ height: listening ? `${h}%` : "20%" }}
-              />
-            )
-          )}
-        </div>
-
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className={cn(
-              "flex-1 border-white/10 text-white transition-all",
-              listening
-                ? "bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20"
-                : "bg-white/5 hover:bg-white/10"
+            
+            {/* Quick Actions */}
+            {(elapsedTime > 0 || sessionTranscript.length > 0) && (
+              <div className="flex items-center gap-1">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg"
+                  onClick={() => handleReset(true)}
+                  title="Reset Session"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </Button>
+              </div>
             )}
+          </div>
+
+          {/* Waveform Visualization - More refined */}
+          <div className="h-12 flex items-center justify-center gap-[3px] mb-4 px-2">
+            {Array.from({ length: 24 }).map((_, i) => {
+              const baseHeight = 20 + Math.sin(i * 0.5) * 15 + Math.random() * 20;
+              return (
+                <motion.div
+                  key={i}
+                  animate={
+                    listening
+                      ? { 
+                          scaleY: [1, 0.3 + Math.random() * 0.7, 1],
+                          opacity: [0.5, 1, 0.5]
+                        }
+                      : { scaleY: 0.15, opacity: 0.3 }
+                  }
+                  transition={{
+                    duration: 0.3 + Math.random() * 0.3,
+                    repeat: Infinity,
+                    delay: i * 0.02,
+                    ease: "easeInOut",
+                  }}
+                  className={cn(
+                    "w-1 rounded-full transition-colors origin-center",
+                    listening 
+                      ? "bg-gradient-to-t from-red-500 to-orange-400"
+                      : "bg-gray-700"
+                  )}
+                  style={{ height: `${baseHeight}%` }}
+                />
+              );
+            })}
+          </div>
+
+          {/* Main Control Button */}
+          <button
             onClick={handleToggleRecording}
-          >
-            {isRecording ? (
-              <Pause className="w-4 h-4 mr-2 fill-current" />
-            ) : (
-              <Play className="w-4 h-4 mr-2 fill-current" />
+            className={cn(
+              "w-full h-14 rounded-xl font-semibold text-base flex items-center justify-center gap-3 transition-all duration-300 active:scale-[0.98]",
+              listening
+                ? "bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white shadow-lg shadow-red-500/25"
+                : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-500/25"
             )}
-            {isRecording ? "Pause" : "Start"}
-          </Button>
+          >
+            {listening ? (
+              <>
+                <Pause className="w-5 h-5 fill-current" />
+                <span>Pause Recording</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-5 h-5 fill-current" />
+                <span>Start Recording</span>
+              </>
+            )}
+          </button>
 
+          {/* Action Buttons Row */}
           {(elapsedTime > 0 || sessionTranscript.length > 0) && (
-            <>
+            <div className="grid grid-cols-2 gap-2 mt-3">
               <Button
-                size="icon"
-                variant="ghost"
-                className="text-gray-400 hover:text-white"
-                onClick={() => handleReset(true)}
-                title="Reset"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                variant="outline"
+                className="h-10 border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 hover:text-purple-200"
                 onClick={handleGenerateNotes}
                 disabled={isGeneratingNotes}
-                title="Generate AI Notes"
               >
                 {isGeneratingNotes ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
-                  <Sparkles className="w-4 h-4" />
+                  <Sparkles className="w-4 h-4 mr-2" />
                 )}
+                AI Notes
               </Button>
               <Button
-                size="icon"
-                variant="ghost"
-                className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+                variant="outline"
+                className="h-10 border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-200"
                 onClick={handleSaveClick}
-                title="Save Session"
               >
-                <Save className="w-4 h-4" />
+                <Save className="w-4 h-4 mr-2" />
+                Save
               </Button>
-            </>
+            </div>
           )}
         </div>
 
-        {/* Upload Section */}
-        <div className="mt-4 space-y-3">
+        {/* Upload Section - Redesigned */}
+        <div className="space-y-3">
           {/* Hidden file input */}
           <input
             ref={fileInputRef}
@@ -883,50 +869,68 @@ export function RightSidebar() {
             className="hidden"
           />
 
-          {/* Improved Upload Area */}
+          {/* Upload Card */}
           <div
             onClick={() =>
               !isUploading && !isTranscribing && fileInputRef.current?.click()
             }
             className={cn(
-              "relative group cursor-pointer overflow-hidden rounded-xl border border-dashed border-white/10 bg-white/5 p-4 transition-all hover:border-cyan-500/50 hover:bg-white/10 active:scale-[0.99]",
-              (isUploading || isTranscribing) &&
-                "pointer-events-none opacity-80 border-cyan-500/20"
+              "relative group cursor-pointer overflow-hidden rounded-xl transition-all duration-300",
+              isUploading || isTranscribing
+                ? "bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/30"
+                : "bg-white/[0.02] border border-dashed border-white/10 hover:border-cyan-500/50 hover:bg-white/[0.04]"
             )}
           >
-            <div className="flex items-center gap-4">
-              {isUploading || isTranscribing ? (
-                <div className="relative h-10 w-10 shrink-0 flex items-center justify-center rounded-full bg-cyan-500/10">
-                  <Loader2 className="h-5 w-5 text-cyan-400 animate-spin" />
-                </div>
-              ) : (
-                <div className="h-10 w-10 shrink-0 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-cyan-500/10 group-hover:scale-105 transition-all duration-300">
-                  <Upload className="h-5 w-5 text-gray-400 group-hover:text-cyan-400 transition-colors" />
-                </div>
-              )}
+            {/* Progress overlay */}
+            {(isUploading || isTranscribing) && (
+              <div 
+                className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            )}
+            
+            <div className="relative p-4 flex items-center gap-4">
+              <div className={cn(
+                "h-12 w-12 shrink-0 rounded-xl flex items-center justify-center transition-all duration-300",
+                isUploading || isTranscribing
+                  ? "bg-cyan-500/20"
+                  : "bg-white/5 group-hover:bg-cyan-500/10 group-hover:scale-105"
+              )}>
+                {isUploading || isTranscribing ? (
+                  <Loader2 className="h-6 w-6 text-cyan-400 animate-spin" />
+                ) : (
+                  <Upload className="h-6 w-6 text-gray-400 group-hover:text-cyan-400 transition-colors" />
+                )}
+              </div>
 
               <div className="flex-1 min-w-0">
                 {isUploading || isTranscribing ? (
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-cyan-400">
-                      {isTranscribing ? "Transcribing..." : "Uploading..."}
-                    </p>
-                    <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-cyan-400">
+                        {isTranscribing ? "Transcribing audio..." : "Uploading file..."}
+                      </p>
+                      <span className="text-xs font-mono text-cyan-400">{uploadProgress}%</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${uploadProgress}%` }}
-                        className="h-full bg-cyan-400"
-                        transition={{ duration: 0.2 }}
+                        className="h-full bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full"
+                        transition={{ duration: 0.3 }}
                       />
                     </div>
+                    <p className="text-[10px] text-gray-500">
+                      {isTranscribing ? "AI is processing your audio" : "Please wait..."}
+                    </p>
                   </div>
                 ) : (
                   <>
-                    <p className="text-sm font-medium text-gray-200 group-hover:text-white transition-colors">
-                      Upload Session
+                    <p className="text-sm font-semibold text-gray-200 group-hover:text-white transition-colors">
+                      Upload Audio File
                     </p>
-                    <p className="text-[10px] text-gray-500 truncate">
-                      Support for MP3, WAV, M4A
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      MP3, WAV, M4A, OGG, FLAC • Max 20MB
                     </p>
                   </>
                 )}
@@ -934,24 +938,28 @@ export function RightSidebar() {
             </div>
           </div>
 
-          {/* Past Sessions Toggle */}
-          <div className="pt-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-between text-gray-500 hover:text-white hover:bg-white/5 font-medium text-xs uppercase tracking-wider h-8 px-2 mb-1"
+          {/* Past Sessions Section */}
+          <div className="pt-1">
+            <button
+              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200"
               onClick={() => setShowPastSessions(!showPastSessions)}
             >
-              <span className="flex items-center gap-2">
-                <History className="w-3.5 h-3.5" />
-                History ({pastRecordings?.length || 0})
+              <span className="flex items-center gap-2.5 text-xs font-semibold uppercase tracking-wider">
+                <History className="w-4 h-4" />
+                Recording History
+                {pastRecordings && pastRecordings.length > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-md bg-white/10 text-[10px] font-bold">
+                    {pastRecordings.length}
+                  </span>
+                )}
               </span>
-              {showPastSessions ? (
-                <ChevronUp className="w-3.5 h-3.5" />
-              ) : (
-                <ChevronDown className="w-3.5 h-3.5" />
-              )}
-            </Button>
+              <motion.div
+                animate={{ rotate: showPastSessions ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChevronDown className="w-4 h-4" />
+              </motion.div>
+            </button>
 
             {/* Past Sessions List */}
             <AnimatePresence>
@@ -960,53 +968,64 @@ export function RightSidebar() {
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
                   className="overflow-hidden"
                 >
-                  <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                  <div className="mt-2 max-h-52 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
                     {pastRecordings && pastRecordings.length > 0 ? (
                       pastRecordings.map((recording) => (
-                        <div
+                        <motion.div
                           key={recording._id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
                           className={cn(
-                            "group relative flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all duration-200",
+                            "group relative flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200",
                             selectedSession === recording._id
-                              ? "bg-linear-to-r from-cyan-500/10 to-transparent border-l-2 border-cyan-500"
-                              : "hover:bg-white/5 border-l-2 border-transparent hover:border-white/10"
+                              ? "bg-gradient-to-r from-cyan-500/15 to-transparent border border-cyan-500/30"
+                              : "hover:bg-white/5 border border-transparent"
                           )}
                           onClick={() => handleLoadPastSession(recording)}
                         >
                           <div
                             className={cn(
-                              "h-8 w-8 shrink-0 rounded-md flex items-center justify-center transition-colors",
+                              "h-10 w-10 shrink-0 rounded-lg flex items-center justify-center transition-all duration-200",
                               selectedSession === recording._id
                                 ? "bg-cyan-500/20 text-cyan-400"
-                                : "bg-white/5 text-gray-500 group-hover:text-gray-300"
+                                : "bg-white/5 text-gray-500 group-hover:text-gray-300 group-hover:bg-white/10"
                             )}
                           >
-                            <FileAudio className="w-4 h-4" />
+                            {selectedSession === recording._id ? (
+                              <Volume2 className="w-5 h-5" />
+                            ) : (
+                              <FileAudio className="w-5 h-5" />
+                            )}
                           </div>
 
                           <div className="flex-1 min-w-0">
                             <p
                               className={cn(
-                                "text-sm truncate transition-colors",
+                                "text-sm font-medium truncate transition-colors",
                                 selectedSession === recording._id
-                                  ? "text-cyan-100 font-medium"
+                                  ? "text-cyan-100"
                                   : "text-gray-300 group-hover:text-white"
                               )}
                             >
                               {recording.title}
                             </p>
-                            <div className="flex items-center gap-2 text-[10px] text-gray-600">
-                              <span>
-                                {new Date(
-                                  recording.createdAt
-                                ).toLocaleDateString()}
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-gray-500">
+                                {new Date(recording.createdAt).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
                               </span>
                               {recording.duration && (
-                                <span>
-                                  • {Math.floor(recording.duration / 60)}m
-                                </span>
+                                <>
+                                  <span className="text-gray-700">•</span>
+                                  <span className="text-[10px] text-gray-500">
+                                    {Math.floor(recording.duration / 60)}:{String(Math.floor(recording.duration % 60)).padStart(2, '0')}
+                                  </span>
+                                </>
                               )}
                             </div>
                           </div>
@@ -1014,20 +1033,25 @@ export function RightSidebar() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-7 w-7 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all absolute right-2"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all rounded-lg"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeleteRecording(recording._id);
                             }}
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </Button>
-                        </div>
+                        </motion.div>
                       ))
                     ) : (
-                      <div className="flex flex-col items-center justify-center py-6 text-gray-600 gap-2">
-                        <History className="w-8 h-8 opacity-20" />
-                        <p className="text-xs">No recording history</p>
+                      <div className="flex flex-col items-center justify-center py-8 text-gray-600 gap-3">
+                        <div className="w-14 h-14 rounded-xl bg-white/5 flex items-center justify-center">
+                          <History className="w-7 h-7 opacity-30" />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs font-medium text-gray-500">No recordings yet</p>
+                          <p className="text-[10px] text-gray-600 mt-0.5">Your saved sessions will appear here</p>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1040,37 +1064,76 @@ export function RightSidebar() {
 
       {/* Middle: Transcript Feed */}
       <div className="flex-1 flex flex-col min-h-0">
-        <div className="px-4 py-3 flex items-center justify-between border-b border-white/5">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase">
-            {selectedSession ? "Loaded Transcript" : "Live Transcript"}
-          </h3>
-          {listening && (
-            <span className="text-[10px] bg-green-500/10 text-green-400 px-1.5 py-0.5 rounded border border-green-500/20 animate-pulse">
-              Listening...
-            </span>
-          )}
+        <div className="px-4 py-3 flex items-center justify-between border-b border-white/5 bg-black/20">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-gray-500" />
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              {selectedSession ? "Session Transcript" : "Live Transcript"}
+            </h3>
+          </div>
+          <div className="flex items-center gap-2">
+            {listening && (
+              <span className="flex items-center gap-1.5 text-[10px] bg-green-500/10 text-green-400 px-2 py-1 rounded-full border border-green-500/20">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
+                </span>
+                Live
+              </span>
+            )}
+            {isAnalyzing && (
+              <span className="flex items-center gap-1.5 text-[10px] bg-purple-500/10 text-purple-400 px-2 py-1 rounded-full border border-purple-500/20">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Analyzing
+              </span>
+            )}
+          </div>
         </div>
         <ScrollArea className="flex-1 p-4">
-          <div className="space-y-6 pr-2">
+          <div className="space-y-4 pr-2">
             {/* Saved transcript chunks */}
             {sessionTranscript.map((chunk, idx) => (
-              <div
+              <motion.div
                 key={idx}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
                 className={cn(
-                  "flex gap-4 group",
-                  chunk.isImportant &&
-                    "bg-yellow-500/5 -mx-2 px-2 py-2 rounded-lg border border-yellow-500/20"
+                  "relative group rounded-xl p-3 transition-all duration-200",
+                  chunk.isImportant
+                    ? "bg-gradient-to-r from-yellow-500/10 to-transparent border border-yellow-500/20"
+                    : "bg-white/[0.02] hover:bg-white/[0.04] border border-transparent hover:border-white/5"
                 )}
               >
-                <div className="w-10 shrink-0 flex flex-col items-end gap-1 pt-1">
-                  <span className="text-[10px] text-zinc-500 font-mono opacity-50 group-hover:opacity-100 transition-opacity">
-                    {chunk.timestamp}
-                  </span>
-                  {chunk.isImportant && (
-                    <Pin className="w-3 h-3 text-yellow-500" />
+                {/* Timestamp badge */}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-gray-500 bg-white/5 px-2 py-0.5 rounded-md">
+                      {chunk.timestamp}
+                    </span>
+                    {chunk.isImportant && (
+                      <span className="flex items-center gap-1 text-[10px] text-yellow-400 bg-yellow-500/10 px-2 py-0.5 rounded-md">
+                        <Pin className="w-3 h-3" />
+                        Important
+                      </span>
+                    )}
+                  </div>
+                  {chunk.concepts.length > 0 && (
+                    <div className="flex items-center gap-1">
+                      {chunk.concepts.slice(0, 2).map((concept, i) => (
+                        <span
+                          key={i}
+                          className="text-[9px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded"
+                        >
+                          {concept}
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
-                <div className="flex-1 text-sm text-zinc-400 leading-relaxed prose prose-invert prose-sm max-w-none">
+                
+                {/* Content */}
+                <div className="text-sm text-zinc-300 leading-relaxed prose prose-invert prose-sm max-w-none">
                   <ReactMarkdown
                     remarkPlugins={[remarkMath]}
                     rehypePlugins={[rehypeKatex]}
@@ -1078,7 +1141,7 @@ export function RightSidebar() {
                     {chunk.enhancedText}
                   </ReactMarkdown>
                 </div>
-              </div>
+              </motion.div>
             ))}
 
             {/* Current live transcript */}
@@ -1086,17 +1149,23 @@ export function RightSidebar() {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex gap-4"
+                className="relative"
               >
-                <span className="w-10 text-[10px] text-cyan-400 font-mono pt-1 text-right shrink-0 font-bold">
-                  {formatTime(elapsedTime)}
-                </span>
-                <div className="flex-1">
-                  <div className="bg-cyan-500/10 border-l-2 border-cyan-400 p-3 rounded-r-lg">
-                    <p className="text-sm text-zinc-100 leading-relaxed font-medium">
-                      {transcript}
-                    </p>
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full" />
+                <div className="ml-4 bg-gradient-to-r from-cyan-500/10 to-transparent p-4 rounded-xl border border-cyan-500/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/20 px-2 py-0.5 rounded-md font-bold">
+                      {formatTime(elapsedTime)}
+                    </span>
+                    <span className="flex items-center gap-1 text-[10px] text-cyan-400">
+                      <Waves className="w-3 h-3" />
+                      Recording...
+                    </span>
                   </div>
+                  <p className="text-sm text-zinc-100 leading-relaxed">
+                    {transcript}
+                    <span className="inline-block w-0.5 h-4 bg-cyan-400 ml-0.5 animate-pulse" />
+                  </p>
                 </div>
               </motion.div>
             )}
@@ -1105,11 +1174,19 @@ export function RightSidebar() {
             {!transcript &&
               sessionTranscript.length === 0 &&
               !generatedNotes && (
-                <div className="flex flex-col items-center justify-center pt-20 opacity-30">
-                  <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
-                    <Mic className="w-8 h-8" />
+                <div className="flex flex-col items-center justify-center pt-16 pb-8">
+                  <div className="relative">
+                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-white/5 to-transparent flex items-center justify-center mb-4 border border-white/5">
+                      <Mic className="w-10 h-10 text-gray-600" />
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+                      <Sparkles className="w-4 h-4 text-indigo-400" />
+                    </div>
                   </div>
-                  <p className="text-xs font-mono">Ready to transcribe</p>
+                  <h4 className="text-sm font-medium text-gray-400 mb-1">Ready to Record</h4>
+                  <p className="text-xs text-gray-600 text-center max-w-[200px]">
+                    Click the record button or upload an audio file to get started
+                  </p>
                 </div>
               )}
 
@@ -1220,13 +1297,41 @@ export function RightSidebar() {
                 {/* Insert to Editor Button */}
                 <Button
                   className="w-full bg-purple-600 hover:bg-purple-500 text-white"
-                  onClick={() => {
-                    setPendingNotes(generatedNotes);
-                    setGeneratedNotes(null);
+                  onClick={async () => {
+                    const currentNoteId = searchParams.get("noteId");
+                    
+                    if (!currentNoteId && generatedNotes) {
+                      // No note is open - create a new one
+                      try {
+                        const title = recordingTitle || usedContextName 
+                          ? `Notes from ${usedContextName || recordingTitle || "Recording"}`
+                          : "Generated Notes";
+                        
+                        const noteId = await createNote({
+                          title,
+                          major: userData?.major || "general",
+                          style: "standard",
+                        });
+                        
+                        // Set pending notes and navigate to the new note
+                        setPendingNotes(generatedNotes);
+                        setGeneratedNotes(null);
+                        router.push(`/dashboard?noteId=${noteId}`);
+                        toast.success("Created new note with generated content");
+                      } catch (error) {
+                        console.error("Failed to create note:", error);
+                        toast.error("Failed to create note. Please try again.");
+                      }
+                    } else {
+                      // Note is already open - just set pending notes
+                      setPendingNotes(generatedNotes);
+                      setGeneratedNotes(null);
+                      toast.success("Content ready to insert");
+                    }
                   }}
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
-                  Insert to Editor
+                  {searchParams.get("noteId") ? "Insert to Editor" : "Create Note"}
                 </Button>
               </motion.div>
             )}

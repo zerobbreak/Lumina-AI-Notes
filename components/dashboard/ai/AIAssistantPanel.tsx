@@ -13,6 +13,9 @@ import {
   HelpCircle,
   ListChecks,
   Info,
+  Copy,
+  Check,
+  PenLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import ReactMarkdown from "react-markdown";
+import { toast } from "sonner";
 
 interface AIAssistantPanelProps {
   isOpen: boolean;
@@ -27,12 +31,14 @@ interface AIAssistantPanelProps {
   context?: string;
   contextType?: "note" | "transcript" | "general";
   contextTitle?: string;
+  onInsertToNote?: (content: string) => void;
 }
 
 interface Message {
   role: "user" | "ai";
   content: string;
   contextUsed?: string;
+  copied?: boolean;
 }
 
 const STARTER_PROMPTS = [
@@ -64,16 +70,40 @@ export function AIAssistantPanel({
   context,
   contextType = "general",
   contextTitle,
+  onInsertToNote,
 }: AIAssistantPanelProps) {
   const [inputValue, setInputValue] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showStarterPrompts, setShowStarterPrompts] = useState(true);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const askAboutContext = useAction(api.ai.askAboutContext);
+
+  // Copy to clipboard
+  const handleCopy = async (content: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedIndex(index);
+      toast.success("Copied to clipboard");
+      setTimeout(() => setCopiedIndex(null), 2000);
+    } catch {
+      toast.error("Failed to copy");
+    }
+  };
+
+  // Insert content into note
+  const handleInsertToNote = (content: string) => {
+    if (onInsertToNote) {
+      onInsertToNote(content);
+      toast.success("Inserted into note");
+    } else {
+      toast.error("Open a note first to insert content");
+    }
+  };
 
   // Focus input when panel opens
   useEffect(() => {
@@ -280,10 +310,45 @@ export function AIAssistantPanel({
                             )}
                           </div>
                         </div>
-                        {message.contextUsed && (
-                          <span className="text-[10px] text-gray-500 px-2">
-                            Used: {message.contextUsed}
-                          </span>
+                        
+                        {/* Action buttons for AI messages */}
+                        {message.role === "ai" && (
+                          <div className="flex items-center gap-1 px-2 mt-1">
+                            <button
+                              onClick={() => handleCopy(message.content, index)}
+                              className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-white/5"
+                              title="Copy to clipboard"
+                            >
+                              {copiedIndex === index ? (
+                                <>
+                                  <Check className="w-3 h-3 text-green-400" />
+                                  <span className="text-green-400">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                            
+                            {onInsertToNote && (
+                              <button
+                                onClick={() => handleInsertToNote(message.content)}
+                                className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-purple-400 transition-colors px-2 py-1 rounded hover:bg-purple-500/10"
+                                title="Insert into current note"
+                              >
+                                <PenLine className="w-3 h-3" />
+                                <span>Insert to Note</span>
+                              </button>
+                            )}
+                            
+                            {message.contextUsed && (
+                              <span className="text-[10px] text-gray-600 ml-auto">
+                                Used: {message.contextUsed}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>

@@ -171,6 +171,64 @@ export const updateCard = mutation({
 });
 
 /**
+ * Update a card's spaced repetition data after review
+ */
+export const updateCardReview = mutation({
+  args: {
+    cardId: v.id("flashcards"),
+    difficulty: v.number(),
+    nextReviewAt: v.number(),
+    reviewCount: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    // Get card and verify ownership through deck
+    const card = await ctx.db.get(args.cardId);
+    if (!card) throw new Error("Card not found");
+
+    const deck = await ctx.db.get(card.deckId);
+    if (!deck || deck.userId !== identity.tokenIdentifier) {
+      throw new Error("Unauthorized");
+    }
+
+    await ctx.db.patch(args.cardId, {
+      difficulty: args.difficulty,
+      nextReviewAt: args.nextReviewAt,
+      reviewCount: args.reviewCount,
+    });
+  },
+});
+
+/**
+ * Get cards due for review (spaced repetition)
+ */
+export const getDueCards = query({
+  args: { deckId: v.id("flashcardDecks") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const deck = await ctx.db.get(args.deckId);
+    if (!deck || deck.userId !== identity.tokenIdentifier) {
+      return [];
+    }
+
+    const now = Date.now();
+    const cards = await ctx.db
+      .query("flashcards")
+      .withIndex("by_deckId", (q) => q.eq("deckId", args.deckId))
+      .collect();
+
+    // Return cards that are due for review (nextReviewAt <= now or never reviewed)
+    return cards.filter(
+      (card) => !card.nextReviewAt || card.nextReviewAt <= now
+    );
+  },
+});
+
+/**
  * Mark a deck as studied (updates lastStudiedAt)
  */
 export const markDeckStudied = mutation({
@@ -208,6 +266,43 @@ export const renameDeck = mutation({
     }
 
     await ctx.db.patch(args.deckId, { title: args.title });
+  },
+});
+
+/**
+ * Delete multiple decks and all their cards (batch operation)
+ */
+export const deleteMultipleDecks = mutation({
+  args: { deckIds: v.array(v.id("flashcardDecks")) },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    let deletedCount = 0;
+    
+    for (const deckId of args.deckIds) {
+      // Verify ownership
+      const deck = await ctx.db.get(deckId);
+      if (!deck || deck.userId !== identity.tokenIdentifier) {
+        continue; // Skip decks that don't exist or aren't owned by user
+      }
+
+      // Delete all flashcards in the deck
+      const cards = await ctx.db
+        .query("flashcards")
+        .withIndex("by_deckId", (q) => q.eq("deckId", deckId))
+        .collect();
+
+      for (const card of cards) {
+        await ctx.db.delete(card._id);
+      }
+
+      // Delete the deck
+      await ctx.db.delete(deckId);
+      deletedCount++;
+    }
+    
+    return { deletedCount };
   },
 });
 

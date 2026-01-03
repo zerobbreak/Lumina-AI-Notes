@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, memo } from "react";
 import { FileText, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActionMenu } from "@/components/shared/ActionMenu";
@@ -24,7 +24,7 @@ interface SidebarNoteProps {
   onArchive?: () => void;
 }
 
-export function SidebarNote({
+function SidebarNoteComponent({
   note,
   isActive,
   isDraggable = true,
@@ -35,16 +35,20 @@ export function SidebarNote({
   const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
 
-  const handleDragStart = (e: React.DragEvent) => {
+  const handleDragStart = useCallback((e: React.DragEvent) => {
     e.dataTransfer.setData("application/lumina-note-id", note._id);
     e.dataTransfer.setData("application/lumina-note-title", note.title);
     e.dataTransfer.effectAllowed = "move";
     setIsDragging(true);
-  };
+  }, [note._id, note.title]);
 
-  const handleDragEnd = () => {
+  const handleDragEnd = useCallback(() => {
     setIsDragging(false);
-  };
+  }, []);
+
+  const handleClick = useCallback(() => {
+    router.push(`/dashboard?noteId=${note._id}`);
+  }, [router, note._id]);
 
   return (
     <div
@@ -70,7 +74,7 @@ export function SidebarNote({
             ? "bg-indigo-500/10 text-indigo-400 font-medium"
             : "text-gray-400 hover:text-white hover:bg-white/4"
         )}
-        onClick={() => router.push(`/dashboard?noteId=${note._id}`)}
+        onClick={handleClick}
       >
         <FileText
           className={cn(
@@ -93,3 +97,14 @@ export function SidebarNote({
     </div>
   );
 }
+
+// Memoize to prevent unnecessary re-renders when parent state changes
+export const SidebarNote = memo(SidebarNoteComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.note._id === nextProps.note._id &&
+    prevProps.note.title === nextProps.note.title &&
+    prevProps.note.isArchived === nextProps.note.isArchived &&
+    prevProps.isActive === nextProps.isActive &&
+    prevProps.isDraggable === nextProps.isDraggable
+  );
+});

@@ -172,6 +172,41 @@ export const toggleArchiveNote = mutation({
   },
 });
 
+export const togglePinNote = mutation({
+  args: { noteId: v.id("notes") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const note = await ctx.db.get(args.noteId);
+    if (!note || note.userId !== identity.tokenIdentifier) {
+      throw new Error("Note not found or unauthorized");
+    }
+    const currentPinned = note.isPinned ?? false;
+    await ctx.db.patch(args.noteId, { isPinned: !currentPinned });
+  },
+});
+
+export const getPinnedNotes = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return [];
+    }
+
+    const notes = await ctx.db
+      .query("notes")
+      .withIndex("by_userId_and_pinned", (q) =>
+        q.eq("userId", identity.tokenIdentifier).eq("isPinned", true)
+      )
+      .filter((q) => q.neq(q.field("isArchived"), true))
+      .order("desc")
+      .take(20);
+
+    return notes;
+  },
+});
+
 export const renameNote = mutation({
   args: { noteId: v.id("notes"), title: v.string() },
   handler: async (ctx, args) => {

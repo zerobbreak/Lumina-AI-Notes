@@ -18,6 +18,9 @@ import {
   Landmark,
   Layout,
   FileText,
+  Clock,
+  ArrowRight,
+  File as FileIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Course } from "@/lib/types";
@@ -51,6 +54,14 @@ const getIcon = (code: string) => {
   return BookOpen;
 };
 
+// Helper function to calculate notes from this week (defined outside component to avoid React compiler issues)
+function calculateNotesThisWeek(recentNotes: Array<{ createdAt: number }> | undefined): number {
+  if (!recentNotes) return 0;
+  const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+  const weekAgo = Date.now() - oneWeekMs;
+  return recentNotes.filter((note) => note.createdAt >= weekAgo).length;
+}
+
 // Animation Variants
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -79,6 +90,8 @@ export default function SmartFolderHub() {
   const createCourse = useMutation(api.users.createCourse);
   const deleteCourse = useMutation(api.users.deleteCourse);
   const renameCourse = useMutation(api.users.renameCourse);
+  const recentNotes = useQuery(api.notes.getRecentNotes);
+  const files = useQuery(api.files.getFiles);
   const router = useRouter();
 
   // Rename State
@@ -97,6 +110,9 @@ export default function SmartFolderHub() {
     setRenameTarget(null);
   };
 
+  // Calculate notes from this week (using helper function to avoid React compiler issues)
+  const notesThisWeek = calculateNotesThisWeek(recentNotes);
+
   if (!userData) return null;
 
   const courseCount = userData.courses?.length || 0;
@@ -105,6 +121,10 @@ export default function SmartFolderHub() {
       (acc: number, curr: Course) => acc + (curr.modules?.length || 0),
       0
     ) || 0;
+  
+  // Calculate statistics
+  const totalNotes = recentNotes?.length || 0;
+  const totalFiles = files?.length || 0;
 
   return (
     <div className="flex-1 h-full overflow-y-auto bg-[#0A0A0A] p-8">
@@ -132,7 +152,7 @@ export default function SmartFolderHub() {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2, duration: 0.5 }}
-          className="flex items-center gap-3"
+          className="flex items-center gap-3 flex-wrap"
         >
           <div className="px-4 py-2 rounded-full bg-white/5 border border-white/10 flex items-center gap-2 text-sm text-gray-300 backdrop-blur-md">
             <Layout className="w-4 h-4 text-cyan-400" />
@@ -148,6 +168,22 @@ export default function SmartFolderHub() {
               Modules
             </span>
           </div>
+          <div className="px-4 py-2 rounded-full bg-white/5 border border-white/10 flex items-center gap-2 text-sm text-gray-300 backdrop-blur-md">
+            <FileText className="w-4 h-4 text-amber-400" />
+            <span>
+              <span className="text-white font-semibold">{totalNotes}</span>{" "}
+              Notes
+            </span>
+          </div>
+          {totalFiles > 0 && (
+            <div className="px-4 py-2 rounded-full bg-white/5 border border-white/10 flex items-center gap-2 text-sm text-gray-300 backdrop-blur-md">
+              <FileIcon className="w-4 h-4 text-blue-400" />
+              <span>
+                <span className="text-white font-semibold">{totalFiles}</span>{" "}
+                Files
+              </span>
+            </div>
+          )}
         </motion.div>
       </motion.div>
 
@@ -265,6 +301,82 @@ export default function SmartFolderHub() {
           </motion.div>
         </motion.div>
       </div>
+
+      {/* Recent Activity Section */}
+      {recentNotes && recentNotes.length > 0 && (
+        <div className="mb-12">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Recent Notes
+            </h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/dashboard")}
+              className="text-xs text-gray-400 hover:text-cyan-400"
+            >
+              View all
+              <ArrowRight className="w-3 h-3 ml-1" />
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {recentNotes.slice(0, 6).map((note) => (
+              <motion.div
+                key={note._id}
+                variants={itemVariants}
+                onClick={() =>
+                  router.push(`/dashboard?noteId=${note._id}`)
+                }
+                whileHover={{ y: -2, transition: { duration: 0.2 } }}
+                className="group relative p-4 rounded-xl border border-white/5 bg-[#121212] hover:bg-[#18181B] hover:border-white/10 cursor-pointer transition-all"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-medium text-white truncate group-hover:text-cyan-100 transition-colors mb-1">
+                      {note.title}
+                    </h3>
+                    <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                      <Clock className="w-3 h-3" />
+                      {new Date(note.createdAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </p>
+                  </div>
+                  <FileText className="w-4 h-4 text-gray-600 group-hover:text-cyan-400 transition-colors shrink-0" />
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Activity Summary */}
+      {notesThisWeek > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.5 }}
+          className="p-6 rounded-2xl border border-cyan-500/20 bg-linear-to-br from-cyan-500/5 to-transparent"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+              <TrendingUp className="w-6 h-6 text-cyan-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-1">
+                Great progress this week!
+              </h3>
+              <p className="text-sm text-gray-400">
+                You've created <span className="text-cyan-400 font-semibold">{notesThisWeek}</span>{" "}
+                {notesThisWeek === 1 ? "note" : "notes"} in the last 7 days.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       <RenameDialog
         open={!!renameTarget}
