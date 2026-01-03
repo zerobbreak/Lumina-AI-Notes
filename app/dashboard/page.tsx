@@ -5,7 +5,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Sparkles } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
 
 import NoteView from "@/components/dashboard/editor/NoteView";
 import FolderView from "@/components/dashboard/views/FolderView";
@@ -14,7 +14,26 @@ import { FlashcardsView } from "@/components/dashboard/flashcards/FlashcardsView
 import { FlashcardStudy } from "@/components/dashboard/flashcards/FlashcardStudy";
 import ArchiveView from "@/components/dashboard/views/ArchiveView";
 
+function DashboardLoading() {
+  return (
+    <div className="h-full bg-black flex items-center justify-center text-gray-500">
+      <div className="flex items-center gap-2 animate-pulse">
+        <Sparkles className="w-5 h-5" />
+        <span>Loading Workspace...</span>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardContent />
+    </Suspense>
+  );
+}
+
+function DashboardContent() {
   const searchParams = useSearchParams();
   const noteId = searchParams.get("noteId");
   const contextId = searchParams.get("contextId");
