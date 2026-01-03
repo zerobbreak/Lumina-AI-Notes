@@ -3,6 +3,7 @@ import { Outfit } from "next/font/google"; // Using Outfit for that modern tech 
 import "./globals.css";
 import { ConvexClientProvider } from "@/components/providers/ConvexClientProvider";
 import { Toaster } from "sonner";
+import { MobileWarning } from "@/components/MobileWarning";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -26,6 +27,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <ConvexClientProvider>{children}</ConvexClientProvider>
+        <MobileWarning />
         <Toaster theme="dark" position="bottom-right" />
       </body>
     </html>
