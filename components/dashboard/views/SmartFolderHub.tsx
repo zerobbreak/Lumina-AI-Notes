@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   BookOpen,
-  MoreHorizontal,
   Plus,
   Code,
   Dna,
@@ -22,7 +21,6 @@ import {
   ArrowRight,
   File as FileIcon,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Course } from "@/lib/types";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
@@ -370,7 +368,7 @@ export default function SmartFolderHub() {
                 Great progress this week!
               </h3>
               <p className="text-sm text-gray-400">
-                You've created <span className="text-cyan-400 font-semibold">{notesThisWeek}</span>{" "}
+                You&apos;ve created <span className="text-cyan-400 font-semibold">{notesThisWeek}</span>{" "}
                 {notesThisWeek === 1 ? "note" : "notes"} in the last 7 days.
               </p>
             </div>

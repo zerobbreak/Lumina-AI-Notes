@@ -14,10 +14,9 @@ import {
   Plus,
   File,
   Clock,
-  MoreVertical,
   Pin,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Id } from "@/convex/_generated/dataModel";
 import { Course, Module } from "@/lib/types";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
@@ -88,11 +87,12 @@ export default function FolderView({
   const renameFile = useMutation(api.files.renameFile);
   const togglePinNote = useMutation(api.notes.togglePinNote);
   const deleteNote = useMutation(api.notes.deleteNote);
+  const renameNote = useMutation(api.notes.renameNote);
 
   const [renameTarget, setRenameTarget] = useState<{
-    id: string;
+    id: string | Id<"files"> | Id<"notes">;
     title: string;
-    type: "module" | "file";
+    type: "module" | "file" | "note";
   } | null>(null);
 
   // --- Helpers ---
@@ -157,13 +157,18 @@ export default function FolderView({
     if (renameTarget.type === "module") {
       await renameModule({
         courseId: contextId,
-        moduleId: renameTarget.id,
+        moduleId: renameTarget.id as string,
         title: newTitle,
       });
     } else if (renameTarget.type === "file") {
       await renameFile({
-        fileId: renameTarget.id as any,
+        fileId: renameTarget.id as Id<"files">,
         name: newTitle,
+      });
+    } else if (renameTarget.type === "note") {
+      await renameNote({
+        noteId: renameTarget.id as Id<"notes">,
+        title: newTitle,
       });
     }
     setRenameTarget(null);
