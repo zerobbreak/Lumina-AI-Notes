@@ -15,6 +15,7 @@ import {
   File,
   Clock,
   MoreVertical,
+  Pin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Course, Module } from "@/lib/types";

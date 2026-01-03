@@ -42,7 +42,7 @@ export function EmptyState({
         <Button
           onClick={action.onClick}
           variant="outline"
-          className="gap-2 border-white/10 hover:bg-white/5 hover:border-white/20"
+          className="gap-2 text-white border-white/10 hover:bg-white/5 hover:border-white/20"
         >
           {action.label}
         </Button>
