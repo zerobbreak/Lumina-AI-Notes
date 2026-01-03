@@ -147,6 +147,12 @@ export const deleteNote = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
+
+    const note = await ctx.db.get(args.noteId);
+    if (!note || note.userId !== identity.tokenIdentifier) {
+      throw new Error("Note not found or unauthorized");
+    }
+
     await ctx.db.delete(args.noteId);
   },
 });
@@ -157,7 +163,9 @@ export const toggleArchiveNote = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
     const note = await ctx.db.get(args.noteId);
-    if (!note) throw new Error("Note not found");
+    if (!note || note.userId !== identity.tokenIdentifier) {
+      throw new Error("Note not found or unauthorized");
+    }
     // If it doesn't have isArchived field yet, treat as false -> true
     const currentArchived = note.isArchived ?? false;
     await ctx.db.patch(args.noteId, { isArchived: !currentArchived });
@@ -169,6 +177,12 @@ export const renameNote = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
+
+    const note = await ctx.db.get(args.noteId);
+    if (!note || note.userId !== identity.tokenIdentifier) {
+      throw new Error("Note not found or unauthorized");
+    }
+
     await ctx.db.patch(args.noteId, { title: args.title });
   },
 });

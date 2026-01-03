@@ -26,7 +26,13 @@ export const getDecks = query({
 export const getDeck = query({
   args: { deckId: v.id("flashcardDecks") },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
     const deck = await ctx.db.get(args.deckId);
+    if (!deck || deck.userId !== identity.tokenIdentifier) {
+      return null;
+    }
     return deck;
   },
 });
@@ -37,6 +43,15 @@ export const getDeck = query({
 export const getFlashcards = query({
   args: { deckId: v.id("flashcardDecks") },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    // Verify user owns the deck before returning cards
+    const deck = await ctx.db.get(args.deckId);
+    if (!deck || deck.userId !== identity.tokenIdentifier) {
+      return [];
+    }
+
     const cards = await ctx.db
       .query("flashcards")
       .withIndex("by_deckId", (q) => q.eq("deckId", args.deckId))
@@ -130,6 +145,18 @@ export const updateCard = mutation({
     difficulty: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    // Get card and verify ownership through deck
+    const card = await ctx.db.get(args.cardId);
+    if (!card) throw new Error("Card not found");
+
+    const deck = await ctx.db.get(card.deckId);
+    if (!deck || deck.userId !== identity.tokenIdentifier) {
+      throw new Error("Unauthorized");
+    }
+
     const { cardId, ...updates } = args;
 
     // Filter out undefined values
@@ -149,6 +176,14 @@ export const updateCard = mutation({
 export const markDeckStudied = mutation({
   args: { deckId: v.id("flashcardDecks") },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const deck = await ctx.db.get(args.deckId);
+    if (!deck || deck.userId !== identity.tokenIdentifier) {
+      throw new Error("Deck not found or unauthorized");
+    }
+
     await ctx.db.patch(args.deckId, {
       lastStudiedAt: Date.now(),
     });

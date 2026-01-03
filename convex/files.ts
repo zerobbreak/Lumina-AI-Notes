@@ -109,6 +109,12 @@ export const deleteFile = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
+
+    const file = await ctx.db.get(args.fileId);
+    if (!file || file.userId !== identity.tokenIdentifier) {
+      throw new Error("File not found or unauthorized");
+    }
+
     await ctx.db.delete(args.fileId);
   },
 });
@@ -118,6 +124,12 @@ export const renameFile = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
+
+    const file = await ctx.db.get(args.fileId);
+    if (!file || file.userId !== identity.tokenIdentifier) {
+      throw new Error("File not found or unauthorized");
+    }
+
     await ctx.db.patch(args.fileId, { name: args.name });
   },
 });
@@ -128,8 +140,14 @@ export const renameFile = mutation({
 export const getFile = query({
   args: { fileId: v.id("files") },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
     const file = await ctx.db.get(args.fileId);
     if (!file) return null;
+
+    // Verify ownership for file access
+    if (!identity || file.userId !== identity.tokenIdentifier) {
+      return null;
+    }
 
     // Get storage URL if applicable
     if (file.storageId) {
