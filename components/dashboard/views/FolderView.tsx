@@ -183,19 +183,19 @@ export default function FolderView({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6 }}
-        className="relative h-48 flex flex-col justify-end px-12 pb-8 border-b border-white/5 overflow-hidden"
+        className="relative h-64 flex flex-col justify-end px-12 pb-10 border-b border-white/5 overflow-hidden"
       >
         {/* Background Art */}
-        <div className="absolute inset-0 bg-linear-to-r from-indigo-900/20 via-purple-900/10 to-black/0" />
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 mix-blend-overlay" />
-        <div className="absolute bottom-0 left-0 w-full h-32 bg-linear-to-t from-[#0A0A0A] to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-r from-indigo-900/30 via-purple-900/20 to-black/0 backdrop-blur-3xl" />
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay" />
+        <div className="absolute bottom-0 left-0 w-full h-48 bg-linear-to-t from-[#050505] to-transparent" />
 
         <div className="relative z-10">
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.4 }}
-            className="flex items-center gap-2 text-sm text-gray-500 mb-4"
+            className="flex items-center gap-3 text-sm text-gray-400 mb-6"
           >
             <span
               className="hover:text-cyan-400 cursor-pointer transition-colors"
@@ -203,8 +203,10 @@ export default function FolderView({
             >
               Smart Folders
             </span>
-            <ChevronRight className="w-4 h-4" />
-            <span className="text-white font-medium">{getContextName()}</span>
+            <ChevronRight className="w-4 h-4 text-gray-600" />
+            <span className="text-white font-medium bg-white/5 px-3 py-1 rounded-full border border-white/10 backdrop-blur-md">
+              {getContextName()}
+            </span>
           </motion.div>
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -212,12 +214,12 @@ export default function FolderView({
             transition={{ delay: 0.3, duration: 0.4 }}
             className="flex items-center justify-between"
           >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-md">
+            <div className="flex items-center gap-6">
+              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-md shadow-2xl">
                 {contextType === "course" ? (
-                  <BookOpen className="w-6 h-6 text-cyan-400" />
+                  <BookOpen className="w-8 h-8 text-cyan-400" />
                 ) : (
-                  <Folder className="w-6 h-6 text-cyan-400" />
+                  <Folder className="w-8 h-8 text-cyan-400" />
                 )}
               </div>
               {contextType === "module" && currentModuleData ? (
@@ -230,11 +232,11 @@ export default function FolderView({
                       title: newTitle,
                     });
                   }}
-                  className="text-4xl font-bold text-white tracking-tight hover:bg-white/5 rounded px-2 -ml-2 transition-colors cursor-text"
+                  className="text-5xl font-bold text-white tracking-tight hover:bg-white/5 rounded px-2 -ml-2 transition-colors cursor-text"
                   placeholder="Untitled Module"
                 />
               ) : (
-                <h1 className="text-4xl font-bold text-white tracking-tight">
+                <h1 className="text-5xl font-bold text-white tracking-tight">
                   {getContextName()}
                 </h1>
               )}
@@ -243,20 +245,20 @@ export default function FolderView({
         </div>
       </motion.div>
 
-      <ScrollArea className="flex-1">
-        <div className="max-w-7xl mx-auto py-12 px-12 space-y-12">
+      <ScrollArea className="flex-1 bg-[#050505]">
+        <div className="max-w-[1600px] mx-auto py-12 px-12 space-y-12">
           {/* MODULES SECTION (Only for Course context) */}
           {contextType === "course" && currentCourse && (
             <section>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+              <div className="flex items-center justify-between mb-6 px-1">
+                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
                   <Folder className="w-4 h-4 text-purple-500" />
                   Modules ({currentCourse.modules?.length || 0})
                 </h2>
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-gray-300 border-white/10 hover:bg-white/5 hover:text-purple-400 hover:border-purple-500/30 transition-all"
+                  className="rounded-full bg-white/5 border-white/10 hover:bg-white/10 hover:text-purple-400 hover:border-purple-500/30 transition-all duration-300"
                   onClick={handleAddModule}
                 >
                   <Plus className="w-3.5 h-3.5 mr-2" />
@@ -280,13 +282,13 @@ export default function FolderView({
                       )
                     }
                     whileHover={{ scale: 1.02 }}
-                    className="group relative flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-[#121212] hover:bg-[#18181B] hover:border-white/10 cursor-pointer transition-colors hover:z-50"
+                    className="group relative flex items-center gap-4 p-4 rounded-2xl border border-white/5 bg-[#121212]/80 backdrop-blur-sm cursor-pointer transition-all duration-300 hover:border-purple-500/30 hover:shadow-[0_0_20px_rgba(168,85,247,0.15)] hover:bg-[#18181B]"
                   >
-                    <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
-                      <Folder className="w-5 h-5 text-purple-400" />
+                    <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
+                      <Folder className="w-6 h-6 text-purple-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate group-hover:text-purple-200 transition-colors">
+                      <p className="text-sm font-semibold text-white truncate group-hover:text-purple-200 transition-colors">
                         {mod.title}
                       </p>
                     </div>
@@ -335,15 +337,15 @@ export default function FolderView({
 
           {/* NOTES SECTION */}
           <section>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+            <div className="flex items-center justify-between mb-6 px-1">
+              <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
                 <FileText className="w-4 h-4 text-cyan-500" />
                 Notes
               </h2>
               <Button
                 size="sm"
                 variant="outline"
-                className="text-gray-300 border-white/10 hover:bg-white/5 hover:text-cyan-400 hover:border-cyan-500/30 transition-all"
+                className="rounded-full bg-white/5 border-white/10 hover:bg-white/10 hover:text-cyan-400 hover:border-cyan-500/30 transition-all duration-300"
                 onClick={handleCreateNoteInContext}
               >
                 <Plus className="w-3.5 h-3.5 mr-2" />
@@ -365,10 +367,10 @@ export default function FolderView({
                 onClick={handleCreateNoteInContext}
                 className="group relative aspect-4/3 rounded-2xl border border-dashed border-white/10 hover:border-cyan-500/30 hover:bg-cyan-500/5 transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 text-gray-500 hover:text-cyan-400"
               >
-                <div className="p-3 rounded-full bg-white/5 group-hover:bg-cyan-500/20 transition-colors">
-                  <Plus className="w-6 h-6" />
+                <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-cyan-500/10 group-hover:scale-110 transition-all duration-300">
+                  <Plus className="w-7 h-7" />
                 </div>
-                <span className="text-sm font-medium">Create New</span>
+                <span className="text-sm font-medium">Create New Note</span>
               </motion.div>
 
               {contextNotes
@@ -380,63 +382,61 @@ export default function FolderView({
                   return b.createdAt - a.createdAt;
                 })
                 .map((n) => (
-                <motion.div
-                  key={n._id}
-                  variants={itemVariants}
-                  onClick={() => router.push(`/dashboard?noteId=${n._id}`)}
-                  whileHover={{ y: -5 }}
-                  className="group relative aspect-4/3 rounded-2xl border border-white/5 bg-[#121212] hover:bg-[#18181B] hover:shadow-[0_0_20px_rgba(0,0,0,0.4)] transition-all cursor-pointer p-6 flex flex-col justify-between overflow-hidden"
-                >
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-2">
-                        {n.isPinned && (
-                          <Pin className="w-3 h-3 text-amber-400" />
-                        )}
-                        <span className="text-[10px] font-mono text-cyan-500/70 bg-cyan-950/30 px-2 py-0.5 rounded border border-cyan-500/10">
-                          {n.style || "NOTE"}
-                        </span>
-                      </div>
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <ActionMenu
-                          onPin={() => togglePinNote({ noteId: n._id })}
-                          isPinned={n.isPinned}
-                          onRename={() =>
-                            setRenameTarget({
-                              id: n._id,
-                              title: n.title,
-                              type: "note",
-                            })
-                          }
-                          onDelete={() => {
-                            if (confirm("Delete this note?")) {
-                              deleteNote({ noteId: n._id });
+                  <motion.div
+                    key={n._id}
+                    variants={itemVariants}
+                    onClick={() => router.push(`/dashboard?noteId=${n._id}`)}
+                    whileHover={{ y: -8 }}
+                    className="group relative aspect-4/3 rounded-3xl border border-white/5 bg-[#121212]/80 backdrop-blur-sm hover:bg-[#18181B] hover:shadow-[0_0_30px_rgba(0,0,0,0.5)] hover:border-white/10 transition-all duration-300 cursor-pointer p-6 flex flex-col justify-between overflow-hidden"
+                  >
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2">
+                          {n.isPinned && (
+                            <Pin className="w-3 h-3 text-amber-400" />
+                          )}
+                          <span className="text-[10px] font-mono text-cyan-400/80 bg-cyan-950/30 px-2 py-1 rounded-md border border-cyan-500/10">
+                            {n.style || "NOTE"}
+                          </span>
+                        </div>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <ActionMenu
+                            onPin={() => togglePinNote({ noteId: n._id })}
+                            isPinned={n.isPinned}
+                            onRename={() =>
+                              setRenameTarget({
+                                id: n._id,
+                                title: n.title,
+                                type: "note",
+                              })
                             }
-                          }}
-                          align="right"
-                        />
+                            onDelete={() => {
+                              if (confirm("Delete this note?")) {
+                                deleteNote({ noteId: n._id });
+                              }
+                            }}
+                            align="right"
+                          />
+                        </div>
                       </div>
+                      <h3 className="font-bold text-xl text-white line-clamp-2 group-hover:text-cyan-200 transition-colors">
+                        {n.title}
+                      </h3>
+                      <p className="text-sm text-gray-500 line-clamp-3 leading-relaxed">
+                        {n.content
+                          ? n.content
+                              .replace(/<[^>]*>/g, "")
+                              .substring(0, 100) + "..."
+                          : "No additional text..."}
+                      </p>
                     </div>
-                    <h3 className="font-semibold text-xl text-white line-clamp-2 group-hover:text-cyan-100 transition-colors">
-                      {n.title}
-                    </h3>
-                    <p className="text-sm text-gray-500 line-clamp-3 leading-relaxed">
-                      {n.content
-                        ? n.content.replace(/<[^>]*>/g, "").substring(0, 100) +
-                          "..."
-                        : "No additional text..."}
-                    </p>
-                  </div>
 
-                  <div className="flex items-center gap-2 text-xs text-gray-600 border-t border-white/5 pt-4 mt-2">
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>{new Date(n.createdAt).toLocaleDateString()}</span>
-                  </div>
-
-                  {/* Hover Ring */}
-                  <div className="absolute inset-0 border-2 border-transparent group-hover:border-white/5 rounded-2xl transition-all pointer-events-none" />
-                </motion.div>
-              ))}
+                    <div className="flex items-center gap-2 text-xs text-gray-600 border-t border-white/5 pt-4 mt-2">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>{new Date(n.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  </motion.div>
+                ))}
 
               {(!contextNotes || contextNotes.length === 0) && (
                 <div className="col-span-full">
@@ -458,7 +458,7 @@ export default function FolderView({
 
           {/* FILES SECTION */}
           <section>
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-2 mb-6">
+            <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2 mb-6 px-1">
               <File className="w-4 h-4 text-indigo-500" />
               Files & Resources
             </h2>
@@ -478,23 +478,23 @@ export default function FolderView({
                 >
                   <motion.a
                     variants={itemVariants}
-                    whileHover={{ scale: 1.02 }}
+                    whileHover={{ scale: 1.02, y: -4 }}
                     href={f.url ?? undefined}
                     target="_blank"
                     rel="noreferrer"
-                    className="group flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-[#121212] hover:bg-[#18181B] hover:border-white/10 transition-colors"
+                    className="group flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-[#121212]/80 backdrop-blur-sm hover:bg-[#18181B] hover:border-indigo-500/30 hover:shadow-[0_0_20px_rgba(99,102,241,0.15)] transition-all duration-300"
                   >
                     <div className="w-12 h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
                       <File className="w-6 h-6 text-indigo-400" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-white truncate group-hover:text-indigo-200 transition-colors">
+                        <p className="text-sm font-bold text-white truncate group-hover:text-indigo-200 transition-colors">
                           {f.name}
                         </p>
                         <DocumentStatusBadge status={f.processingStatus} />
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5">
+                      <p className="text-xs text-gray-500 mt-1">
                         {f.processingStatus === "done"
                           ? "Drag to generate notes"
                           : new Date(f.createdAt).toLocaleDateString()}
