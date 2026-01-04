@@ -28,6 +28,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { DiagramExtension } from "./extensions/DiagramExtension";
+import Editor from "./Editor";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -40,6 +41,7 @@ import { usePDF } from "@/hooks/usePDF";
 import { AIBubbleMenu } from "./AIBubbleMenu";
 import { DocumentDropZone } from "@/components/documents";
 import { marked } from "marked";
+import { extractOutlineStructure, calculateOutlineMetadata, serializeOutline } from "@/lib/outlineUtils";
 import "./editor.css";
 
 // Props for the NoteView
@@ -72,7 +74,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   // Editor State
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [debouncedContent, setDebouncedContent] = useState<string | null>(null);
+  const [debouncedContent, setDebouncedContent] = useState<string | any>(null);
   const [isRenameOpen, setIsRenameOpen] = useState(false);
 
   // Parse context (Course / Module)
@@ -106,16 +108,44 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     if (debouncedContent === null) return;
 
     const handler = setTimeout(() => {
-      updateNote({ noteId, content: debouncedContent }).then(() => {
-        setIsSaving(false);
-      });
+      // Check if this is Cornell data (object with cornellCues, cornellNotes, cornellSummary)
+      if (typeof debouncedContent === 'object' && 'cornellCues' in debouncedContent) {
+        updateNote({
+          noteId,
+          cornellCues: debouncedContent.cornellCues,
+          cornellNotes: debouncedContent.cornellNotes,
+          cornellSummary: debouncedContent.cornellSummary,
+        }).then(() => {
+          setIsSaving(false);
+        });
+      } else if (note?.style === "outline" && typeof debouncedContent === 'string') {
+        // Extract outline structure and metadata
+        const structure = extractOutlineStructure(debouncedContent);
+        const metadata = calculateOutlineMetadata(structure);
+        const outlineData = serializeOutline(structure);
+        
+        updateNote({
+          noteId,
+          content: debouncedContent,
+          outlineData,
+          outlineMetadata: metadata,
+        }).then(() => {
+          setIsSaving(false);
+        });
+      } else {
+        // Standard content save
+        updateNote({ noteId, content: debouncedContent }).then(() => {
+          setIsSaving(false);
+        });
+      }
     }, 1000);
 
     return () => clearTimeout(handler);
-  }, [debouncedContent, noteId, updateNote]);
+  }, [debouncedContent, noteId, updateNote, note?.style]);
 
   const editor = useEditor({
     immediatelyRender: false,
+    editable: true,
     extensions: [
       StarterKit,
       Placeholder.configure({
@@ -184,11 +214,33 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   // Inject structured notes from RightSidebar when pendingNotes changes
   // Wait for note to be loaded (loadedNoteId === noteId) to avoid conflicts
   useEffect(() => {
-    if (!pendingNotes || !editor || editor.isDestroyed) return;
+    if (!pendingNotes) return;
     // Wait for the note content to be loaded first (important for new notes)
     if (loadedNoteId !== noteIdRef.current) return;
 
-    // Build HTML content from structured notes
+    // If this is a Cornell note, update the Cornell fields directly
+    if (note?.style === "cornell") {
+      const cornellCuesText = pendingNotes.cornellCues.join("\n\n");
+      const cornellNotesHtml = pendingNotes.cornellNotes.map((note, i) => 
+        `<h4>${pendingNotes.cornellCues[i] || ""}</h4><p>${note}</p>`
+      ).join("");
+      const cornellSummaryText = pendingNotes.summary || "";
+
+      // Update the note with Cornell data
+      updateNote({
+        noteId,
+        cornellCues: cornellCuesText,
+        cornellNotes: cornellNotesHtml,
+        cornellSummary: cornellSummaryText,
+      }).then(() => {
+        clearPendingNotes();
+      });
+      return;
+    }
+
+    // For non-Cornell notes, build HTML content from structured notes
+    if (!editor || editor.isDestroyed) return;
+
     let html = "";
 
     // Summary
@@ -529,9 +581,9 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
       {/* 2. Main Scrollable Content */}
       <ScrollArea className="flex-1">
-        <div id="note-content-area" className="max-w-5xl mx-auto py-12 px-12">
-          {/* Header Section */}
-          <div className="mb-8">
+        <div className="max-w-5xl mx-auto py-12 px-12">
+          {/* Header Section - Not included in PDF export */}
+          <div className="mb-8" data-html2canvas-ignore>
             {/* Title & Actions */}
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
@@ -587,7 +639,10 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             </div>
           </div>
 
-          <Separator className="bg-white/10 mb-6" />
+          <Separator className="bg-white/10 mb-6" data-html2canvas-ignore />
+
+          {/* PDF Export Area - This is what gets exported */}
+          <div id="note-content-area">
 
           {/* Toolbar */}
           {editor && (
@@ -644,15 +699,49 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             }}
             className="pb-32"
           >
-            {editor && <AIBubbleMenu editor={editor} />}
-            <EditorContent editor={editor} />
+            {note?.style === "cornell" ? (
+              <Editor
+                styleType="cornell"
+                cornellCues={note.cornellCues || ""}
+                cornellNotes={note.cornellNotes || ""}
+                cornellSummary={note.cornellSummary || ""}
+                onChange={(content) => {
+                  setIsSaving(true);
+                  setDebouncedContent(content);
+                }}
+                isEditable={true}
+              />
+            ) : note?.style === "outline" ? (
+              <Editor
+                styleType="outline"
+                initialContent={note.content || ""}
+                outlineData={note.outlineData}
+                outlineMetadata={note.outlineMetadata}
+                onChange={(content) => {
+                  setIsSaving(true);
+                  setDebouncedContent(content);
+                }}
+                isEditable={true}
+              />
+            ) : (
+              <>
+                {editor && <AIBubbleMenu editor={editor} />}
+                <EditorContent editor={editor} />
+              </>
+            )}
           </DocumentDropZone>
+          </div>
+          {/* End PDF Export Area */}
         </div>
       </ScrollArea>
 
       {/* AI Assistant Bar */}
       <AskAI
-        context={note.content || ""}
+        context={
+          note.style === "cornell"
+            ? `Cues: ${note.cornellCues || ""}\n\nNotes: ${note.cornellNotes || ""}\n\nSummary: ${note.cornellSummary || ""}`
+            : note.content || ""
+        }
         contextType="note"
         contextTitle={note.title}
         onInsertToNote={handleInsertFromAI}

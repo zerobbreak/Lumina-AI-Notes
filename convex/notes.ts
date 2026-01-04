@@ -238,6 +238,17 @@ export const updateNote = mutation({
     noteId: v.id("notes"),
     title: v.optional(v.string()),
     content: v.optional(v.string()),
+    // Cornell Notes specific fields
+    cornellCues: v.optional(v.string()),
+    cornellNotes: v.optional(v.string()),
+    cornellSummary: v.optional(v.string()),
+    // Outline Mode specific fields
+    outlineData: v.optional(v.string()),
+    outlineMetadata: v.optional(v.object({
+      totalItems: v.number(),
+      completedTasks: v.number(),
+      collapsedNodes: v.array(v.string()),
+    })),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -251,6 +262,11 @@ export const updateNote = mutation({
     const patch: any = {};
     if (args.title !== undefined) patch.title = args.title;
     if (args.content !== undefined) patch.content = args.content;
+    if (args.cornellCues !== undefined) patch.cornellCues = args.cornellCues;
+    if (args.cornellNotes !== undefined) patch.cornellNotes = args.cornellNotes;
+    if (args.cornellSummary !== undefined) patch.cornellSummary = args.cornellSummary;
+    if (args.outlineData !== undefined) patch.outlineData = args.outlineData;
+    if (args.outlineMetadata !== undefined) patch.outlineMetadata = args.outlineMetadata;
 
     await ctx.db.patch(args.noteId, patch);
   },
@@ -449,21 +465,41 @@ Rules:
           parsed.diagramNodes.length > 0
         ) {
           const nodes = parsed.diagramNodes.map(
-            (label: string, index: number) => ({
-              id: String(index),
-              type: index === 0 ? "input" : "default",
-              data: { label },
-              position: {
-                x: index === 0 ? 200 : 100 + (index % 3) * 150,
-                y: index === 0 ? 0 : Math.floor(index / 3) * 100 + 100,
-              },
-            })
+            (label: string, index: number) => {
+              // Assign node types and colors based on position
+              let type = "default";
+              let color = "bg-gradient-to-br from-gray-500 to-gray-600";
+              
+              if (index === 0) {
+                type = "concept";
+                color = "bg-gradient-to-br from-purple-500 to-pink-500";
+              } else if (index <= 3) {
+                type = "topic";
+                color = "bg-gradient-to-br from-blue-500 to-cyan-500";
+              } else if (index <= 6) {
+                type = "subtopic";
+                color = "bg-gradient-to-br from-emerald-500 to-teal-500";
+              } else {
+                type = "note";
+                color = "bg-gradient-to-br from-amber-400 to-orange-400";
+              }
+
+              return {
+                id: String(index),
+                type,
+                data: { label, color },
+                position: {
+                  x: index === 0 ? 400 : 200 + (index % 3) * 200,
+                  y: index === 0 ? 50 : Math.floor(index / 3) * 150 + 200,
+                },
+              };
+            }
           );
 
           const edges = (parsed.diagramEdges || []).map(
             (edge: string, index: number) => {
               const [source, target] = edge.split("-");
-              return { id: `e${index}`, source, target };
+              return { id: `e${index}`, source, target, animated: true };
             }
           );
 

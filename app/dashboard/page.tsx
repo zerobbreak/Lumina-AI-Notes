@@ -12,6 +12,8 @@ import FolderView from "@/components/dashboard/views/FolderView";
 import SmartFolderHub from "@/components/dashboard/views/SmartFolderHub";
 import { FlashcardsView } from "@/components/dashboard/flashcards/FlashcardsView";
 import { FlashcardStudy } from "@/components/dashboard/flashcards/FlashcardStudy";
+import { QuizzesView } from "@/components/dashboard/quizzes/QuizzesView";
+import { QuizTaking } from "@/components/dashboard/quizzes/QuizTaking";
 import ArchiveView from "@/components/dashboard/views/ArchiveView";
 
 function DashboardLoading() {
@@ -97,18 +99,26 @@ function DashboardContent() {
     return <FlashcardsView />;
   }
 
-  // --- VIEW 3: ARCHIVE ---
+  // --- VIEW 3: QUIZZES ---
+  if (view === "quizzes") {
+    if (deckId) {
+      return <QuizTaking deckId={deckId} />;
+    }
+    return <QuizzesView />;
+  }
+
+  // --- VIEW 4: ARCHIVE ---
   if (view === "archive") {
     return <ArchiveView />;
   }
 
-  // --- VIEW 4: SMART FOLDER OVERVIEW ---
+  // --- VIEW 5: SMART FOLDER OVERVIEW ---
   if (contextId) {
     return (
       <FolderView contextId={contextId} contextType={contextType || "course"} />
     );
   }
 
-  // --- VIEW 4: SMART FOLDER HUB (HOME) ---
+  // --- VIEW 6: SMART FOLDER HUB (HOME) ---
   return <SmartFolderHub />;
 }

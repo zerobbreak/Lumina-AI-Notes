@@ -8,6 +8,7 @@ import {
   Upload,
   Loader2,
   Archive,
+  ClipboardList,
 } from "lucide-react";
 import { toast } from "sonner";
 import { UserButton, useUser } from "@clerk/nextjs";
@@ -172,7 +173,7 @@ export function Sidebar() {
       <div className="p-4 space-y-4">
         {/* Profile Card */}
         <div className="flex items-center gap-3.5 p-2 rounded-xl bg-white/3 border border-white/5 hover:bg-white/6 hover:border-white/8 transition-all duration-300 cursor-pointer group shadow-sm">
-          <div className="w-9 h-9 bg-linear-to-br from-indigo-500 via-indigo-600 to-violet-600 rounded-lg flex items-center justify-center text-white font-bold shadow-[0_0_15px_-3px_rgba(99,102,241,0.4)] group-hover:shadow-[0_0_20px_-3px_rgba(99,102,241,0.5)] transition-shadow">
+          <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-600 rounded-lg flex items-center justify-center text-white font-bold shadow-[0_0_15px_-3px_rgba(99,102,241,0.4)] group-hover:shadow-[0_0_20px_-3px_rgba(99,102,241,0.5)] transition-shadow">
             <span className="drop-shadow-md">U</span>
           </div>
           <div className="flex-1 overflow-hidden">
@@ -385,6 +386,16 @@ export function Sidebar() {
               <Layers className="w-3.5 h-3.5 text-indigo-400 group-hover:text-indigo-300" />
             </div>
             <span>Flashcards</span>
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full justify-start h-9 px-2.5 text-[13px] text-gray-400 hover:text-white hover:bg-white/4 gap-3 transition-all group mt-1"
+            onClick={() => router.push("/dashboard?view=quizzes")}
+          >
+            <div className="p-0.5 rounded bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors">
+              <ClipboardList className="w-3.5 h-3.5 text-purple-400 group-hover:text-purple-300" />
+            </div>
+            <span>Quizzes</span>
           </Button>
           <Button
             variant="ghost"

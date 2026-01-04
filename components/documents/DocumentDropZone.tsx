@@ -120,16 +120,57 @@ export function DocumentDropZone({
     [generateNotesFromDocument, onNotesGenerated]
   );
 
+  // Get root props but extract only the necessary handlers when children are present
+  const rootProps = getRootProps();
+  const dropZoneProps = children
+    ? {
+        // When children are present (editor), only handle actual file/document drops
+        onDrop: (e: React.DragEvent) => {
+          // Check if it's a document drop first
+          if (e.dataTransfer.getData("application/lumina-resource-id")) {
+            handleDocumentDrop(e);
+          } else if (e.dataTransfer.files.length > 0) {
+            // Only handle if there are actual files being dropped
+            rootProps.onDrop?.(e);
+          }
+          // Otherwise, ignore - it's just text selection
+        },
+        onDragOver: (e: React.DragEvent) => {
+          // Only prevent default if there are actual files being dragged
+          // Check dataTransfer.types to see if this is a file drag or just text selection
+          if (e.dataTransfer.types.includes('Files') || e.dataTransfer.types.includes('application/lumina-resource-id')) {
+            rootProps.onDragOver?.(e);
+          }
+          // Otherwise, don't call preventDefault - allow text selection
+        },
+        onDragEnter: (e: React.DragEvent) => {
+          // Only handle if there are files
+          if (e.dataTransfer.types.includes('Files')) {
+            rootProps.onDragEnter?.(e);
+          }
+        },
+        onDragLeave: (e: React.DragEvent) => {
+          // Only handle if there are files
+          if (e.dataTransfer.types.includes('Files')) {
+            rootProps.onDragLeave?.(e);
+          }
+        },
+      }
+    : {
+        // When no children (upload area), use all dropzone props
+        ...rootProps,
+        onDrop: (e: React.DragEvent) => {
+          if (e.dataTransfer.getData("application/lumina-resource-id")) {
+            handleDocumentDrop(e);
+          } else {
+            rootProps.onDrop?.(e);
+          }
+        },
+      };
+
   return (
     <div
-      {...getRootProps()}
-      onDrop={(e) => {
-        // Check if it's a document drop first
-        if (e.dataTransfer.getData("application/lumina-resource-id")) {
-          handleDocumentDrop(e);
-        }
-        // Otherwise let react-dropzone handle it
-      }}
+      {...dropZoneProps}
       className={`relative ${className} ${
         isDragActive ? "ring-2 ring-indigo-500 bg-indigo-500/10" : ""
       } transition-all duration-200`}

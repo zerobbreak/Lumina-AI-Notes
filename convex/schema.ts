@@ -52,6 +52,17 @@ export default defineSchema({
     embedding: v.optional(v.array(v.float64())),
     // Linked source documents for citations
     linkedDocumentIds: v.optional(v.array(v.id("files"))),
+    // Cornell Notes specific fields
+    cornellCues: v.optional(v.string()),
+    cornellNotes: v.optional(v.string()),
+    cornellSummary: v.optional(v.string()),
+    // Outline Mode specific fields
+    outlineData: v.optional(v.string()), // JSON stringified tree structure
+    outlineMetadata: v.optional(v.object({
+      totalItems: v.number(),
+      completedTasks: v.number(),
+      collapsedNodes: v.array(v.string()), // IDs of collapsed nodes
+    })),
   })
     .index("by_userId", ["userId"])
     .index("by_userId_and_pinned", ["userId", "isPinned"])
@@ -131,6 +142,44 @@ export default defineSchema({
     nextReviewAt: v.optional(v.number()),
     reviewCount: v.optional(v.number()),
   }).index("by_deckId", ["deckId"]),
+
+  quizDecks: defineTable({
+    userId: v.string(),
+    title: v.string(),
+    sourceNoteId: v.optional(v.id("notes")),
+    courseId: v.optional(v.string()),
+    questionCount: v.number(),
+    createdAt: v.number(),
+    lastTakenAt: v.optional(v.number()),
+  })
+    .index("by_userId", ["userId"])
+    .searchIndex("search_title", {
+      searchField: "title",
+      filterFields: ["userId"],
+    }),
+
+  quizQuestions: defineTable({
+    deckId: v.id("quizDecks"),
+    question: v.string(),
+    options: v.array(v.string()), // Array of 4 options
+    correctAnswer: v.number(), // Index 0-3
+    explanation: v.optional(v.string()),
+    difficulty: v.optional(v.number()), // For future use
+  }).index("by_deckId", ["deckId"]),
+
+  quizResults: defineTable({
+    deckId: v.id("quizDecks"),
+    userId: v.string(),
+    score: v.number(),
+    totalQuestions: v.number(),
+    answers: v.array(v.number()), // User's answers (indices)
+    completedAt: v.number(),
+    timeSpent: v.optional(v.number()), // For future use
+  })
+    .index("by_userId", ["userId"])
+    .index("by_deckId", ["deckId"])
+    .index("by_userId_and_deckId", ["userId", "deckId"]),
+
   documents: defineTable({
     storageId: v.string(),
     courseId: v.string(), // e.g., "REQ-001"

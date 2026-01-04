@@ -114,8 +114,24 @@ export const generateCourseRoadmap = action({
     Return EXACTLY this JSON structure:
     {
       "nodes": [
-        { "id": "1", "type": "input", "data": { "label": "${args.major}" }, "position": { "x": 0, "y": 0 } },
-        { "id": "2", "data": { "label": "Course Name" }, "position": { "x": 100, "y": 100 } }
+        { 
+          "id": "1", 
+          "type": "concept", 
+          "data": { 
+            "label": "${args.major}",
+            "color": "bg-gradient-to-br from-purple-500 to-pink-500"
+          }, 
+          "position": { "x": 400, "y": 50 } 
+        },
+        { 
+          "id": "2", 
+          "type": "topic",
+          "data": { 
+            "label": "Course Name",
+            "color": "bg-gradient-to-br from-blue-500 to-cyan-500"
+          }, 
+          "position": { "x": 200, "y": 200 } 
+        }
       ],
       "edges": [
         { "id": "e1-2", "source": "1", "target": "2", "animated": true }
@@ -123,37 +139,112 @@ export const generateCourseRoadmap = action({
     }
 
     Rules:
-    - The central node should be the Major.
-    - Branch out to Semesters or Core Areas, then to specific Courses.
-    - Add "Concept" nodes for key topics within courses if relevant.
-    - Use "animated": true for edges showing progression.
-    - Generate reasonable (x, y) positions to minimize overlap (simulated layout).
-    - Return ONLY valid JSON.
+    - The central node (id: "1") should be the Major with type "concept"
+    - Use node types: "concept" (major), "topic" (courses/semesters), "subtopic" (key concepts), "note" (details)
+    - Assign colors based on node type:
+      * concept: "bg-gradient-to-br from-purple-500 to-pink-500"
+      * topic: "bg-gradient-to-br from-blue-500 to-cyan-500"
+      * subtopic: "bg-gradient-to-br from-emerald-500 to-teal-500"
+      * note: "bg-gradient-to-br from-amber-400 to-orange-400"
+    - Position the major node at center-top (x: 400, y: 50)
+    - Arrange courses/topics in a hierarchical tree below
+    - Use reasonable spacing: 200-300px horizontally, 150-200px vertically between levels
+    - Create 8-12 nodes total (major + courses + key concepts)
+    - All edges should have "animated": true
+    - Return ONLY valid JSON, no markdown code fences.
     `;
 
     try {
       const result = await model.generateContent(prompt);
-      const text = result.response.text();
+      let text = result.response.text().trim();
+
+      // Remove markdown code fences if present
+      text = text.replace(/^```json?\s*/i, "").replace(/```\s*$/i, "");
 
       // Extract JSON
       const match = text.match(/\{[\s\S]*\}/);
       if (!match) throw new Error("Failed to generate roadmap JSON");
 
-      return JSON.parse(match[0]);
+      const data = JSON.parse(match[0]);
+
+      // Apply dagre layout for better positioning
+      if (data.nodes && data.nodes.length > 0) {
+        const dagre = require("dagre");
+        const dagreGraph = new dagre.graphlib.Graph();
+        dagreGraph.setDefaultEdgeLabel(() => ({}));
+        dagreGraph.setGraph({ rankdir: "TB", nodesep: 150, ranksep: 100 });
+
+        // Add nodes with estimated dimensions
+        data.nodes.forEach((node: any) => {
+          const width = node.type === "concept" ? 200 : node.type === "topic" ? 160 : node.type === "subtopic" ? 120 : 100;
+          const height = node.type === "concept" ? 80 : node.type === "topic" ? 60 : node.type === "subtopic" ? 50 : 40;
+          dagreGraph.setNode(node.id, { width, height });
+        });
+
+        // Add edges
+        data.edges.forEach((edge: any) => {
+          dagreGraph.setEdge(edge.source, edge.target);
+        });
+
+        // Calculate layout
+        dagre.layout(dagreGraph);
+
+        // Update positions
+        data.nodes = data.nodes.map((node: any) => {
+          const nodeWithPosition = dagreGraph.node(node.id);
+          return {
+            ...node,
+            position: {
+              x: nodeWithPosition.x - nodeWithPosition.width / 2,
+              y: nodeWithPosition.y - nodeWithPosition.height / 2,
+            },
+          };
+        });
+      }
+
+      return data;
     } catch (e) {
       console.error("Roadmap generation failed", e);
-      // Return a basic fallback structure
-      return {
-        nodes: [
-          {
-            id: "1",
-            type: "input",
-            data: { label: args.major },
-            position: { x: 0, y: 0 },
+      
+      // Return a better fallback structure with the courses
+      const nodes = [
+        {
+          id: "1",
+          type: "concept",
+          data: { 
+            label: args.major,
+            color: "bg-gradient-to-br from-purple-500 to-pink-500"
           },
-        ],
-        edges: [],
-      };
+          position: { x: 400, y: 50 },
+        },
+      ];
+
+      const edges: any[] = [];
+
+      // Add courses as topic nodes
+      args.courses.forEach((course, index) => {
+        const nodeId = `${index + 2}`;
+        nodes.push({
+          id: nodeId,
+          type: "topic",
+          data: { 
+            label: course,
+            color: "bg-gradient-to-br from-blue-500 to-cyan-500"
+          },
+          position: { 
+            x: 200 + (index % 3) * 200, 
+            y: 200 + Math.floor(index / 3) * 150 
+          },
+        });
+        edges.push({
+          id: `e1-${nodeId}`,
+          source: "1",
+          target: nodeId,
+          animated: true,
+        });
+      });
+
+      return { nodes, edges };
     }
   },
 });
@@ -207,20 +298,41 @@ export const generateStructuredNotes = action({
   args: {
     transcript: v.string(), // JSON stringified array of {text, timestamp}
     title: v.optional(v.string()),
+    style: v.optional(v.string()), // "cornell" | "outline" | "standard"
   },
   handler: async (ctx, args) => {
     const model = getGeminiModel();
 
-    const prompt = `You are an expert academic note-taker with years of experience creating comprehensive study materials. Your goal is to transform this lecture transcript into detailed, exam-ready study notes.
+    let prompt = `You are an expert academic note-taker with years of experience creating comprehensive study materials. Your goal is to transform this lecture transcript into detailed, exam-ready study notes.
 
 Transcript:
 """
 ${args.transcript}
 """
 
-${args.title ? `Lecture Title: ${args.title}` : ""}
+${args.title ? `Lecture Title: ${args.title}` : ""}`;
 
-Generate a JSON response with this EXACT structure:
+    // Add style-specific instructions
+    if (args.style === "outline") {
+      prompt += `\n\nFormat as a hierarchical outline with:
+- Main topics as top-level items
+- Sub-topics indented under main topics
+- Key details as further nested items
+- Use task items (checkboxes) for action items
+- Maximum 4 levels of nesting
+
+Generate a JSON response with this structure:
+{
+  "summary": "Brief overview of the lecture",
+  "outlineHtml": "<ul><li>Main Topic 1<ul><li>Subtopic 1.1</li><li>Subtopic 1.2</li></ul></li><li>Main Topic 2...</li></ul>",
+  "actionItems": ["Task 1", "Task 2"],
+  "reviewQuestions": ["Question 1?", "Question 2?"]
+}
+
+Return as HTML with proper <ul>, <ol>, and task list structure using data-type="taskList" for checkboxes.
+- Return ONLY valid JSON, no markdown code fences`;
+    } else {
+      prompt += `\n\nGenerate a JSON response with this EXACT structure:
 {
   "summary": "A comprehensive 4-6 sentence summary that: 1) States the main topic clearly, 2) Explains WHY this topic matters, 3) Lists the key themes covered, 4) Mentions any important conclusions or takeaways.",
   "cornellCues": ["Concept/Term 1", "Concept/Term 2", "Concept/Term 3", "Concept/Term 4", "Concept/Term 5"],
@@ -252,6 +364,7 @@ IMPORTANT RULES:
 - diagramEdges: Connect nodes logically (format: "sourceIndex-targetIndex")
 - actionItems: Only include if explicitly mentioned (homework, readings, deadlines)
 - Return ONLY valid JSON, no markdown code fences`;
+    }
 
     try {
       const result = await model.generateContent(prompt);
@@ -275,21 +388,41 @@ IMPORTANT RULES:
           parsed.diagramNodes.length > 0
         ) {
           const nodes = parsed.diagramNodes.map(
-            (label: string, index: number) => ({
-              id: String(index),
-              type: index === 0 ? "input" : "default",
-              data: { label },
-              position: {
-                x: index === 0 ? 200 : 100 + (index % 3) * 150,
-                y: index === 0 ? 0 : Math.floor(index / 3) * 100 + 100,
-              },
-            })
+            (label: string, index: number) => {
+              // Assign node types and colors based on position
+              let type = "default";
+              let color = "bg-gradient-to-br from-gray-500 to-gray-600";
+              
+              if (index === 0) {
+                type = "concept";
+                color = "bg-gradient-to-br from-purple-500 to-pink-500";
+              } else if (index <= 3) {
+                type = "topic";
+                color = "bg-gradient-to-br from-blue-500 to-cyan-500";
+              } else if (index <= 6) {
+                type = "subtopic";
+                color = "bg-gradient-to-br from-emerald-500 to-teal-500";
+              } else {
+                type = "note";
+                color = "bg-gradient-to-br from-amber-400 to-orange-400";
+              }
+
+              return {
+                id: String(index),
+                type,
+                data: { label, color },
+                position: {
+                  x: index === 0 ? 400 : 200 + (index % 3) * 200,
+                  y: index === 0 ? 50 : Math.floor(index / 3) * 150 + 200,
+                },
+              };
+            }
           );
 
           const edges = (parsed.diagramEdges || []).map(
             (edge: string, index: number) => {
               const [source, target] = edge.split("-");
-              return { id: `e${index}`, source, target };
+              return { id: `e${index}`, source, target, animated: true };
             }
           );
 
@@ -875,6 +1008,136 @@ Rules:
           error instanceof Error
             ? error.message
             : "Failed to generate flashcards",
+      };
+    }
+  },
+});
+
+/**
+ * Generate quiz questions from note content and save them to the database
+ */
+export const generateAndSaveQuiz = action({
+  args: {
+    noteId: v.id("notes"),
+    title: v.string(),
+    count: v.optional(v.number()),
+  },
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    success: boolean;
+    deckId?: string;
+    questionCount?: number;
+    error?: string;
+  }> => {
+    // Get the note content
+    const note = await ctx.runQuery(api.notes.getNote, { noteId: args.noteId });
+    if (!note) {
+      return {
+        success: false,
+        error: "Note not found. Please select a different note.",
+      };
+    }
+
+    // Strip HTML tags from content
+    const plainText = (note.content || "")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!plainText || plainText.length < 50) {
+      return {
+        success: false,
+        error:
+          "This note doesn't have enough content yet. Add more text to your note before generating a quiz.",
+      };
+    }
+
+    const model = getGeminiModel();
+    const count = args.count || 10;
+
+    const prompt = `Generate ${count} multiple-choice questions from the following study content.
+
+Content:
+"""
+${plainText.substring(0, 8000)}
+"""
+
+Each question should have:
+- A clear question testing understanding of key concepts
+- Exactly 4 plausible options labeled A, B, C, D
+- One correct answer (specify by index 0-3)
+- A brief explanation of why the answer is correct
+
+Return a JSON array with this exact structure:
+[
+  {
+    "question": "What is the main concept of...?",
+    "options": ["A) First option", "B) Second option", "C) Third option", "D) Fourth option"],
+    "correctAnswer": 0,
+    "explanation": "Brief explanation of the correct answer"
+  }
+]
+
+Rules:
+- Focus on key concepts and important facts
+- Make all options plausible to test real understanding
+- Ensure correctAnswer is a number from 0 to 3
+- Keep questions clear and concise
+- Return ONLY valid JSON, no markdown or explanation`;
+
+    try {
+      const result = await model.generateContent(prompt);
+      const responseText = result.response.text().trim();
+
+      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        throw new Error("Failed to parse AI response");
+      }
+
+      const questions = JSON.parse(jsonMatch[0]) as Array<{
+        question: string;
+        options: string[];
+        correctAnswer: number;
+        explanation?: string;
+      }>;
+
+      if (!questions.length) {
+        throw new Error("No questions generated");
+      }
+
+      // Validate questions
+      for (const q of questions) {
+        if (!q.question || !q.options || q.options.length !== 4) {
+          throw new Error("Invalid question format: must have 4 options");
+        }
+        if (q.correctAnswer < 0 || q.correctAnswer > 3) {
+          throw new Error("Invalid correctAnswer: must be 0-3");
+        }
+      }
+
+      // Save to database
+      const deckId = await ctx.runMutation(api.quizzes.createDeckWithQuestions, {
+        title: args.title,
+        sourceNoteId: args.noteId,
+        courseId: note.courseId,
+        questions: questions,
+      });
+
+      return {
+        success: true,
+        deckId,
+        questionCount: questions.length,
+      };
+    } catch (error) {
+      console.error("generateAndSaveQuiz error:", error);
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to generate quiz",
       };
     }
   },

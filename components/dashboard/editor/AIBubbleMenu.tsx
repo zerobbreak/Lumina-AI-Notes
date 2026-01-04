@@ -17,7 +17,9 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [isLoading, setIsLoading] = useState(false);
   const [activeAction, setActiveAction] = useState<string | null>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const showTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const simplifyText = useAction(api.ai.simplifyText);
   const expandText = useAction(api.ai.expandText);
@@ -31,6 +33,13 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
       const { from, to } = editor.state.selection;
       const selectedText = editor.state.doc.textBetween(from, to, " ");
 
+      // Clear any pending timeout
+      if (showTimeoutRef.current) {
+        clearTimeout(showTimeoutRef.current);
+        showTimeoutRef.current = null;
+      }
+
+      // Only show if we have a meaningful selection
       if (selectedText.trim().length > 3) {
         // Get the DOM coordinates of the selection
         const { view } = editor;
@@ -39,21 +48,39 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
 
         // Center the menu above the selection
         const left = (start.left + end.left) / 2;
-        const top = start.top - 50;
+        const top = start.top - 70; // Position above selection
 
         setPosition({ top, left });
-        setIsVisible(true);
+        
+        // Show menu after a brief delay
+        showTimeoutRef.current = setTimeout(() => {
+          setIsVisible(true);
+        }, 500);
       } else {
         setIsVisible(false);
       }
     };
 
+    const handleBlur = (event: FocusEvent) => {
+      // Don't hide if clicking on the bubble menu itself
+      const relatedTarget = event.relatedTarget as HTMLElement;
+      if (relatedTarget && relatedTarget.closest('[data-bubble-menu]')) {
+        return;
+      }
+      // Delay hiding to allow button clicks to register
+      setTimeout(() => setIsVisible(false), 150);
+    };
+
     editor.on("selectionUpdate", updatePosition);
-    editor.on("blur", () => setIsVisible(false));
+    editor.on("blur", handleBlur);
 
     return () => {
       editor.off("selectionUpdate", updatePosition);
-      editor.off("blur", () => setIsVisible(false));
+      editor.off("blur", handleBlur);
+      
+      if (showTimeoutRef.current) {
+        clearTimeout(showTimeoutRef.current);
+      }
     };
   }, [editor]);
 
@@ -135,15 +162,18 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
       {isVisible && (
         <motion.div
           ref={menuRef}
-          initial={{ opacity: 0, y: 5 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 5 }}
+          data-bubble-menu
+          initial={{ opacity: 0, y: 5, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 5, scale: 0.95 }}
+          transition={{ duration: 0.15 }}
           style={{
             position: "fixed",
             top: position.top,
             left: position.left,
             transform: "translateX(-50%)",
             zIndex: 50,
+            pointerEvents: "auto", // Enable pointer events on the menu itself
           }}
           className="flex items-center gap-1 p-1.5 bg-zinc-900/95 backdrop-blur-sm border border-white/10 rounded-lg shadow-xl"
         >

@@ -8,6 +8,17 @@
   color: inherit;
 }
 
+/* Text selection highlight - make it visible on dark background */
+.ProseMirror ::selection {
+  background-color: rgba(99, 102, 241, 0.5); /* indigo with 50% opacity */
+  color: #ffffff;
+}
+
+.ProseMirror ::-moz-selection {
+  background-color: rgba(99, 102, 241, 0.5); /* indigo with 50% opacity */
+  color: #ffffff;
+}
+
 .ProseMirror p.is-editor-empty:first-child::before {
   color: #6b7280;
   content: attr(data-placeholder);
@@ -138,4 +149,155 @@
 
 .ProseMirror a:hover {
   color: #93c5fd;
+}
+
+/* Cornell Notes Layout */
+.cornell-container {
+  max-height: 100%;
+}
+
+.cornell-container textarea {
+  font-family: inherit;
+  line-height: 1.6;
+}
+
+.cornell-container textarea:focus {
+  outline: none;
+}
+
+/* Ensure proper scrolling in Cornell sections */
+.cornell-container .ProseMirror {
+  min-height: 300px;
+  max-height: 100%;
+}
+
+/* Outline Mode Container */
+.outline-mode-container {
+  padding: 1rem;
+}
+
+.outline-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(10, 10, 10, 0.95);
+  backdrop-filter: blur(8px);
+}
+
+/* List Styling */
+.outline-bullet-list,
+.outline-ordered-list,
+.outline-task-list {
+  margin-left: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.outline-list-item {
+  position: relative;
+  margin: 0.25rem 0;
+  padding-left: 1.5rem;
+}
+
+/* Indentation levels */
+.outline-list-item .outline-list-item {
+  margin-left: 2rem;
+}
+
+/* Bullet points */
+.outline-bullet-list > .outline-list-item::before {
+  content: "•";
+  position: absolute;
+  left: 0.5rem;
+  color: #6366f1;
+  font-weight: bold;
+}
+
+/* Nested bullets */
+.outline-bullet-list .outline-bullet-list > .outline-list-item::before {
+  content: "◦";
+  color: #8b5cf6;
+}
+
+.outline-bullet-list .outline-bullet-list .outline-bullet-list > .outline-list-item::before {
+  content: "▪";
+  color: #a78bfa;
+}
+
+/* Numbered lists */
+.outline-ordered-list {
+  counter-reset: outline-counter;
+}
+
+.outline-ordered-list > .outline-list-item {
+  counter-increment: outline-counter;
+}
+
+.outline-ordered-list > .outline-list-item::before {
+  content: counter(outline-counter) ".";
+  position: absolute;
+  left: 0;
+  color: #6366f1;
+  font-weight: 600;
+}
+
+/* Task items */
+.outline-task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.outline-task-item input[type="checkbox"] {
+  margin-top: 0.25rem;
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+  accent-color: #6366f1;
+}
+
+.outline-task-item input[type="checkbox"]:checked + div {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+/* Drag and drop cursor */
+.ProseMirror-dropcursor {
+  border-left: 2px solid #6366f1;
+  margin-left: -1px;
+}
+
+/* Hover effects */
+.outline-list-item:hover {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0.25rem;
+}
+
+/* Focus styles */
+.outline-editor-content .ProseMirror:focus {
+  outline: none;
+}
+
+/* Collapsible indicators */
+.outline-list-item.has-children::marker {
+  content: "▶";
+}
+
+.outline-list-item.has-children.expanded::marker {
+  content: "▼";
+}
+
+/* Collapsible content */
+.collapsed-content {
+  display: none;
+}
+
+/* Outline list item wrapper */
+.outline-list-item-wrapper {
+  margin: 0.125rem 0;
+}
+
+.outline-node-content {
+  flex: 1;
 }
