@@ -1,4 +1,25 @@
 import { useCallback, useState } from "react";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
+
+interface PageMetrics {
+  width: number;
+  height: number;
+  marginLeft: number;
+  marginRight: number;
+  marginTop: number;
+  marginBottom: number;
+  contentWidth: number;
+  contentHeight: number;
+}
+
+interface RenderContext {
+  doc: jsPDF;
+  metrics: PageMetrics;
+  currentY: number;
+  fontSize: number;
+  lineHeight: number;
+}
 
 export function usePDF() {
   const [isLoading, setIsLoading] = useState(false);
@@ -6,292 +27,567 @@ export function usePDF() {
   const generatePDF = useCallback(
     async (elementId: string, filename: string, title?: string) => {
       setIsLoading(true);
+      
+      // Yield to browser
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
       try {
-        const { jsPDF } = await import("jspdf");
-        const html2canvas = (await import("html2canvas")).default;
-
         const element = document.getElementById(elementId);
         if (!element) throw new Error("Element not found");
 
-        // Clone the element to avoid modifying the original
+        // Clone element to avoid modifying original
         const clonedElement = element.cloneNode(true) as HTMLElement;
         
-        // Remove elements that shouldn't be in the PDF
+        // Clean up the clone
         clonedElement.querySelectorAll('[data-html2canvas-ignore]').forEach(el => el.remove());
         clonedElement.querySelectorAll('.ProseMirror-gapcursor').forEach(el => el.remove());
         clonedElement.querySelectorAll('[contenteditable]').forEach(el => {
           el.removeAttribute('contenteditable');
         });
 
-        // Get the HTML content
-        let htmlContent = clonedElement.innerHTML;
-        
-        // Clean up the HTML - remove empty paragraphs and unnecessary elements
-        htmlContent = htmlContent
-          .replace(/<p><\/p>/g, '')
-          .replace(/<p>\s*<\/p>/g, '')
-          .replace(/data-html2canvas-ignore="[^"]*"/g, '')
-          .replace(/contenteditable="[^"]*"/g, '');
-
-        // Create a temporary container with clean, print-friendly styles
+        // Create temporary container for processing
         const container = document.createElement('div');
-        container.style.position = 'absolute';
-        container.style.left = '-9999px';
+        container.style.position = 'fixed';
+        container.style.left = '-99999px';
         container.style.top = '0';
-        container.style.width = '794px'; // A4 width in pixels at 96 DPI
-        container.style.minHeight = '1123px'; // A4 height in pixels at 96 DPI
-        container.style.backgroundColor = '#ffffff';
-        container.style.color = '#000000';
-        
-        // Apply comprehensive styles for PDF export with better visibility
-        container.innerHTML = `
-          <style>
-            @media print {
-              * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-              }
-            }
-            * { 
-              margin: 0; 
-              padding: 0; 
-              box-sizing: border-box;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-            .pdf-content {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-              font-size: 14px;
-              line-height: 1.6;
-              color: #000000 !important;
-              padding: 40px;
-              background: #ffffff !important;
-              width: 794px;
-              min-height: 1123px;
-            }
-            .pdf-content * {
-              color: #000000 !important;
-              background: transparent !important;
-            }
-            .pdf-content h1 {
-              font-size: 28px;
-              font-weight: 700;
-              margin: 0 0 24px 0;
-              color: #000000 !important;
-              border-bottom: 3px solid #000000;
-              padding-bottom: 12px;
-              line-height: 1.3;
-            }
-            .pdf-content h2 {
-              font-size: 22px;
-              font-weight: 600;
-              margin: 24px 0 14px 0;
-              color: #000000 !important;
-              line-height: 1.4;
-            }
-            .pdf-content h3 {
-              font-size: 18px;
-              font-weight: 600;
-              margin: 20px 0 12px 0;
-              color: #000000 !important;
-              line-height: 1.4;
-            }
-            .pdf-content h4 {
-              font-size: 16px;
-              font-weight: 600;
-              margin: 16px 0 10px 0;
-              color: #000000 !important;
-              line-height: 1.4;
-            }
-            .pdf-content p {
-              margin: 12px 0;
-              color: #000000 !important;
-              line-height: 1.6;
-            }
-            .pdf-content ul, .pdf-content ol {
-              margin: 12px 0;
-              padding-left: 32px;
-            }
-            .pdf-content li {
-              margin: 8px 0;
-              color: #000000 !important;
-              line-height: 1.6;
-            }
-            .pdf-content strong, .pdf-content b {
-              font-weight: 700;
-              color: #000000 !important;
-            }
-            .pdf-content em, .pdf-content i {
-              font-style: italic;
-              color: #000000 !important;
-            }
-            .pdf-content code {
-              background: #f0f0f0 !important;
-              padding: 3px 8px;
-              border-radius: 4px;
-              font-family: 'Courier New', Courier, monospace;
-              font-size: 13px;
-              color: #000000 !important;
-              border: 1px solid #d0d0d0;
-            }
-            .pdf-content pre {
-              background: #f5f5f5 !important;
-              padding: 16px;
-              border-radius: 6px;
-              overflow-x: auto;
-              margin: 16px 0;
-              border: 1px solid #d0d0d0;
-            }
-            .pdf-content pre code {
-              background: transparent !important;
-              padding: 0;
-              border: none;
-            }
-            .pdf-content blockquote {
-              border-left: 4px solid #000000;
-              padding-left: 20px;
-              margin: 16px 0;
-              color: #000000 !important;
-              font-style: italic;
-            }
-            .pdf-content hr {
-              border: none;
-              border-top: 2px solid #cccccc;
-              margin: 24px 0;
-            }
-            .pdf-content a {
-              color: #000000 !important;
-              text-decoration: underline;
-            }
-            .pdf-content table {
-              border-collapse: collapse;
-              width: 100%;
-              margin: 16px 0;
-            }
-            .pdf-content th, .pdf-content td {
-              border: 1px solid #000000;
-              padding: 10px;
-              text-align: left;
-              color: #000000 !important;
-            }
-            .pdf-content th {
-              background-color: #e0e0e0 !important;
-              font-weight: 700;
-            }
-            /* Ensure ProseMirror content is visible */
-            .pdf-content .ProseMirror,
-            .pdf-content .ProseMirror * {
-              color: #000000 !important;
-              background: transparent !important;
-            }
-            /* Remove any dark mode or colored backgrounds */
-            .pdf-content [class*="dark"],
-            .pdf-content [class*="bg-"],
-            .pdf-content [style*="background"],
-            .pdf-content [style*="color"] {
-              background: transparent !important;
-              color: #000000 !important;
-            }
-          </style>
-          <div class="pdf-content">
-            ${title ? `<h1>${title}</h1>` : ''}
-            ${htmlContent}
-          </div>
-        `;
-        
+        container.style.width = '210mm'; // A4 width
+        container.style.visibility = 'hidden';
+        container.appendChild(clonedElement);
         document.body.appendChild(container);
 
-        // Wait for content to render and fonts to load
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Wait for rendering
+        await new Promise(resolve => setTimeout(resolve, 100));
 
-        // Get the content element
-        const contentElement = container.querySelector('.pdf-content') as HTMLElement;
-        if (!contentElement) throw new Error("Content element not found");
-
-        // Force all text to be black
-        const allElements = contentElement.querySelectorAll('*');
-        allElements.forEach((el: Element) => {
-          const htmlEl = el as HTMLElement;
-          htmlEl.style.color = '#000000';
-          htmlEl.style.backgroundColor = 'transparent';
-        });
-
-        // Calculate dimensions
-        const contentHeight = contentElement.scrollHeight;
-        const contentWidth = contentElement.scrollWidth;
-        
-        // Create canvas with higher quality settings
-        const canvas = await html2canvas(contentElement, {
-          scale: 3, // Higher scale for better quality
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: '#ffffff',
-          logging: false,
-          width: contentWidth,
-          height: contentHeight,
-          windowWidth: contentWidth,
-          windowHeight: contentHeight,
-          scrollY: -window.scrollY,
-          scrollX: -window.scrollX,
-          onclone: (clonedDoc) => {
-            // Ensure all text is black in the cloned document
-            const clonedContent = clonedDoc.querySelector('.pdf-content');
-            if (clonedContent) {
-              const allEls = clonedContent.querySelectorAll('*');
-              allEls.forEach((el: Element) => {
-                const htmlEl = el as HTMLElement;
-                htmlEl.style.color = '#000000';
-                htmlEl.style.backgroundColor = 'transparent';
-              });
-            }
-          }
-        });
-
-        // Clean up the temporary container
-        document.body.removeChild(container);
-
-        // PDF dimensions (A4)
-        const pdfWidth = 210; // mm
-        const pdfHeight = 297; // mm
-        const margin = 15; // mm
-        const contentWidthMM = pdfWidth - (2 * margin);
-        
-        // Calculate image dimensions
-        const imgWidth = contentWidthMM;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        
-        // Create PDF
-        const pdf = new jsPDF({
+        // Initialize PDF
+        const doc = new jsPDF({
           orientation: 'portrait',
           unit: 'mm',
           format: 'a4',
-          compress: true
+          compress: true,
         });
 
-        // Use PNG for better quality with text
-        const imgData = canvas.toDataURL('image/png', 1.0);
-        
-        // Calculate how many pages we need
-        const pageContentHeight = pdfHeight - (2 * margin);
-        let heightLeft = imgHeight;
-        let position = margin;
-        let page = 1;
+        // Set up page metrics
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const marginLeft = 15;
+        const marginRight = 15;
+        const marginTop = 15;
+        const marginBottom = 15;
 
-        // Add first page
-        pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
-        heightLeft -= pageContentHeight;
+        const metrics: PageMetrics = {
+          width: pageWidth,
+          height: pageHeight,
+          marginLeft,
+          marginRight,
+          marginTop,
+          marginBottom,
+          contentWidth: pageWidth - marginLeft - marginRight,
+          contentHeight: pageHeight - marginTop - marginBottom,
+        };
 
-        // Add additional pages if needed
-        while (heightLeft > 0) {
-          position = -(pageContentHeight * page) + margin;
-          pdf.addPage();
-          pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
-          heightLeft -= pageContentHeight;
-          page++;
+        // Initialize render context
+        const ctx: RenderContext = {
+          doc,
+          metrics,
+          currentY: marginTop,
+          fontSize: 12,
+          lineHeight: 1.5,
+        };
+
+        /**
+         * Determine if an element should be rendered as canvas (complex) or text (simple)
+         */
+        const shouldUseCanvas = (elem: Element): boolean => {
+          const tagName = elem.tagName.toLowerCase();
+          const classList = Array.from(elem.classList);
+
+          // Complex elements that need canvas rendering
+          const canvasElements = ['svg', 'canvas', 'img'];
+
+          // Check for specific classes that indicate complex rendering
+          const canvasClasses = ['mermaid', 'diagram', 'react-flow', 'katex-display'];
+
+          return (
+            canvasElements.includes(tagName) ||
+            classList.some(cls => canvasClasses.some(cc => cls.includes(cc)))
+          );
+        };
+
+        /**
+         * Check if we need a new page
+         */
+        const checkPageBreak = (requiredHeight: number): void => {
+          if (ctx.currentY + requiredHeight > ctx.metrics.contentHeight) {
+            ctx.doc.addPage();
+            ctx.currentY = ctx.metrics.marginTop;
+          }
+        };
+
+        /**
+         * Render text with word wrapping
+         */
+        const renderText = (
+          text: string,
+          options: {
+            fontSize?: number;
+            fontStyle?: 'normal' | 'bold' | 'italic' | 'bolditalic';
+            align?: 'left' | 'center' | 'right' | 'justify';
+            color?: [number, number, number];
+            indent?: number;
+          } = {}
+        ): void => {
+          const {
+            fontSize = ctx.fontSize,
+            fontStyle = 'normal',
+            align = 'left',
+            color = [0, 0, 0],
+            indent = 0,
+          } = options;
+
+          ctx.doc.setFontSize(fontSize);
+          ctx.doc.setFont('helvetica', fontStyle);
+          ctx.doc.setTextColor(color[0], color[1], color[2]);
+
+          const maxWidth = ctx.metrics.contentWidth - indent;
+          const lines = ctx.doc.splitTextToSize(text, maxWidth);
+          const lineHeight = fontSize * ctx.lineHeight;
+
+          for (const line of lines) {
+            checkPageBreak(lineHeight);
+            
+            const x = ctx.metrics.marginLeft + indent;
+            ctx.doc.text(line, x, ctx.currentY, { align });
+            ctx.currentY += lineHeight;
+          }
+        };
+
+        /**
+         * Render a heading
+         */
+        const renderHeading = (elem: Element, level: number): void => {
+          const text = elem.textContent?.trim() || '';
+          if (!text) return;
+
+          const fontSizes = [24, 20, 16, 14, 12, 11];
+          const fontSize = fontSizes[level - 1] || 12;
+          const spaceBefore = level === 1 ? 20 : 12;
+          const spaceAfter = 8;
+
+          // Add space before heading (but not on first page at top)
+          if (ctx.currentY > ctx.metrics.marginTop) {
+            ctx.currentY += spaceBefore;
+          }
+
+          // Ensure heading stays with next content (orphan control)
+          const headingHeight = fontSize * ctx.lineHeight + spaceAfter;
+          const minContentHeight = 30; // Minimum content to keep with heading
+          checkPageBreak(headingHeight + minContentHeight);
+
+          renderText(text, {
+            fontSize,
+            fontStyle: 'bold',
+            color: [0, 0, 0],
+          });
+
+          ctx.currentY += spaceAfter;
+        };
+
+        /**
+         * Render a paragraph
+         */
+        const renderParagraph = (elem: Element): void => {
+          const text = elem.textContent?.trim() || '';
+          if (!text) return;
+
+          const spaceBefore = 6;
+          ctx.currentY += spaceBefore;
+
+          renderText(text, {
+            fontSize: 12,
+            fontStyle: 'normal',
+          });
+        };
+
+        /**
+         * Render a list (ul or ol)
+         */
+        const renderList = (elem: Element, ordered: boolean = false): void => {
+          const items = Array.from(elem.querySelectorAll(':scope > li'));
+          if (items.length === 0) return;
+
+          const spaceBefore = 6;
+          const indent = 15;
+          const bulletWidth = 10;
+
+          ctx.currentY += spaceBefore;
+
+          items.forEach((item, index) => {
+            const text = item.textContent?.trim() || '';
+            if (!text) return;
+
+            const bullet = ordered ? `${index + 1}.` : '•';
+            const lineHeight = 12 * ctx.lineHeight;
+
+            checkPageBreak(lineHeight);
+
+            // Render bullet/number
+            ctx.doc.setFontSize(12);
+            ctx.doc.setFont('helvetica', 'normal');
+            ctx.doc.text(bullet, ctx.metrics.marginLeft + indent - bulletWidth, ctx.currentY);
+
+            // Render text with indent
+            renderText(text, {
+              fontSize: 12,
+              indent: indent,
+            });
+
+            // Add small space between list items
+            ctx.currentY += 2;
+          });
+        };
+
+        /**
+         * Render a blockquote
+         */
+        const renderBlockquote = (elem: Element): void => {
+          const text = elem.textContent?.trim() || '';
+          if (!text) return;
+
+          const spaceBefore = 8;
+          const indent = 20;
+          const borderWidth = 3;
+
+          ctx.currentY += spaceBefore;
+
+          // Save position for border
+          const startY = ctx.currentY;
+
+          // Render text with indent
+          renderText(text, {
+            fontSize: 12,
+            fontStyle: 'italic',
+            color: [60, 60, 60],
+            indent: indent,
+          });
+
+          // Draw left border
+          ctx.doc.setDrawColor(0, 0, 0);
+          ctx.doc.setLineWidth(borderWidth);
+          ctx.doc.line(
+            ctx.metrics.marginLeft + indent - 10,
+            startY,
+            ctx.metrics.marginLeft + indent - 10,
+            ctx.currentY
+          );
+
+          ctx.currentY += 6;
+        };
+
+        /**
+         * Render a table using manual jsPDF drawing
+         */
+        const renderTable = (elem: Element): void => {
+          const rows = Array.from(elem.querySelectorAll('tr'));
+          if (rows.length === 0) return;
+
+          const spaceBefore = 8;
+          ctx.currentY += spaceBefore;
+
+          // Extract headers and body
+          const headers: string[] = [];
+          const body: string[][] = [];
+
+          rows.forEach((row, rowIndex) => {
+            const cells = Array.from(row.querySelectorAll('th, td'));
+            const cellTexts = cells.map(cell => cell.textContent?.trim() || '');
+
+            if (rowIndex === 0 && cells[0]?.tagName.toLowerCase() === 'th') {
+              headers.push(...cellTexts);
+            } else {
+              body.push(cellTexts);
+            }
+          });
+
+          const allRows = headers.length > 0 ? [headers, ...body] : body;
+          if (allRows.length === 0) return;
+
+          // Calculate column widths
+          const numCols = Math.max(...allRows.map(row => row.length));
+          const colWidth = ctx.metrics.contentWidth / numCols;
+          const rowHeight = 8;
+          const cellPadding = 2;
+
+          checkPageBreak(rowHeight * Math.min(allRows.length, 3)); // Ensure some space
+
+          // Draw table
+          allRows.forEach((row, rowIndex) => {
+            const isHeader = headers.length > 0 && rowIndex === 0;
+            
+            // Check if we need a new page
+            checkPageBreak(rowHeight);
+
+            // Draw cell backgrounds
+            if (isHeader) {
+              ctx.doc.setFillColor(220, 220, 220);
+              ctx.doc.rect(
+                ctx.metrics.marginLeft,
+                ctx.currentY,
+                ctx.metrics.contentWidth,
+                rowHeight,
+                'F'
+              );
+            }
+
+            // Draw cell borders and text
+            row.forEach((cell, colIndex) => {
+              const x = ctx.metrics.marginLeft + colIndex * colWidth;
+              
+              // Draw cell border
+              ctx.doc.setDrawColor(0, 0, 0);
+              ctx.doc.setLineWidth(0.1);
+              ctx.doc.rect(x, ctx.currentY, colWidth, rowHeight, 'S');
+
+              // Draw cell text
+              ctx.doc.setFontSize(9);
+              ctx.doc.setFont('helvetica', isHeader ? 'bold' : 'normal');
+              ctx.doc.setTextColor(0, 0, 0);
+              
+              // Truncate text if too long
+              const maxWidth = colWidth - cellPadding * 2;
+              const lines = ctx.doc.splitTextToSize(cell, maxWidth);
+              const textY = ctx.currentY + rowHeight / 2 + 2;
+              
+              ctx.doc.text(lines[0] || '', x + cellPadding, textY);
+            });
+
+            ctx.currentY += rowHeight;
+          });
+
+          ctx.currentY += 8; // Space after table
+        };
+
+        /**
+         * Render a code block
+         */
+        const renderCodeBlock = (elem: Element): void => {
+          const code = elem.textContent?.trim() || '';
+          if (!code) return;
+
+          const spaceBefore = 8;
+          const padding = 8;
+
+          ctx.currentY += spaceBefore;
+
+          // Calculate code block height
+          ctx.doc.setFontSize(9);
+          const lines = ctx.doc.splitTextToSize(code, ctx.metrics.contentWidth - padding * 2);
+          const blockHeight = lines.length * 9 * ctx.lineHeight + padding * 2;
+
+          checkPageBreak(blockHeight);
+
+          // Draw background
+          ctx.doc.setFillColor(245, 245, 245);
+          ctx.doc.rect(
+            ctx.metrics.marginLeft,
+            ctx.currentY,
+            ctx.metrics.contentWidth,
+            blockHeight,
+            'F'
+          );
+
+          // Draw border
+          ctx.doc.setDrawColor(200, 200, 200);
+          ctx.doc.rect(
+            ctx.metrics.marginLeft,
+            ctx.currentY,
+            ctx.metrics.contentWidth,
+            blockHeight,
+            'S'
+          );
+
+          // Render code text
+          ctx.currentY += padding;
+          ctx.doc.setFont('courier', 'normal');
+          ctx.doc.setFontSize(9);
+          ctx.doc.setTextColor(0, 0, 0);
+
+          lines.forEach((line: string) => {
+            ctx.doc.text(line, ctx.metrics.marginLeft + padding, ctx.currentY);
+            ctx.currentY += 9 * ctx.lineHeight;
+          });
+
+          ctx.currentY += padding + 6;
+        };
+
+        /**
+         * Render an element as canvas (for complex elements)
+         */
+        const renderAsCanvas = async (elem: Element): Promise<void> => {
+          try {
+            const htmlElement = elem as HTMLElement;
+            
+            // Create canvas from element
+            const canvas = await html2canvas(htmlElement, {
+              scale: 2,
+              useCORS: true,
+              backgroundColor: '#ffffff',
+              logging: false,
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+            const imgWidth = ctx.metrics.contentWidth;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            checkPageBreak(imgHeight + 10);
+
+            ctx.doc.addImage(
+              imgData,
+              'PNG',
+              ctx.metrics.marginLeft,
+              ctx.currentY,
+              imgWidth,
+              imgHeight
+            );
+
+            ctx.currentY += imgHeight + 10;
+          } catch (error) {
+            console.error('Failed to render element as canvas:', error);
+            // Fallback: render as text
+            const text = elem.textContent?.trim() || '[Complex element - rendering failed]';
+            renderText(text, { fontSize: 10, color: [100, 100, 100] });
+          }
+        };
+
+        /**
+         * Process and render an element
+         */
+        const renderElement = async (elem: Element): Promise<void> => {
+          const tagName = elem.tagName.toLowerCase();
+
+          // Skip hidden elements
+          if ((elem as HTMLElement).style.display === 'none') {
+            return;
+          }
+
+          // Check if this element needs canvas rendering
+          if (shouldUseCanvas(elem)) {
+            await renderAsCanvas(elem);
+            return;
+          }
+
+          // Text-based rendering
+          switch (tagName) {
+            case 'h1':
+              renderHeading(elem, 1);
+              break;
+            case 'h2':
+              renderHeading(elem, 2);
+              break;
+            case 'h3':
+              renderHeading(elem, 3);
+              break;
+            case 'h4':
+              renderHeading(elem, 4);
+              break;
+            case 'h5':
+              renderHeading(elem, 5);
+              break;
+            case 'h6':
+              renderHeading(elem, 6);
+              break;
+            case 'p':
+              renderParagraph(elem);
+              break;
+            case 'ul':
+              renderList(elem, false);
+              break;
+            case 'ol':
+              renderList(elem, true);
+              break;
+            case 'blockquote':
+              renderBlockquote(elem);
+              break;
+            case 'table':
+              renderTable(elem);
+              break;
+            case 'pre':
+              // Check if it contains a code block
+              const codeElement = elem.querySelector('code');
+              if (codeElement) {
+                renderCodeBlock(codeElement);
+              } else {
+                renderCodeBlock(elem);
+              }
+              break;
+            case 'code':
+              // Inline code - render as text with monospace
+              const codeText = elem.textContent?.trim() || '';
+              if (codeText) {
+                ctx.doc.setFont('courier', 'normal');
+                ctx.doc.text(codeText, ctx.metrics.marginLeft, ctx.currentY);
+                ctx.doc.setFont('helvetica', 'normal');
+              }
+              break;
+            case 'hr':
+              ctx.currentY += 10;
+              ctx.doc.setDrawColor(200, 200, 200);
+              ctx.doc.line(
+                ctx.metrics.marginLeft,
+                ctx.currentY,
+                ctx.metrics.marginLeft + ctx.metrics.contentWidth,
+                ctx.currentY
+              );
+              ctx.currentY += 10;
+              break;
+            case 'br':
+              ctx.currentY += 12 * ctx.lineHeight;
+              break;
+            default:
+              // For other elements, process children
+              const children = Array.from(elem.children);
+              if (children.length > 0) {
+                for (const child of children) {
+                  await renderElement(child);
+                }
+              } else if (elem.textContent?.trim()) {
+                // Leaf element with text
+                renderParagraph(elem);
+              }
+          }
+        };
+
+        // Add title if provided
+        if (title) {
+          renderText(title, {
+            fontSize: 24,
+            fontStyle: 'bold',
+            align: 'left',
+          });
+          
+          // Add underline
+          ctx.doc.setDrawColor(0, 0, 0);
+          ctx.doc.setLineWidth(0.5);
+          ctx.doc.line(
+            marginLeft,
+            ctx.currentY + 2,
+            marginLeft + metrics.contentWidth,
+            ctx.currentY + 2
+          );
+          ctx.currentY += 12;
         }
 
-        // Save the PDF
-        pdf.save(filename);
+        // Process all child elements
+        const children = Array.from(clonedElement.children);
+        for (const child of children) {
+          await renderElement(child);
+        }
+
+        // Clean up temporary container
+        document.body.removeChild(container);
+
+        // Save PDF
+        doc.save(filename);
+
       } catch (error) {
         console.error("PDF generation failed:", error);
         alert("PDF generation failed. Please try using your browser's print function (Ctrl+P or Cmd+P) and save as PDF.");

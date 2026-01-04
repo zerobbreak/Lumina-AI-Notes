@@ -1208,20 +1208,58 @@ export const processDocument = action({
           },
         },
         {
-          text: `Analyze this PDF document and extract its content.
+          text: `Analyze this PDF document and extract its content with careful attention to structure and formatting.
 
 Return a JSON response with this exact structure:
 {
-  "extractedText": "The full text content of the document, preserving important formatting and structure",
+  "extractedText": "The full text content with preserved structure",
   "summary": "2-3 sentence summary of the document",
   "keyTopics": ["topic1", "topic2", "topic3", "topic4", "topic5"]
 }
 
-Rules:
-- extractedText should contain all readable text from the document
-- Summary should capture the main purpose and key information
-- keyTopics should be 3-7 important concepts/terms from the document
-- Return ONLY valid JSON, no markdown code fences or explanation`,
+CRITICAL EXTRACTION RULES:
+1. **Preserve Document Structure**:
+   - Maintain heading hierarchy (use markdown: # for H1, ## for H2, etc.)
+   - Keep paragraph breaks and spacing
+   - Preserve list structures (use - for bullets, 1. for numbered lists)
+   - Maintain table structure using markdown table syntax if present
+
+2. **Handle Page Breaks Intelligently**:
+   - Continue sentences/paragraphs that span page breaks
+   - Don't insert extra breaks where pages end
+   - Preserve section continuity across pages
+
+3. **Format Special Content**:
+   - Code blocks: wrap in triple backticks (\`\`\`)
+   - Mathematical formulas: preserve using LaTeX notation when possible
+   - Tables: use markdown table format (| col1 | col2 |)
+   - Quotes/callouts: prefix with > for blockquotes
+
+4. **Multi-Column Layouts**:
+   - Read left-to-right, top-to-bottom
+   - Merge columns into single flowing text
+   - Preserve logical reading order
+
+5. **Metadata Extraction**:
+   - Include document title if present
+   - Preserve author, date, or version info if visible
+   - Keep section numbers and references
+
+6. **Text Quality**:
+   - Fix obvious OCR errors if any
+   - Preserve technical terms, acronyms, and proper nouns exactly
+   - Keep URLs and references intact
+
+7. **Summary Requirements**:
+   - 2-3 sentences capturing main purpose and key information
+   - Mention document type (textbook, research paper, notes, etc.)
+
+8. **Key Topics**:
+   - Extract 3-7 most important concepts, terms, or themes
+   - Use specific terminology from the document
+   - Prioritize exam-worthy or central concepts
+
+Return ONLY valid JSON, no markdown code fences or explanation.`,
         },
       ]);
 
@@ -1825,11 +1863,27 @@ export const ingestAndGenerateFlashcards = action({
           },
         },
         {
-          text: `Extract the main text content from this PDF document.
-          
-Return the extracted text as plain text, preserving the logical structure and important information.
-Focus on extractable content that would be useful for creating study flashcards.
-Return ONLY the extracted text, no JSON or formatting.`,
+          text: `Extract the complete text content from this PDF document for flashcard generation.
+
+EXTRACTION GUIDELINES:
+1. **Preserve Structure**: Maintain headings, sections, and logical organization
+2. **Handle Page Breaks**: Continue concepts that span multiple pages seamlessly
+3. **Capture Definitions**: Pay special attention to terms, definitions, and key concepts
+4. **Include Context**: Keep explanations and examples that clarify concepts
+5. **Preserve Lists**: Maintain bullet points and numbered lists intact
+6. **Tables & Formulas**: Extract table data and mathematical formulas accurately
+7. **Multi-Column Content**: Read in logical order (left-to-right, top-to-bottom)
+8. **Important Details**: Include dates, names, numbers, and specific facts
+
+Focus on content that would be valuable for study flashcards:
+- Definitions and terminology
+- Key concepts and principles
+- Important facts and figures
+- Cause-and-effect relationships
+- Processes and procedures
+- Comparisons and contrasts
+
+Return ONLY the extracted text with preserved structure. Use markdown for headings (# ## ###) and lists (- or 1.).`,
         },
       ]);
 
@@ -2049,47 +2103,100 @@ Generate a JSON response with this structure:
   "content": "Comprehensive study notes in HTML format"
 }
 
+DOCUMENT ANALYSIS REQUIREMENTS:
+1. **Read Across Page Breaks**: Treat the document as a continuous whole, not separate pages
+2. **Preserve Document Structure**: Maintain the original heading hierarchy and organization
+3. **Handle Multi-Column Layouts**: Read in logical order (left-to-right, top-to-bottom)
+4. **Extract Tables**: Convert tables to HTML <table> format with proper <thead> and <tbody>
+5. **Preserve Code Blocks**: Wrap code in <pre><code> tags with proper formatting
+6. **Mathematical Formulas**: Keep formulas intact (use LaTeX notation if present)
+7. **Lists and Bullets**: Maintain all list structures from the original document
+8. **Diagrams and Figures**: Reference them by description if text-based explanations exist
+
 For the content field, create DETAILED notes using this HTML structure:
 
 <h2>📋 Executive Summary</h2>
-<p>A 3-4 sentence overview explaining what this document covers and why it matters.</p>
+<p>A 3-4 sentence overview explaining what this document covers, its purpose, and why it matters. Include document type (textbook chapter, lecture notes, research paper, etc.).</p>
 
 <h2>🎯 Key Concepts & Definitions</h2>
 <ul>
-<li><strong>Term 1</strong>: Complete definition with context and examples</li>
-<li><strong>Term 2</strong>: Full explanation including how it relates to other concepts</li>
+<li><strong>Term 1</strong>: Complete definition with context, examples, and how it relates to other concepts</li>
+<li><strong>Term 2</strong>: Full explanation including practical applications and significance</li>
+<li><strong>Term 3</strong>: Detailed description with any formulas, processes, or procedures</li>
 </ul>
 
 <h2>📚 Main Content</h2>
-<h3>Section Title</h3>
-<p>Detailed explanation of the topic with specific facts, figures, and examples from the document.</p>
+<h3>Section 1: [Actual Section Title from Document]</h3>
+<p>Detailed explanation of the topic with SPECIFIC information from the document:</p>
 <ul>
-<li>Important point with supporting details</li>
-<li>Another key point with examples or evidence</li>
+<li><strong>Key Point</strong>: Explanation with supporting details, facts, figures, dates, or names</li>
+<li><strong>Important Concept</strong>: Description with examples, evidence, or real-world applications</li>
+<li><strong>Process/Procedure</strong>: Step-by-step explanation if applicable</li>
+</ul>
+
+<h3>Section 2: [Next Section Title]</h3>
+<p>Continue with thorough coverage of all major sections from the document...</p>
+
+<h3>Tables and Data</h3>
+<table>
+<thead>
+<tr><th>Column 1</th><th>Column 2</th></tr>
+</thead>
+<tbody>
+<tr><td>Data 1</td><td>Data 2</td></tr>
+</tbody>
+</table>
+<p>Explanation of the table and its significance.</p>
+
+<h3>Code Examples (if applicable)</h3>
+<pre><code>// Preserve any code blocks from the document
+function example() {
+  return "formatted code";
+}
+</code></pre>
+<p>Explanation of what the code does and why it matters.</p>
+
+<h2>🔗 Connections & Relationships</h2>
+<ul>
+<li><strong>Concept A relates to Concept B</strong>: Explain how different ideas connect</li>
+<li><strong>Cause and Effect</strong>: Describe causal relationships between concepts</li>
+<li><strong>Comparisons</strong>: Highlight similarities and differences between related topics</li>
 </ul>
 
 <h2>💡 Important Takeaways</h2>
 <ul>
-<li>Key insight 1 - why it matters</li>
-<li>Key insight 2 - practical application</li>
+<li><strong>Key Insight 1</strong>: Why it matters and practical implications</li>
+<li><strong>Key Insight 2</strong>: Real-world applications or significance</li>
+<li><strong>Key Insight 3</strong>: Common misconceptions or important distinctions</li>
+<li><strong>Exam Focus</strong>: Topics most likely to appear on tests or assessments</li>
 </ul>
 
 <h2>❓ Review Questions</h2>
 <ul>
-<li>What is the main purpose of [concept]?</li>
-<li>How does [X] relate to [Y]?</li>
-<li>Why is [topic] significant?</li>
+<li><strong>Definition</strong>: What is [key term] and why is it important?</li>
+<li><strong>Application</strong>: How would you apply [concept] in [scenario]?</li>
+<li><strong>Analysis</strong>: How does [X] relate to [Y]?</li>
+<li><strong>Comparison</strong>: What are the differences between [A] and [B]?</li>
+<li><strong>Synthesis</strong>: How do these concepts work together to explain [phenomenon]?</li>
 </ul>
 
-CRITICAL REQUIREMENTS:
-- Extract SPECIFIC information: names, dates, numbers, formulas, examples
-- Include ALL major topics and subtopics from the document
-- Provide thorough explanations, not just surface-level summaries
-- Add context and connections between ideas
-- Create 3-5 review questions based on the content
-- Use <strong> for key terms and <em> for emphasis
-- Return ONLY valid JSON, no markdown code fences
-- IMPORTANT: Escape all newlines in the "content" string as \\n`,
+CRITICAL EXTRACTION REQUIREMENTS:
+✓ Extract SPECIFIC information: names, dates, numbers, formulas, examples, citations
+✓ Include ALL major topics and subtopics - don't skip sections
+✓ Preserve original structure: if document has 5 sections, notes should cover all 5
+✓ Handle page breaks: continue concepts seamlessly across pages
+✓ Tables: convert to proper HTML table format
+✓ Code blocks: wrap in <pre><code> tags
+✓ Formulas: preserve using appropriate notation
+✓ Lists: maintain bullet points and numbered lists
+✓ Provide thorough explanations, not surface-level summaries
+✓ Add context and connections between ideas
+✓ Create 5-7 review questions based on actual content
+✓ Use <strong> for key terms and <em> for emphasis
+✓ Use <blockquote> for important quotes or definitions
+✓ Return ONLY valid JSON, no markdown code fences
+✓ IMPORTANT: Escape all newlines in the "content" string as \\n
+✓ IMPORTANT: Escape all quotes in HTML attributes and content`,
         },
       ]);
 
