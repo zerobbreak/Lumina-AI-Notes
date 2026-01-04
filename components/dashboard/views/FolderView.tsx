@@ -236,7 +236,7 @@ export default function FolderView({
                   placeholder="Untitled Module"
                 />
               ) : (
-                <h1 className="text-5xl font-bold text-white tracking-tight">
+                <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight line-clamp-2 leading-tight max-w-4xl">
                   {getContextName()}
                 </h1>
               )}
@@ -258,7 +258,7 @@ export default function FolderView({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="rounded-full bg-white/5 border-white/10 hover:bg-white/10 hover:text-purple-400 hover:border-purple-500/30 transition-all duration-300"
+                  className="rounded-full bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:text-purple-400 hover:border-purple-500/30 transition-all duration-300"
                   onClick={handleAddModule}
                 >
                   <Plus className="w-3.5 h-3.5 mr-2" />
@@ -345,7 +345,7 @@ export default function FolderView({
               <Button
                 size="sm"
                 variant="outline"
-                className="rounded-full bg-white/5 border-white/10 hover:bg-white/10 hover:text-cyan-400 hover:border-cyan-500/30 transition-all duration-300"
+                className="rounded-full bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:text-cyan-400 hover:border-cyan-500/30 transition-all duration-300"
                 onClick={handleCreateNoteInContext}
               >
                 <Plus className="w-3.5 h-3.5 mr-2" />
