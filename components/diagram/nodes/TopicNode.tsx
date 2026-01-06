@@ -4,9 +4,16 @@ import { memo, useState, useCallback, useRef, useEffect } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
 import { BookOpen } from "lucide-react";
 
+interface TopicNodeData {
+  label?: string;
+  color?: string;
+  onLabelChange?: (label: string) => void;
+}
+
 export const TopicNode = memo(({ data, selected }: NodeProps) => {
+  const nodeData = data as TopicNodeData;
   const [isEditing, setIsEditing] = useState(false);
-  const [label, setLabel] = useState(data.label || "Topic");
+  const [label, setLabel] = useState(nodeData.label || "Topic");
   const inputRef = useRef<HTMLDivElement>(null);
 
   const handleDoubleClick = useCallback(() => {
@@ -15,22 +22,22 @@ export const TopicNode = memo(({ data, selected }: NodeProps) => {
 
   const handleBlur = useCallback(() => {
     setIsEditing(false);
-    if (data.onLabelChange) {
-      data.onLabelChange(label);
+    if (nodeData.onLabelChange) {
+      nodeData.onLabelChange(label);
     }
-  }, [label, data]);
+  }, [label, nodeData]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         setIsEditing(false);
-        if (data.onLabelChange) {
-          data.onLabelChange(label);
+        if (nodeData.onLabelChange) {
+          nodeData.onLabelChange(label);
         }
       }
     },
-    [label, data]
+    [label, nodeData]
   );
 
   useEffect(() => {
@@ -44,7 +51,8 @@ export const TopicNode = memo(({ data, selected }: NodeProps) => {
     }
   }, [isEditing]);
 
-  const bgColor = data.color || "bg-gradient-to-br from-blue-500 to-cyan-500";
+  const bgColor =
+    nodeData.color || "bg-gradient-to-br from-blue-500 to-cyan-500";
 
   return (
     <div
@@ -53,10 +61,26 @@ export const TopicNode = memo(({ data, selected }: NodeProps) => {
       } ${bgColor} min-w-[140px] transition-all duration-200 hover:scale-105`}
       onDoubleClick={handleDoubleClick}
     >
-      <Handle type="target" position={Position.Top} className="w-2.5 h-2.5 !bg-white" />
-      <Handle type="source" position={Position.Bottom} className="w-2.5 h-2.5 !bg-white" />
-      <Handle type="source" position={Position.Left} className="w-2.5 h-2.5 !bg-white" />
-      <Handle type="source" position={Position.Right} className="w-2.5 h-2.5 !bg-white" />
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="w-2.5 h-2.5 bg-white!"
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="w-2.5 h-2.5 bg-white!"
+      />
+      <Handle
+        type="source"
+        position={Position.Left}
+        className="w-2.5 h-2.5 bg-white!"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="w-2.5 h-2.5 bg-white!"
+      />
 
       <div className="flex items-center gap-2">
         <BookOpen className="w-4 h-4 text-white" />
@@ -81,6 +105,3 @@ export const TopicNode = memo(({ data, selected }: NodeProps) => {
 });
 
 TopicNode.displayName = "TopicNode";
-
-
-

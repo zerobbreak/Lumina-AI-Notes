@@ -4,9 +4,16 @@ import { memo, useState, useCallback, useRef, useEffect } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
 import { StickyNote } from "lucide-react";
 
+interface NoteNodeData {
+  label?: string;
+  color?: string;
+  onLabelChange?: (label: string) => void;
+}
+
 export const NoteNode = memo(({ data, selected }: NodeProps) => {
+  const nodeData = data as NoteNodeData;
   const [isEditing, setIsEditing] = useState(false);
-  const [label, setLabel] = useState(data.label || "Note");
+  const [label, setLabel] = useState(nodeData.label || "Note");
   const inputRef = useRef<HTMLDivElement>(null);
 
   const handleDoubleClick = useCallback(() => {
@@ -15,22 +22,22 @@ export const NoteNode = memo(({ data, selected }: NodeProps) => {
 
   const handleBlur = useCallback(() => {
     setIsEditing(false);
-    if (data.onLabelChange) {
-      data.onLabelChange(label);
+    if (nodeData.onLabelChange) {
+      nodeData.onLabelChange(label);
     }
-  }, [label, data]);
+  }, [label, nodeData]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         setIsEditing(false);
-        if (data.onLabelChange) {
-          data.onLabelChange(label);
+        if (nodeData.onLabelChange) {
+          nodeData.onLabelChange(label);
         }
       }
     },
-    [label, data]
+    [label, nodeData]
   );
 
   useEffect(() => {
@@ -44,7 +51,8 @@ export const NoteNode = memo(({ data, selected }: NodeProps) => {
     }
   }, [isEditing]);
 
-  const bgColor = data.color || "bg-gradient-to-br from-amber-400 to-orange-400";
+  const bgColor =
+    nodeData.color || "bg-gradient-to-br from-amber-400 to-orange-400";
 
   return (
     <div
@@ -53,8 +61,16 @@ export const NoteNode = memo(({ data, selected }: NodeProps) => {
       } ${bgColor} min-w-[80px] transition-all duration-200 hover:scale-105`}
       onDoubleClick={handleDoubleClick}
     >
-      <Handle type="target" position={Position.Top} className="w-1.5 h-1.5 !bg-white" />
-      <Handle type="source" position={Position.Bottom} className="w-1.5 h-1.5 !bg-white" />
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="w-1.5 h-1.5 bg-white!"
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="w-1.5 h-1.5 bg-white!"
+      />
 
       <div className="flex items-center gap-1">
         <StickyNote className="w-3 h-3 text-white" />
@@ -79,6 +95,3 @@ export const NoteNode = memo(({ data, selected }: NodeProps) => {
 });
 
 NoteNode.displayName = "NoteNode";
-
-
-
