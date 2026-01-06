@@ -125,45 +125,48 @@ export function DocumentDropZone({
   const dropZoneProps = children
     ? {
         // When children are present (editor), only handle actual file/document drops
-        onDrop: (e: React.DragEvent) => {
+        onDrop: (e: React.DragEvent<HTMLDivElement>) => {
           // Check if it's a document drop first
           if (e.dataTransfer.getData("application/lumina-resource-id")) {
             handleDocumentDrop(e);
           } else if (e.dataTransfer.files.length > 0) {
             // Only handle if there are actual files being dropped
-            rootProps.onDrop?.(e);
+            rootProps.onDrop?.(e as React.DragEvent<HTMLElement>);
           }
           // Otherwise, ignore - it's just text selection
         },
-        onDragOver: (e: React.DragEvent) => {
+        onDragOver: (e: React.DragEvent<HTMLDivElement>) => {
           // Only prevent default if there are actual files being dragged
           // Check dataTransfer.types to see if this is a file drag or just text selection
-          if (e.dataTransfer.types.includes('Files') || e.dataTransfer.types.includes('application/lumina-resource-id')) {
-            rootProps.onDragOver?.(e);
+          if (
+            e.dataTransfer.types.includes("Files") ||
+            e.dataTransfer.types.includes("application/lumina-resource-id")
+          ) {
+            rootProps.onDragOver?.(e as React.DragEvent<HTMLElement>);
           }
           // Otherwise, don't call preventDefault - allow text selection
         },
-        onDragEnter: (e: React.DragEvent) => {
+        onDragEnter: (e: React.DragEvent<HTMLDivElement>) => {
           // Only handle if there are files
-          if (e.dataTransfer.types.includes('Files')) {
-            rootProps.onDragEnter?.(e);
+          if (e.dataTransfer.types.includes("Files")) {
+            rootProps.onDragEnter?.(e as React.DragEvent<HTMLElement>);
           }
         },
-        onDragLeave: (e: React.DragEvent) => {
+        onDragLeave: (e: React.DragEvent<HTMLDivElement>) => {
           // Only handle if there are files
-          if (e.dataTransfer.types.includes('Files')) {
-            rootProps.onDragLeave?.(e);
+          if (e.dataTransfer.types.includes("Files")) {
+            rootProps.onDragLeave?.(e as React.DragEvent<HTMLElement>);
           }
         },
       }
     : {
         // When no children (upload area), use all dropzone props
         ...rootProps,
-        onDrop: (e: React.DragEvent) => {
+        onDrop: (e: React.DragEvent<HTMLDivElement>) => {
           if (e.dataTransfer.getData("application/lumina-resource-id")) {
             handleDocumentDrop(e);
           } else {
-            rootProps.onDrop?.(e);
+            rootProps.onDrop?.(e as React.DragEvent<HTMLElement>);
           }
         },
       };
