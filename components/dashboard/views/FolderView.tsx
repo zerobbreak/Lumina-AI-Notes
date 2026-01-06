@@ -17,7 +17,7 @@ import {
   Pin,
 } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
-import { Course, Module } from "@/lib/types";
+import { Course, Module } from "@/types";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { EditableTitle } from "@/components/shared/EditableTitle";

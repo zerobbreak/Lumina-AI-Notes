@@ -1,16 +1,22 @@
 "use client";
 
-import { useEditor, EditorContent, ReactNodeViewRenderer } from "@tiptap/react";
+import {
+  useEditor,
+  EditorContent,
+  ReactNodeViewRenderer,
+  AnyExtension,
+} from "@tiptap/react";
 import { Node, mergeAttributes } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
-import TaskList from '@tiptap/extension-task-list';
-import TaskItem from '@tiptap/extension-task-item';
-import { Dropcursor } from '@tiptap/extension-dropcursor';
+import TaskList from "@tiptap/extension-task-list";
+import TaskItem from "@tiptap/extension-task-item";
+import { Dropcursor } from "@tiptap/extension-dropcursor";
 import { useEffect, useState } from "react";
 import { ResourceMentionNode } from "./ResourceMentionNode";
 import { OutlineExtension } from "./extensions/OutlineExtension";
 import { DiagramExtension } from "./extensions/DiagramExtension";
+import { CornellData, OutlineMetadata, NoteStyleType } from "@/types";
 import "./editor.css";
 
 const ResourceMention = Node.create({
@@ -57,24 +63,12 @@ const ResourceMention = Node.create({
   },
 });
 
-interface CornellData {
-  cornellCues: string;
-  cornellNotes: string;
-  cornellSummary: string;
-}
-
-interface OutlineMetadata {
-  totalItems: number;
-  completedTasks: number;
-  collapsedNodes: string[];
-}
-
 interface EditorProps {
   initialContent?: string;
   isEditable?: boolean;
   onChange?: (content: string | CornellData) => void;
   placeholder?: string;
-  styleType?: "standard" | "cornell" | "outline" | "mindmap";
+  styleType?: NoteStyleType;
   // Cornell-specific props
   cornellCues?: string;
   cornellNotes?: string;
@@ -98,32 +92,36 @@ export default function Editor({
 }: EditorProps) {
   // State for Cornell Notes sections
   const [cornellCues, setCornellCues] = useState(initialCornellCues || "");
-  const [cornellSummary, setCornellSummary] = useState(initialCornellSummary || "");
+  const [cornellSummary, setCornellSummary] = useState(
+    initialCornellSummary || ""
+  );
 
   // Build extensions based on style type
-  const extensions = [
+  const extensions: AnyExtension[] = [
     StarterKit.configure({
-      ...(styleType === "outline" ? {
-        bulletList: {
-          HTMLAttributes: {
-            class: 'outline-bullet-list',
-          },
-          keepMarks: true,
-          keepAttributes: true,
-        },
-        orderedList: {
-          HTMLAttributes: {
-            class: 'outline-ordered-list',
-          },
-          keepMarks: true,
-          keepAttributes: true,
-        },
-        listItem: {
-          HTMLAttributes: {
-            class: 'outline-list-item',
-          },
-        },
-      } : {}),
+      ...(styleType === "outline"
+        ? {
+            bulletList: {
+              HTMLAttributes: {
+                class: "outline-bullet-list",
+              },
+              keepMarks: true,
+              keepAttributes: true,
+            },
+            orderedList: {
+              HTMLAttributes: {
+                class: "outline-ordered-list",
+              },
+              keepMarks: true,
+              keepAttributes: true,
+            },
+            listItem: {
+              HTMLAttributes: {
+                class: "outline-list-item",
+              },
+            },
+          }
+        : {}),
     }),
     Placeholder.configure({
       placeholder,
@@ -137,17 +135,17 @@ export default function Editor({
     extensions.push(
       TaskList.configure({
         HTMLAttributes: {
-          class: 'outline-task-list',
+          class: "outline-task-list",
         },
       }),
       TaskItem.configure({
         nested: true,
         HTMLAttributes: {
-          class: 'outline-task-item',
+          class: "outline-task-item",
         },
       }),
       Dropcursor.configure({
-        color: '#6366f1',
+        color: "#6366f1",
         width: 2,
       }),
       OutlineExtension
@@ -157,7 +155,8 @@ export default function Editor({
   const editor = useEditor({
     immediatelyRender: false,
     extensions,
-    content: styleType === "cornell" ? initialCornellNotes || "" : initialContent,
+    content:
+      styleType === "cornell" ? initialCornellNotes || "" : initialContent,
     editable: isEditable,
     editorProps: {
       attributes: {
@@ -221,11 +220,23 @@ export default function Editor({
       if (editor && initialCornellNotes !== undefined) {
         const currentContent = editor.getHTML();
         if (currentContent !== initialCornellNotes) {
-          editor.commands.setContent(initialCornellNotes || "");
+          // Use queueMicrotask to schedule setContent outside of React's commit phase
+          // This avoids the flushSync error since TipTap internally uses flushSync
+          queueMicrotask(() => {
+            if (editor && !editor.isDestroyed) {
+              editor.commands.setContent(initialCornellNotes || "");
+            }
+          });
         }
       }
     }
-  }, [initialCornellCues, initialCornellNotes, initialCornellSummary, styleType, editor]);
+  }, [
+    initialCornellCues,
+    initialCornellNotes,
+    initialCornellSummary,
+    styleType,
+    editor,
+  ]);
 
   // Notify parent when Cornell cues or summary change
   useEffect(() => {
@@ -240,12 +251,22 @@ export default function Editor({
 
   // Effect to update content if it changes externally (for non-Cornell notes)
   useEffect(() => {
-    if (styleType !== "cornell" && editor && initialContent !== editor.getHTML()) {
-      if (initialContent) {
-        editor.commands.setContent(initialContent);
-      } else {
-        editor.commands.clearContent();
-      }
+    if (
+      styleType !== "cornell" &&
+      editor &&
+      initialContent !== editor.getHTML()
+    ) {
+      // Use queueMicrotask to schedule content updates outside of React's commit phase
+      // This avoids the flushSync error since TipTap internally uses flushSync
+      queueMicrotask(() => {
+        if (editor && !editor.isDestroyed) {
+          if (initialContent) {
+            editor.commands.setContent(initialContent);
+          } else {
+            editor.commands.clearContent();
+          }
+        }
+      });
     }
   }, [initialContent, editor, styleType]);
 
@@ -260,7 +281,7 @@ export default function Editor({
         {/* Main Grid */}
         <div className="grid grid-cols-[300px_1fr] gap-6 flex-1 min-h-0">
           {/* Left Column - Cues */}
-          <div className="border-r border-white/10 p-6 bg-gradient-to-br from-white/5 to-transparent">
+          <div className="border-r border-white/10 p-6 bg-linear-to-br from-white/5 to-transparent">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
                 <span className="text-lg">💡</span>
@@ -295,7 +316,7 @@ export default function Editor({
         </div>
 
         {/* Bottom Row - Summary */}
-        <div className="border-t border-white/10 p-6 bg-gradient-to-br from-white/5 to-transparent">
+        <div className="border-t border-white/10 p-6 bg-linear-to-br from-white/5 to-transparent">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
               <span className="text-lg">📋</span>
@@ -324,7 +345,7 @@ export default function Editor({
           <div className="flex items-center gap-2 text-xs text-gray-400 mb-2">
             <span>💡</span>
             <span>
-              <strong>Shortcuts:</strong> Tab to indent • Shift+Tab to outdent • 
+              <strong>Shortcuts:</strong> Tab to indent • Shift+Tab to outdent •
               Cmd+Shift+8 for bullets • Cmd+Shift+9 for tasks
             </span>
           </div>
@@ -332,9 +353,9 @@ export default function Editor({
             <button
               onClick={() => editor?.chain().focus().toggleBulletList().run()}
               className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                editor?.isActive('bulletList')
-                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                  : 'bg-white/5 text-gray-400 hover:bg-white/10 border border-transparent'
+                editor?.isActive("bulletList")
+                  ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                  : "bg-white/5 text-gray-400 hover:bg-white/10 border border-transparent"
               }`}
             >
               • Bullets
@@ -342,9 +363,9 @@ export default function Editor({
             <button
               onClick={() => editor?.chain().focus().toggleOrderedList().run()}
               className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                editor?.isActive('orderedList')
-                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                  : 'bg-white/5 text-gray-400 hover:bg-white/10 border border-transparent'
+                editor?.isActive("orderedList")
+                  ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                  : "bg-white/5 text-gray-400 hover:bg-white/10 border border-transparent"
               }`}
             >
               1. Numbers
@@ -352,9 +373,9 @@ export default function Editor({
             <button
               onClick={() => editor?.chain().focus().toggleTaskList().run()}
               className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                editor?.isActive('taskList')
-                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                  : 'bg-white/5 text-gray-400 hover:bg-white/10 border border-transparent'
+                editor?.isActive("taskList")
+                  ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                  : "bg-white/5 text-gray-400 hover:bg-white/10 border border-transparent"
               }`}
             >
               ☐ Tasks
@@ -362,14 +383,12 @@ export default function Editor({
             <div className="ml-auto flex items-center gap-4 text-xs text-gray-500">
               <span>{outlineMetadata?.totalItems || 0} items</span>
               {outlineMetadata && outlineMetadata.completedTasks > 0 && (
-                <span>
-                  {outlineMetadata.completedTasks} completed
-                </span>
+                <span>{outlineMetadata.completedTasks} completed</span>
               )}
             </div>
           </div>
         </div>
-        
+
         {/* Editor */}
         <div className="outline-editor-content">
           <EditorContent editor={editor} />

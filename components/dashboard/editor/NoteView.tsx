@@ -218,8 +218,14 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         // Only load content if we haven't loaded for this noteId yet
         if (noteId !== loadedNoteId) {
           const htmlContent = await convertMarkdownIfNeeded(note.content || "");
-          editor.commands.setContent(htmlContent);
-          setLoadedNoteId(noteId);
+          // Use queueMicrotask to schedule setContent outside of React's commit phase
+          // This avoids the flushSync error since TipTap internally uses flushSync
+          queueMicrotask(() => {
+            if (editor && !editor.isDestroyed) {
+              editor.commands.setContent(htmlContent);
+              setLoadedNoteId(noteId);
+            }
+          });
         }
       }
     };

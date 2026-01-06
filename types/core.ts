@@ -1,5 +1,5 @@
 /**
- * Shared type definitions for the application
+ * Core application types
  * These types match the Convex schema definitions
  */
 

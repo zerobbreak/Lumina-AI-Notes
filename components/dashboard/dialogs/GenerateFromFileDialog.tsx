@@ -22,7 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { FileText, Sparkles, Brain } from "lucide-react";
-import { Course, Module } from "@/lib/types";
+import { Course, Module } from "@/types";
 import { useRouter } from "next/navigation";
 
 interface GenerateFromFileDialogProps {

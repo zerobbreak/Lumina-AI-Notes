@@ -28,7 +28,7 @@ import {
   applyForceLayout,
 } from "./layouts";
 import { exportToPNG, exportToPDF, exportToSVG } from "./export";
-import { NodeType, LayoutType } from "./types";
+import { NodeType, LayoutType } from "@/types";
 import { toast } from "sonner";
 
 interface FlowCanvasProps {
@@ -160,48 +160,43 @@ function FlowCanvasInner({
   );
 
   // Export diagram
-  const handleExport = useCallback(
-    async (format: "png" | "svg" | "pdf") => {
-      if (!reactFlowWrapper.current) return;
+  const handleExport = useCallback(async (format: "png" | "svg" | "pdf") => {
+    if (!reactFlowWrapper.current) return;
 
-      const element = reactFlowWrapper.current.querySelector(
-        ".react-flow__viewport"
-      ) as HTMLElement;
+    const element = reactFlowWrapper.current.querySelector(
+      ".react-flow__viewport"
+    ) as HTMLElement;
 
-      if (!element) return;
+    if (!element) return;
 
-      try {
-        toast.loading(`Exporting as ${format.toUpperCase()}...`);
+    try {
+      toast.loading(`Exporting as ${format.toUpperCase()}...`);
 
-        switch (format) {
-          case "png":
-            await exportToPNG(element, { format: "png" });
-            break;
-          case "svg":
-            await exportToSVG(element, { format: "svg" });
-            break;
-          case "pdf":
-            await exportToPDF(element, { format: "pdf" });
-            break;
-        }
-
-        toast.success(`Exported as ${format.toUpperCase()}`);
-      } catch (error) {
-        console.error("Export failed:", error);
-        toast.error("Export failed");
+      switch (format) {
+        case "png":
+          await exportToPNG(element, { format: "png" });
+          break;
+        case "svg":
+          await exportToSVG(element, { format: "svg" });
+          break;
+        case "pdf":
+          await exportToPDF(element, { format: "pdf" });
+          break;
       }
-    },
-    []
-  );
+
+      toast.success(`Exported as ${format.toUpperCase()}`);
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast.error("Export failed");
+    }
+  }, []);
 
   // Change color of selected nodes
   const handleColorChange = useCallback(
     (color: string) => {
       setNodes((nds) =>
         nds.map((node) =>
-          node.selected
-            ? { ...node, data: { ...node.data, color } }
-            : node
+          node.selected ? { ...node, data: { ...node.data, color } } : node
         )
       );
       toast.success("Color updated");

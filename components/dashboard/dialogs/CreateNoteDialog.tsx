@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Course, Module } from "@/lib/types";
+import { Course, Module } from "@/types";
 
 interface CreateNoteDialogProps {
   open: boolean;

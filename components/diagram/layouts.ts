@@ -1,6 +1,6 @@
 import dagre from "dagre";
 import { Node, Edge } from "@xyflow/react";
-import { LayoutType, LayoutOptions } from "./types";
+import { LayoutType, LayoutOptions } from "@/types";
 
 /**
  * Apply hierarchical layout using Dagre
@@ -10,11 +10,7 @@ export function applyHierarchicalLayout(
   edges: Edge[],
   options: LayoutOptions = {}
 ): Node[] {
-  const {
-    direction = "TB",
-    nodeSpacing = 150,
-    rankSpacing = 100,
-  } = options;
+  const { direction = "TB", nodeSpacing = 150, rankSpacing = 100 } = options;
 
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
@@ -289,6 +285,3 @@ function getNodeHeight(type?: string): number {
       return 60;
   }
 }
-
-
-

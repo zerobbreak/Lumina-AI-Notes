@@ -19,7 +19,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { NodeType, LayoutType } from "./types";
+import { NodeType, LayoutType } from "@/types";
 
 interface MindMapToolbarProps {
   onAddNode: (type: NodeType) => void;
@@ -33,9 +33,19 @@ interface MindMapToolbarProps {
 }
 
 const NODE_TYPES = [
-  { type: "concept" as NodeType, label: "Concept", icon: Sparkles, color: "purple" },
+  {
+    type: "concept" as NodeType,
+    label: "Concept",
+    icon: Sparkles,
+    color: "purple",
+  },
   { type: "topic" as NodeType, label: "Topic", icon: BookOpen, color: "blue" },
-  { type: "subtopic" as NodeType, label: "Subtopic", icon: FileText, color: "emerald" },
+  {
+    type: "subtopic" as NodeType,
+    label: "Subtopic",
+    icon: FileText,
+    color: "emerald",
+  },
   { type: "note" as NodeType, label: "Note", icon: StickyNote, color: "amber" },
 ];
 
@@ -257,6 +267,3 @@ export function MindMapToolbar({
     </div>
   );
 }
-
-
-

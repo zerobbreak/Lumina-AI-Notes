@@ -1,7 +1,6 @@
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import { getRectOfNodes, getTransformForBounds } from "@xyflow/react";
-import { ExportOptions } from "./types";
+import { ExportOptions } from "@/types";
 
 /**
  * Export the diagram to PNG
@@ -85,7 +84,7 @@ export async function exportToSVG(
   try {
     // Clone the element
     const clone = element.cloneNode(true) as HTMLElement;
-    
+
     // Get dimensions
     const rect = element.getBoundingClientRect();
     const width = rect.width;
@@ -158,6 +157,3 @@ export function exportToJSON(
   link.click();
   URL.revokeObjectURL(url);
 }
-
-
-

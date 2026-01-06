@@ -19,7 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { SearchDialog } from "@/components/dashboard/search/SearchDialog";
-import { Course, UserFile } from "@/lib/types";
+import { Course, UserFile } from "@/types";
 import { Id } from "@/convex/_generated/dataModel";
 import { UploadDialog } from "@/components/dashboard/dialogs/UploadDialog";
 
@@ -30,7 +30,10 @@ import { SidebarCourse } from "./SidebarCourse";
 import { SidebarNote } from "./SidebarNote";
 import { ActionMenu } from "@/components/shared/ActionMenu"; // Still needed for Files
 import { File, FolderOpen, FileText } from "lucide-react"; // Still needed for Files
-import { useKeyboardShortcut, formatShortcut } from "@/hooks/useKeyboardShortcut";
+import {
+  useKeyboardShortcut,
+  formatShortcut,
+} from "@/hooks/useKeyboardShortcut";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 type RenameTarget = {
@@ -150,11 +153,7 @@ export function Sidebar() {
     { preventDefault: true }
   );
 
-  useKeyboardShortcut(
-    "cmd+n",
-    handleCreateNote,
-    { preventDefault: true }
-  );
+  useKeyboardShortcut("cmd+n", handleCreateNote, { preventDefault: true });
 
   // Courses
   const handleCreateCourse = async () => {
@@ -173,7 +172,7 @@ export function Sidebar() {
       <div className="p-4 space-y-4">
         {/* Profile Card */}
         <div className="flex items-center gap-3.5 p-2 rounded-xl bg-white/3 border border-white/5 hover:bg-white/6 hover:border-white/8 transition-all duration-300 cursor-pointer group shadow-sm">
-          <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-600 rounded-lg flex items-center justify-center text-white font-bold shadow-[0_0_15px_-3px_rgba(99,102,241,0.4)] group-hover:shadow-[0_0_20px_-3px_rgba(99,102,241,0.5)] transition-shadow">
+          <div className="w-9 h-9 bg-linear-to-br from-indigo-500 via-indigo-600 to-violet-600 rounded-lg flex items-center justify-center text-white font-bold shadow-[0_0_15px_-3px_rgba(99,102,241,0.4)] group-hover:shadow-[0_0_20px_-3px_rgba(99,102,241,0.5)] transition-shadow">
             <span className="drop-shadow-md">U</span>
           </div>
           <div className="flex-1 overflow-hidden">

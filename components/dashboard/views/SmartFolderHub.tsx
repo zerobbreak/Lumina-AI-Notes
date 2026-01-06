@@ -21,7 +21,7 @@ import {
   ArrowRight,
   File as FileIcon,
 } from "lucide-react";
-import { Course } from "@/lib/types";
+import { Course } from "@/types";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";

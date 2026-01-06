@@ -9,7 +9,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
-import { Course, Module } from "@/lib/types";
+import { Course, Module } from "@/types";
 import { SidebarModule } from "./SidebarModule";
 import { SidebarNote } from "./SidebarNote";
 import { toast } from "sonner";
@@ -50,15 +50,18 @@ function SidebarCourseComponent({
   const addModule = useMutation(api.users.addModuleToCourse);
   const moveNoteToFolder = useMutation(api.notes.moveNoteToFolder);
 
-  const handleCreateModule = useCallback(async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await addModule({ courseId: course.id, title: "New Module" });
-      if (!isExpanded) onToggle();
-    } catch (e) {
-      console.error(e);
-    }
-  }, [addModule, course.id, isExpanded, onToggle]);
+  const handleCreateModule = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      try {
+        await addModule({ courseId: course.id, title: "New Module" });
+        if (!isExpanded) onToggle();
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    [addModule, course.id, isExpanded, onToggle]
+  );
 
   // Drop zone handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -75,36 +78,42 @@ function SidebarCourseComponent({
     setIsDragOver(false);
   }, []);
 
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
+  const handleDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragOver(false);
 
-    const noteId = e.dataTransfer.getData("application/lumina-note-id");
-    const noteTitle = e.dataTransfer.getData("application/lumina-note-title");
+      const noteId = e.dataTransfer.getData("application/lumina-note-id");
+      const noteTitle = e.dataTransfer.getData("application/lumina-note-title");
 
-    if (noteId) {
-      try {
-        await moveNoteToFolder({
-          noteId: noteId as Id<"notes">,
-          courseId: course.id,
-        });
-        toast.success(`Moved "${noteTitle}" to ${course.name}`);
-      } catch (error) {
-        console.error("Failed to move note:", error);
-        toast.error("Failed to move note");
+      if (noteId) {
+        try {
+          await moveNoteToFolder({
+            noteId: noteId as Id<"notes">,
+            courseId: course.id,
+          });
+          toast.success(`Moved "${noteTitle}" to ${course.name}`);
+        } catch (error) {
+          console.error("Failed to move note:", error);
+          toast.error("Failed to move note");
+        }
       }
-    }
-  }, [moveNoteToFolder, course.id, course.name]);
+    },
+    [moveNoteToFolder, course.id, course.name]
+  );
 
   const handleCourseClick = useCallback(() => {
     router.push(`/dashboard?contextId=${course.id}&contextType=course`);
   }, [router, course.id]);
 
-  const handleToggleClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    onToggle();
-  }, [onToggle]);
+  const handleToggleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onToggle();
+    },
+    [onToggle]
+  );
 
   const handleRename = useCallback(() => {
     onRename(course.id, course.name);
@@ -115,8 +124,8 @@ function SidebarCourseComponent({
   }, [onDelete, course.id]);
 
   // Filter notes that don't belong to any module - memoized
-  const rootCourseNotes = useMemo(() => 
-    courseNotes?.filter((note) => !note.moduleId),
+  const rootCourseNotes = useMemo(
+    () => courseNotes?.filter((note) => !note.moduleId),
     [courseNotes]
   );
 
@@ -167,10 +176,7 @@ function SidebarCourseComponent({
 
         {/* Action Menu - Absolute Positioned */}
         <div className="absolute right-1 opacity-0 group-hover/course:opacity-100 transition-opacity">
-          <ActionMenu
-            onRename={handleRename}
-            onDelete={handleDelete}
-          />
+          <ActionMenu onRename={handleRename} onDelete={handleDelete} />
         </div>
       </div>
 

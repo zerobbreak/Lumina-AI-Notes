@@ -1,6 +1,12 @@
 import { Node, Edge } from "@xyflow/react";
 
-export type NodeType = "concept" | "topic" | "subtopic" | "note" | "default" | "input";
+export type NodeType =
+  | "concept"
+  | "topic"
+  | "subtopic"
+  | "note"
+  | "default"
+  | "input";
 
 export interface MindMapNode extends Node {
   type?: NodeType;
@@ -30,6 +36,3 @@ export interface ExportOptions {
   backgroundColor?: string;
   quality?: number;
 }
-
-
-

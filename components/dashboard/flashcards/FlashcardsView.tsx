@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Layers, Plus, Trash2, Clock, BookOpen, Sparkles } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
-import { FlashcardDeck } from "@/lib/types";
+import { FlashcardDeck } from "@/types";
 import { useState } from "react";
 import { GenerateFlashcardsDialog } from "@/components/dashboard/dialogs/GenerateFlashcardsDialog";
 
