@@ -7,6 +7,8 @@ import {
   RefreshCw,
   Pin,
   PinOff,
+  GraduationCap,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +22,8 @@ interface ActionMenuProps {
   onDelete?: () => void;
   onArchive?: () => void;
   onPin?: () => void;
+  onGenerateFlashcards?: () => void;
+  onGenerateQuiz?: () => void;
   onRetry?: () => void;
   isArchived?: boolean;
   isPinned?: boolean;
@@ -32,6 +36,8 @@ export function ActionMenu({
   onDelete,
   onArchive,
   onPin,
+  onGenerateFlashcards,
+  onGenerateQuiz,
   onRetry,
   isArchived,
   isPinned,
@@ -59,6 +65,37 @@ export function ActionMenu({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-col gap-0.5">
+          {onGenerateFlashcards && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onGenerateFlashcards();
+                setIsOpen(false);
+              }}
+              className="flex items-center gap-2 px-2 py-1.5 text-xs text-indigo-400 hover:bg-indigo-500/10 rounded-md w-full text-left"
+            >
+              <GraduationCap className="w-3 h-3" />
+              Generate Flashcards
+            </button>
+          )}
+
+          {onGenerateQuiz && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onGenerateQuiz();
+                setIsOpen(false);
+              }}
+              className="flex items-center gap-2 px-2 py-1.5 text-xs text-purple-400 hover:bg-purple-500/10 rounded-md w-full text-left"
+            >
+              <Sparkles className="w-3 h-3" />
+              Take a Quiz
+            </button>
+          )}
+
+          {(onGenerateFlashcards || onGenerateQuiz) && (
+            <div className="h-px bg-white/10 my-1" />
+          )}
           {onRename && (
             <button
               onClick={(e) => {

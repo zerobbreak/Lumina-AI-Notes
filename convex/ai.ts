@@ -7,13 +7,16 @@ import { Id } from "./_generated/dataModel";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Initialize Gemini client
-const getGeminiModel = () => {
+const getGeminiModel = (config?: { responseMimeType: string }) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY environment variable not set");
   }
   const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  return genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    generationConfig: config,
+  });
 };
 
 /**
@@ -176,8 +179,22 @@ export const generateCourseRoadmap = action({
 
         // Add nodes with estimated dimensions
         data.nodes.forEach((node: any) => {
-          const width = node.type === "concept" ? 200 : node.type === "topic" ? 160 : node.type === "subtopic" ? 120 : 100;
-          const height = node.type === "concept" ? 80 : node.type === "topic" ? 60 : node.type === "subtopic" ? 50 : 40;
+          const width =
+            node.type === "concept"
+              ? 200
+              : node.type === "topic"
+                ? 160
+                : node.type === "subtopic"
+                  ? 120
+                  : 100;
+          const height =
+            node.type === "concept"
+              ? 80
+              : node.type === "topic"
+                ? 60
+                : node.type === "subtopic"
+                  ? 50
+                  : 40;
           dagreGraph.setNode(node.id, { width, height });
         });
 
@@ -205,15 +222,15 @@ export const generateCourseRoadmap = action({
       return data;
     } catch (e) {
       console.error("Roadmap generation failed", e);
-      
+
       // Return a better fallback structure with the courses
       const nodes = [
         {
           id: "1",
           type: "concept",
-          data: { 
+          data: {
             label: args.major,
-            color: "bg-gradient-to-br from-purple-500 to-pink-500"
+            color: "bg-gradient-to-br from-purple-500 to-pink-500",
           },
           position: { x: 400, y: 50 },
         },
@@ -227,13 +244,13 @@ export const generateCourseRoadmap = action({
         nodes.push({
           id: nodeId,
           type: "topic",
-          data: { 
+          data: {
             label: course,
-            color: "bg-gradient-to-br from-blue-500 to-cyan-500"
+            color: "bg-gradient-to-br from-blue-500 to-cyan-500",
           },
-          position: { 
-            x: 200 + (index % 3) * 200, 
-            y: 200 + Math.floor(index / 3) * 150 
+          position: {
+            x: 200 + (index % 3) * 200,
+            y: 200 + Math.floor(index / 3) * 150,
           },
         });
         edges.push({
@@ -301,7 +318,7 @@ export const generateStructuredNotes = action({
     style: v.optional(v.string()), // "cornell" | "outline" | "standard"
   },
   handler: async (ctx, args) => {
-    const model = getGeminiModel();
+    const model = getGeminiModel({ responseMimeType: "application/json" });
 
     let prompt = `You are an expert academic note-taker with years of experience creating comprehensive study materials. Your goal is to transform this lecture transcript into detailed, exam-ready study notes.
 
@@ -392,7 +409,7 @@ IMPORTANT RULES:
               // Assign node types and colors based on position
               let type = "default";
               let color = "bg-gradient-to-br from-gray-500 to-gray-600";
-              
+
               if (index === 0) {
                 type = "concept";
                 color = "bg-gradient-to-br from-purple-500 to-pink-500";
@@ -946,7 +963,7 @@ export const generateAndSaveFlashcards = action({
       };
     }
 
-    const model = getGeminiModel();
+    const model = getGeminiModel({ responseMimeType: "application/json" });
     const count = args.count || 10;
 
     const prompt = `Generate ${count} flashcards from the following study content.
@@ -1054,7 +1071,7 @@ export const generateAndSaveQuiz = action({
       };
     }
 
-    const model = getGeminiModel();
+    const model = getGeminiModel({ responseMimeType: "application/json" });
     const count = args.count || 10;
 
     const prompt = `Generate ${count} multiple-choice questions from the following study content.
@@ -1118,12 +1135,15 @@ Rules:
       }
 
       // Save to database
-      const deckId = await ctx.runMutation(api.quizzes.createDeckWithQuestions, {
-        title: args.title,
-        sourceNoteId: args.noteId,
-        courseId: note.courseId,
-        questions: questions,
-      });
+      const deckId = await ctx.runMutation(
+        api.quizzes.createDeckWithQuestions,
+        {
+          title: args.title,
+          sourceNoteId: args.noteId,
+          courseId: note.courseId,
+          questions: questions,
+        }
+      );
 
       return {
         success: true,
@@ -1135,9 +1155,7 @@ Rules:
       return {
         success: false,
         error:
-          error instanceof Error
-            ? error.message
-            : "Failed to generate quiz",
+          error instanceof Error ? error.message : "Failed to generate quiz",
       };
     }
   },

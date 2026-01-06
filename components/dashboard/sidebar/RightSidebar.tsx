@@ -30,6 +30,7 @@ import {
   Waves,
   Radio,
   Volume2,
+  PenLine,
 } from "lucide-react";
 import {
   Dialog,
@@ -332,6 +333,40 @@ export function RightSidebar() {
     }
   };
 
+  const handleInsertNotes = async () => {
+    const currentNoteId = searchParams.get("noteId");
+
+    if (!currentNoteId && generatedNotes) {
+      // No note is open - create a new one
+      try {
+        const title =
+          recordingTitle || usedContextName
+            ? `Notes from ${usedContextName || recordingTitle || "Recording"}`
+            : "Generated Notes";
+
+        const noteId = await createNote({
+          title,
+          major: userData?.major || "general",
+          style: "standard",
+        });
+
+        // Set pending notes and navigate to the new note
+        setPendingNotes(generatedNotes);
+        setGeneratedNotes(null);
+        router.push(`/dashboard?noteId=${noteId}`);
+        toast.success("Created new note with generated content");
+      } catch (error) {
+        console.error("Failed to create note:", error);
+        toast.error("Failed to create note. Please try again.");
+      }
+    } else if (generatedNotes) {
+      // Note is already open - just set pending notes
+      setPendingNotes(generatedNotes);
+      setGeneratedNotes(null);
+      toast.success("Content ready to insert");
+    }
+  };
+
   // Timer Ref
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -571,7 +606,10 @@ export function RightSidebar() {
         setSelectedSession(recordingId);
         alert("Recording uploaded and transcribed successfully!");
       } else {
-        const errorMsg = "error" in transcriptionResult ? transcriptionResult.error : "Unknown error";
+        const errorMsg =
+          "error" in transcriptionResult
+            ? transcriptionResult.error
+            : "Unknown error";
         alert(`Upload successful but transcription failed: ${errorMsg}`);
       }
 
@@ -698,33 +736,37 @@ export function RightSidebar() {
       <div className="p-4 border-b border-white/5 relative overflow-hidden">
         {/* Context Deck */}
         <ContextDeck />
-        
+
         {/* Animated gradient border when recording */}
         <div
           className={cn(
             "absolute top-0 left-0 w-full h-1 transition-all duration-500",
-            listening 
-              ? "bg-gradient-to-r from-red-500 via-orange-500 to-red-500 bg-[length:200%_100%] animate-gradient-x opacity-100"
-              : "bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-500 opacity-30"
+            listening
+              ? "bg-linear-to-r from-red-500 via-orange-500 to-red-500 bg-size-[200%_100%] animate-gradient-x opacity-100"
+              : "bg-linear-to-r from-cyan-500 via-indigo-500 to-purple-500 opacity-30"
           )}
         />
 
         {/* Recording Status Card */}
-        <div className={cn(
-          "relative rounded-2xl p-4 mb-4 transition-all duration-300",
-          listening 
-            ? "bg-gradient-to-br from-red-500/10 via-orange-500/5 to-transparent border border-red-500/20"
-            : "bg-gradient-to-br from-white/5 via-transparent to-transparent border border-white/5"
-        )}>
+        <div
+          className={cn(
+            "relative rounded-2xl p-4 mb-4 transition-all duration-300",
+            listening
+              ? "bg-linear-to-br from-red-500/10 via-orange-500/5 to-transparent border border-red-500/20"
+              : "bg-linear-to-br from-white/5 via-transparent to-transparent border border-white/5"
+          )}
+        >
           {/* Status Header */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className={cn(
-                "relative w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300",
-                listening 
-                  ? "bg-red-500/20 shadow-lg shadow-red-500/20"
-                  : "bg-white/5"
-              )}>
+              <div
+                className={cn(
+                  "relative w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300",
+                  listening
+                    ? "bg-red-500/20 shadow-lg shadow-red-500/20"
+                    : "bg-white/5"
+                )}
+              >
                 {listening ? (
                   <>
                     <Radio className="w-6 h-6 text-red-400" />
@@ -736,10 +778,12 @@ export function RightSidebar() {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className={cn(
-                    "text-sm font-bold tracking-wide transition-colors",
-                    listening ? "text-red-400" : "text-gray-400"
-                  )}>
+                  <span
+                    className={cn(
+                      "text-sm font-bold tracking-wide transition-colors",
+                      listening ? "text-red-400" : "text-gray-400"
+                    )}
+                  >
                     {listening ? "RECORDING" : "READY"}
                   </span>
                   {listening && (
@@ -757,7 +801,7 @@ export function RightSidebar() {
                 </div>
               </div>
             </div>
-            
+
             {/* Quick Actions */}
             {(elapsedTime > 0 || sessionTranscript.length > 0) && (
               <div className="flex items-center gap-1">
@@ -777,15 +821,16 @@ export function RightSidebar() {
           {/* Waveform Visualization - More refined */}
           <div className="h-12 flex items-center justify-center gap-[3px] mb-4 px-2">
             {Array.from({ length: 24 }).map((_, i) => {
-              const baseHeight = 20 + Math.sin(i * 0.5) * 15 + Math.random() * 20;
+              const baseHeight =
+                20 + Math.sin(i * 0.5) * 15 + Math.random() * 20;
               return (
                 <motion.div
                   key={i}
                   animate={
                     listening
-                      ? { 
+                      ? {
                           scaleY: [1, 0.3 + Math.random() * 0.7, 1],
-                          opacity: [0.5, 1, 0.5]
+                          opacity: [0.5, 1, 0.5],
                         }
                       : { scaleY: 0.15, opacity: 0.3 }
                   }
@@ -797,8 +842,8 @@ export function RightSidebar() {
                   }}
                   className={cn(
                     "w-1 rounded-full transition-colors origin-center",
-                    listening 
-                      ? "bg-gradient-to-t from-red-500 to-orange-400"
+                    listening
+                      ? "bg-linear-to-t from-red-500 to-orange-400"
                       : "bg-gray-700"
                   )}
                   style={{ height: `${baseHeight}%` }}
@@ -813,8 +858,8 @@ export function RightSidebar() {
             className={cn(
               "w-full h-14 rounded-xl font-semibold text-base flex items-center justify-center gap-3 transition-all duration-300 active:scale-[0.98]",
               listening
-                ? "bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white shadow-lg shadow-red-500/25"
-                : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-500/25"
+                ? "bg-linear-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white shadow-lg shadow-red-500/25"
+                : "bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-500/25"
             )}
           >
             {listening ? (
@@ -836,15 +881,23 @@ export function RightSidebar() {
               <Button
                 variant="outline"
                 className="h-10 border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 hover:text-purple-200"
-                onClick={handleGenerateNotes}
+                onClick={
+                  generatedNotes ? handleInsertNotes : handleGenerateNotes
+                }
                 disabled={isGeneratingNotes}
               >
                 {isGeneratingNotes ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : generatedNotes ? (
+                  <PenLine className="w-4 h-4 mr-2" />
                 ) : (
                   <Sparkles className="w-4 h-4 mr-2" />
                 )}
-                AI Notes
+                {generatedNotes
+                  ? searchParams.get("noteId")
+                    ? "Insert Notes"
+                    : "Create Note"
+                  : "AI Notes"}
               </Button>
               <Button
                 variant="outline"
@@ -877,25 +930,27 @@ export function RightSidebar() {
             className={cn(
               "relative group cursor-pointer overflow-hidden rounded-xl transition-all duration-300",
               isUploading || isTranscribing
-                ? "bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/30"
-                : "bg-white/[0.02] border border-dashed border-white/10 hover:border-cyan-500/50 hover:bg-white/[0.04]"
+                ? "bg-linear-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/30"
+                : "bg-white/2 border border-dashed border-white/10 hover:border-cyan-500/50 hover:bg-white/4"
             )}
           >
             {/* Progress overlay */}
             {(isUploading || isTranscribing) && (
-              <div 
-                className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 transition-all duration-300"
+              <div
+                className="absolute inset-0 bg-linear-to-r from-cyan-500/20 to-blue-500/20 transition-all duration-300"
                 style={{ width: `${uploadProgress}%` }}
               />
             )}
-            
+
             <div className="relative p-4 flex items-center gap-4">
-              <div className={cn(
-                "h-12 w-12 shrink-0 rounded-xl flex items-center justify-center transition-all duration-300",
-                isUploading || isTranscribing
-                  ? "bg-cyan-500/20"
-                  : "bg-white/5 group-hover:bg-cyan-500/10 group-hover:scale-105"
-              )}>
+              <div
+                className={cn(
+                  "h-12 w-12 shrink-0 rounded-xl flex items-center justify-center transition-all duration-300",
+                  isUploading || isTranscribing
+                    ? "bg-cyan-500/20"
+                    : "bg-white/5 group-hover:bg-cyan-500/10 group-hover:scale-105"
+                )}
+              >
                 {isUploading || isTranscribing ? (
                   <Loader2 className="h-6 w-6 text-cyan-400 animate-spin" />
                 ) : (
@@ -908,20 +963,26 @@ export function RightSidebar() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold text-cyan-400">
-                        {isTranscribing ? "Transcribing audio..." : "Uploading file..."}
+                        {isTranscribing
+                          ? "Transcribing audio..."
+                          : "Uploading file..."}
                       </p>
-                      <span className="text-xs font-mono text-cyan-400">{uploadProgress}%</span>
+                      <span className="text-xs font-mono text-cyan-400">
+                        {uploadProgress}%
+                      </span>
                     </div>
                     <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${uploadProgress}%` }}
-                        className="h-full bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full"
+                        className="h-full bg-linear-to-r from-cyan-400 to-blue-400 rounded-full"
                         transition={{ duration: 0.3 }}
                       />
                     </div>
                     <p className="text-[10px] text-gray-500">
-                      {isTranscribing ? "AI is processing your audio" : "Please wait..."}
+                      {isTranscribing
+                        ? "AI is processing your audio"
+                        : "Please wait..."}
                     </p>
                   </div>
                 ) : (
@@ -981,7 +1042,7 @@ export function RightSidebar() {
                           className={cn(
                             "group relative flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200",
                             selectedSession === recording._id
-                              ? "bg-gradient-to-r from-cyan-500/15 to-transparent border border-cyan-500/30"
+                              ? "bg-linear-to-r from-cyan-500/15 to-transparent border border-cyan-500/30"
                               : "hover:bg-white/5 border border-transparent"
                           )}
                           onClick={() => handleLoadPastSession(recording)}
@@ -1014,16 +1075,21 @@ export function RightSidebar() {
                             </p>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className="text-[10px] text-gray-500">
-                                {new Date(recording.createdAt).toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric'
+                                {new Date(
+                                  recording.createdAt
+                                ).toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
                                 })}
                               </span>
                               {recording.duration && (
                                 <>
                                   <span className="text-gray-700">•</span>
                                   <span className="text-[10px] text-gray-500">
-                                    {Math.floor(recording.duration / 60)}:{String(Math.floor(recording.duration % 60)).padStart(2, '0')}
+                                    {Math.floor(recording.duration / 60)}:
+                                    {String(
+                                      Math.floor(recording.duration % 60)
+                                    ).padStart(2, "0")}
                                   </span>
                                 </>
                               )}
@@ -1049,8 +1115,12 @@ export function RightSidebar() {
                           <History className="w-7 h-7 opacity-30" />
                         </div>
                         <div className="text-center">
-                          <p className="text-xs font-medium text-gray-500">No recordings yet</p>
-                          <p className="text-[10px] text-gray-600 mt-0.5">Your saved sessions will appear here</p>
+                          <p className="text-xs font-medium text-gray-500">
+                            No recordings yet
+                          </p>
+                          <p className="text-[10px] text-gray-600 mt-0.5">
+                            Your saved sessions will appear here
+                          </p>
                         </div>
                       </div>
                     )}
@@ -1101,8 +1171,8 @@ export function RightSidebar() {
                 className={cn(
                   "relative group rounded-xl p-3 transition-all duration-200",
                   chunk.isImportant
-                    ? "bg-gradient-to-r from-yellow-500/10 to-transparent border border-yellow-500/20"
-                    : "bg-white/[0.02] hover:bg-white/[0.04] border border-transparent hover:border-white/5"
+                    ? "bg-linear-to-r from-yellow-500/10 to-transparent border border-yellow-500/20"
+                    : "bg-white/2 hover:bg-white/4 border border-transparent hover:border-white/5"
                 )}
               >
                 {/* Timestamp badge */}
@@ -1131,7 +1201,7 @@ export function RightSidebar() {
                     </div>
                   )}
                 </div>
-                
+
                 {/* Content */}
                 <div className="text-sm text-zinc-300 leading-relaxed prose prose-invert prose-sm max-w-none">
                   <ReactMarkdown
@@ -1151,8 +1221,8 @@ export function RightSidebar() {
                 animate={{ opacity: 1, y: 0 }}
                 className="relative"
               >
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full" />
-                <div className="ml-4 bg-gradient-to-r from-cyan-500/10 to-transparent p-4 rounded-xl border border-cyan-500/20">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-linear-to-b from-cyan-400 to-blue-500 rounded-full" />
+                <div className="ml-4 bg-linear-to-r from-cyan-500/10 to-transparent p-4 rounded-xl border border-cyan-500/20">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/20 px-2 py-0.5 rounded-md font-bold">
                       {formatTime(elapsedTime)}
@@ -1176,16 +1246,19 @@ export function RightSidebar() {
               !generatedNotes && (
                 <div className="flex flex-col items-center justify-center pt-16 pb-8">
                   <div className="relative">
-                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-white/5 to-transparent flex items-center justify-center mb-4 border border-white/5">
+                    <div className="w-20 h-20 rounded-2xl bg-linear-to-br from-white/5 to-transparent flex items-center justify-center mb-4 border border-white/5">
                       <Mic className="w-10 h-10 text-gray-600" />
                     </div>
                     <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
                       <Sparkles className="w-4 h-4 text-indigo-400" />
                     </div>
                   </div>
-                  <h4 className="text-sm font-medium text-gray-400 mb-1">Ready to Record</h4>
+                  <h4 className="text-sm font-medium text-gray-400 mb-1">
+                    Ready to Record
+                  </h4>
                   <p className="text-xs text-gray-600 text-center max-w-[200px]">
-                    Click the record button or upload an audio file to get started
+                    Click the record button or upload an audio file to get
+                    started
                   </p>
                 </div>
               )}
@@ -1299,25 +1372,28 @@ export function RightSidebar() {
                   className="w-full bg-purple-600 hover:bg-purple-500 text-white"
                   onClick={async () => {
                     const currentNoteId = searchParams.get("noteId");
-                    
+
                     if (!currentNoteId && generatedNotes) {
                       // No note is open - create a new one
                       try {
-                        const title = recordingTitle || usedContextName 
-                          ? `Notes from ${usedContextName || recordingTitle || "Recording"}`
-                          : "Generated Notes";
-                        
+                        const title =
+                          recordingTitle || usedContextName
+                            ? `Notes from ${usedContextName || recordingTitle || "Recording"}`
+                            : "Generated Notes";
+
                         const noteId = await createNote({
                           title,
                           major: userData?.major || "general",
                           style: "standard",
                         });
-                        
+
                         // Set pending notes and navigate to the new note
                         setPendingNotes(generatedNotes);
                         setGeneratedNotes(null);
                         router.push(`/dashboard?noteId=${noteId}`);
-                        toast.success("Created new note with generated content");
+                        toast.success(
+                          "Created new note with generated content"
+                        );
                       } catch (error) {
                         console.error("Failed to create note:", error);
                         toast.error("Failed to create note. Please try again.");
@@ -1331,7 +1407,9 @@ export function RightSidebar() {
                   }}
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
-                  {searchParams.get("noteId") ? "Insert to Editor" : "Create Note"}
+                  {searchParams.get("noteId")
+                    ? "Insert to Editor"
+                    : "Create Note"}
                 </Button>
               </motion.div>
             )}

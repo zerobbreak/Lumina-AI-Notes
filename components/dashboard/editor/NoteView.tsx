@@ -41,7 +41,13 @@ import { usePDF } from "@/hooks/usePDF";
 import { AIBubbleMenu } from "./AIBubbleMenu";
 import { DocumentDropZone } from "@/components/documents";
 import { marked } from "marked";
-import { extractOutlineStructure, calculateOutlineMetadata, serializeOutline } from "@/lib/outlineUtils";
+import {
+  extractOutlineStructure,
+  calculateOutlineMetadata,
+  serializeOutline,
+} from "@/lib/outlineUtils";
+import { GenerateFlashcardsDialog } from "@/components/dashboard/dialogs/GenerateFlashcardsDialog";
+import { GenerateQuizDialog } from "@/components/dashboard/dialogs/GenerateQuizDialog";
 import "./editor.css";
 
 // Props for the NoteView
@@ -76,30 +82,33 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [debouncedContent, setDebouncedContent] = useState<string | any>(null);
   const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [isFlashcardsOpen, setIsFlashcardsOpen] = useState(false);
+  const [isQuizOpen, setIsQuizOpen] = useState(false);
 
   // Parse context (Course / Module)
   const courseName =
-    userData?.courses?.find((c: { id: string; name: string }) => c.id === note?.courseId)?.name ||
-    "General";
+    userData?.courses?.find(
+      (c: { id: string; name: string }) => c.id === note?.courseId
+    )?.name || "General";
 
   // Calculate word count and reading time
   const noteContent = note?.content;
   const { wordCount, readingTime } = useMemo(() => {
     if (!noteContent) return { wordCount: 0, readingTime: "< 1 min" };
-    
+
     // Strip HTML tags and count words
     const plainText = noteContent
       .replace(/<[^>]*>/g, " ")
       .replace(/\s+/g, " ")
       .trim();
-    
-    const words = plainText.split(/\s+/).filter(word => word.length > 0);
+
+    const words = plainText.split(/\s+/).filter((word) => word.length > 0);
     const count = words.length;
-    
+
     // Average reading speed: 200-250 words per minute
     const minutes = Math.ceil(count / 225);
     const time = minutes < 1 ? "< 1 min" : `${minutes} min read`;
-    
+
     return { wordCount: count, readingTime: time };
   }, [noteContent]);
 
@@ -109,7 +118,10 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
     const handler = setTimeout(() => {
       // Check if this is Cornell data (object with cornellCues, cornellNotes, cornellSummary)
-      if (typeof debouncedContent === 'object' && 'cornellCues' in debouncedContent) {
+      if (
+        typeof debouncedContent === "object" &&
+        "cornellCues" in debouncedContent
+      ) {
         updateNote({
           noteId,
           cornellCues: debouncedContent.cornellCues,
@@ -118,12 +130,15 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         }).then(() => {
           setIsSaving(false);
         });
-      } else if (note?.style === "outline" && typeof debouncedContent === 'string') {
+      } else if (
+        note?.style === "outline" &&
+        typeof debouncedContent === "string"
+      ) {
         // Extract outline structure and metadata
         const structure = extractOutlineStructure(debouncedContent);
         const metadata = calculateOutlineMetadata(structure);
         const outlineData = serializeOutline(structure);
-        
+
         updateNote({
           noteId,
           content: debouncedContent,
@@ -221,9 +236,12 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     // If this is a Cornell note, update the Cornell fields directly
     if (note?.style === "cornell") {
       const cornellCuesText = pendingNotes.cornellCues.join("\n\n");
-      const cornellNotesHtml = pendingNotes.cornellNotes.map((note, i) => 
-        `<h4>${pendingNotes.cornellCues[i] || ""}</h4><p>${note}</p>`
-      ).join("");
+      const cornellNotesHtml = pendingNotes.cornellNotes
+        .map(
+          (note, i) =>
+            `<h4>${pendingNotes.cornellCues[i] || ""}</h4><p>${note}</p>`
+        )
+        .join("");
       const cornellSummaryText = pendingNotes.summary || "";
 
       // Update the note with Cornell data
@@ -354,35 +372,39 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   };
 
   // Handle inserting AI-generated content into the note
-  const handleInsertFromAI = useCallback((content: string) => {
-    if (!editor || editor.isDestroyed) return;
-    
-    // Convert markdown to HTML for the editor
-    // Simple conversion for common markdown patterns
-    let htmlContent = content
-      .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-      .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-      .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/^\- (.*$)/gim, '<li>$1</li>')
-      .replace(/^\* (.*$)/gim, '<li>$1</li>')
-      .replace(/\n/g, '<br>');
-    
-    // Wrap consecutive <li> elements in <ul>
-    htmlContent = htmlContent.replace(/(<li>.*?<\/li>(<br>)?)+/g, (match) => {
-      const items = match.replace(/<br>/g, '');
-      return `<ul>${items}</ul>`;
-    });
-    
-    // Insert at the end of the document with a separator
-    editor.chain()
-      .focus('end')
-      .insertContent('<hr><p></p>')
-      .insertContent(htmlContent)
-      .insertContent('<p></p>')
-      .run();
-  }, [editor]);
+  const handleInsertFromAI = useCallback(
+    (content: string) => {
+      if (!editor || editor.isDestroyed) return;
+
+      // Convert markdown to HTML for the editor
+      // Simple conversion for common markdown patterns
+      let htmlContent = content
+        .replace(/^### (.*$)/gim, "<h3>$1</h3>")
+        .replace(/^## (.*$)/gim, "<h2>$1</h2>")
+        .replace(/^# (.*$)/gim, "<h1>$1</h1>")
+        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*(.*?)\*/g, "<em>$1</em>")
+        .replace(/^\- (.*$)/gim, "<li>$1</li>")
+        .replace(/^\* (.*$)/gim, "<li>$1</li>")
+        .replace(/\n/g, "<br>");
+
+      // Wrap consecutive <li> elements in <ul>
+      htmlContent = htmlContent.replace(/(<li>.*?<\/li>(<br>)?)+/g, (match) => {
+        const items = match.replace(/<br>/g, "");
+        return `<ul>${items}</ul>`;
+      });
+
+      // Insert at the end of the document with a separator
+      editor
+        .chain()
+        .focus("end")
+        .insertContent("<hr><p></p>")
+        .insertContent(htmlContent)
+        .insertContent("<p></p>")
+        .run();
+    },
+    [editor]
+  );
 
   // --- Deleting State ---
   if (isDeleting) {
@@ -535,12 +557,15 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
               <Type className="w-3 h-3" />
               {wordCount.toLocaleString()} words
             </span>
-            <span className="flex items-center gap-1" title="Estimated reading time">
+            <span
+              className="flex items-center gap-1"
+              title="Estimated reading time"
+            >
               <Clock className="w-3 h-3" />
               {readingTime}
             </span>
           </div>
-          
+
           <span className="text-xs font-mono text-gray-600 uppercase tracking-widest hidden lg:block mr-2">
             {isSaving ? "Saving..." : "Saved"}
           </span>
@@ -563,6 +588,8 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             onRename={() => setIsRenameOpen(true)}
             onDelete={handleDelete}
             onArchive={handleArchive}
+            onGenerateFlashcards={() => setIsFlashcardsOpen(true)}
+            onGenerateQuiz={() => setIsQuizOpen(true)}
             isArchived={note.isArchived}
           />
 
@@ -643,93 +670,92 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
           {/* PDF Export Area - This is what gets exported */}
           <div id="note-content-area">
-
-          {/* Toolbar */}
-          {editor && (
-            // Hide toolbar during export to clean up the PDF
-            <div
-              data-html2canvas-ignore
-              className="flex items-center justify-between mb-6 sticky top-0 bg-[#0A0A0A] py-4 z-10 border-b border-transparent data-[stuck=true]:border-white/10 transition-colors"
-            >
-              <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1 border border-white/5">
-                <ToolbarButton
-                  isActive={editor.isActive("bold")}
-                  onClick={() => editor.chain().focus().toggleBold().run()}
-                  icon={<Bold className="w-4 h-4" />}
-                />
-                <ToolbarButton
-                  isActive={editor.isActive("italic")}
-                  onClick={() => editor.chain().focus().toggleItalic().run()}
-                  icon={<Italic className="w-4 h-4" />}
-                />
-                <ToolbarButton
-                  isActive={editor.isActive("strike")}
-                  onClick={() => editor.chain().focus().toggleStrike().run()}
-                  icon={<Strikethrough className="w-4 h-4" />}
-                />
-                <div className="w-px h-4 bg-white/10 mx-1" />
-                <ToolbarButton
-                  isActive={editor.isActive("bulletList")}
-                  onClick={() =>
-                    editor.chain().focus().toggleBulletList().run()
-                  }
-                  icon={<List className="w-4 h-4" />}
-                />
-                <ToolbarButton
-                  isActive={false}
-                  onClick={() => alert("Image upload coming soon")}
-                  icon={<ImageIcon className="w-4 h-4" />}
-                />
+            {/* Toolbar */}
+            {editor && (
+              // Hide toolbar during export to clean up the PDF
+              <div
+                data-html2canvas-ignore
+                className="flex items-center justify-between mb-6 sticky top-0 bg-[#0A0A0A] py-4 z-10 border-b border-transparent data-[stuck=true]:border-white/10 transition-colors"
+              >
+                <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1 border border-white/5">
+                  <ToolbarButton
+                    isActive={editor.isActive("bold")}
+                    onClick={() => editor.chain().focus().toggleBold().run()}
+                    icon={<Bold className="w-4 h-4" />}
+                  />
+                  <ToolbarButton
+                    isActive={editor.isActive("italic")}
+                    onClick={() => editor.chain().focus().toggleItalic().run()}
+                    icon={<Italic className="w-4 h-4" />}
+                  />
+                  <ToolbarButton
+                    isActive={editor.isActive("strike")}
+                    onClick={() => editor.chain().focus().toggleStrike().run()}
+                    icon={<Strikethrough className="w-4 h-4" />}
+                  />
+                  <div className="w-px h-4 bg-white/10 mx-1" />
+                  <ToolbarButton
+                    isActive={editor.isActive("bulletList")}
+                    onClick={() =>
+                      editor.chain().focus().toggleBulletList().run()
+                    }
+                    icon={<List className="w-4 h-4" />}
+                  />
+                  <ToolbarButton
+                    isActive={false}
+                    onClick={() => alert("Image upload coming soon")}
+                    icon={<ImageIcon className="w-4 h-4" />}
+                  />
+                </div>
               </div>
-            </div>
-          )}
-
-          {/* Editor Content - Wrapped with DocumentDropZone for drag-drop note generation */}
-          <DocumentDropZone
-            onNotesGenerated={(content, title, sourceDoc) => {
-              if (editor && !editor.isDestroyed) {
-                // Insert generated notes at cursor or end
-                const sourceTag = `<p><em>[Source: ${sourceDoc.name}]</em></p>`;
-                editor
-                  .chain()
-                  .focus()
-                  .insertContent(content + sourceTag)
-                  .run();
-              }
-            }}
-            className="pb-32"
-          >
-            {note?.style === "cornell" ? (
-              <Editor
-                styleType="cornell"
-                cornellCues={note.cornellCues || ""}
-                cornellNotes={note.cornellNotes || ""}
-                cornellSummary={note.cornellSummary || ""}
-                onChange={(content) => {
-                  setIsSaving(true);
-                  setDebouncedContent(content);
-                }}
-                isEditable={true}
-              />
-            ) : note?.style === "outline" ? (
-              <Editor
-                styleType="outline"
-                initialContent={note.content || ""}
-                outlineData={note.outlineData}
-                outlineMetadata={note.outlineMetadata}
-                onChange={(content) => {
-                  setIsSaving(true);
-                  setDebouncedContent(content);
-                }}
-                isEditable={true}
-              />
-            ) : (
-              <>
-                {editor && <AIBubbleMenu editor={editor} />}
-                <EditorContent editor={editor} />
-              </>
             )}
-          </DocumentDropZone>
+
+            {/* Editor Content - Wrapped with DocumentDropZone for drag-drop note generation */}
+            <DocumentDropZone
+              onNotesGenerated={(content, title, sourceDoc) => {
+                if (editor && !editor.isDestroyed) {
+                  // Insert generated notes at cursor or end
+                  const sourceTag = `<p><em>[Source: ${sourceDoc.name}]</em></p>`;
+                  editor
+                    .chain()
+                    .focus()
+                    .insertContent(content + sourceTag)
+                    .run();
+                }
+              }}
+              className="pb-32"
+            >
+              {note?.style === "cornell" ? (
+                <Editor
+                  styleType="cornell"
+                  cornellCues={note.cornellCues || ""}
+                  cornellNotes={note.cornellNotes || ""}
+                  cornellSummary={note.cornellSummary || ""}
+                  onChange={(content) => {
+                    setIsSaving(true);
+                    setDebouncedContent(content);
+                  }}
+                  isEditable={true}
+                />
+              ) : note?.style === "outline" ? (
+                <Editor
+                  styleType="outline"
+                  initialContent={note.content || ""}
+                  outlineData={note.outlineData}
+                  outlineMetadata={note.outlineMetadata}
+                  onChange={(content) => {
+                    setIsSaving(true);
+                    setDebouncedContent(content);
+                  }}
+                  isEditable={true}
+                />
+              ) : (
+                <>
+                  {editor && <AIBubbleMenu editor={editor} />}
+                  <EditorContent editor={editor} />
+                </>
+              )}
+            </DocumentDropZone>
           </div>
           {/* End PDF Export Area */}
         </div>
@@ -753,6 +779,18 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         initialValue={note.title}
         title="Note"
         onConfirm={handleRenameConfirm}
+      />
+
+      <GenerateFlashcardsDialog
+        open={isFlashcardsOpen}
+        onOpenChange={setIsFlashcardsOpen}
+        defaultNoteId={noteId}
+      />
+
+      <GenerateQuizDialog
+        open={isQuizOpen}
+        onOpenChange={setIsQuizOpen}
+        defaultNoteId={noteId}
       />
     </div>
   );
