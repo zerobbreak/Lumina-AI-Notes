@@ -51,7 +51,7 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
         const top = start.top - 70; // Position above selection
 
         setPosition({ top, left });
-        
+
         // Show menu after a brief delay
         showTimeoutRef.current = setTimeout(() => {
           setIsVisible(true);
@@ -61,10 +61,10 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
       }
     };
 
-    const handleBlur = (event: FocusEvent) => {
+    const handleBlur = ({ event }: { event: FocusEvent }) => {
       // Don't hide if clicking on the bubble menu itself
       const relatedTarget = event.relatedTarget as HTMLElement;
-      if (relatedTarget && relatedTarget.closest('[data-bubble-menu]')) {
+      if (relatedTarget && relatedTarget.closest("[data-bubble-menu]")) {
         return;
       }
       // Delay hiding to allow button clicks to register
@@ -77,7 +77,7 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
     return () => {
       editor.off("selectionUpdate", updatePosition);
       editor.off("blur", handleBlur);
-      
+
       if (showTimeoutRef.current) {
         clearTimeout(showTimeoutRef.current);
       }
