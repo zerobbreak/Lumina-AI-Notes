@@ -267,3 +267,4 @@ export function MindMapToolbar({
     </div>
   );
 }
+

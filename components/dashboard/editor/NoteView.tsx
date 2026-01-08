@@ -37,7 +37,6 @@ import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { EditableTitle } from "@/components/shared/EditableTitle";
 import { AskAI } from "@/components/dashboard/ai/AskAI";
 import { useDashboard } from "@/hooks/useDashboard";
-import { usePDF } from "@/hooks/usePDF";
 import { AIBubbleMenu } from "./AIBubbleMenu";
 import { DocumentDropZone } from "@/components/documents";
 import { marked } from "marked";
@@ -48,6 +47,7 @@ import {
 } from "@/lib/outlineUtils";
 import { GenerateFlashcardsDialog } from "@/components/dashboard/dialogs/GenerateFlashcardsDialog";
 import { GenerateQuizDialog } from "@/components/dashboard/dialogs/GenerateQuizDialog";
+import { ExportDialog } from "@/components/dashboard/dialogs/ExportDialog";
 import "./editor.css";
 
 // Props for the NoteView
@@ -66,7 +66,6 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     pendingNotes,
     clearPendingNotes,
   } = useDashboard();
-  const { generatePDF, isLoading: isExporting } = usePDF();
 
   // Fetch data
   const note = useQuery(api.notes.getNote, { noteId });
@@ -84,6 +83,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [isFlashcardsOpen, setIsFlashcardsOpen] = useState(false);
   const [isQuizOpen, setIsQuizOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
 
   // Parse context (Course / Module)
   const courseName =
@@ -369,14 +369,6 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     await renameNote({ noteId, title: newTitle });
   };
 
-  const handleExportPDF = async () => {
-    await generatePDF(
-      "note-content-area",
-      `${note?.title || "note"}.pdf`,
-      note?.title
-    );
-  };
-
   // Handle inserting AI-generated content into the note
   const handleInsertFromAI = useCallback(
     (content: string) => {
@@ -579,15 +571,10 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={handleExportPDF}
-            disabled={isExporting}
+            onClick={() => setIsExportOpen(true)}
             title="Export as PDF"
           >
-            {isExporting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Download className="w-5 h-5 text-gray-400 hover:text-white" />
-            )}
+            <Download className="w-5 h-5 text-gray-400 hover:text-white" />
           </Button>
 
           <ActionMenu
@@ -797,6 +784,13 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         open={isQuizOpen}
         onOpenChange={setIsQuizOpen}
         defaultNoteId={noteId}
+      />
+
+      <ExportDialog
+        open={isExportOpen}
+        onOpenChange={setIsExportOpen}
+        noteId={noteId}
+        noteTitle={note.title}
       />
     </div>
   );

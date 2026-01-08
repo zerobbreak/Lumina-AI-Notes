@@ -1,0 +1,201 @@
+/* Print-specific styles for PDF export */
+
+/* Base container */
+.print-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  background: #ffffff;
+  color: #1a1a1a;
+  min-height: 100vh;
+}
+
+/* Header */
+.print-header {
+  margin-bottom: 24px;
+}
+
+.print-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #111111;
+  margin: 0 0 8px 0;
+  line-height: 1.2;
+}
+
+.print-meta {
+  font-size: 14px;
+  color: #666666;
+}
+
+/* Divider */
+.print-divider {
+  border: none;
+  border-top: 2px solid #e5e5e5;
+  margin: 24px 0;
+}
+
+/* Content area */
+.print-content {
+  line-height: 1.7;
+}
+
+/* Override dark mode editor styles for print */
+.print-content .ProseMirror {
+  color: #1a1a1a;
+}
+
+.print-content .ProseMirror * {
+  color: inherit;
+}
+
+.print-content .ProseMirror h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #111111;
+  margin-top: 32px;
+  margin-bottom: 16px;
+}
+
+.print-content .ProseMirror h2 {
+  font-size: 22px;
+  font-weight: 600;
+  color: #222222;
+  margin-top: 28px;
+  margin-bottom: 12px;
+}
+
+.print-content .ProseMirror h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333333;
+  margin-top: 24px;
+  margin-bottom: 10px;
+}
+
+.print-content .ProseMirror p {
+  color: #1a1a1a;
+  margin-bottom: 14px;
+}
+
+.print-content .ProseMirror li {
+  color: #1a1a1a;
+}
+
+.print-content .ProseMirror strong {
+  color: #111111;
+  font-weight: 600;
+}
+
+.print-content .ProseMirror blockquote {
+  border-left: 4px solid #6366f1;
+  padding-left: 16px;
+  color: #4a4a4a;
+  font-style: italic;
+  margin: 16px 0;
+}
+
+.print-content .ProseMirror pre {
+  background-color: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 16px;
+  overflow-x: auto;
+  font-size: 13px;
+}
+
+.print-content .ProseMirror code {
+  color: #e91e63;
+  background-color: #fce4ec;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.print-content .ProseMirror pre code {
+  color: #1a1a1a;
+  background: none;
+  padding: 0;
+}
+
+.print-content .ProseMirror table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+}
+
+.print-content .ProseMirror th,
+.print-content .ProseMirror td {
+  border: 1px solid #e0e0e0;
+  padding: 10px 14px;
+  text-align: left;
+}
+
+.print-content .ProseMirror th {
+  background-color: #f5f5f5;
+  font-weight: 600;
+}
+
+.print-content .ProseMirror a {
+  color: #6366f1;
+  text-decoration: underline;
+}
+
+/* Footer */
+.print-footer {
+  margin-top: 48px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e5e5;
+  font-size: 12px;
+  color: #888888;
+  text-align: center;
+}
+
+/* Loading and error states */
+.print-loading,
+.print-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  text-align: center;
+  color: #666666;
+}
+
+.print-error h1 {
+  font-size: 24px;
+  color: #333333;
+  margin-bottom: 8px;
+}
+
+/* Print media queries - hide elements and optimize for paper */
+@media print {
+  .print-container {
+    padding: 0;
+    max-width: none;
+  }
+
+  .print-footer {
+    position: fixed;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+  }
+
+  /* Page break control */
+  .print-content h1,
+  .print-content h2,
+  .print-content h3 {
+    page-break-after: avoid;
+  }
+
+  .print-content pre,
+  .print-content blockquote,
+  .print-content table {
+    page-break-inside: avoid;
+  }
+}

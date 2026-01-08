@@ -58,11 +58,16 @@ export default defineSchema({
     cornellSummary: v.optional(v.string()),
     // Outline Mode specific fields
     outlineData: v.optional(v.string()), // JSON stringified tree structure
-    outlineMetadata: v.optional(v.object({
-      totalItems: v.number(),
-      completedTasks: v.number(),
-      collapsedNodes: v.array(v.string()), // IDs of collapsed nodes
-    })),
+    outlineMetadata: v.optional(
+      v.object({
+        totalItems: v.number(),
+        completedTasks: v.number(),
+        collapsedNodes: v.array(v.string()), // IDs of collapsed nodes
+      })
+    ),
+    // PDF Export tracking
+    lastExportedAt: v.optional(v.number()),
+    exportStorageId: v.optional(v.string()),
   })
     .index("by_userId", ["userId"])
     .index("by_userId_and_pinned", ["userId", "isPinned"])

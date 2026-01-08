@@ -95,3 +95,4 @@ export const NoteNode = memo(({ data, selected }: NodeProps) => {
 });
 
 NoteNode.displayName = "NoteNode";
+
