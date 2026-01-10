@@ -65,9 +65,6 @@ export default defineSchema({
         collapsedNodes: v.array(v.string()), // IDs of collapsed nodes
       })
     ),
-    // PDF Export tracking
-    lastExportedAt: v.optional(v.number()),
-    exportStorageId: v.optional(v.string()),
   })
     .index("by_userId", ["userId"])
     .index("by_userId_and_pinned", ["userId", "isPinned"])

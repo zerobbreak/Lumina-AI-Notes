@@ -1,170 +1,240 @@
 "use client";
 
 import { useState } from "react";
-import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { FileDown, Loader2, ExternalLink } from "lucide-react";
-import { toast } from "sonner";
+  Download,
+  Printer,
+  Zap,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+} from "lucide-react";
+import { usePDF, ExportMethod } from "@/hooks/usePDF";
 
 interface ExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  noteId: Id<"notes">;
-  noteTitle: string;
+  elementId: string;
+  filename: string;
+  title?: string;
 }
 
-type PageFormat = "A4" | "Letter" | "Legal";
+const exportMethods: {
+  value: ExportMethod;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+}[] = [
+  {
+    value: "auto",
+    label: "Auto (Recommended)",
+    description: "Automatically chooses the best method based on your content",
+    icon: <Zap className="w-4 h-4" />,
+  },
+  {
+    value: "print",
+    label: "Print Dialog",
+    description:
+      "Opens browser print dialog. Most reliable for complex content",
+    icon: <Printer className="w-4 h-4" />,
+  },
+  {
+    value: "jspdf",
+    label: "Direct Download",
+    description: "Downloads PDF directly. Fastest for text-heavy notes",
+    icon: <Download className="w-4 h-4" />,
+  },
+];
 
 export function ExportDialog({
   open,
   onOpenChange,
-  noteId,
-  noteTitle,
+  elementId,
+  filename,
+  title,
 }: ExportDialogProps) {
-  const [format, setFormat] = useState<PageFormat>("A4");
-  const [isExporting, setIsExporting] = useState(false);
-
-  const generatePdf = useAction(api.export.generateAndStorePdf);
+  const [selectedMethod, setSelectedMethod] = useState<ExportMethod>("auto");
+  const [status, setStatus] = useState<
+    "idle" | "exporting" | "success" | "error"
+  >("idle");
+  const [error, setError] = useState<string | null>(null);
+  const { exportPDF, progress } = usePDF();
 
   const handleExport = async () => {
-    setIsExporting(true);
+    setStatus("exporting");
+    setError(null);
 
     try {
-      const result = await generatePdf({
-        noteId,
-        options: {
-          format,
-          printBackground: true,
-        },
+      await exportPDF(elementId, filename, {
+        method: selectedMethod,
+        title,
+        onProgress: () => {}, // Progress is tracked via hook state
       });
+      setStatus("success");
 
-      if (result?.url) {
-        // Open PDF in new tab
-        window.open(result.url, "_blank");
-        toast.success("PDF exported successfully!", {
-          description: "Your PDF has been generated and opened in a new tab.",
-        });
+      // Close dialog after short delay on success
+      setTimeout(() => {
         onOpenChange(false);
-      } else {
-        throw new Error("No PDF URL returned");
-      }
-    } catch (error) {
-      console.error("Export failed:", error);
-      toast.error("Export failed", {
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to generate PDF. Please try again.",
-      });
-    } finally {
-      setIsExporting(false);
+        setStatus("idle");
+      }, 1500);
+    } catch (err) {
+      setStatus("error");
+      setError(err instanceof Error ? err.message : "Export failed");
+    }
+  };
+
+  const handleClose = () => {
+    if (status !== "exporting") {
+      onOpenChange(false);
+      setStatus("idle");
+      setError(null);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] bg-[#0A0A0A] border-white/10 text-white shadow-2xl">
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-md bg-[#111] border border-white/10">
         <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-              <FileDown className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <DialogTitle>Export to PDF</DialogTitle>
-              <DialogDescription className="text-gray-400">
-                Generate a PDF of &quot;{noteTitle}&quot;
-              </DialogDescription>
-            </div>
-          </div>
+          <DialogTitle className="text-white flex items-center gap-2">
+            <Download className="w-5 h-5 text-cyan-400" />
+            Export as PDF
+          </DialogTitle>
+          <DialogDescription className="text-gray-400">
+            Choose how you want to export your note
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 py-4">
-          {/* Page Format */}
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="format" className="text-right text-gray-400">
-              Page Size
-            </Label>
-            <Select
-              value={format}
-              onValueChange={(value) => setFormat(value as PageFormat)}
-            >
-              <SelectTrigger className="col-span-3 bg-white/5 border-white/10 text-white">
-                <SelectValue placeholder="Select format" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#1a1a1a] border-white/10">
-                <SelectItem value="A4" className="text-white hover:bg-white/5">
-                  A4 (210 × 297 mm)
-                </SelectItem>
-                <SelectItem
-                  value="Letter"
-                  className="text-white hover:bg-white/5"
+        <div className="space-y-4 py-4">
+          {/* Method Selection */}
+          <div className="space-y-3">
+            <Label className="text-gray-300">Export Method</Label>
+            <div className="space-y-2">
+              {exportMethods.map((method) => (
+                <button
+                  key={method.value}
+                  type="button"
+                  onClick={() => setSelectedMethod(method.value)}
+                  disabled={status === "exporting"}
+                  className={`w-full flex items-start gap-3 p-3 rounded-lg border transition-all text-left ${
+                    selectedMethod === method.value
+                      ? "border-cyan-500/50 bg-cyan-500/10"
+                      : "border-white/10 bg-white/5 hover:bg-white/10"
+                  } ${status === "exporting" ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
-                  Letter (8.5 × 11 in)
-                </SelectItem>
-                <SelectItem
-                  value="Legal"
-                  className="text-white hover:bg-white/5"
-                >
-                  Legal (8.5 × 14 in)
-                </SelectItem>
-              </SelectContent>
-            </Select>
+                  <div
+                    className={`p-2 rounded-lg ${
+                      selectedMethod === method.value
+                        ? "bg-cyan-500/20 text-cyan-400"
+                        : "bg-white/10 text-gray-400"
+                    }`}
+                  >
+                    {method.icon}
+                  </div>
+                  <div className="flex-1">
+                    <div
+                      className={`font-medium ${
+                        selectedMethod === method.value
+                          ? "text-cyan-400"
+                          : "text-gray-200"
+                      }`}
+                    >
+                      {method.label}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      {method.description}
+                    </div>
+                  </div>
+                  <div
+                    className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                      selectedMethod === method.value
+                        ? "border-cyan-500 bg-cyan-500"
+                        : "border-gray-600"
+                    }`}
+                  >
+                    {selectedMethod === method.value && (
+                      <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Info */}
-          <div className="text-xs text-gray-500 bg-white/5 rounded-lg p-3 mt-2">
-            <p>
-              The PDF will be generated server-side for the best quality. This
-              may take a few seconds.
-            </p>
-          </div>
+          {/* Progress Bar */}
+          {status === "exporting" && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-400">Exporting...</span>
+                <span className="text-cyan-400">{progress}%</span>
+              </div>
+              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-cyan-500 to-indigo-500 transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Success State */}
+          {status === "success" && (
+            <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+              <CheckCircle className="w-5 h-5 text-emerald-400" />
+              <span className="text-emerald-400">Export complete!</span>
+            </div>
+          )}
+
+          {/* Error State */}
+          {status === "error" && error && (
+            <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+              <div>
+                <div className="text-red-400 font-medium">Export failed</div>
+                <div className="text-red-400/70 text-sm mt-1">{error}</div>
+              </div>
+            </div>
+          )}
         </div>
 
-        <DialogFooter>
+        {/* Actions */}
+        <div className="flex justify-end gap-2">
           <Button
             variant="ghost"
-            onClick={() => onOpenChange(false)}
-            disabled={isExporting}
+            onClick={handleClose}
+            disabled={status === "exporting"}
             className="text-gray-400 hover:text-white"
           >
             Cancel
           </Button>
           <Button
             onClick={handleExport}
-            disabled={isExporting}
-            className="bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white gap-2"
+            disabled={status === "exporting" || status === "success"}
+            className="bg-cyan-500 hover:bg-cyan-600 text-white"
           >
-            {isExporting ? (
+            {status === "exporting" ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Generating...
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Exporting...
               </>
+            ) : status === "error" ? (
+              "Retry"
             ) : (
               <>
-                <ExternalLink className="w-4 h-4" />
+                <Download className="w-4 h-4 mr-2" />
                 Export PDF
               </>
             )}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -37,6 +37,7 @@ import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { EditableTitle } from "@/components/shared/EditableTitle";
 import { AskAI } from "@/components/dashboard/ai/AskAI";
 import { useDashboard } from "@/hooks/useDashboard";
+import { usePDF } from "@/hooks/usePDF";
 import { AIBubbleMenu } from "./AIBubbleMenu";
 import { DocumentDropZone } from "@/components/documents";
 import { marked } from "marked";
@@ -66,6 +67,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     pendingNotes,
     clearPendingNotes,
   } = useDashboard();
+  const { isLoading: isExporting } = usePDF();
 
   // Fetch data
   const note = useQuery(api.notes.getNote, { noteId });
@@ -369,6 +371,10 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     await renameNote({ noteId, title: newTitle });
   };
 
+  const handleExportPDF = () => {
+    setIsExportOpen(true);
+  };
+
   // Handle inserting AI-generated content into the note
   const handleInsertFromAI = useCallback(
     (content: string) => {
@@ -571,10 +577,15 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setIsExportOpen(true)}
+            onClick={handleExportPDF}
+            disabled={isExporting}
             title="Export as PDF"
           >
-            <Download className="w-5 h-5 text-gray-400 hover:text-white" />
+            {isExporting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-5 h-5 text-gray-400 hover:text-white" />
+            )}
           </Button>
 
           <ActionMenu
@@ -789,8 +800,9 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       <ExportDialog
         open={isExportOpen}
         onOpenChange={setIsExportOpen}
-        noteId={noteId}
-        noteTitle={note.title}
+        elementId="note-content-area"
+        filename={`${note.title || "note"}.pdf`}
+        title={note.title}
       />
     </div>
   );

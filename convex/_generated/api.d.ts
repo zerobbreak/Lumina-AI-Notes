@@ -9,7 +9,6 @@
  */
 
 import type * as ai from "../ai.js";
-import type * as export_ from "../export.js";
 import type * as files from "../files.js";
 import type * as flashcards from "../flashcards.js";
 import type * as notes from "../notes.js";
@@ -26,7 +25,6 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   ai: typeof ai;
-  export: typeof export_;
   files: typeof files;
   flashcards: typeof flashcards;
   notes: typeof notes;
