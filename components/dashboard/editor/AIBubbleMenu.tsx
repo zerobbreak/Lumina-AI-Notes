@@ -106,12 +106,31 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
       switch (action) {
         case "simplify":
           result = await simplifyText({ text: selectedText });
-          editor.chain().focus().deleteSelection().insertContent(result).run();
+          // Use queueMicrotask to schedule editor command outside React's render cycle
+          queueMicrotask(() => {
+            if (editor && !editor.isDestroyed) {
+              editor
+                .chain()
+                .focus()
+                .deleteSelection()
+                .insertContent(result)
+                .run();
+            }
+          });
           break;
 
         case "expand":
           result = await expandText({ text: selectedText });
-          editor.chain().focus().deleteSelection().insertContent(result).run();
+          queueMicrotask(() => {
+            if (editor && !editor.isDestroyed) {
+              editor
+                .chain()
+                .focus()
+                .deleteSelection()
+                .insertContent(result)
+                .run();
+            }
+          });
           break;
 
         case "continue":
@@ -119,12 +138,16 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
             text: selectedText,
             fullContext: editor.getText(),
           });
-          const { to } = editor.state.selection;
-          editor
-            .chain()
-            .focus()
-            .insertContentAt(to, " " + result)
-            .run();
+          queueMicrotask(() => {
+            if (editor && !editor.isDestroyed) {
+              const { to } = editor.state.selection;
+              editor
+                .chain()
+                .focus()
+                .insertContentAt(to, " " + result)
+                .run();
+            }
+          });
           break;
 
         case "flashcards":
@@ -137,12 +160,16 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
               }
             );
             flashcardHtml += "</ul>";
-            const { to } = editor.state.selection;
-            editor
-              .chain()
-              .focus()
-              .insertContentAt(to, "<br/>" + flashcardHtml)
-              .run();
+            queueMicrotask(() => {
+              if (editor && !editor.isDestroyed) {
+                const { to } = editor.state.selection;
+                editor
+                  .chain()
+                  .focus()
+                  .insertContentAt(to, "<br/>" + flashcardHtml)
+                  .run();
+              }
+            });
           }
           break;
       }

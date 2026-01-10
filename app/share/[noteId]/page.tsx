@@ -32,7 +32,13 @@ export default function PublicNotePage() {
 
   useEffect(() => {
     if (note && editor && !editor.isDestroyed) {
-      editor.commands.setContent(note.content || "");
+      // Use queueMicrotask to schedule setContent outside of React's commit phase
+      // This avoids the flushSync error since TipTap internally uses flushSync
+      queueMicrotask(() => {
+        if (editor && !editor.isDestroyed) {
+          editor.commands.setContent(note.content || "");
+        }
+      });
     }
   }, [note, editor]);
 

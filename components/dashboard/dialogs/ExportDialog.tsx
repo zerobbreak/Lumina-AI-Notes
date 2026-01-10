@@ -178,7 +178,7 @@ export function ExportDialog({
               </div>
               <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-cyan-500 to-indigo-500 transition-all duration-300"
+                  className="h-full bg-linear-to-r from-cyan-500 to-indigo-500 transition-all duration-300"
                   style={{ width: `${progress}%` }}
                 />
               </div>

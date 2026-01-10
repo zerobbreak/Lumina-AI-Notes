@@ -49,6 +49,8 @@ import {
 import { GenerateFlashcardsDialog } from "@/components/dashboard/dialogs/GenerateFlashcardsDialog";
 import { GenerateQuizDialog } from "@/components/dashboard/dialogs/GenerateQuizDialog";
 import { ExportDialog } from "@/components/dashboard/dialogs/ExportDialog";
+import { ImageUploadDialog } from "@/components/dashboard/dialogs/ImageUploadDialog";
+import { ImageExtension } from "./extensions/ImageExtension";
 import "./editor.css";
 
 // Props for the NoteView
@@ -86,6 +88,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const [isFlashcardsOpen, setIsFlashcardsOpen] = useState(false);
   const [isQuizOpen, setIsQuizOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
 
   // Parse context (Course / Module)
   const courseName =
@@ -169,6 +172,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         placeholder: "Start writing your notes...",
       }),
       DiagramExtension,
+      ImageExtension,
     ],
     editorProps: {
       attributes: {
@@ -707,7 +711,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                   />
                   <ToolbarButton
                     isActive={false}
-                    onClick={() => alert("Image upload coming soon")}
+                    onClick={() => setIsImageUploadOpen(true)}
                     icon={<ImageIcon className="w-4 h-4" />}
                   />
                 </div>
@@ -803,6 +807,20 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         elementId="note-content-area"
         filename={`${note.title || "note"}.pdf`}
         title={note.title}
+      />
+
+      <ImageUploadDialog
+        open={isImageUploadOpen}
+        onOpenChange={setIsImageUploadOpen}
+        onImageUploaded={(url) => {
+          // Use queueMicrotask to schedule the editor command outside of React's render cycle
+          // This avoids the flushSync error since TipTap internally uses flushSync
+          queueMicrotask(() => {
+            if (editor && !editor.isDestroyed) {
+              editor.chain().focus().setImage({ src: url }).run();
+            }
+          });
+        }}
       />
     </div>
   );
