@@ -12,9 +12,11 @@ import type * as ai from "../ai.js";
 import type * as files from "../files.js";
 import type * as flashcards from "../flashcards.js";
 import type * as notes from "../notes.js";
+import type * as presence from "../presence.js";
 import type * as quizzes from "../quizzes.js";
 import type * as recordings from "../recordings.js";
 import type * as search from "../search.js";
+import type * as subscriptions from "../subscriptions.js";
 import type * as users from "../users.js";
 
 import type {
@@ -28,9 +30,11 @@ declare const fullApi: ApiFromModules<{
   files: typeof files;
   flashcards: typeof flashcards;
   notes: typeof notes;
+  presence: typeof presence;
   quizzes: typeof quizzes;
   recordings: typeof recordings;
   search: typeof search;
+  subscriptions: typeof subscriptions;
   users: typeof users;
 }>;
 

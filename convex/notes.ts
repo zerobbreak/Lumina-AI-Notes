@@ -595,3 +595,88 @@ export const unassignNoteFromFolder = mutation({
     return args.noteId;
   },
 });
+
+/**
+ * Get multiple notes by IDs for bulk export
+ */
+export const getNotesByIds = query({
+  args: {
+    noteIds: v.array(v.id("notes")),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const notes = [];
+    for (const noteId of args.noteIds) {
+      const note = await ctx.db.get(noteId);
+      if (note && note.userId === identity.tokenIdentifier) {
+        notes.push(note);
+      }
+    }
+
+    return notes;
+  },
+});
+
+/**
+ * Get all notes for a course (for bulk export)
+ */
+export const getNotesByCourse = query({
+  args: {
+    courseId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const notes = await ctx.db
+      .query("notes")
+      .withIndex("by_courseId", (q) => q.eq("courseId", args.courseId))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("userId"), identity.tokenIdentifier),
+          q.neq(q.field("isArchived"), true)
+        )
+      )
+      .collect();
+
+    return notes;
+  },
+});
+
+/**
+ * Get all notes for the user (for bulk export)
+ */
+export const getAllNotesForExport = query({
+  args: {
+    includeArchived: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    let notesQuery = ctx.db
+      .query("notes")
+      .withIndex("by_userId", (q) => q.eq("userId", identity.tokenIdentifier));
+
+    if (!args.includeArchived) {
+      notesQuery = notesQuery.filter((q) => q.neq(q.field("isArchived"), true));
+    }
+
+    const notes = await notesQuery.order("desc").collect();
+
+    return notes.map((note) => ({
+      _id: note._id,
+      title: note.title,
+      content: note.content,
+      courseId: note.courseId,
+      moduleId: note.moduleId,
+      noteType: note.noteType,
+      style: note.style,
+      createdAt: note.createdAt,
+      isPinned: note.isPinned,
+      isArchived: note.isArchived,
+    }));
+  },
+});

@@ -2,18 +2,13 @@
 
 import * as React from "react";
 import {
-  Calculator,
-  Calendar,
-  CreditCard,
-  Settings,
-  Smile,
-  User,
   Search,
   FileText,
   File,
   Layers,
   CornerDownLeft,
-  Filter,
+  Crown,
+  Sparkles,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
@@ -21,10 +16,8 @@ import { api } from "@/convex/_generated/api";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -34,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/useDebounce";
+import Link from "next/link";
 
 export function SearchDialog({
   open,
@@ -48,12 +42,17 @@ export function SearchDialog({
   const debouncedQuery = useDebounce(query, 300);
 
   // Conditionally fetch results only when query exists
-  const results = useQuery(
+  const searchResponse = useQuery(
     api.search.search,
     debouncedQuery.trim()
       ? { query: debouncedQuery, type: filterType }
       : "skip"
   );
+
+  const results = searchResponse?.results;
+  const tier = searchResponse?.tier || "free";
+  const limitReached = searchResponse?.limitReached || false;
+  const isFreeTier = tier === "free";
 
   React.useEffect(() => {
     if (!open) {
@@ -103,7 +102,7 @@ export function SearchDialog({
             </div>
           )}
 
-          {debouncedQuery && !results && (
+          {debouncedQuery && !searchResponse && (
             <div className="text-center py-10 text-gray-600 text-sm animate-pulse">
               Searching...
             </div>
@@ -148,6 +147,31 @@ export function SearchDialog({
                   <CornerDownLeft className="w-3.5 h-3.5 text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
               ))}
+
+              {/* Upgrade prompt when limit reached */}
+              {limitReached && isFreeTier && (
+                <div className="mt-3 p-3 bg-linear-to-r from-purple-500/10 to-indigo-500/10 border border-purple-500/20 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-300">
+                        More results available with Scholar
+                      </p>
+                      <p className="text-[10px] text-gray-500 mt-0.5">
+                        Upgrade for unlimited search across all your notes
+                      </p>
+                    </div>
+                    <Link
+                      href="/#pricing"
+                      onClick={() => onOpenChange(false)}
+                      className="shrink-0 flex items-center gap-1 px-2 py-1 text-[10px] font-medium bg-purple-600 hover:bg-purple-500 text-white rounded transition-colors"
+                    >
+                      <Crown className="w-3 h-3" />
+                      Upgrade
+                    </Link>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

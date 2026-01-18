@@ -32,7 +32,25 @@ export default defineSchema({
     noteStyle: v.optional(v.string()), // "cornell" | "outline" | "mindmap"
     theme: v.optional(v.string()), // UI accent color preference (e.g., "indigo", "amber")
     enabledBlocks: v.optional(v.array(v.string())),
-  }).index("by_tokenIdentifier", ["tokenIdentifier"]),
+    // Subscription & Payment Fields
+    subscriptionTier: v.optional(v.string()), // "free" | "scholar" | "institution"
+    subscriptionStatus: v.optional(v.string()), // "active" | "cancelled" | "past_due" | "expired"
+    paystackCustomerId: v.optional(v.string()),
+    paystackSubscriptionCode: v.optional(v.string()),
+    paystackAuthorizationCode: v.optional(v.string()), // For recurring charges
+    subscriptionStartDate: v.optional(v.number()),
+    subscriptionEndDate: v.optional(v.number()),
+    // Usage Tracking Fields
+    monthlyUsage: v.optional(
+      v.object({
+        audioMinutesUsed: v.number(),
+        notesCreated: v.number(),
+        lastResetDate: v.number(),
+      })
+    ),
+  })
+    .index("by_tokenIdentifier", ["tokenIdentifier"])
+    .index("by_paystackCustomerId", ["paystackCustomerId"]),
 
   notes: defineTable({
     userId: v.string(), // Storing tokenIdentifier for simplicity
@@ -192,4 +210,16 @@ export default defineSchema({
     dimensions: 768, // Match your Gemini embedding size
     filterFields: ["storageId", "courseId"], // <--- CRITICAL ADDITION
   }),
+
+  // Real-time presence tracking for collaborative features
+  presence: defineTable({
+    noteId: v.id("notes"),
+    userId: v.string(),
+    userName: v.optional(v.string()),
+    userImage: v.optional(v.string()),
+    lastSeen: v.number(),
+  })
+    .index("by_noteId", ["noteId"])
+    .index("by_userId_noteId", ["userId", "noteId"])
+    .index("by_lastSeen", ["lastSeen"]),
 });

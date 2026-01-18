@@ -22,6 +22,9 @@ import {
   Download,
   Clock,
   Type,
+  Calculator,
+  BarChart3,
+  Plus,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -51,7 +54,13 @@ import { GenerateQuizDialog } from "@/components/dashboard/dialogs/GenerateQuizD
 import { ExportDialog } from "@/components/dashboard/dialogs/ExportDialog";
 import { ImageUploadDialog } from "@/components/dashboard/dialogs/ImageUploadDialog";
 import { ImageExtension } from "./extensions/ImageExtension";
+import { GraphCalculatorExtension } from "./extensions/GraphCalculatorExtension";
+import { ChartExtension } from "./extensions/ChartExtension";
+import { PresenceIndicator } from "@/components/dashboard/PresenceIndicator";
 import "./editor.css";
+
+// Heartbeat interval for presence tracking (30 seconds)
+const PRESENCE_HEARTBEAT_INTERVAL = 30 * 1000;
 
 // Props for the NoteView
 interface NoteViewProps {
@@ -79,6 +88,10 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const toggleArchiveNote = useMutation(api.notes.toggleArchiveNote);
   const renameNote = useMutation(api.notes.renameNote);
   const toggleShare = useMutation(api.notes.toggleShareNote);
+
+  // Presence tracking
+  const presenceHeartbeat = useMutation(api.presence.heartbeat);
+  const presenceLeave = useMutation(api.presence.leave);
 
   // Editor State
   const [isSaving, setIsSaving] = useState(false);
@@ -163,6 +176,23 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     return () => clearTimeout(handler);
   }, [debouncedContent, noteId, updateNote, note?.style]);
 
+  // Presence Heartbeat Effect - sends heartbeat on mount and every 30 seconds
+  useEffect(() => {
+    // Send initial heartbeat
+    presenceHeartbeat({ noteId }).catch(console.error);
+
+    // Set up interval for regular heartbeats
+    const intervalId = setInterval(() => {
+      presenceHeartbeat({ noteId }).catch(console.error);
+    }, PRESENCE_HEARTBEAT_INTERVAL);
+
+    // Cleanup: send leave signal and clear interval
+    return () => {
+      clearInterval(intervalId);
+      presenceLeave({ noteId }).catch(console.error);
+    };
+  }, [noteId, presenceHeartbeat, presenceLeave]);
+
   const editor = useEditor({
     immediatelyRender: false,
     editable: true,
@@ -173,6 +203,8 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       }),
       DiagramExtension,
       ImageExtension,
+      GraphCalculatorExtension,
+      ChartExtension,
     ],
     editorProps: {
       attributes: {
@@ -559,6 +591,9 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
+          {/* Presence Indicator - shows who else is viewing */}
+          <PresenceIndicator noteId={noteId} className="hidden md:flex mr-2" />
+
           {/* Word count and reading time */}
           <div className="hidden lg:flex items-center gap-3 text-xs text-gray-500 mr-3">
             <span className="flex items-center gap-1" title="Word count">
@@ -714,6 +749,17 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                     onClick={() => setIsImageUploadOpen(true)}
                     icon={<ImageIcon className="w-4 h-4" />}
                   />
+                  <div className="w-px h-4 bg-white/10 mx-1" />
+                  <ToolbarButton
+                    isActive={false}
+                    onClick={() => editor.chain().focus().insertGraphCalculator().run()}
+                    icon={<Calculator className="w-4 h-4" />}
+                  />
+                  <ToolbarButton
+                    isActive={false}
+                    onClick={() => editor.chain().focus().insertChart().run()}
+                    icon={<BarChart3 className="w-4 h-4" />}
+                  />
                 </div>
               </div>
             )}
@@ -818,6 +864,15 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
           queueMicrotask(() => {
             if (editor && !editor.isDestroyed) {
               editor.chain().focus().setImage({ src: url }).run();
+            }
+          });
+        }}
+        onFormulaExtracted={(latex) => {
+          // Insert the LaTeX formula into the editor
+          queueMicrotask(() => {
+            if (editor && !editor.isDestroyed) {
+              // Insert as a code block or formatted text
+              editor.chain().focus().insertContent(`$$${latex}$$`).run();
             }
           });
         }}

@@ -6,6 +6,70 @@ import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// Types for subscription tier checking
+type SubscriptionTier = "free" | "scholar" | "institution";
+type TierFeature = "flashcards" | "quizzes" | "advanced-formula" | "semantic-search-full";
+
+// Features available for each tier
+const TIER_FEATURES: Record<SubscriptionTier, TierFeature[]> = {
+  free: [],
+  scholar: ["flashcards", "quizzes", "advanced-formula", "semantic-search-full"],
+  institution: ["flashcards", "quizzes", "advanced-formula", "semantic-search-full"],
+};
+
+// Type for subscription status response
+interface SubscriptionStatusResponse {
+  tier: string;
+  rawTier: string;
+  status: string;
+  paystackCustomerId?: string;
+  paystackSubscriptionCode?: string;
+  subscriptionStartDate?: number;
+  subscriptionEndDate?: number;
+  monthlyUsage: {
+    audioMinutesUsed: number;
+    notesCreated: number;
+    lastResetDate: number;
+  };
+}
+
+// Helper to check if user has access to a premium feature
+async function checkTierAccess(
+  ctx: { runQuery: (query: typeof api.subscriptions.getSubscriptionStatus) => Promise<SubscriptionStatusResponse | null> },
+  feature: TierFeature
+): Promise<{ allowed: boolean; tier: SubscriptionTier; error?: string }> {
+  // Get subscription status from Convex
+  const subscription = await ctx.runQuery(api.subscriptions.getSubscriptionStatus);
+  
+  if (!subscription) {
+    return {
+      allowed: false,
+      tier: "free",
+      error: "Unable to verify subscription. Please try again.",
+    };
+  }
+
+  const tier = subscription.tier as SubscriptionTier;
+  const hasFeature = TIER_FEATURES[tier].includes(feature);
+
+  if (!hasFeature) {
+    const featureNames: Record<TierFeature, string> = {
+      flashcards: "Flashcard Generation",
+      quizzes: "Quiz Generation",
+      "advanced-formula": "Advanced Formula Recognition",
+      "semantic-search-full": "Full Semantic Search",
+    };
+
+    return {
+      allowed: false,
+      tier,
+      error: `${featureNames[feature]} is a Scholar feature. Upgrade to unlock this feature and more!`,
+    };
+  }
+
+  return { allowed: true, tier };
+}
+
 // Initialize Gemini client
 const getGeminiModel = (config?: { responseMimeType: string }) => {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -168,17 +232,32 @@ export const generateCourseRoadmap = action({
       const match = text.match(/\{[\s\S]*\}/);
       if (!match) throw new Error("Failed to generate roadmap JSON");
 
-      const data = JSON.parse(match[0]);
+      // Types for roadmap nodes and edges
+      interface RoadmapNode {
+        id: string;
+        type: string;
+        data: { label: string; color: string };
+        position: { x: number; y: number };
+      }
+      interface RoadmapEdge {
+        id: string;
+        source: string;
+        target: string;
+        animated?: boolean;
+      }
+
+      const data = JSON.parse(match[0]) as { nodes: RoadmapNode[]; edges: RoadmapEdge[] };
 
       // Apply dagre layout for better positioning
       if (data.nodes && data.nodes.length > 0) {
-        const dagre = require("dagre");
+        // Dynamic import for dagre
+        const dagre = await import("dagre");
         const dagreGraph = new dagre.graphlib.Graph();
         dagreGraph.setDefaultEdgeLabel(() => ({}));
         dagreGraph.setGraph({ rankdir: "TB", nodesep: 150, ranksep: 100 });
 
         // Add nodes with estimated dimensions
-        data.nodes.forEach((node: any) => {
+        data.nodes.forEach((node: RoadmapNode) => {
           const width =
             node.type === "concept"
               ? 200
@@ -199,7 +278,7 @@ export const generateCourseRoadmap = action({
         });
 
         // Add edges
-        data.edges.forEach((edge: any) => {
+        data.edges.forEach((edge: RoadmapEdge) => {
           dagreGraph.setEdge(edge.source, edge.target);
         });
 
@@ -207,7 +286,7 @@ export const generateCourseRoadmap = action({
         dagre.layout(dagreGraph);
 
         // Update positions
-        data.nodes = data.nodes.map((node: any) => {
+        data.nodes = data.nodes.map((node: RoadmapNode) => {
           const nodeWithPosition = dagreGraph.node(node.id);
           return {
             ...node,
@@ -224,7 +303,12 @@ export const generateCourseRoadmap = action({
       console.error("Roadmap generation failed", e);
 
       // Return a better fallback structure with the courses
-      const nodes = [
+      const nodes: Array<{
+        id: string;
+        type: string;
+        data: { label: string; color: string };
+        position: { x: number; y: number };
+      }> = [
         {
           id: "1",
           type: "concept",
@@ -236,7 +320,12 @@ export const generateCourseRoadmap = action({
         },
       ];
 
-      const edges: any[] = [];
+      const edges: Array<{
+        id: string;
+        source: string;
+        target: string;
+        animated: boolean;
+      }> = [];
 
       // Add courses as topic nodes
       args.courses.forEach((course, index) => {
@@ -924,6 +1013,7 @@ Return ONLY valid JSON, no markdown code fences.`,
 
 /**
  * Generate flashcards from note content and save them to the database
+ * PREMIUM FEATURE: Requires Scholar tier
  */
 export const generateAndSaveFlashcards = action({
   args: {
@@ -939,7 +1029,18 @@ export const generateAndSaveFlashcards = action({
     deckId?: string;
     cardCount?: number;
     error?: string;
+    requiresUpgrade?: boolean;
   }> => {
+    // Check tier access for flashcards feature
+    const tierCheck = await checkTierAccess(ctx, "flashcards");
+    if (!tierCheck.allowed) {
+      return {
+        success: false,
+        error: tierCheck.error,
+        requiresUpgrade: true,
+      };
+    }
+
     // Get the note content
     const note = await ctx.runQuery(api.notes.getNote, { noteId: args.noteId });
     if (!note) {
@@ -1032,6 +1133,7 @@ Rules:
 
 /**
  * Generate quiz questions from note content and save them to the database
+ * PREMIUM FEATURE: Requires Scholar tier
  */
 export const generateAndSaveQuiz = action({
   args: {
@@ -1047,7 +1149,18 @@ export const generateAndSaveQuiz = action({
     deckId?: string;
     questionCount?: number;
     error?: string;
+    requiresUpgrade?: boolean;
   }> => {
+    // Check tier access for quizzes feature
+    const tierCheck = await checkTierAccess(ctx, "quizzes");
+    if (!tierCheck.allowed) {
+      return {
+        success: false,
+        error: tierCheck.error,
+        requiresUpgrade: true,
+      };
+    }
+
     // Get the note content
     const note = await ctx.runQuery(api.notes.getNote, { noteId: args.noteId });
     if (!note) {
@@ -1748,8 +1861,8 @@ export const getDocumentReference = action({
       const documentContent = file.extractedText;
       const currentContext =
         args.currentNoteContent?.replace(/<[^>]*>/g, " ") || "";
-      // maxLength could be used for future truncation of responses
-      const _maxLength = args.maxLength || 1000;
+      // maxLength is available for future use to truncate responses
+      void args.maxLength; // Acknowledge but don't use yet
 
       const model = getGeminiModel();
 
@@ -2277,6 +2390,140 @@ CRITICAL EXTRACTION REQUIREMENTS:
           error instanceof Error
             ? error.message
             : "Failed to generate notes from PDF",
+      };
+    }
+  },
+});
+
+/**
+ * Extract mathematical formulas from an image using Gemini Vision.
+ * Supports both printed and handwritten formulas.
+ * PREMIUM FEATURE: Requires Scholar tier (advanced-formula)
+ */
+export const extractFormulaFromImage = action({
+  args: {
+    imageBase64: v.string(),
+    mimeType: v.string(),
+  },
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    success: boolean;
+    latex?: string;
+    description?: string;
+    confidence?: "high" | "medium" | "low";
+    error?: string;
+    requiresUpgrade?: boolean;
+  }> => {
+    // Check tier access for advanced formula feature
+    const tierCheck = await checkTierAccess(ctx, "advanced-formula");
+    if (!tierCheck.allowed) {
+      return {
+        success: false,
+        error: tierCheck.error,
+        requiresUpgrade: true,
+      };
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY environment variable not set");
+    }
+
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({
+        model: "gemini-2.5-flash",
+        generationConfig: {
+          responseMimeType: "application/json",
+        },
+      });
+
+      const prompt = `You are an expert at recognizing mathematical formulas and equations from images.
+Analyze this image and extract any mathematical formulas, equations, or expressions.
+
+Convert all recognized formulas to valid LaTeX notation that can be rendered with KaTeX.
+
+Return a JSON response with this exact structure:
+{
+  "latex": "The LaTeX representation of the formula(s)",
+  "description": "A brief description of what the formula represents",
+  "confidence": "high" | "medium" | "low",
+  "multipleFormulas": false,
+  "formulas": [] // If multiple formulas, list each separately with its own latex and description
+}
+
+Rules:
+- Use standard LaTeX notation (\\frac, \\sqrt, \\sum, \\int, etc.)
+- For display math, use $$ delimiters
+- For inline math, use $ delimiters
+- If the image contains multiple formulas, set multipleFormulas to true and list each in the formulas array
+- If the formula is handwritten and hard to read, mention this in the description
+- Set confidence based on image quality and clarity:
+  - "high": Clear, printed formulas
+  - "medium": Somewhat clear handwriting or partially visible formulas
+  - "low": Unclear image or uncertain recognition
+- If no formula is found, set latex to empty string and explain in description
+
+Return ONLY valid JSON.`;
+
+      const result = await model.generateContent([
+        prompt,
+        {
+          inlineData: {
+            mimeType: args.mimeType,
+            data: args.imageBase64,
+          },
+        },
+      ]);
+
+      const responseText = result.response.text().trim();
+
+      // Parse JSON response
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        return {
+          success: false,
+          error: "Failed to parse formula recognition response",
+        };
+      }
+
+      const data = JSON.parse(jsonMatch[0]) as {
+        latex: string;
+        description: string;
+        confidence: "high" | "medium" | "low";
+        multipleFormulas?: boolean;
+        formulas?: Array<{ latex: string; description: string }>;
+      };
+
+      if (!data.latex && !data.multipleFormulas) {
+        return {
+          success: false,
+          error: data.description || "No formula detected in the image",
+        };
+      }
+
+      // If multiple formulas, combine them
+      let finalLatex = data.latex;
+      if (data.multipleFormulas && data.formulas && data.formulas.length > 0) {
+        finalLatex = data.formulas.map((f) => f.latex).join("\n\n");
+      }
+
+      return {
+        success: true,
+        latex: finalLatex,
+        description: data.description,
+        confidence: data.confidence,
+      };
+    } catch (error) {
+      console.error("extractFormulaFromImage error:", error);
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to extract formula from image",
       };
     }
   },

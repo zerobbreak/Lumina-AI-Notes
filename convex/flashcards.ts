@@ -172,13 +172,16 @@ export const updateCard = mutation({
 
 /**
  * Update a card's spaced repetition data after review
+ * Uses SM-2 algorithm parameters
  */
 export const updateCardReview = mutation({
   args: {
     cardId: v.id("flashcards"),
-    difficulty: v.number(),
+    quality: v.number(), // SM-2 quality rating 0-5
+    easeFactor: v.number(),
+    interval: v.number(),
+    repetitions: v.number(),
     nextReviewAt: v.number(),
-    reviewCount: v.number(),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -194,10 +197,73 @@ export const updateCardReview = mutation({
     }
 
     await ctx.db.patch(args.cardId, {
-      difficulty: args.difficulty,
+      difficulty: args.easeFactor, // Using difficulty field to store easeFactor
       nextReviewAt: args.nextReviewAt,
-      reviewCount: args.reviewCount,
+      reviewCount: (card.reviewCount || 0) + 1,
     });
+
+    // Update deck's lastStudiedAt
+    await ctx.db.patch(deck._id, {
+      lastStudiedAt: Date.now(),
+    });
+
+    return {
+      cardId: args.cardId,
+      nextReviewAt: args.nextReviewAt,
+      interval: args.interval,
+    };
+  },
+});
+
+/**
+ * Batch update multiple cards after a study session
+ */
+export const batchUpdateCardReviews = mutation({
+  args: {
+    reviews: v.array(
+      v.object({
+        cardId: v.id("flashcards"),
+        quality: v.number(),
+        easeFactor: v.number(),
+        interval: v.number(),
+        repetitions: v.number(),
+        nextReviewAt: v.number(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const updatedCards: string[] = [];
+    const deckIds = new Set<string>();
+
+    for (const review of args.reviews) {
+      const card = await ctx.db.get(review.cardId);
+      if (!card) continue;
+
+      const deck = await ctx.db.get(card.deckId);
+      if (!deck || deck.userId !== identity.tokenIdentifier) continue;
+
+      await ctx.db.patch(review.cardId, {
+        difficulty: review.easeFactor,
+        nextReviewAt: review.nextReviewAt,
+        reviewCount: (card.reviewCount || 0) + 1,
+      });
+
+      updatedCards.push(review.cardId);
+      deckIds.add(deck._id);
+    }
+
+    // Update lastStudiedAt for all affected decks
+    const now = Date.now();
+    for (const deckId of deckIds) {
+      await ctx.db.patch(deckId as any, {
+        lastStudiedAt: now,
+      });
+    }
+
+    return { updatedCount: updatedCards.length };
   },
 });
 
@@ -245,6 +311,140 @@ export const markDeckStudied = mutation({
     await ctx.db.patch(args.deckId, {
       lastStudiedAt: Date.now(),
     });
+  },
+});
+
+/**
+ * Get detailed statistics for a deck (for spaced repetition dashboard)
+ */
+export const getDeckStats = query({
+  args: { deckId: v.id("flashcardDecks") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const deck = await ctx.db.get(args.deckId);
+    if (!deck || deck.userId !== identity.tokenIdentifier) {
+      return null;
+    }
+
+    const cards = await ctx.db
+      .query("flashcards")
+      .withIndex("by_deckId", (q) => q.eq("deckId", args.deckId))
+      .collect();
+
+    const now = Date.now();
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+    const endOfDayTimestamp = endOfDay.getTime();
+
+    let newCards = 0;
+    let learningCards = 0;
+    let reviewCards = 0;
+    let dueNow = 0;
+    let dueToday = 0;
+    let masteredCards = 0;
+    let totalEaseFactor = 0;
+    let cardsWithEaseFactor = 0;
+
+    for (const card of cards) {
+      const reviewCount = card.reviewCount || 0;
+      const easeFactor = card.difficulty || 2.5;
+      const nextReview = card.nextReviewAt;
+
+      // Categorize by learning stage
+      if (reviewCount === 0) {
+        newCards++;
+      } else if (reviewCount < 3) {
+        learningCards++;
+      } else {
+        reviewCards++;
+      }
+
+      // Check if mastered (reviewed 5+ times with high ease factor)
+      if (reviewCount >= 5 && easeFactor >= 2.3) {
+        masteredCards++;
+      }
+
+      // Check if due
+      if (!nextReview || nextReview <= now) {
+        dueNow++;
+      } else if (nextReview <= endOfDayTimestamp) {
+        dueToday++;
+      }
+
+      // Track ease factor
+      if (card.difficulty) {
+        totalEaseFactor += easeFactor;
+        cardsWithEaseFactor++;
+      }
+    }
+
+    return {
+      totalCards: cards.length,
+      newCards,
+      learningCards,
+      reviewCards,
+      dueNow,
+      dueToday,
+      masteredCards,
+      averageEaseFactor: cardsWithEaseFactor > 0 
+        ? totalEaseFactor / cardsWithEaseFactor 
+        : 2.5,
+      lastStudiedAt: deck.lastStudiedAt,
+    };
+  },
+});
+
+/**
+ * Get study summary across all decks for a user
+ */
+export const getStudySummary = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const decks = await ctx.db
+      .query("flashcardDecks")
+      .withIndex("by_userId", (q) => q.eq("userId", identity.tokenIdentifier))
+      .collect();
+
+    const now = Date.now();
+    let totalDue = 0;
+    let totalCards = 0;
+    let studiedToday = 0;
+
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const startOfDayTimestamp = startOfDay.getTime();
+
+    for (const deck of decks) {
+      const cards = await ctx.db
+        .query("flashcards")
+        .withIndex("by_deckId", (q) => q.eq("deckId", deck._id))
+        .collect();
+
+      totalCards += cards.length;
+
+      for (const card of cards) {
+        if (!card.nextReviewAt || card.nextReviewAt <= now) {
+          totalDue++;
+        }
+      }
+
+      // Check if studied today
+      if (deck.lastStudiedAt && deck.lastStudiedAt >= startOfDayTimestamp) {
+        studiedToday++;
+      }
+    }
+
+    return {
+      totalDecks: decks.length,
+      totalCards,
+      totalDue,
+      decksStudiedToday: studiedToday,
+    };
   },
 });
 

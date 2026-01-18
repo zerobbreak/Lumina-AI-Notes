@@ -22,7 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Sparkles, Loader2, FileText } from "lucide-react";
+import { Sparkles, Loader2, FileText, Crown, Lock } from "lucide-react";
+import Link from "next/link";
 
 interface GenerateQuizDialogProps {
   open: boolean;
@@ -37,6 +38,7 @@ export function GenerateQuizDialog({
 }: GenerateQuizDialogProps) {
   const router = useRouter();
   const notes = useQuery(api.notes.getRecentNotes);
+  const subscription = useQuery(api.subscriptions.getSubscriptionStatus);
   const generateQuiz = useAction(api.ai.generateAndSaveQuiz);
 
   const [selectedNoteId, setSelectedNoteId] = useState<string>(
@@ -46,8 +48,10 @@ export function GenerateQuizDialog({
   const [title, setTitle] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [requiresUpgrade, setRequiresUpgrade] = useState(false);
 
   const selectedNote = notes?.find((n) => n._id === selectedNoteId);
+  const isFreeTier = !subscription || subscription.tier === "free";
 
   const handleGenerate = async () => {
     if (!selectedNoteId) {
@@ -56,6 +60,7 @@ export function GenerateQuizDialog({
     }
 
     setError(null);
+    setRequiresUpgrade(false);
     setIsGenerating(true);
 
     try {
@@ -71,6 +76,9 @@ export function GenerateQuizDialog({
         router.push(`/dashboard?view=quizzes&deckId=${result.deckId}`);
       } else {
         setError(result.error || "Failed to generate quiz");
+        if (result.requiresUpgrade) {
+          setRequiresUpgrade(true);
+        }
       }
     } catch (err) {
       setError(
@@ -88,6 +96,81 @@ export function GenerateQuizDialog({
       setTitle(`${note.title} Quiz`);
     }
   };
+
+  // Show upgrade prompt for free tier users
+  if (isFreeTier) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="bg-[#0a0a12] border-white/10 text-white sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="relative">
+                <Sparkles className="w-5 h-5 text-purple-400" />
+                <Lock className="w-3 h-3 text-yellow-400 absolute -top-1 -right-1" />
+              </div>
+              Generate Quiz
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              AI-generated quizzes are a Scholar feature.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-6">
+            {/* Upgrade Prompt */}
+            <div className="relative overflow-hidden rounded-xl border border-purple-500/20 bg-linear-to-br from-purple-500/10 via-pink-500/10 to-purple-500/10 p-6">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl" />
+              
+              <div className="relative space-y-4">
+                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                  <Crown className="w-6 h-6 text-white" />
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-2">
+                    Upgrade to Scholar
+                  </h3>
+                  <p className="text-sm text-gray-400 leading-relaxed">
+                    Get access to AI-generated quizzes, flashcards, unlimited audio processing, and more.
+                  </p>
+                </div>
+
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-center gap-2 text-gray-300">
+                    <Sparkles className="w-4 h-4 text-purple-400" />
+                    AI Quiz Generation
+                  </li>
+                  <li className="flex items-center gap-2 text-gray-300">
+                    <Sparkles className="w-4 h-4 text-indigo-400" />
+                    Auto-generated Flashcards
+                  </li>
+                  <li className="flex items-center gap-2 text-gray-300">
+                    <Sparkles className="w-4 h-4 text-pink-400" />
+                    Unlimited Audio Processing
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="border-white/10 text-gray-300 hover:bg-white/5"
+            >
+              Maybe Later
+            </Button>
+            <Link href="/#pricing">
+              <Button className="bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 gap-2">
+                <Crown className="w-4 h-4" />
+                Upgrade Now
+              </Button>
+            </Link>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -174,8 +257,20 @@ export function GenerateQuizDialog({
 
           {/* Error Message */}
           {error && (
-            <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-md px-3 py-2">
+            <div className={`text-sm rounded-md px-3 py-2 ${
+              requiresUpgrade 
+                ? "text-yellow-400 bg-yellow-500/10 border border-yellow-500/20" 
+                : "text-red-400 bg-red-500/10 border border-red-500/20"
+            }`}>
               {error}
+              {requiresUpgrade && (
+                <Link href="/#pricing" className="block mt-2">
+                  <Button size="sm" className="w-full bg-purple-600 hover:bg-purple-500">
+                    <Crown className="w-3 h-3 mr-1" />
+                    Upgrade to Scholar
+                  </Button>
+                </Link>
+              )}
             </div>
           )}
         </div>
@@ -192,7 +287,7 @@ export function GenerateQuizDialog({
           <Button
             onClick={handleGenerate}
             disabled={isGenerating || !selectedNoteId}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 gap-2"
+            className="bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 gap-2"
           >
             {isGenerating ? (
               <>
@@ -211,4 +306,3 @@ export function GenerateQuizDialog({
     </Dialog>
   );
 }
-

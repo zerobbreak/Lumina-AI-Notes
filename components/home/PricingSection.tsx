@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { Check, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,9 +12,26 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useUser, SignInButton } from "@clerk/nextjs";
+import { toast } from "sonner";
 
-const pricingPlans = [
+type PlanType = "starter" | "scholar" | "institution";
+
+interface PricingPlan {
+  id: PlanType;
+  name: string;
+  price: string;
+  period?: string;
+  description: string;
+  features: string[];
+  cta: string;
+  popular: boolean;
+  paystackPlanCode?: string;
+}
+
+const pricingPlans: PricingPlan[] = [
   {
+    id: "starter",
     name: "Starter",
     price: "$0",
     description: "Perfect for trying out semantic notes.",
@@ -27,6 +45,7 @@ const pricingPlans = [
     popular: false,
   },
   {
+    id: "scholar",
     name: "Scholar",
     price: "$12",
     period: "/month",
@@ -40,8 +59,10 @@ const pricingPlans = [
     ],
     cta: "Get Scholar",
     popular: true,
+    paystackPlanCode: process.env.NEXT_PUBLIC_PAYSTACK_SCHOLAR_PLAN_CODE,
   },
   {
+    id: "institution",
     name: "Institution",
     price: "Custom",
     description: "For universities and departments.",
@@ -58,6 +79,131 @@ const pricingPlans = [
 ];
 
 export function PricingSection() {
+  const { user, isSignedIn, isLoaded } = useUser();
+  const [loadingPlan, setLoadingPlan] = useState<PlanType | null>(null);
+
+  const handlePlanClick = async (plan: PricingPlan) => {
+    // Handle free plan - redirect to sign up or dashboard
+    if (plan.id === "starter") {
+      if (isSignedIn) {
+        window.location.href = "/dashboard";
+      }
+      // If not signed in, the SignInButton wrapper will handle it
+      return;
+    }
+
+    // Handle institution plan - redirect to contact
+    if (plan.id === "institution") {
+      window.location.href = "mailto:sales@luminanotes.ai?subject=Institution Plan Inquiry";
+      return;
+    }
+
+    // Handle Scholar plan - initialize Paystack checkout
+    if (plan.id === "scholar") {
+      if (!isSignedIn) {
+        toast.error("Please sign in to subscribe");
+        return;
+      }
+
+      if (!plan.paystackPlanCode) {
+        toast.error("Subscription plan not configured. Please contact support.");
+        return;
+      }
+
+      setLoadingPlan(plan.id);
+
+      try {
+        const response = await fetch("/api/paystack/initialize", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: user?.primaryEmailAddress?.emailAddress,
+            plan: plan.paystackPlanCode,
+            callbackUrl: `${window.location.origin}/api/paystack/verify`,
+            metadata: {
+              userId: user?.id,
+              planName: plan.name,
+            },
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to initialize payment");
+        }
+
+        // Redirect to Paystack checkout
+        if (data.authorizationUrl) {
+          window.location.href = data.authorizationUrl;
+        } else {
+          throw new Error("No authorization URL received");
+        }
+      } catch (error) {
+        console.error("Payment initialization error:", error);
+        toast.error(
+          error instanceof Error ? error.message : "Failed to start checkout"
+        );
+      } finally {
+        setLoadingPlan(null);
+      }
+    }
+  };
+
+  const renderButton = (plan: PricingPlan) => {
+    const isLoading = loadingPlan === plan.id;
+    const buttonContent = (
+      <>
+        {isLoading ? (
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        ) : plan.popular ? (
+          <Sparkles className="ml-2 w-4 h-4" />
+        ) : null}
+        {isLoading ? "Processing..." : plan.cta}
+      </>
+    );
+
+    const buttonClasses = `w-full ${
+      plan.popular
+        ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+        : "bg-white/10 hover:bg-white/20 text-white"
+    }`;
+
+    // For starter plan, wrap with SignInButton if not signed in
+    if (plan.id === "starter" && !isSignedIn && isLoaded) {
+      return (
+        <SignInButton mode="modal">
+          <Button className={buttonClasses} disabled={isLoading}>
+            {buttonContent}
+          </Button>
+        </SignInButton>
+      );
+    }
+
+    // For scholar plan when not signed in
+    if (plan.id === "scholar" && !isSignedIn && isLoaded) {
+      return (
+        <SignInButton mode="modal">
+          <Button className={buttonClasses} disabled={isLoading}>
+            {buttonContent}
+          </Button>
+        </SignInButton>
+      );
+    }
+
+    return (
+      <Button
+        className={buttonClasses}
+        onClick={() => handlePlanClick(plan)}
+        disabled={isLoading}
+      >
+        {buttonContent}
+      </Button>
+    );
+  };
+
   return (
     <section id="pricing" className="py-24 relative">
       {/* Background Glow */}
@@ -129,18 +275,7 @@ export function PricingSection() {
                 </ul>
               </CardContent>
 
-              <CardFooter>
-                <Button
-                  className={`w-full ${
-                    plan.popular
-                      ? "bg-indigo-600 hover:bg-indigo-700 text-white"
-                      : "bg-white/10 hover:bg-white/20 text-white"
-                  }`}
-                >
-                  {plan.cta}
-                  {plan.popular && <Sparkles className="ml-2 w-4 h-4" />}
-                </Button>
-              </CardFooter>
+              <CardFooter>{renderButton(plan)}</CardFooter>
             </Card>
           ))}
         </div>
