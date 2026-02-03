@@ -107,6 +107,35 @@ export const completeOnboarding = mutation({
   },
 });
 
+export const updatePreferences = mutation({
+  args: {
+    major: v.optional(v.string()),
+    noteStyle: v.optional(v.string()),
+    theme: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_tokenIdentifier", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier)
+      )
+      .unique();
+
+    if (!user) throw new Error("User not found");
+
+    const updates: Record<string, unknown> = {};
+    if (args.major !== undefined) updates.major = args.major;
+    if (args.noteStyle !== undefined) updates.noteStyle = args.noteStyle;
+    if (args.theme !== undefined) updates.theme = args.theme;
+    if (Object.keys(updates).length === 0) return;
+
+    await ctx.db.patch(user._id, updates);
+  },
+});
+
 export const createCourse = mutation({
   args: {
     name: v.string(),

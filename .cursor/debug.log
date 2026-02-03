@@ -1,0 +1,5 @@
+{"location":"Sidebar.tsx:footer-settings-click","message":"Footer settings button clicked","data":{"which":"footer"},"timestamp":1769467486217,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"SettingsDialog.tsx:render","message":"SettingsDialog render open=true","data":{"open":true},"timestamp":1769467486239,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"SettingsDialog.tsx:render","message":"SettingsDialog render open=true","data":{"open":true},"timestamp":1769467486240,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"Sidebar.tsx:footer-settings-click","message":"Footer settings button clicked","data":{"which":"footer"},"timestamp":1769467704935,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"Sidebar.tsx:footer-settings-click","message":"Footer settings button clicked","data":{"which":"footer"},"timestamp":1769470032250,"sessionId":"debug-session","hypothesisId":"B"}

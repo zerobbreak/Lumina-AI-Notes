@@ -302,6 +302,134 @@
   flex: 1;
 }
 
+/* ===== Math Formula Styles ===== */
+
+/* Inline math */
+.inline-math-node {
+  display: inline;
+}
+
+.inline-math-container,
+.inline-math-content {
+  display: inline;
+  padding: 0.125rem 0.25rem;
+  margin: 0 0.125rem;
+  background: rgba(139, 92, 246, 0.1);
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.inline-math-content:hover {
+  background: rgba(139, 92, 246, 0.2);
+}
+
+.inline-math-content.ring-2 {
+  background: rgba(139, 92, 246, 0.25);
+}
+
+/* Block math */
+.block-math-node {
+  display: block;
+  margin: 1.5rem 0;
+}
+
+.block-math-container,
+.block-math-content {
+  display: block;
+  padding: 1.5rem 2rem;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(99, 102, 241, 0.08));
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 0.75rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.block-math-content:hover {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(99, 102, 241, 0.12));
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.block-math-content.ring-2 {
+  border-color: rgba(139, 92, 246, 0.5);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+}
+
+/* Math editing mode */
+.math-editing {
+  display: inline;
+}
+
+.block-math-editing {
+  display: block;
+  margin: 1rem 0;
+}
+
+.inline-math-editing {
+  display: inline;
+}
+
+/* KaTeX styling overrides for dark theme */
+.katex-content,
+.katex-preview {
+  color: #e2e8f0;
+}
+
+.katex-content .katex,
+.katex-preview .katex {
+  font-size: 1.1em;
+}
+
+.block-math-content .katex {
+  font-size: 1.25em;
+}
+
+/* Selected state for math nodes */
+.math-node.selected .katex-content {
+  outline: none;
+}
+
+/* Ensure KaTeX colors work in dark mode */
+.ProseMirror .katex .katex-html {
+  color: #e2e8f0;
+}
+
+.ProseMirror .katex .mathnormal,
+.ProseMirror .katex .mathit,
+.ProseMirror .katex .mathrm,
+.ProseMirror .katex .mathbf,
+.ProseMirror .katex .mathsf,
+.ProseMirror .katex .mathtt,
+.ProseMirror .katex .mathdefault {
+  color: #e2e8f0;
+}
+
+.ProseMirror .katex .mord,
+.ProseMirror .katex .mbin,
+.ProseMirror .katex .mrel,
+.ProseMirror .katex .mopen,
+.ProseMirror .katex .mclose,
+.ProseMirror .katex .mpunct,
+.ProseMirror .katex .minner {
+  color: #e2e8f0;
+}
+
+/* Math operator colors */
+.ProseMirror .katex .mop {
+  color: #a5b4fc;
+}
+
+/* Fraction line color */
+.ProseMirror .katex .frac-line {
+  border-color: #9ca3af;
+}
+
+/* Sqrt symbol color */
+.ProseMirror .katex .sqrt > .sqrt-sign {
+  color: #a5b4fc;
+}
+
 /* ===== Print Styles for PDF Export ===== */
 @media print {
   /* Reset to light theme */
@@ -483,5 +611,30 @@
     content: "[Diagram - View in app for interactive version]";
     color: #6b7280 !important;
     font-style: italic;
+  }
+
+  /* Math formulas in print */
+  .inline-math-content,
+  .block-math-content,
+  .inline-math-container,
+  .block-math-container {
+    background: #f3f4f6 !important;
+    color: #000000 !important;
+  }
+
+  .block-math-content,
+  .block-math-container {
+    border: 1px solid #d1d5db !important;
+    padding: 16px !important;
+    page-break-inside: avoid;
+  }
+
+  .katex,
+  .katex * {
+    color: #000000 !important;
+  }
+
+  .katex .frac-line {
+    border-color: #333333 !important;
   }
 }

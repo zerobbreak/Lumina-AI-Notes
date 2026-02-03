@@ -35,12 +35,15 @@ function SidebarNoteComponent({
   const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
 
-  const handleDragStart = useCallback((e: React.DragEvent) => {
-    e.dataTransfer.setData("application/lumina-note-id", note._id);
-    e.dataTransfer.setData("application/lumina-note-title", note.title);
-    e.dataTransfer.effectAllowed = "move";
-    setIsDragging(true);
-  }, [note._id, note.title]);
+  const handleDragStart = useCallback(
+    (e: React.DragEvent) => {
+      e.dataTransfer.setData("application/lumina-note-id", note._id);
+      e.dataTransfer.setData("application/lumina-note-title", note.title);
+      e.dataTransfer.effectAllowed = "move";
+      setIsDragging(true);
+    },
+    [note._id, note.title],
+  );
 
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);
@@ -54,7 +57,7 @@ function SidebarNoteComponent({
     <div
       className={cn(
         "relative group/note flex items-center",
-        isDragging && "opacity-50"
+        isDragging && "opacity-50",
       )}
       draggable={isDraggable}
       onDragStart={handleDragStart}
@@ -62,7 +65,7 @@ function SidebarNoteComponent({
     >
       {isDraggable && (
         <div className="absolute left-0 opacity-0 group-hover/note:opacity-50 cursor-grab active:cursor-grabbing transition-opacity">
-          <GripVertical className="w-3 h-3 text-gray-500" />
+          <GripVertical className="w-3 h-3 text-slate-400 dark:text-gray-500" />
         </div>
       )}
       <Button
@@ -71,8 +74,8 @@ function SidebarNoteComponent({
           "w-full justify-start h-9 px-2.5 pr-16 text-[13px] gap-3 transition-all",
           isDraggable && "pl-5", // Extra padding for drag handle
           isActive
-            ? "bg-indigo-500/10 text-indigo-400 font-medium"
-            : "text-gray-400 hover:text-white hover:bg-white/4"
+            ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-medium"
+            : "text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/4",
         )}
         onClick={handleClick}
       >
@@ -80,8 +83,8 @@ function SidebarNoteComponent({
           className={cn(
             "w-3.5 h-3.5 transition-colors shrink-0",
             isActive
-              ? "text-indigo-400"
-              : "text-amber-500/70 group-hover/note:text-amber-400"
+              ? "text-indigo-600 dark:text-indigo-400"
+              : "text-amber-600 dark:text-amber-500/70 group-hover/note:text-amber-500 dark:group-hover/note:text-amber-400",
           )}
         />
         <span className="truncate">{note.title}</span>
@@ -99,12 +102,15 @@ function SidebarNoteComponent({
 }
 
 // Memoize to prevent unnecessary re-renders when parent state changes
-export const SidebarNote = memo(SidebarNoteComponent, (prevProps, nextProps) => {
-  return (
-    prevProps.note._id === nextProps.note._id &&
-    prevProps.note.title === nextProps.note.title &&
-    prevProps.note.isArchived === nextProps.note.isArchived &&
-    prevProps.isActive === nextProps.isActive &&
-    prevProps.isDraggable === nextProps.isDraggable
-  );
-});
+export const SidebarNote = memo(
+  SidebarNoteComponent,
+  (prevProps, nextProps) => {
+    return (
+      prevProps.note._id === nextProps.note._id &&
+      prevProps.note.title === nextProps.note.title &&
+      prevProps.note.isArchived === nextProps.note.isArchived &&
+      prevProps.isActive === nextProps.isActive &&
+      prevProps.isDraggable === nextProps.isDraggable
+    );
+  },
+);

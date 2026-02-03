@@ -29,12 +29,13 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
   const deck = useQuery(api.flashcards.getDeck, { deckId: typedDeckId });
   const flashcards = useQuery(api.flashcards.getFlashcards, { deckId: typedDeckId });
   const markStudied = useMutation(api.flashcards.markDeckStudied);
-  const updateCardReview = useMutation(api.flashcards.updateCardReview);
+  const scheduleNextReview = useMutation(api.flashcards.scheduleNextReview);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [knownCards, setKnownCards] = useState<Set<number>>(new Set());
-  const [unknownCards, setUnknownCards] = useState<Set<number>>(new Set());
+  const [easyCards, setEasyCards] = useState<Set<number>>(new Set());
+  const [mediumCards, setMediumCards] = useState<Set<number>>(new Set());
+  const [hardCards, setHardCards] = useState<Set<number>>(new Set());
   const [shuffledIndices, setShuffledIndices] = useState<number[] | null>(null);
 
   const totalCards = flashcards?.length ?? 0;
@@ -52,26 +53,6 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
     }
   }, [deck, markStudied, typedDeckId]);
 
-  // Memoized keyboard handler
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === " " || e.key === "Enter") {
-      e.preventDefault();
-      setIsFlipped((prev) => !prev);
-    } else if (e.key === "ArrowLeft" && currentIndex > 0) {
-      setCurrentIndex((prev) => prev - 1);
-      setIsFlipped(false);
-    } else if (e.key === "ArrowRight" && currentIndex < totalCards - 1) {
-      setCurrentIndex((prev) => prev + 1);
-      setIsFlipped(false);
-    }
-  }, [currentIndex, totalCards]);
-
-  // Keyboard navigation
-  useEffect(() => {
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleKeyDown]);
-
   const handlePrevious = useCallback(() => {
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
@@ -86,77 +67,77 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
     }
   }, [currentIndex, totalCards]);
 
-  // Spaced repetition: update card review with difficulty rating
-  const handleKnow = useCallback(() => {
+  // Spaced repetition: update card review with rating
+  const handleRate = useCallback((rating: "easy" | "medium" | "hard") => {
     const cardIndex = shuffledIndices ? shuffledIndices[currentIndex] : currentIndex;
     const card = flashcards?.[cardIndex];
     
-    setKnownCards((prev) => new Set(prev).add(currentIndex));
-    setUnknownCards((prev) => {
+    setEasyCards((prev) => {
       const next = new Set(prev);
-      next.delete(currentIndex);
+      if (rating === "easy") next.add(currentIndex);
+      else next.delete(currentIndex);
       return next;
     });
-    
-    // Update spaced repetition - easy = longer interval
-    if (card) {
-      const currentDifficulty = card.difficulty ?? 2.5;
-      const newDifficulty = Math.min(currentDifficulty + 0.1, 3.0);
-      const reviewCount = (card.reviewCount ?? 0) + 1;
-      // Next review in days: base * difficulty^reviewCount (capped at 30 days)
-      const daysUntilReview = Math.min(Math.pow(newDifficulty, reviewCount), 30);
-      const nextReviewAt = Date.now() + daysUntilReview * 24 * 60 * 60 * 1000;
-      
-      updateCardReview({
-        cardId: card._id,
-        difficulty: newDifficulty,
-        nextReviewAt,
-        reviewCount,
-      });
-    }
-    
-    if (currentIndex < totalCards - 1) {
-      handleNext();
-    }
-  }, [currentIndex, totalCards, flashcards, shuffledIndices, handleNext, updateCardReview]);
+    setMediumCards((prev) => {
+      const next = new Set(prev);
+      if (rating === "medium") next.add(currentIndex);
+      else next.delete(currentIndex);
+      return next;
+    });
+    setHardCards((prev) => {
+      const next = new Set(prev);
+      if (rating === "hard") next.add(currentIndex);
+      else next.delete(currentIndex);
+      return next;
+    });
 
-  const handleDontKnow = useCallback(() => {
-    const cardIndex = shuffledIndices ? shuffledIndices[currentIndex] : currentIndex;
-    const card = flashcards?.[cardIndex];
-    
-    setUnknownCards((prev) => new Set(prev).add(currentIndex));
-    setKnownCards((prev) => {
-      const next = new Set(prev);
-      next.delete(currentIndex);
-      return next;
-    });
-    
-    // Update spaced repetition - hard = shorter interval, lower difficulty
     if (card) {
-      const currentDifficulty = card.difficulty ?? 2.5;
-      const newDifficulty = Math.max(currentDifficulty - 0.2, 1.3);
-      const reviewCount = card.reviewCount ?? 0; // Don't increment for wrong answers
-      // Review again soon (1 day minimum)
-      const nextReviewAt = Date.now() + 1 * 24 * 60 * 60 * 1000;
-      
-      updateCardReview({
+      scheduleNextReview({
         cardId: card._id,
-        difficulty: newDifficulty,
-        nextReviewAt,
-        reviewCount,
+        rating,
       });
     }
     
     if (currentIndex < totalCards - 1) {
       handleNext();
     }
-  }, [currentIndex, totalCards, flashcards, shuffledIndices, handleNext, updateCardReview]);
+  }, [currentIndex, totalCards, flashcards, shuffledIndices, handleNext, scheduleNextReview]);
+
+  // Memoized keyboard handler
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      setIsFlipped((prev) => !prev);
+    } else if (e.key === "1") {
+      e.preventDefault();
+      handleRate("hard");
+    } else if (e.key === "2") {
+      e.preventDefault();
+      handleRate("medium");
+    } else if (e.key === "3") {
+      e.preventDefault();
+      handleRate("easy");
+    } else if (e.key === "ArrowLeft" && currentIndex > 0) {
+      setCurrentIndex((prev) => prev - 1);
+      setIsFlipped(false);
+    } else if (e.key === "ArrowRight" && currentIndex < totalCards - 1) {
+      setCurrentIndex((prev) => prev + 1);
+      setIsFlipped(false);
+    }
+  }, [currentIndex, totalCards, handleRate]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
 
   const handleReset = useCallback(() => {
     setCurrentIndex(0);
     setIsFlipped(false);
-    setKnownCards(new Set());
-    setUnknownCards(new Set());
+    setEasyCards(new Set());
+    setMediumCards(new Set());
+    setHardCards(new Set());
     setShuffledIndices(null);
   }, []);
 
@@ -200,8 +181,9 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
   }
 
   const progress = ((currentIndex + 1) / totalCards) * 100;
-  const knownCount = knownCards.size;
-  const unknownCount = unknownCards.size;
+  const easyCount = easyCards.size;
+  const mediumCount = mediumCards.size;
+  const hardCount = hardCards.size;
 
   return (
     <div className="h-full flex flex-col bg-linear-to-br from-[#050505] to-[#0a0a12] overflow-hidden">
@@ -248,8 +230,9 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
             Card {currentIndex + 1} of {totalCards}
           </span>
           <div className="flex gap-4">
-            <span className="text-green-400">✓ {knownCount}</span>
-            <span className="text-red-400">✗ {unknownCount}</span>
+            <span className="text-green-400">Easy {easyCount}</span>
+            <span className="text-blue-400">Medium {mediumCount}</span>
+            <span className="text-red-400">Hard {hardCount}</span>
           </div>
         </div>
         <div className="h-1 bg-white/5 rounded-full overflow-hidden">
@@ -278,26 +261,38 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
           <Button
             variant="outline"
             size="lg"
-            onClick={handleDontKnow}
+            onClick={() => handleRate("hard")}
             className={cn(
               "gap-2 border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400",
-              unknownCards.has(currentIndex) && "ring-2 ring-red-500/50"
+              hardCards.has(currentIndex) && "ring-2 ring-red-500/50"
             )}
           >
             <X className="w-5 h-5" />
-            Don&apos;t Know
+            Hard
           </Button>
           <Button
             variant="outline"
             size="lg"
-            onClick={handleKnow}
+            onClick={() => handleRate("medium")}
             className={cn(
-              "gap-2 border-green-500/30 bg-green-500/10 hover:bg-green-500/20 text-green-400",
-              knownCards.has(currentIndex) && "ring-2 ring-green-500/50"
+              "gap-2 border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400",
+              mediumCards.has(currentIndex) && "ring-2 ring-blue-500/50"
             )}
           >
             <Check className="w-5 h-5" />
-            Know It
+            Medium
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => handleRate("easy")}
+            className={cn(
+              "gap-2 border-green-500/30 bg-green-500/10 hover:bg-green-500/20 text-green-400",
+              easyCards.has(currentIndex) && "ring-2 ring-green-500/50"
+            )}
+          >
+            <Check className="w-5 h-5" />
+            Easy
           </Button>
         </div>
 
@@ -312,7 +307,7 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
             <ChevronLeft className="w-6 h-6" />
           </Button>
           <span className="text-sm text-gray-500 min-w-[100px] text-center">
-            Use ← → arrows or space to flip
+            Use ← → or space to flip, 1/2/3 to rate
           </span>
           <Button
             variant="ghost"

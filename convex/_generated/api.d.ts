@@ -9,6 +9,8 @@
  */
 
 import type * as ai from "../ai.js";
+import type * as collaboration from "../collaboration.js";
+import type * as crons from "../crons.js";
 import type * as files from "../files.js";
 import type * as flashcards from "../flashcards.js";
 import type * as notes from "../notes.js";
@@ -17,6 +19,7 @@ import type * as quizzes from "../quizzes.js";
 import type * as recordings from "../recordings.js";
 import type * as search from "../search.js";
 import type * as subscriptions from "../subscriptions.js";
+import type * as tags from "../tags.js";
 import type * as users from "../users.js";
 
 import type {
@@ -27,6 +30,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   ai: typeof ai;
+  collaboration: typeof collaboration;
+  crons: typeof crons;
   files: typeof files;
   flashcards: typeof flashcards;
   notes: typeof notes;
@@ -35,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   recordings: typeof recordings;
   search: typeof search;
   subscriptions: typeof subscriptions;
+  tags: typeof tags;
   users: typeof users;
 }>;
 

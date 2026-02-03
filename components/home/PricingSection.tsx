@@ -83,73 +83,15 @@ export function PricingSection() {
   const [loadingPlan, setLoadingPlan] = useState<PlanType | null>(null);
 
   const handlePlanClick = async (plan: PricingPlan) => {
-    // Handle free plan - redirect to sign up or dashboard
-    if (plan.id === "starter") {
-      if (isSignedIn) {
-        window.location.href = "/dashboard";
-      }
-      // If not signed in, the SignInButton wrapper will handle it
-      return;
-    }
-
-    // Handle institution plan - redirect to contact
-    if (plan.id === "institution") {
+    // TEMPORARY: All plans redirect to dashboard - payment disabled
+    // Payment gateway disabled due to Paystack bug
+    if (isSignedIn) {
+      window.location.href = "/dashboard";
+    } else if (plan.id === "institution") {
+      // Institution plan still shows contact email
       window.location.href = "mailto:sales@luminanotes.ai?subject=Institution Plan Inquiry";
-      return;
     }
-
-    // Handle Scholar plan - initialize Paystack checkout
-    if (plan.id === "scholar") {
-      if (!isSignedIn) {
-        toast.error("Please sign in to subscribe");
-        return;
-      }
-
-      if (!plan.paystackPlanCode) {
-        toast.error("Subscription plan not configured. Please contact support.");
-        return;
-      }
-
-      setLoadingPlan(plan.id);
-
-      try {
-        const response = await fetch("/api/paystack/initialize", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: user?.primaryEmailAddress?.emailAddress,
-            plan: plan.paystackPlanCode,
-            callbackUrl: `${window.location.origin}/api/paystack/verify`,
-            metadata: {
-              userId: user?.id,
-              planName: plan.name,
-            },
-          }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || "Failed to initialize payment");
-        }
-
-        // Redirect to Paystack checkout
-        if (data.authorizationUrl) {
-          window.location.href = data.authorizationUrl;
-        } else {
-          throw new Error("No authorization URL received");
-        }
-      } catch (error) {
-        console.error("Payment initialization error:", error);
-        toast.error(
-          error instanceof Error ? error.message : "Failed to start checkout"
-        );
-      } finally {
-        setLoadingPlan(null);
-      }
-    }
+    // If not signed in, the SignInButton wrapper will handle it for other plans
   };
 
   const renderButton = (plan: PricingPlan) => {

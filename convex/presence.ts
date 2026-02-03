@@ -4,6 +4,22 @@ import { v } from "convex/values";
 // How long before a presence entry is considered stale (60 seconds)
 const PRESENCE_TIMEOUT_MS = 60 * 1000;
 
+async function requireNoteAccess(ctx: any, noteId: any) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error("Unauthorized");
+  const note = await ctx.db.get(noteId);
+  if (!note) throw new Error("Note not found");
+  if (note.userId === identity.tokenIdentifier) return identity;
+  const collab = await ctx.db
+    .query("noteCollaborators")
+    .withIndex("by_noteId_userId", (q: any) =>
+      q.eq("noteId", noteId).eq("userId", identity.tokenIdentifier)
+    )
+    .unique();
+  if (!collab) throw new Error("Unauthorized");
+  return identity;
+}
+
 /**
  * Send a heartbeat to indicate the user is viewing a note.
  * Creates or updates the presence entry.
@@ -13,10 +29,7 @@ export const heartbeat = mutation({
     noteId: v.id("notes"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Unauthorized");
-    }
+    const identity = await requireNoteAccess(ctx, args.noteId);
 
     const userId = identity.tokenIdentifier;
     const now = Date.now();
@@ -62,6 +75,10 @@ export const getViewers = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     const currentUserId = identity?.tokenIdentifier;
+    // If not logged in, no viewers list.
+    if (!identity) return [];
+    // Must have access to this note to see viewers.
+    await requireNoteAccess(ctx, args.noteId);
 
     const cutoff = Date.now() - PRESENCE_TIMEOUT_MS;
 
@@ -96,9 +113,9 @@ export const leave = mutation({
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return { success: false };
-    }
+    if (!identity) return { success: false };
+    // Only users with access can write presence.
+    await requireNoteAccess(ctx, args.noteId);
 
     const userId = identity.tokenIdentifier;
 
@@ -153,6 +170,8 @@ export const getViewerCount = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     const currentUserId = identity?.tokenIdentifier;
+    if (!identity) return 0;
+    await requireNoteAccess(ctx, args.noteId);
 
     const cutoff = Date.now() - PRESENCE_TIMEOUT_MS;
 

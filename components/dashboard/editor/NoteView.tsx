@@ -24,7 +24,8 @@ import {
   Type,
   Calculator,
   BarChart3,
-  Plus,
+  Sigma,
+  Pin,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -56,7 +57,10 @@ import { ImageUploadDialog } from "@/components/dashboard/dialogs/ImageUploadDia
 import { ImageExtension } from "./extensions/ImageExtension";
 import { GraphCalculatorExtension } from "./extensions/GraphCalculatorExtension";
 import { ChartExtension } from "./extensions/ChartExtension";
+import { MathExtensions } from "./extensions/MathExtension";
 import { PresenceIndicator } from "@/components/dashboard/PresenceIndicator";
+import { CollaboratorsDialog } from "@/components/dashboard/dialogs/CollaboratorsDialog";
+import { TagPicker } from "@/components/dashboard/tags/TagPicker";
 import "./editor.css";
 
 // Heartbeat interval for presence tracking (30 seconds)
@@ -88,6 +92,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const toggleArchiveNote = useMutation(api.notes.toggleArchiveNote);
   const renameNote = useMutation(api.notes.renameNote);
   const toggleShare = useMutation(api.notes.toggleShareNote);
+  const togglePinNote = useMutation(api.notes.togglePinNote);
 
   // Presence tracking
   const presenceHeartbeat = useMutation(api.presence.heartbeat);
@@ -96,17 +101,18 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   // Editor State
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [debouncedContent, setDebouncedContent] = useState<string | any>(null);
+  const [debouncedContent, setDebouncedContent] = useState<string | { cornellCues: string; cornellNotes: string; cornellSummary: string } | null>(null);
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [isFlashcardsOpen, setIsFlashcardsOpen] = useState(false);
   const [isQuizOpen, setIsQuizOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
+  const [isCollaboratorsOpen, setIsCollaboratorsOpen] = useState(false);
 
   // Parse context (Course / Module)
   const courseName =
     userData?.courses?.find(
-      (c: { id: string; name: string }) => c.id === note?.courseId
+      (c: { id: string; name: string }) => c.id === note?.courseId,
     )?.name || "General";
 
   // Calculate word count and reading time
@@ -133,6 +139,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   // Debounce Save Effect
   useEffect(() => {
     if (debouncedContent === null) return;
+    if (!note) return;
 
     const handler = setTimeout(() => {
       // Check if this is Cornell data (object with cornellCues, cornellNotes, cornellSummary)
@@ -167,14 +174,30 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         });
       } else {
         // Standard content save
-        updateNote({ noteId, content: debouncedContent }).then(() => {
+        // Calculate word count for stats
+        const contentStr =
+          typeof debouncedContent === "string" ? debouncedContent : "";
+        const plainText = contentStr
+          .replace(/<[^>]*>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        const count =
+          plainText.length > 0
+            ? plainText.split(/\s+/).filter((word) => word.length > 0).length
+            : 0;
+
+        updateNote({
+          noteId,
+          content: debouncedContent,
+          wordCount: count,
+        }).then(() => {
           setIsSaving(false);
         });
       }
     }, 1000);
 
     return () => clearTimeout(handler);
-  }, [debouncedContent, noteId, updateNote, note?.style]);
+  }, [debouncedContent, note, noteId, updateNote, note?.style]);
 
   // Presence Heartbeat Effect - sends heartbeat on mount and every 30 seconds
   useEffect(() => {
@@ -194,8 +217,8 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   }, [noteId, presenceHeartbeat, presenceLeave]);
 
   const editor = useEditor({
-    immediatelyRender: false,
     editable: true,
+    immediatelyRender: false,
     extensions: [
       StarterKit,
       Placeholder.configure({
@@ -205,6 +228,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       ImageExtension,
       GraphCalculatorExtension,
       ChartExtension,
+      ...MathExtensions, // Math formula support (inline $...$ and block $$...$$)
     ],
     editorProps: {
       attributes: {
@@ -224,6 +248,14 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   useEffect(() => {
     noteIdRef.current = noteId;
   }, [noteId]);
+
+  const scheduleEditorUpdate = useCallback((fn: () => void) => {
+    queueMicrotask(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(fn);
+      });
+    });
+  }, []);
 
   // Helper function to detect if content is markdown and convert to HTML
   const convertMarkdownIfNeeded = async (content: string): Promise<string> => {
@@ -258,7 +290,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
           const htmlContent = await convertMarkdownIfNeeded(note.content || "");
           // Use queueMicrotask to schedule setContent outside of React's commit phase
           // This avoids the flushSync error since TipTap internally uses flushSync
-          queueMicrotask(() => {
+          scheduleEditorUpdate(() => {
             if (editor && !editor.isDestroyed) {
               editor.commands.setContent(htmlContent);
               setLoadedNoteId(noteId);
@@ -268,7 +300,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       }
     };
     loadContent();
-  }, [note, noteId, editor, loadedNoteId]); // Note: loadedNoteId prevents re-runs after initial load
+  }, [note, noteId, editor, loadedNoteId, scheduleEditorUpdate]); // Note: loadedNoteId prevents re-runs after initial load
 
   // Inject structured notes from RightSidebar when pendingNotes changes
   // Wait for note to be loaded (loadedNoteId === noteId) to avoid conflicts
@@ -283,7 +315,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       const cornellNotesHtml = pendingNotes.cornellNotes
         .map(
           (note, i) =>
-            `<h4>${pendingNotes.cornellCues[i] || ""}</h4><p>${note}</p>`
+            `<h4>${pendingNotes.cornellCues[i] || ""}</h4><p>${note}</p>`,
         )
         .join("");
       const cornellSummaryText = pendingNotes.summary || "";
@@ -357,20 +389,22 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     // Use setTimeout to avoid flushSync error during React render
     // Delay ensures editor is fully initialized and React rendering cycle is complete
     const timeoutId = setTimeout(() => {
-      if (editor && !editor.isDestroyed && editor.view) {
-        try {
-          editor.chain().focus().insertContent(html).run();
-          clearPendingNotes();
-        } catch (error) {
-          console.error("Failed to insert pending notes:", error);
-          clearPendingNotes();
+      scheduleEditorUpdate(() => {
+        if (editor && !editor.isDestroyed && editor.view) {
+          try {
+            editor.chain().focus().insertContent(html).run();
+            clearPendingNotes();
+          } catch (error) {
+            console.error("Failed to insert pending notes:", error);
+            clearPendingNotes();
+          }
         }
-      }
+      });
     }, 200);
 
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingNotes, editor, clearPendingNotes, loadedNoteId]);
+  }, [pendingNotes, editor, clearPendingNotes, loadedNoteId, scheduleEditorUpdate]);
 
   // --- Handlers ---
   const handleDelete = async () => {
@@ -443,7 +477,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         .insertContent("<p></p>")
         .run();
     },
-    [editor]
+    [editor],
   );
 
   // --- Deleting State ---
@@ -537,9 +571,9 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   }
 
   return (
-    <div className="h-full flex flex-col bg-[#0A0A0A] relative animate-in fade-in duration-500">
+    <div className="h-full flex flex-col bg-background relative animate-in fade-in duration-500">
       {/* 1. Top Navigation / Breadcrumbs */}
-      <div className="h-16 flex items-center px-4 lg:px-8 border-b border-white/5 bg-black/20 backdrop-blur top-0 z-20 sticky justify-between">
+      <div className="h-16 flex items-center px-4 lg:px-8 border-b border-border bg-background/80 backdrop-blur top-0 z-20 sticky justify-between">
         <div className="flex items-center gap-4">
           {/* Left Sidebar Toggle */}
           <Button
@@ -567,11 +601,11 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                 // Navigate back to course/module context
                 if (note.moduleId) {
                   router.push(
-                    `/dashboard?contextId=${note.moduleId}&contextType=module`
+                    `/dashboard?contextId=${note.moduleId}&contextType=module`,
                   );
                 } else if (note.courseId) {
                   router.push(
-                    `/dashboard?contextId=${note.courseId}&contextType=course`
+                    `/dashboard?contextId=${note.courseId}&contextType=course`,
                   );
                 } else {
                   onBack();
@@ -668,6 +702,29 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
               {/* Actions: Share */}
               <div className="flex items-center gap-2 mt-2">
                 <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsCollaboratorsOpen(true)}
+                  className="text-gray-400 hover:text-white hover:bg-white/10"
+                >
+                  <User className="w-4 h-4 mr-2" />
+                  Collaborate
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={async () => {
+                    await togglePinNote({ noteId });
+                  }}
+                  className={`${note.isPinned ? "text-rose-400 bg-rose-500/10 hover:bg-rose-500/20" : "text-gray-400 hover:text-white hover:bg-white/10"}`}
+                  title={note.isPinned ? "Unpin note" : "Pin note"}
+                >
+                  <Pin
+                    className={`w-4 h-4 mr-2 ${note.isPinned ? "fill-current" : ""}`}
+                  />
+                  {note.isPinned ? "Pinned" : "Pin"}
+                </Button>
+                <Button
                   variant={note.isShared ? "default" : "ghost"}
                   size="sm"
                   onClick={async () => {
@@ -687,6 +744,19 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                   <Share2 className="w-4 h-4 mr-2" />
                   {note.isShared ? "Shared" : "Share"}
                 </Button>
+
+                {/* Tag Picker */}
+                <div className="h-6 w-px bg-white/10 mx-1 hidden sm:block" />
+                <TagPicker
+                  selectedTagIds={note.tagIds || []}
+                  onTagToggle={async (tagId) => {
+                    const currentTags = note.tagIds || [];
+                    const newTags = currentTags.includes(tagId)
+                      ? currentTags.filter((t) => t !== tagId)
+                      : [...currentTags, tagId];
+                    await updateNote({ noteId, tagIds: newTags });
+                  }}
+                />
               </div>
             </div>
 
@@ -752,7 +822,9 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                   <div className="w-px h-4 bg-white/10 mx-1" />
                   <ToolbarButton
                     isActive={false}
-                    onClick={() => editor.chain().focus().insertGraphCalculator().run()}
+                    onClick={() =>
+                      editor.chain().focus().insertGraphCalculator().run()
+                    }
                     icon={<Calculator className="w-4 h-4" />}
                   />
                   <ToolbarButton
@@ -760,6 +832,31 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                     onClick={() => editor.chain().focus().insertChart().run()}
                     icon={<BarChart3 className="w-4 h-4" />}
                   />
+                  <ToolbarButton
+                    isActive={false}
+                    onClick={() => {
+                      // Insert a sample inline math formula
+                      editor
+                        .chain()
+                        .focus()
+                        .setInlineMath("x^2 + y^2 = z^2")
+                        .run();
+                    }}
+                    icon={<Sigma className="w-4 h-4" />}
+                  />
+                </div>
+                {/* Math formula hint */}
+                <div className="hidden lg:flex items-center gap-2 text-[10px] text-gray-500 bg-white/5 px-2 py-1 rounded">
+                  <Sigma className="w-3 h-3" />
+                  <span>
+                    Use{" "}
+                    <code className="bg-white/10 px-1 rounded">$formula$</code>{" "}
+                    for inline or{" "}
+                    <code className="bg-white/10 px-1 rounded">
+                      $$formula$$
+                    </code>{" "}
+                    for block math
+                  </span>
                 </div>
               </div>
             )}
@@ -876,6 +973,12 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             }
           });
         }}
+      />
+
+      <CollaboratorsDialog
+        open={isCollaboratorsOpen}
+        onOpenChange={setIsCollaboratorsOpen}
+        noteId={noteId}
       />
     </div>
   );

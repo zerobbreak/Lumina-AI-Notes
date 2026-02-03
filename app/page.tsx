@@ -10,6 +10,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Play } from "lucide-react";
 import { FadeIn } from "@/components/animations/FadeIn";
+import { ComparisonBento } from "@/components/home/ComparisonBento";
 
 export default function Home() {
   return (
@@ -102,6 +103,10 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      <FadeIn>
+        <ComparisonBento />
+      </FadeIn>
 
       <StatsSection />
 

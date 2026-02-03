@@ -60,7 +60,7 @@ function SidebarCourseComponent({
         console.error(e);
       }
     },
-    [addModule, course.id, isExpanded, onToggle]
+    [addModule, course.id, isExpanded, onToggle],
   );
 
   // Drop zone handlers
@@ -100,7 +100,7 @@ function SidebarCourseComponent({
         }
       }
     },
-    [moveNoteToFolder, course.id, course.name]
+    [moveNoteToFolder, course.id, course.name],
   );
 
   const handleCourseClick = useCallback(() => {
@@ -112,7 +112,7 @@ function SidebarCourseComponent({
       e.stopPropagation();
       onToggle();
     },
-    [onToggle]
+    [onToggle],
   );
 
   const handleRename = useCallback(() => {
@@ -126,7 +126,7 @@ function SidebarCourseComponent({
   // Filter notes that don't belong to any module - memoized
   const rootCourseNotes = useMemo(
     () => courseNotes?.filter((note) => !note.moduleId),
-    [courseNotes]
+    [courseNotes],
   );
 
   return (
@@ -136,10 +136,10 @@ function SidebarCourseComponent({
           className={cn(
             "flex-1 flex items-center h-9 px-2.5 text-[13px] font-medium transition-all duration-200 border-l-2 gap-2 cursor-pointer",
             isDragOver
-              ? "bg-indigo-500/30 text-indigo-300 border-indigo-400 ring-1 ring-indigo-400/50"
+              ? "bg-indigo-500/30 text-indigo-700 dark:text-indigo-300 border-indigo-400 ring-1 ring-indigo-400/50"
               : isExpanded
-                ? "bg-indigo-500/10 text-indigo-400 border-indigo-500 hover:bg-indigo-500/20 hover:text-indigo-300"
-                : "border-transparent text-gray-400 hover:text-white hover:bg-white/4"
+                ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500 hover:bg-indigo-500/20 hover:text-indigo-700 dark:hover:text-indigo-300"
+                : "border-transparent text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/4",
           )}
           onClick={handleCourseClick}
           onDragOver={handleDragOver}
@@ -151,8 +151,8 @@ function SidebarCourseComponent({
             className={cn(
               "p-0.5 rounded-md transition-colors",
               isExpanded
-                ? "text-indigo-400"
-                : "text-gray-500 hover:bg-white/10 hover:text-gray-300"
+                ? "text-indigo-600 dark:text-indigo-400"
+                : "text-slate-500 dark:text-gray-500 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-700 dark:hover:text-gray-300",
             )}
             onClick={handleToggleClick}
           >
@@ -181,7 +181,7 @@ function SidebarCourseComponent({
       </div>
 
       {isExpanded && (
-        <div className="pl-4 space-y-0.5 ml-2 border-l border-white/5">
+        <div className="pl-4 space-y-0.5 ml-2 border-l border-slate-200 dark:border-white/5">
           {/* MODULES */}
           {course.modules?.map((mod: Module) => (
             <SidebarModule
@@ -211,7 +211,7 @@ function SidebarCourseComponent({
           {/* ADD MODULE BUTTON */}
           <Button
             variant="ghost"
-            className="w-full justify-start h-8 px-2 text-[11px] text-gray-600 hover:text-indigo-400 hover:bg-indigo-500/5 gap-2 transition-all ml-0.5"
+            className="w-full justify-start h-8 px-2 text-[11px] text-slate-500 dark:text-gray-600 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/5 gap-2 transition-all ml-0.5"
             onClick={handleCreateModule}
           >
             <Plus className="w-3 h-3" /> Add Module

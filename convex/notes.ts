@@ -3,6 +3,42 @@ import { mutation, query, action } from "./_generated/server";
 import { api } from "./_generated/api";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+type NoteRole = "owner" | "editor" | "viewer";
+
+async function getNoteRole(
+  ctx: any,
+  noteId: any,
+  userId: string,
+): Promise<NoteRole | null> {
+  const note = await ctx.db.get(noteId);
+  if (!note) return null;
+  if (note.userId === userId) return "owner";
+  const collab = await ctx.db
+    .query("noteCollaborators")
+    .withIndex("by_noteId_userId", (q: any) =>
+      q.eq("noteId", noteId).eq("userId", userId),
+    )
+    .unique();
+  if (!collab) return null;
+  return collab.role as "editor" | "viewer";
+}
+
+async function requireNoteAccess(ctx: any, noteId: any) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error("Unauthorized");
+  const role = await getNoteRole(ctx, noteId, identity.tokenIdentifier);
+  if (!role) throw new Error("Unauthorized");
+  const note = await ctx.db.get(noteId);
+  if (!note) throw new Error("Note not found");
+  return { identity, role, note };
+}
+
+async function requireNoteEdit(ctx: any, noteId: any) {
+  const { identity, role, note } = await requireNoteAccess(ctx, noteId);
+  if (role !== "owner" && role !== "editor") throw new Error("Forbidden");
+  return { identity, role, note };
+}
+
 export const createNote = mutation({
   args: {
     title: v.string(),
@@ -12,6 +48,8 @@ export const createNote = mutation({
     parentNoteId: v.optional(v.id("notes")),
     style: v.optional(v.string()),
     noteType: v.optional(v.string()), // "quick" | "page"
+    tagIds: v.optional(v.array(v.id("tags"))),
+    wordCount: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -34,6 +72,8 @@ export const createNote = mutation({
       style: args.style || "standard",
       content: "",
       isPinned: false,
+      tagIds: args.tagIds || [],
+      wordCount: args.wordCount || 0,
       createdAt: Date.now(),
     });
 
@@ -50,7 +90,7 @@ export const getQuickNotes = query({
       return [];
     }
 
-    const notes = await ctx.db
+    const ownedNotes = await ctx.db
       .query("notes")
       .withIndex("by_userId", (q) => q.eq("userId", identity.tokenIdentifier))
       .filter((q) =>
@@ -62,15 +102,40 @@ export const getQuickNotes = query({
             q.and(
               q.eq(q.field("noteType"), undefined),
               q.eq(q.field("courseId"), undefined),
-              q.eq(q.field("moduleId"), undefined)
-            )
-          )
-        )
+              q.eq(q.field("moduleId"), undefined),
+            ),
+          ),
+        ),
       )
       .order("desc")
       .take(10);
 
-    return notes;
+    // Also include quick notes shared with the user.
+    const collabs = await ctx.db
+      .query("noteCollaborators")
+      .withIndex("by_userId", (q: any) =>
+        q.eq("userId", identity.tokenIdentifier),
+      )
+      .collect();
+
+    const sharedNotes = [];
+    for (const c of collabs) {
+      const n = await ctx.db.get(c.noteId);
+      if (!n) continue;
+      if (n.isArchived) continue;
+      const isQuick =
+        n.noteType === "quick" ||
+        (n.noteType === undefined &&
+          n.courseId === undefined &&
+          n.moduleId === undefined);
+      if (isQuick) sharedNotes.push(n);
+    }
+
+    const combined = [...ownedNotes, ...sharedNotes]
+      .sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+      .slice(0, 10);
+
+    return combined;
   },
 });
 
@@ -83,14 +148,33 @@ export const getRecentNotes = query({
       return [];
     }
 
-    const notes = await ctx.db
+    const ownedNotes = await ctx.db
       .query("notes")
       .withIndex("by_userId", (q) => q.eq("userId", identity.tokenIdentifier))
       .filter((q) => q.neq(q.field("isArchived"), true))
       .order("desc") // Most recent first
-      .take(5);
+      .take(20);
 
-    return notes;
+    const collabs = await ctx.db
+      .query("noteCollaborators")
+      .withIndex("by_userId", (q: any) =>
+        q.eq("userId", identity.tokenIdentifier),
+      )
+      .collect();
+
+    const sharedNotes = [];
+    for (const c of collabs) {
+      const n = await ctx.db.get(c.noteId);
+      if (!n) continue;
+      if (n.isArchived) continue;
+      sharedNotes.push(n);
+    }
+
+    const combined = [...ownedNotes, ...sharedNotes]
+      .sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+      .slice(0, 5);
+
+    return combined;
   },
 });
 
@@ -123,19 +207,29 @@ export const getNotesByContext = query({
     if (!identity) return [];
 
     if (args.moduleId) {
-      return await ctx.db
+      const notes = await ctx.db
         .query("notes")
         .withIndex("by_moduleId", (q) => q.eq("moduleId", args.moduleId!))
-        .filter((q) => q.eq(q.field("userId"), identity.tokenIdentifier))
         .collect();
+      const accessible = [];
+      for (const n of notes) {
+        const role = await getNoteRole(ctx, n._id, identity.tokenIdentifier);
+        if (role) accessible.push(n);
+      }
+      return accessible;
     }
 
     if (args.courseId) {
-      return await ctx.db
+      const notes = await ctx.db
         .query("notes")
         .withIndex("by_courseId", (q) => q.eq("courseId", args.courseId!))
-        .filter((q) => q.eq(q.field("userId"), identity.tokenIdentifier))
         .collect();
+      const accessible = [];
+      for (const n of notes) {
+        const role = await getNoteRole(ctx, n._id, identity.tokenIdentifier);
+        if (role) accessible.push(n);
+      }
+      return accessible;
     }
 
     return [];
@@ -145,13 +239,8 @@ export const getNotesByContext = query({
 export const deleteNote = mutation({
   args: { noteId: v.id("notes") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
-
-    const note = await ctx.db.get(args.noteId);
-    if (!note || note.userId !== identity.tokenIdentifier) {
-      throw new Error("Note not found or unauthorized");
-    }
+    const { identity, role } = await requireNoteAccess(ctx, args.noteId);
+    if (role !== "owner") throw new Error("Forbidden");
 
     await ctx.db.delete(args.noteId);
   },
@@ -160,12 +249,8 @@ export const deleteNote = mutation({
 export const toggleArchiveNote = mutation({
   args: { noteId: v.id("notes") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
-    const note = await ctx.db.get(args.noteId);
-    if (!note || note.userId !== identity.tokenIdentifier) {
-      throw new Error("Note not found or unauthorized");
-    }
+    const { note, role } = await requireNoteAccess(ctx, args.noteId);
+    if (role !== "owner") throw new Error("Forbidden");
     // If it doesn't have isArchived field yet, treat as false -> true
     const currentArchived = note.isArchived ?? false;
     await ctx.db.patch(args.noteId, { isArchived: !currentArchived });
@@ -175,12 +260,8 @@ export const toggleArchiveNote = mutation({
 export const togglePinNote = mutation({
   args: { noteId: v.id("notes") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
-    const note = await ctx.db.get(args.noteId);
-    if (!note || note.userId !== identity.tokenIdentifier) {
-      throw new Error("Note not found or unauthorized");
-    }
+    const { note, role } = await requireNoteAccess(ctx, args.noteId);
+    if (role !== "owner") throw new Error("Forbidden");
     const currentPinned = note.isPinned ?? false;
     await ctx.db.patch(args.noteId, { isPinned: !currentPinned });
   },
@@ -197,7 +278,7 @@ export const getPinnedNotes = query({
     const notes = await ctx.db
       .query("notes")
       .withIndex("by_userId_and_pinned", (q) =>
-        q.eq("userId", identity.tokenIdentifier).eq("isPinned", true)
+        q.eq("userId", identity.tokenIdentifier).eq("isPinned", true),
       )
       .filter((q) => q.neq(q.field("isArchived"), true))
       .order("desc")
@@ -210,13 +291,8 @@ export const getPinnedNotes = query({
 export const renameNote = mutation({
   args: { noteId: v.id("notes"), title: v.string() },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
-
-    const note = await ctx.db.get(args.noteId);
-    if (!note || note.userId !== identity.tokenIdentifier) {
-      throw new Error("Note not found or unauthorized");
-    }
+    const { role } = await requireNoteEdit(ctx, args.noteId);
+    // Allow owners + editors to rename (shared editing experience)
 
     await ctx.db.patch(args.noteId, { title: args.title });
   },
@@ -227,9 +303,9 @@ export const getNote = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
-    const note = await ctx.db.get(args.noteId);
-    if (note?.userId !== identity.tokenIdentifier) return null;
-    return note;
+    const role = await getNoteRole(ctx, args.noteId, identity.tokenIdentifier);
+    if (!role) return null;
+    return await ctx.db.get(args.noteId);
   },
 });
 
@@ -244,29 +320,31 @@ export const updateNote = mutation({
     cornellSummary: v.optional(v.string()),
     // Outline Mode specific fields
     outlineData: v.optional(v.string()),
-    outlineMetadata: v.optional(v.object({
-      totalItems: v.number(),
-      completedTasks: v.number(),
-      collapsedNodes: v.array(v.string()),
-    })),
+    outlineMetadata: v.optional(
+      v.object({
+        totalItems: v.number(),
+        completedTasks: v.number(),
+        collapsedNodes: v.array(v.string()),
+      }),
+    ),
+    tagIds: v.optional(v.array(v.id("tags"))),
+    wordCount: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
-
-    // Validate ownership
-    const note = await ctx.db.get(args.noteId);
-    if (!note || note.userId !== identity.tokenIdentifier)
-      throw new Error("Unauthorized");
+    await requireNoteEdit(ctx, args.noteId);
 
     const patch: any = {};
     if (args.title !== undefined) patch.title = args.title;
     if (args.content !== undefined) patch.content = args.content;
     if (args.cornellCues !== undefined) patch.cornellCues = args.cornellCues;
     if (args.cornellNotes !== undefined) patch.cornellNotes = args.cornellNotes;
-    if (args.cornellSummary !== undefined) patch.cornellSummary = args.cornellSummary;
+    if (args.cornellSummary !== undefined)
+      patch.cornellSummary = args.cornellSummary;
     if (args.outlineData !== undefined) patch.outlineData = args.outlineData;
-    if (args.outlineMetadata !== undefined) patch.outlineMetadata = args.outlineMetadata;
+    if (args.outlineMetadata !== undefined)
+      patch.outlineMetadata = args.outlineMetadata;
+    if (args.tagIds !== undefined) patch.tagIds = args.tagIds;
+    if (args.wordCount !== undefined) patch.wordCount = args.wordCount;
 
     await ctx.db.patch(args.noteId, patch);
   },
@@ -275,13 +353,8 @@ export const updateNote = mutation({
 export const toggleShareNote = mutation({
   args: { noteId: v.id("notes") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
-
-    const note = await ctx.db.get(args.noteId);
-    if (!note || note.userId !== identity.tokenIdentifier) {
-      throw new Error("Unauthorized");
-    }
+    const { note, role } = await requireNoteAccess(ctx, args.noteId);
+    if (role !== "owner") throw new Error("Forbidden");
 
     const currentShared = note.isShared ?? false;
     await ctx.db.patch(args.noteId, { isShared: !currentShared });
@@ -309,13 +382,9 @@ export const linkDocuments = mutation({
     documentIds: v.array(v.id("files")),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
-
-    const note = await ctx.db.get(args.noteId);
-    if (!note || note.userId !== identity.tokenIdentifier) {
-      throw new Error("Unauthorized");
-    }
+    const { note, role } = await requireNoteEdit(ctx, args.noteId);
+    // Only owners can manage linked documents for now (reduces shared-state surprises)
+    if (role !== "owner") throw new Error("Forbidden");
 
     const existingIds = note.linkedDocumentIds || [];
     const newIds = [...new Set([...existingIds, ...args.documentIds])];
@@ -334,16 +403,11 @@ export const unlinkDocument = mutation({
     documentId: v.id("files"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
-
-    const note = await ctx.db.get(args.noteId);
-    if (!note || note.userId !== identity.tokenIdentifier) {
-      throw new Error("Unauthorized");
-    }
+    const { note, role } = await requireNoteEdit(ctx, args.noteId);
+    if (role !== "owner") throw new Error("Forbidden");
 
     const existingIds = note.linkedDocumentIds || [];
-    const newIds = existingIds.filter((id) => id !== args.documentId);
+    const newIds = existingIds.filter((id: any) => id !== args.documentId);
 
     await ctx.db.patch(args.noteId, { linkedDocumentIds: newIds });
     return newIds;
@@ -354,10 +418,10 @@ export const unlinkDocument = mutation({
  * Helper query to fetch documents by their IDs (for use in actions)
  */
 export const getDocumentsByIds = query({
-  args: { documentIds: v.array(v.id("documents")) },
+  args: { documentIds: v.array(v.id("files")) },
   handler: async (ctx, args) => {
     const docs = await Promise.all(
-      args.documentIds.map((id) => ctx.db.get(id))
+      args.documentIds.map((id) => ctx.db.get(id)),
     );
     return docs.filter((doc) => doc !== null);
   },
@@ -378,6 +442,21 @@ export const generateFromPinnedAudio = action({
     const embeddingModel = genAI.getGenerativeModel({
       model: "text-embedding-004",
     });
+
+    const tryParseJson = (text: string) => {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return null;
+      return JSON.parse(jsonMatch[0]);
+    };
+
+    const fixJson = async (text: string) => {
+      const fixPrompt = `Fix the following JSON. Return ONLY valid JSON with the same structure and content, no markdown.
+
+JSON:
+${text}`;
+      const fixResult = await model.generateContent(fixPrompt);
+      return fixResult.response.text().trim();
+    };
 
     // 1. Embed the transcript
     const embeddingResult = await embeddingModel.embedContent(args.transcript);
@@ -453,9 +532,23 @@ Rules:
         .replace(/```\s*$/i, "");
 
       // Parse JSON response
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
+      let parsed = null;
+      try {
+        parsed = tryParseJson(responseText);
+      } catch {
+        parsed = null;
+      }
+
+      if (!parsed) {
+        const fixedText = await fixJson(responseText);
+        try {
+          parsed = tryParseJson(fixedText);
+        } catch {
+          parsed = null;
+        }
+      }
+
+      if (parsed) {
 
         // Convert simplified diagram format to ReactFlow format
         let diagramData = undefined;
@@ -469,7 +562,7 @@ Rules:
               // Assign node types and colors based on position
               let type = "default";
               let color = "bg-gradient-to-br from-gray-500 to-gray-600";
-              
+
               if (index === 0) {
                 type = "concept";
                 color = "bg-gradient-to-br from-purple-500 to-pink-500";
@@ -493,14 +586,14 @@ Rules:
                   y: index === 0 ? 50 : Math.floor(index / 3) * 150 + 200,
                 },
               };
-            }
+            },
           );
 
           const edges = (parsed.diagramEdges || []).map(
             (edge: string, index: number) => {
               const [source, target] = edge.split("-");
               return { id: `e${index}`, source, target, animated: true };
-            }
+            },
           );
 
           diagramData = { nodes, edges };
@@ -550,13 +643,8 @@ export const moveNoteToFolder = mutation({
     moduleId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
-
-    const note = await ctx.db.get(args.noteId);
-    if (!note || note.userId !== identity.tokenIdentifier) {
-      throw new Error("Note not found or unauthorized");
-    }
+    const { role } = await requireNoteAccess(ctx, args.noteId);
+    if (role !== "owner") throw new Error("Forbidden");
 
     // Move note to folder/module and convert to "page" type
     await ctx.db.patch(args.noteId, {
@@ -577,13 +665,8 @@ export const unassignNoteFromFolder = mutation({
     noteId: v.id("notes"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
-
-    const note = await ctx.db.get(args.noteId);
-    if (!note || note.userId !== identity.tokenIdentifier) {
-      throw new Error("Note not found or unauthorized");
-    }
+    const { role } = await requireNoteAccess(ctx, args.noteId);
+    if (role !== "owner") throw new Error("Forbidden");
 
     // Convert back to quick note by removing folder associations
     await ctx.db.patch(args.noteId, {
@@ -609,8 +692,10 @@ export const getNotesByIds = query({
 
     const notes = [];
     for (const noteId of args.noteIds) {
-      const note = await ctx.db.get(noteId);
-      if (note && note.userId === identity.tokenIdentifier) {
+      const role = await getNoteRole(ctx, noteId, identity.tokenIdentifier);
+      if (role) {
+        const note = await ctx.db.get(noteId);
+        if (!note) continue;
         notes.push(note);
       }
     }
@@ -633,15 +718,15 @@ export const getNotesByCourse = query({
     const notes = await ctx.db
       .query("notes")
       .withIndex("by_courseId", (q) => q.eq("courseId", args.courseId))
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("userId"), identity.tokenIdentifier),
-          q.neq(q.field("isArchived"), true)
-        )
-      )
       .collect();
 
-    return notes;
+    const accessible = [];
+    for (const n of notes) {
+      if (n.isArchived) continue;
+      const role = await getNoteRole(ctx, n._id, identity.tokenIdentifier);
+      if (role) accessible.push(n);
+    }
+    return accessible;
   },
 });
 
@@ -678,5 +763,57 @@ export const getAllNotesForExport = query({
       isPinned: note.isPinned,
       isArchived: note.isArchived,
     }));
+  },
+});
+
+export const searchNotes = query({
+  args: {
+    query: v.optional(v.string()),
+    tagIds: v.optional(v.array(v.id("tags"))),
+    noteType: v.optional(v.string()),
+    courseId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    let notes;
+
+    if (args.query) {
+      notes = await ctx.db
+        .query("notes")
+        .withSearchIndex("search_title", (q) =>
+          q.search("title", args.query!).eq("userId", identity.tokenIdentifier),
+        )
+        .collect();
+    } else {
+      notes = await ctx.db
+        .query("notes")
+        .withIndex("by_userId", (q) => q.eq("userId", identity.tokenIdentifier))
+        .order("desc") // Most recent first for non-search views
+        .collect();
+    }
+
+    // In-memory filtering
+    return notes.filter((n) => {
+      // Exclude archived
+      if (n.isArchived) return false;
+
+      // Filter by noteType
+      if (args.noteType && n.noteType !== args.noteType) return false;
+
+      // Filter by courseId
+      if (args.courseId && n.courseId !== args.courseId) return false;
+
+      // Filter by Tags (Intersection: Note must have ALL selected tags)
+      if (args.tagIds && args.tagIds.length > 0) {
+        if (!n.tagIds || n.tagIds.length === 0) return false;
+        const noteTagIds = new Set(n.tagIds);
+        const hasAllTags = args.tagIds.every((tId) => noteTagIds.has(tId));
+        if (!hasAllTags) return false;
+      }
+
+      return true;
+    });
   },
 });

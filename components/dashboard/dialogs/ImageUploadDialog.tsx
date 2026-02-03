@@ -20,11 +20,11 @@ import {
   Copy,
   Check,
   AlertCircle,
-  Upload,
-  X,
+  Crown,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 import "katex/dist/katex.min.css";
 import katex from "katex";
 
@@ -60,11 +60,8 @@ export function ImageUploadDialog({
   const [description, setDescription] = useState<string | null>(null);
   const [confidence, setConfidence] = useState<"high" | "medium" | "low" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [requiresUpgrade, setRequiresUpgrade] = useState(false);
   const [copied, setCopied] = useState(false);
   const [editedLatex, setEditedLatex] = useState<string>("");
-
-  const isFreeTier = !subscription || subscription.tier === "free";
 
   const resetFormulaState = () => {
     setImagePreview(null);
@@ -73,7 +70,6 @@ export function ImageUploadDialog({
     setDescription(null);
     setConfidence(null);
     setError(null);
-    setRequiresUpgrade(false);
     setEditedLatex("");
   };
 
@@ -94,7 +90,6 @@ export function ImageUploadDialog({
     setMimeType(file.type);
     setError(null);
     setExtractedLatex(null);
-    setRequiresUpgrade(false);
 
     const previewUrl = URL.createObjectURL(file);
     setImagePreview(previewUrl);
@@ -121,7 +116,6 @@ export function ImageUploadDialog({
 
     setIsExtracting(true);
     setError(null);
-    setRequiresUpgrade(false);
 
     try {
       const result = await extractFormula({ imageBase64, mimeType });
@@ -133,9 +127,6 @@ export function ImageUploadDialog({
         setConfidence(result.confidence || null);
       } else {
         setError(result.error || "Failed to extract formula");
-        if (result.requiresUpgrade) {
-          setRequiresUpgrade(true);
-        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to extract formula");
@@ -193,268 +184,237 @@ export function ImageUploadDialog({
     );
   };
 
-  // For free users, only show upload mode
-  const showTabs = !isFreeTier;
-  const currentMode = isFreeTier ? "upload" : mode;
+  // TEMPORARY: All features are free - show all tabs
+  const showTabs = true;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] bg-[#0A0A0A] border-white/10 text-white shadow-2xl p-0 gap-0 overflow-hidden">
-        {/* Header */}
-        <div className="px-6 pt-6 pb-4">
-          <DialogHeader className="space-y-1.5">
-            <DialogTitle className="text-lg font-semibold text-white">
-              {currentMode === "upload" ? "Upload Image" : "Extract Formula"}
-            </DialogTitle>
-            <DialogDescription className="text-sm text-gray-400">
-              {currentMode === "upload"
-                ? "Add an image to your note"
-                : "Convert a formula image to LaTeX"}
-            </DialogDescription>
-          </DialogHeader>
-        </div>
+      <DialogContent className="sm:max-w-[550px] bg-[#0A0A0A] border-white/10 text-white shadow-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <div className={cn("p-2 rounded-lg", mode === "upload" ? "bg-indigo-500/20" : "bg-purple-500/20")}>
+              {mode === "upload" ? (
+                <ImageIcon className="w-5 h-5 text-indigo-400" />
+              ) : (
+                <Sparkles className="w-5 h-5 text-purple-400" />
+              )}
+            </div>
+            {mode === "upload" ? "Upload Image" : "Extract Formula"}
+          </DialogTitle>
+          <DialogDescription className="text-gray-400">
+            {mode === "upload"
+              ? "Add an image to your note. Supports PNG, JPG, GIF up to 4MB."
+              : "Upload an image containing a formula. AI will convert it to LaTeX."}
+          </DialogDescription>
+        </DialogHeader>
 
         {/* Mode Tabs - Only show for Scholar users */}
         {showTabs && (
-          <div className="px-6 pb-4">
-            <div className="flex p-1 bg-white/5 rounded-lg border border-white/5">
-              <button
-                onClick={() => {
-                  setMode("upload");
-                  resetFormulaState();
-                }}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-all duration-200",
-                  mode === "upload"
-                    ? "bg-white text-black shadow-sm"
-                    : "text-gray-400 hover:text-white"
-                )}
-              >
-                <ImageIcon className="w-4 h-4" />
-                Image
-              </button>
-              <button
-                onClick={() => {
-                  setMode("formula");
-                  setUploadSuccess(false);
-                }}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-all duration-200",
-                  mode === "formula"
-                    ? "bg-white text-black shadow-sm"
-                    : "text-gray-400 hover:text-white"
-                )}
-              >
-                <Sparkles className="w-4 h-4" />
-                Formula
-              </button>
-            </div>
+          <div className="flex gap-2 p-1 bg-white/5 rounded-lg">
+            <button
+              onClick={() => {
+                setMode("upload");
+                resetFormulaState();
+              }}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all",
+                mode === "upload"
+                  ? "bg-indigo-600 text-white"
+                  : "text-gray-400 hover:text-white hover:bg-white/5"
+              )}
+            >
+              <ImageIcon className="w-4 h-4" />
+              Insert Image
+            </button>
+            <button
+              onClick={() => {
+                setMode("formula");
+                setUploadSuccess(false);
+              }}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all",
+                mode === "formula"
+                  ? "bg-purple-600 text-white"
+                  : "text-gray-400 hover:text-white hover:bg-white/5"
+              )}
+            >
+              <Sparkles className="w-4 h-4" />
+              Extract Formula
+            </button>
           </div>
         )}
 
-        {/* Content Area */}
-        <div className="px-6 pb-6">
-          {/* Upload Mode */}
-          {currentMode === "upload" && (
-            <div>
-              {uploadSuccess ? (
-                <div className="flex flex-col items-center justify-center gap-3 py-12 bg-emerald-500/5 rounded-xl border border-emerald-500/20">
-                  <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                    <CheckCircle className="w-6 h-6 text-emerald-400" />
-                  </div>
-                  <p className="text-emerald-400 font-medium">Upload complete</p>
+        {/* Upload Mode */}
+        {mode === "upload" && (
+          <div className="py-4">
+            {uploadSuccess ? (
+              <div className="flex flex-col items-center justify-center gap-4 py-8">
+                <div className="p-4 bg-emerald-500/20 rounded-full">
+                  <CheckCircle className="w-10 h-10 text-emerald-400" />
                 </div>
-              ) : isUploading ? (
-                <div className="flex flex-col items-center justify-center gap-3 py-12 bg-white/5 rounded-xl border border-white/10">
-                  <Loader2 className="w-8 h-8 text-white animate-spin" />
-                  <p className="text-gray-400 text-sm">Uploading...</p>
-                </div>
-              ) : (
-                <UploadDropzone
-                  endpoint="imageUploader"
-                  onUploadBegin={() => setIsUploading(true)}
-                  onClientUploadComplete={(res) => {
-                    setIsUploading(false);
-                    setUploadSuccess(true);
+                <p className="text-emerald-400 font-medium">
+                  Image uploaded successfully!
+                </p>
+              </div>
+            ) : isUploading ? (
+              <div className="flex flex-col items-center justify-center gap-4 py-8">
+                <Loader2 className="w-10 h-10 text-indigo-400 animate-spin" />
+                <p className="text-gray-400">Uploading your image...</p>
+              </div>
+            ) : (
+              <UploadDropzone
+                endpoint="imageUploader"
+                onUploadBegin={() => setIsUploading(true)}
+                onClientUploadComplete={(res) => {
+                  setIsUploading(false);
+                  setUploadSuccess(true);
 
-                    if (res && res[0]) {
-                      const file = res[0];
-                      const url = file.ufsUrl || file.url || file.appUrl;
+                  if (res && res[0]) {
+                    const file = res[0];
+                    const url = file.ufsUrl || file.url || file.appUrl;
 
-                      if (url) {
-                        onImageUploaded(url);
-                      } else {
-                        alert("Upload succeeded but no URL was returned.");
-                      }
-
-                      setTimeout(() => {
-                        handleClose();
-                      }, 800);
+                    if (url) {
+                      onImageUploaded(url);
+                    } else {
+                      alert("Upload succeeded but no URL was returned.");
                     }
-                  }}
-                  onUploadError={(error: Error) => {
-                    setIsUploading(false);
-                    alert(`Upload failed: ${error.message}`);
-                  }}
-                  className="w-full"
-                  appearance={{
-                    container:
-                      "w-full min-h-[200px] border border-dashed border-white/20 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/30 transition-all cursor-pointer flex flex-col items-center justify-center gap-3 group",
-                    label: "text-gray-300 text-sm font-medium group-hover:text-white transition-colors",
-                    allowedContent: "text-gray-500 text-xs mt-1",
-                    button:
-                      "bg-white text-black font-medium px-5 py-2 rounded-lg text-sm hover:bg-gray-100 transition-colors mt-3",
-                    uploadIcon: "text-gray-500 w-10 h-10 group-hover:text-gray-400 transition-colors",
-                  }}
-                />
-              )}
-            </div>
-          )}
 
-          {/* Formula Mode - Only for Scholar users */}
-          {currentMode === "formula" && !isFreeTier && (
-            <div className="space-y-4">
-              {/* Formula Upload Zone */}
-              {!extractedLatex && (
-                <div
-                  {...getRootProps()}
-                  className={cn(
-                    "relative border border-dashed rounded-xl p-8 text-center transition-all cursor-pointer group",
-                    isDragActive
-                      ? "border-purple-400 bg-purple-500/10"
-                      : imagePreview
-                        ? "border-purple-500/40 bg-purple-500/5"
-                        : "border-white/20 hover:border-white/30 bg-white/[0.02] hover:bg-white/[0.04]"
-                  )}
-                >
-                  <input {...getInputProps()} />
+                    setTimeout(() => {
+                      handleClose();
+                    }, 800);
+                  }
+                }}
+                onUploadError={(error: Error) => {
+                  setIsUploading(false);
+                  alert(`Upload failed: ${error.message}`);
+                }}
+                className="w-full"
+                appearance={{
+                  container:
+                    "w-full h-52 border-2 border-dashed border-white/10 rounded-xl bg-white/5 hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all cursor-pointer ut-uploading:border-indigo-500/30 flex flex-col items-center justify-center gap-4",
+                  label: "text-gray-300 hover:text-white transition-colors font-medium",
+                  allowedContent: "text-gray-500 text-xs",
+                  button:
+                    "bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-md transition-colors ut-uploading:bg-indigo-700 ut-uploading:cursor-not-allowed",
+                  uploadIcon: "text-indigo-400 w-12 h-12 mb-2",
+                }}
+              />
+            )}
+          </div>
+        )}
 
-                  {imagePreview ? (
-                    <div className="space-y-4">
-                      <div className="relative inline-block">
-                        <img
-                          src={imagePreview}
-                          alt="Uploaded formula"
-                          className="max-h-32 mx-auto rounded-lg border border-white/10 shadow-lg"
-                        />
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            resetFormulaState();
-                          }}
-                          className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-400 rounded-full flex items-center justify-center transition-colors"
-                        >
-                          <X className="w-3.5 h-3.5 text-white" />
-                        </button>
-                      </div>
-                      <p className="text-xs text-gray-500">Click or drop to replace</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="w-14 h-14 mx-auto rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-colors">
-                        <Upload className="w-6 h-6 text-gray-500 group-hover:text-gray-400 transition-colors" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-300 font-medium">
-                          {isDragActive ? "Drop the image here" : "Drop an image with a formula"}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          PNG, JPG, GIF, WebP up to 10MB
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+        {/* Formula Mode */}
+        {mode === "formula" && (
+          <div className="space-y-4 py-4">
+            {/* Formula Upload Zone */}
+            {!extractedLatex && (
+              <div
+                {...getRootProps()}
+                className={cn(
+                  "relative border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer",
+                  isDragActive
+                    ? "border-purple-500 bg-purple-500/10"
+                    : imagePreview
+                      ? "border-purple-500/30 bg-purple-500/5"
+                      : "border-white/10 hover:border-purple-500/50 hover:bg-purple-500/5"
+                )}
+              >
+                <input {...getInputProps()} />
 
-              {/* Extracted Formula Display */}
-              {extractedLatex && (
-                <div className="space-y-4">
-                  <div className="bg-white/5 rounded-xl p-5 border border-white/10">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs text-gray-500 uppercase tracking-wider font-medium">Preview</span>
-                      {getConfidenceBadge()}
-                    </div>
-                    <div
-                      className="text-center text-white overflow-x-auto py-3 bg-black/30 rounded-lg"
-                      dangerouslySetInnerHTML={{ __html: renderLatex(editedLatex) }}
+                {imagePreview ? (
+                  <div className="space-y-3">
+                    <img
+                      src={imagePreview}
+                      alt="Uploaded formula"
+                      className="max-h-36 mx-auto rounded-lg border border-white/10"
                     />
-                    {description && (
-                      <p className="text-xs text-gray-400 mt-3 text-center">{description}</p>
-                    )}
+                    <p className="text-xs text-gray-400">Click or drop to replace</p>
                   </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs text-gray-500 uppercase tracking-wider font-medium">LaTeX Code</label>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={handleCopy} 
-                        className="h-7 px-2 text-xs text-gray-400 hover:text-white hover:bg-white/10"
-                      >
-                        {copied ? <><Check className="w-3 h-3 mr-1.5" />Copied</> : <><Copy className="w-3 h-3 mr-1.5" />Copy</>}
-                      </Button>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="w-12 h-12 mx-auto rounded-xl bg-white/5 flex items-center justify-center">
+                      <Sparkles className="w-6 h-6 text-gray-500" />
                     </div>
-                    <textarea
-                      value={editedLatex}
-                      onChange={(e) => setEditedLatex(e.target.value)}
-                      className="w-full h-24 p-3 rounded-lg bg-black/40 border border-white/10 text-gray-200 font-mono text-xs resize-none focus:outline-none focus:ring-1 focus:ring-white/20 focus:border-white/20 transition-all"
-                      placeholder="LaTeX code will appear here..."
-                    />
+                    <p className="text-sm text-gray-300">
+                      {isDragActive ? "Drop the image here" : "Drop an image with a formula"}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      PNG, JPG, GIF, WebP up to 10MB
+                    </p>
                   </div>
+                )}
+              </div>
+            )}
 
-                  <button 
-                    onClick={resetFormulaState} 
-                    className="text-xs text-gray-400 hover:text-white transition-colors flex items-center gap-1.5"
-                  >
-                    <Upload className="w-3 h-3" />
-                    Upload different image
-                  </button>
+            {/* Extracted Formula Display */}
+            {extractedLatex && (
+              <div className="space-y-3">
+                <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-gray-500 uppercase tracking-wider">Result</span>
+                    {getConfidenceBadge()}
+                  </div>
+                  <div
+                    className="text-center text-white overflow-x-auto py-2"
+                    dangerouslySetInnerHTML={{ __html: renderLatex(editedLatex) }}
+                  />
+                  {description && (
+                    <p className="text-xs text-gray-400 mt-2 text-center">{description}</p>
+                  )}
                 </div>
-              )}
 
-              {/* Error Display */}
-              {error && (
-                <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
-                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-400">{error}</p>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-gray-500">LaTeX (editable)</label>
+                    <Button variant="ghost" size="sm" onClick={handleCopy} className="h-6 text-xs text-gray-400">
+                      {copied ? <><Check className="w-3 h-3 mr-1" />Copied</> : <><Copy className="w-3 h-3 mr-1" />Copy</>}
+                    </Button>
+                  </div>
+                  <textarea
+                    value={editedLatex}
+                    onChange={(e) => setEditedLatex(e.target.value)}
+                    className="w-full h-20 p-2 rounded-lg bg-black/50 border border-white/10 text-gray-200 font-mono text-xs resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  />
                 </div>
-              )}
-            </div>
-          )}
-        </div>
+
+                <button onClick={resetFormulaState} className="text-xs text-purple-400 hover:text-purple-300">
+                  Try another image
+                </button>
+              </div>
+            )}
+
+            {/* Error Display */}
+            {error && (
+              <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                <p className="text-sm text-red-400">{error}</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 px-6 py-4 border-t border-white/5 bg-white/[0.02]">
-          <Button 
-            variant="ghost" 
-            onClick={handleClose} 
-            className="text-gray-400 hover:text-white hover:bg-white/10 px-4"
-          >
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={handleClose} className="text-gray-400 hover:text-white">
             Cancel
           </Button>
 
-          {currentMode === "formula" && !extractedLatex && !isFreeTier && (
+          {mode === "formula" && !extractedLatex && (
             <Button
               onClick={handleExtract}
               disabled={!imageBase64 || isExtracting}
-              className="bg-white text-black hover:bg-gray-100 font-medium px-5 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-purple-600 hover:bg-purple-500 text-white"
             >
               {isExtracting ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Extracting...</>
               ) : (
-                <><Sparkles className="w-4 h-4 mr-2" />Extract Formula</>
+                <><Sparkles className="w-4 h-4 mr-2" />Extract</>
               )}
             </Button>
           )}
 
-          {currentMode === "formula" && extractedLatex && !isFreeTier && onFormulaExtracted && (
-            <Button 
-              onClick={handleInsertFormula} 
-              className="bg-white text-black hover:bg-gray-100 font-medium px-5"
-            >
-              <Check className="w-4 h-4 mr-2" />
+          {mode === "formula" && extractedLatex && onFormulaExtracted && (
+            <Button onClick={handleInsertFormula} className="bg-purple-600 hover:bg-purple-500 text-white">
               Insert Formula
             </Button>
           )}

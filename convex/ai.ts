@@ -8,66 +8,19 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Types for subscription tier checking
 type SubscriptionTier = "free" | "scholar" | "institution";
-type TierFeature = "flashcards" | "quizzes" | "advanced-formula" | "semantic-search-full";
 
-// Features available for each tier
-const TIER_FEATURES: Record<SubscriptionTier, TierFeature[]> = {
-  free: [],
-  scholar: ["flashcards", "quizzes", "advanced-formula", "semantic-search-full"],
-  institution: ["flashcards", "quizzes", "advanced-formula", "semantic-search-full"],
-};
-
-// Type for subscription status response
-interface SubscriptionStatusResponse {
-  tier: string;
-  rawTier: string;
-  status: string;
-  paystackCustomerId?: string;
-  paystackSubscriptionCode?: string;
-  subscriptionStartDate?: number;
-  subscriptionEndDate?: number;
-  monthlyUsage: {
-    audioMinutesUsed: number;
-    notesCreated: number;
-    lastResetDate: number;
-  };
-}
+// TEMPORARY: All features are free - payment gateway disabled due to Paystack bug
+// Tier feature checks and subscription response types removed
 
 // Helper to check if user has access to a premium feature
-async function checkTierAccess(
-  ctx: { runQuery: (query: typeof api.subscriptions.getSubscriptionStatus) => Promise<SubscriptionStatusResponse | null> },
-  feature: TierFeature
-): Promise<{ allowed: boolean; tier: SubscriptionTier; error?: string }> {
-  // Get subscription status from Convex
-  const subscription = await ctx.runQuery(api.subscriptions.getSubscriptionStatus);
-  
-  if (!subscription) {
-    return {
-      allowed: false,
-      tier: "free",
-      error: "Unable to verify subscription. Please try again.",
-    };
-  }
-
-  const tier = subscription.tier as SubscriptionTier;
-  const hasFeature = TIER_FEATURES[tier].includes(feature);
-
-  if (!hasFeature) {
-    const featureNames: Record<TierFeature, string> = {
-      flashcards: "Flashcard Generation",
-      quizzes: "Quiz Generation",
-      "advanced-formula": "Advanced Formula Recognition",
-      "semantic-search-full": "Full Semantic Search",
-    };
-
-    return {
-      allowed: false,
-      tier,
-      error: `${featureNames[feature]} is a Scholar feature. Upgrade to unlock this feature and more!`,
-    };
-  }
-
-  return { allowed: true, tier };
+// TEMPORARY: All features are free - always allow access
+// Payment gateway disabled due to Paystack bug
+async function checkTierAccess(): Promise<{
+  allowed: boolean;
+  tier: SubscriptionTier;
+  error?: string;
+}> {
+  return { allowed: true, tier: "scholar" as SubscriptionTier };
 }
 
 // Initialize Gemini client
@@ -246,7 +199,10 @@ export const generateCourseRoadmap = action({
         animated?: boolean;
       }
 
-      const data = JSON.parse(match[0]) as { nodes: RoadmapNode[]; edges: RoadmapEdge[] };
+      const data = JSON.parse(match[0]) as {
+        nodes: RoadmapNode[];
+        edges: RoadmapEdge[];
+      };
 
       // Apply dagre layout for better positioning
       if (data.nodes && data.nodes.length > 0) {
@@ -409,6 +365,21 @@ export const generateStructuredNotes = action({
   handler: async (ctx, args) => {
     const model = getGeminiModel({ responseMimeType: "application/json" });
 
+    const tryParseJson = (text: string) => {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return null;
+      return JSON.parse(jsonMatch[0]);
+    };
+
+    const fixJson = async (text: string) => {
+      const fixPrompt = `Fix the following JSON. Return ONLY valid JSON with the same structure and content, no markdown.
+
+JSON:
+${text}`;
+      const fixResult = await model.generateContent(fixPrompt);
+      return fixResult.response.text().trim();
+    };
+
     let prompt = `You are an expert academic note-taker with years of experience creating comprehensive study materials. Your goal is to transform this lecture transcript into detailed, exam-ready study notes.
 
 Transcript:
@@ -482,9 +453,24 @@ IMPORTANT RULES:
         .replace(/```\s*$/i, "");
 
       // Parse JSON response
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
+      let parsed = null;
+      try {
+        parsed = tryParseJson(responseText);
+      } catch {
+        parsed = null;
+      }
+
+      if (!parsed) {
+        // Attempt one repair pass through the model
+        const fixedText = await fixJson(responseText);
+        try {
+          parsed = tryParseJson(fixedText);
+        } catch {
+          parsed = null;
+        }
+      }
+
+      if (parsed) {
 
         // Convert simplified diagram format to ReactFlow format
         let diagramData = undefined;
@@ -522,14 +508,14 @@ IMPORTANT RULES:
                   y: index === 0 ? 50 : Math.floor(index / 3) * 150 + 200,
                 },
               };
-            }
+            },
           );
 
           const edges = (parsed.diagramEdges || []).map(
             (edge: string, index: number) => {
               const [source, target] = edge.split("-");
               return { id: `e${index}`, source, target, animated: true };
-            }
+            },
           );
 
           diagramData = { nodes, edges };
@@ -817,7 +803,7 @@ export const semanticSearch = action({
   },
   handler: async (
     ctx,
-    args
+    args,
   ): Promise<{
     answer: string;
     sources: Array<{ id: string; title: string; score: number }>;
@@ -861,7 +847,7 @@ export const semanticSearch = action({
           content: note?.content?.substring(0, 500) || "",
           score: result._score,
         };
-      })
+      }),
     );
 
     // Synthesize answer using found context
@@ -869,7 +855,7 @@ export const semanticSearch = action({
       const contextText = notes
         .map(
           (n: { title: string; content: string }) =>
-            `## ${n.title}\n${n.content}`
+            `## ${n.title}\n${n.content}`,
         )
         .join("\n\n");
 
@@ -897,7 +883,7 @@ Instructions:
             id: n.id,
             title: n.title,
             score: n.score,
-          })
+          }),
         ),
       };
     }
@@ -921,19 +907,61 @@ export const transcribeAudio = action({
     mimeType: v.string(),
   },
   handler: async (ctx, args) => {
+    const startMs = Date.now();
+    console.log(
+      `[transcribeAudio] Start: storageId=${args.storageId}, mimeType=${args.mimeType}`,
+    );
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error("GEMINI_API_KEY environment variable not set");
+      return {
+        transcript: "",
+        duration: null,
+        speakers: null,
+        keyTopics: [],
+        success: false,
+        error: "GEMINI_API_KEY environment variable not set",
+      };
     }
 
     try {
+      const fetchStartMs = Date.now();
       // Fetch the audio file from Convex storage
       const audioBlob = await ctx.storage.get(args.storageId);
+      console.log(
+        `[transcribeAudio] Storage fetch time: ${Date.now() - fetchStartMs}ms`,
+      );
       if (!audioBlob) {
-        throw new Error("Audio file not found in storage");
+        return {
+          transcript: "",
+          duration: null,
+          speakers: null,
+          keyTopics: [],
+          success: false,
+          error: "Audio file not found in storage. It may have been deleted.",
+        };
       }
 
+      // Check file size - Gemini supports inline audio up to ~50MB
+      const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+      if (audioBlob.size > MAX_FILE_SIZE) {
+        return {
+          transcript: "",
+          duration: null,
+          speakers: null,
+          keyTopics: [],
+          success: false,
+          error: `Audio file is too large (${(audioBlob.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 50MB.`,
+        };
+      }
+
+      console.log(
+        `[transcribeAudio] Processing audio: ${(audioBlob.size / 1024).toFixed(1)}KB, mimeType: ${args.mimeType}`,
+      );
+
+      const genAI = new GoogleGenerativeAI(apiKey);
+
       // Convert blob to base64
+      const encodeStartMs = Date.now();
       const arrayBuffer = await audioBlob.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
       let binary = "";
@@ -941,55 +969,102 @@ export const transcribeAudio = action({
         binary += String.fromCharCode(uint8Array[i]);
       }
       const audioBase64 = btoa(binary);
+      console.log(
+        `[transcribeAudio] Base64 encode time: ${Date.now() - encodeStartMs}ms, base64Bytes=${audioBase64.length}`,
+      );
 
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      // Timeout wrapper to prevent hanging connections
+      const withTimeout = <T>(
+        promise: Promise<T>,
+        timeoutMs: number,
+      ): Promise<T> => {
+        return Promise.race([
+          promise,
+          new Promise<T>((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error(`Request timed out after ${timeoutMs / 1000}s`),
+                ),
+              timeoutMs,
+            ),
+          ),
+        ]);
+      };
 
-      const result = await model.generateContent([
-        {
-          inlineData: {
-            mimeType: args.mimeType,
-            data: audioBase64,
-          },
-        },
-        {
-          text: `Transcribe this audio recording. This is a lecture or study session recording.
+      const generateTranscription = async (modelName: string) => {
+        console.log(
+          `[transcribeAudio] Attempting transcription with model: ${modelName}`,
+        );
+        const model = genAI.getGenerativeModel({ model: modelName });
 
-Instructions:
-- Provide a complete and accurate transcription
-- Include timestamps at natural breaks (format: [MM:SS])
-- If multiple speakers are detected, label them (Speaker 1, Speaker 2, etc.)
-- Preserve important terms and concepts
-- Format the output as clear, readable text
+        // 90 second timeout for the API call (longer for larger files)
+        const apiStartMs = Date.now();
+        const result = await withTimeout(
+          model.generateContent([
+            {
+              inlineData: {
+                mimeType: args.mimeType,
+                data: audioBase64,
+              },
+            },
+            {
+              text: `Transcribe this audio file completely and accurately. 
+Return the transcription as plain text. 
+If you detect timestamps or speaker changes, include them.
+Focus on accuracy above all else.`,
+            },
+          ]),
+          90000, // 90 seconds
+        );
+        console.log(
+          `[transcribeAudio] AI call time: ${Date.now() - apiStartMs}ms`,
+        );
+        return result.response.text().trim();
+      };
 
-Return the transcription in this JSON format:
-{
-  "transcript": "The full transcription text with timestamps",
-  "duration": "Estimated duration in MM:SS format",
-  "speakers": ["Speaker 1", "Speaker 2"] or null if single speaker,
-  "keyTopics": ["Topic 1", "Topic 2", "Topic 3"]
-}
+      let responseText = "";
+      const maxRetries = 3; // Increased for transient errors
+      let lastError: Error | null = null;
 
-Return ONLY valid JSON, no markdown code fences.`,
-        },
-      ]);
+      // Retry with exponential backoff for transient errors
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(
+            `[transcribeAudio] Attempt ${attempt}/${maxRetries} with gemini-2.5-flash`,
+          );
+          responseText = await generateTranscription("gemini-2.5-flash");
+          break; // Success, exit loop
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+          console.warn(
+            `[transcribeAudio] Attempt ${attempt} failed:`,
+            lastError.message,
+          );
 
-      const responseText = result.response.text().trim();
-
-      // Try to parse JSON response
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return {
-          transcript: parsed.transcript || responseText,
-          duration: parsed.duration || null,
-          speakers: parsed.speakers || null,
-          keyTopics: parsed.keyTopics || [],
-          success: true,
-        };
+          // If this was the last attempt, don't wait
+          if (attempt < maxRetries) {
+            // Exponential backoff: 1s, 2s, 4s
+            const delay = Math.pow(2, attempt - 1) * 1000;
+            console.log(`[transcribeAudio] Waiting ${delay}ms before retry...`);
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          }
+        }
       }
 
-      // Fallback: return raw text as transcript
+      // If all retries failed, throw the last error
+      if (!responseText && lastError) {
+        throw lastError;
+      }
+
+      console.log(
+        `[transcribeAudio] Success! Got ${responseText.length} characters of transcription`,
+      );
+      console.log(
+        `[transcribeAudio] Total action time: ${Date.now() - startMs}ms`,
+      );
+
+      // Return the transcription directly as plain text
       return {
         transcript: responseText,
         duration: null,
@@ -998,14 +1073,60 @@ Return ONLY valid JSON, no markdown code fences.`,
         success: true,
       };
     } catch (error) {
-      console.error("transcribeAudio error:", error);
+      // Log full error details for debugging
+      console.error(
+        "[transcribeAudio] Full error:",
+        JSON.stringify(error, Object.getOwnPropertyNames(error), 2),
+      );
+      console.error(
+        "[transcribeAudio] Error message:",
+        error instanceof Error ? error.message : String(error),
+      );
+      console.error(
+        `[transcribeAudio] Total action time (error): ${Date.now() - startMs}ms`,
+      );
+
+      // Parse specific error types
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      let userFriendlyError = "Transcription failed";
+
+      if (
+        errorMessage.includes("RESOURCE_EXHAUSTED") ||
+        errorMessage.includes("quota")
+      ) {
+        userFriendlyError = "API quota exceeded. Please try again later.";
+      } else if (
+        errorMessage.includes("RATE_LIMIT") ||
+        errorMessage.includes("429")
+      ) {
+        userFriendlyError =
+          "Too many requests. Please wait a moment and try again.";
+      } else if (errorMessage.includes("INVALID_ARGUMENT")) {
+        userFriendlyError =
+          "Invalid audio format. Please try MP3, WAV, or M4A formats.";
+      } else if (
+        errorMessage.includes("couldn't be completed") ||
+        errorMessage.includes("completed")
+      ) {
+        userFriendlyError =
+          "The AI service is temporarily unavailable. Please try again in a few minutes.";
+      } else if (
+        errorMessage.includes("deadline") ||
+        errorMessage.includes("timeout")
+      ) {
+        userFriendlyError =
+          "Request timed out. The audio file may be too long. Try a shorter recording.";
+      }
+
       return {
         transcript: "",
         duration: null,
         speakers: null,
         keyTopics: [],
         success: false,
-        error: error instanceof Error ? error.message : "Transcription failed",
+        error: userFriendlyError,
       };
     }
   },
@@ -1023,7 +1144,7 @@ export const generateAndSaveFlashcards = action({
   },
   handler: async (
     ctx,
-    args
+    args,
   ): Promise<{
     success: boolean;
     deckId?: string;
@@ -1032,7 +1153,7 @@ export const generateAndSaveFlashcards = action({
     requiresUpgrade?: boolean;
   }> => {
     // Check tier access for flashcards feature
-    const tierCheck = await checkTierAccess(ctx, "flashcards");
+    const tierCheck = await checkTierAccess();
     if (!tierCheck.allowed) {
       return {
         success: false,
@@ -1143,7 +1264,7 @@ export const generateAndSaveQuiz = action({
   },
   handler: async (
     ctx,
-    args
+    args,
   ): Promise<{
     success: boolean;
     deckId?: string;
@@ -1152,7 +1273,7 @@ export const generateAndSaveQuiz = action({
     requiresUpgrade?: boolean;
   }> => {
     // Check tier access for quizzes feature
-    const tierCheck = await checkTierAccess(ctx, "quizzes");
+    const tierCheck = await checkTierAccess();
     if (!tierCheck.allowed) {
       return {
         success: false,
@@ -1255,7 +1376,7 @@ Rules:
           sourceNoteId: args.noteId,
           courseId: note.courseId,
           questions: questions,
-        }
+        },
       );
 
       return {
@@ -1284,7 +1405,7 @@ export const processDocument = action({
   },
   handler: async (
     ctx,
-    args
+    args,
   ): Promise<{
     success: boolean;
     error?: string;
@@ -1470,7 +1591,7 @@ export const unifiedSemanticSearch = action({
   },
   handler: async (
     ctx,
-    args
+    args,
   ): Promise<{
     answer: string;
     sources: Array<{
@@ -1528,7 +1649,7 @@ export const unifiedSemanticSearch = action({
           fullContent:
             note?.content?.replace(/<[^>]*>/g, " ").substring(0, 1000) || "",
         };
-      })
+      }),
     );
 
     // Fetch document details
@@ -1546,7 +1667,7 @@ export const unifiedSemanticSearch = action({
             file?.summary || file?.extractedText?.substring(0, 200) || "",
           fullContent: file?.extractedText?.substring(0, 1000) || "",
         };
-      })
+      }),
     );
 
     // Combine and sort by score
@@ -1610,7 +1731,7 @@ export const improveNoteWithDocuments = action({
   },
   handler: async (
     ctx,
-    args
+    args,
   ): Promise<{
     success: boolean;
     improvedContent?: string;
@@ -1642,13 +1763,13 @@ export const improveNoteWithDocuments = action({
             content: file?.extractedText?.substring(0, 5000) || "",
             summary: file?.summary || "",
           };
-        })
+        }),
       );
 
       const validDocs = documents.filter((d) => d.content);
       if (validDocs.length === 0) {
         throw new Error(
-          "No processed documents found. Please wait for document processing to complete."
+          "No processed documents found. Please wait for document processing to complete.",
         );
       }
 
@@ -1656,7 +1777,7 @@ export const improveNoteWithDocuments = action({
       const docContext = validDocs
         .map(
           (d, i) =>
-            `[${i + 1}] ${d.name}:\nSummary: ${d.summary}\nContent: ${d.content}`
+            `[${i + 1}] ${d.name}:\nSummary: ${d.summary}\nContent: ${d.content}`,
         )
         .join("\n\n---\n\n");
 
@@ -1720,7 +1841,7 @@ export const generateNotesFromDocument = action({
   },
   handler: async (
     ctx,
-    args
+    args,
   ): Promise<{
     success: boolean;
     content?: string;
@@ -1743,7 +1864,7 @@ export const generateNotesFromDocument = action({
       // Check if document is processed
       if (file.processingStatus !== "done" || !file.extractedText) {
         throw new Error(
-          "Document not yet processed. Please wait for processing to complete."
+          "Document not yet processed. Please wait for processing to complete.",
         );
       }
 
@@ -1836,7 +1957,7 @@ export const getDocumentReference = action({
   },
   handler: async (
     ctx,
-    args
+    args,
   ): Promise<{
     success: boolean;
     reference?: {
@@ -1953,7 +2074,7 @@ export const ingestAndGenerateFlashcards = action({
   },
   handler: async (
     ctx,
-    args
+    args,
   ): Promise<{
     success: boolean;
     deckId?: string;
@@ -2071,7 +2192,7 @@ Rules:
           sourceFileName: args.fileName,
           courseId: args.courseId,
           cards: cards,
-        }
+        },
       );
 
       return {
@@ -2103,7 +2224,7 @@ export const askAboutFile = action({
   },
   handler: async (
     ctx,
-    args
+    args,
   ): Promise<{
     success: boolean;
     answer?: string;
@@ -2182,7 +2303,7 @@ export const ingestAndGenerateNote = action({
   },
   handler: async (
     ctx,
-    args
+    args,
   ): Promise<{
     success: boolean;
     noteId?: string;
@@ -2354,7 +2475,7 @@ CRITICAL EXTRACTION REQUIREMENTS:
         console.error("Response text was:", responseText);
         // Attempt to clean newlines inside strings if possible, or fail gracefully
         throw new Error(
-          "AI generated invalid JSON (control characters). Please try again."
+          "AI generated invalid JSON (control characters). Please try again.",
         );
       }
       const noteTitle =
@@ -2407,7 +2528,7 @@ export const extractFormulaFromImage = action({
   },
   handler: async (
     ctx,
-    args
+    args,
   ): Promise<{
     success: boolean;
     latex?: string;
@@ -2417,7 +2538,7 @@ export const extractFormulaFromImage = action({
     requiresUpgrade?: boolean;
   }> => {
     // Check tier access for advanced formula feature
-    const tierCheck = await checkTierAccess(ctx, "advanced-formula");
+    const tierCheck = await checkTierAccess();
     if (!tierCheck.allowed) {
       return {
         success: false,

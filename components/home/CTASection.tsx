@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 export function CTASection() {
@@ -14,26 +15,22 @@ export function CTASection() {
             Ready to Ace Your Semester?
           </h2>
           <p className="text-lg md:text-xl text-black/80 max-w-2xl mx-auto mb-10 font-medium">
-            Join the waitlist today and get 3 months of Premium for free when we
-            launch.
+            Join thousands of students transforming their grades today. Start
+            your free trial now.
           </p>
 
-          <form className="max-w-md mx-auto flex flex-col sm:flex-row gap-4">
-            <input
-              type="email"
-              placeholder="Enter your .edu email"
-              className="flex-1 h-12 px-6 rounded-full bg-white/20 border border-black/10 text-black placeholder:text-black/50 focus:outline-none focus:ring-2 focus:ring-black/20"
-              required
-            />
-            <Button
-              size="lg"
-              className="h-12 px-8 bg-black text-white hover:bg-gray-900 rounded-full font-semibold"
-            >
-              Get Early Access
-            </Button>
-          </form>
-          <p className="mt-4 text-xs text-black/60 font-medium">
-            No credit card required.
+          <div className="flex justify-center">
+            <Link href="/sign-up">
+              <Button
+                size="lg"
+                className="h-14 px-10 bg-black text-white hover:bg-gray-900 rounded-full font-bold text-lg shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all"
+              >
+                Get Started for Free
+              </Button>
+            </Link>
+          </div>
+          <p className="mt-6 text-sm text-black/60 font-medium">
+            No credit card required for free tier.
           </p>
         </div>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import SpeechRecognition, {
   useSpeechRecognition,
@@ -20,17 +20,17 @@ import {
   AlertCircle,
   Sparkles,
   Loader2,
-  Pin,
   Upload,
   ChevronDown,
-  History,
   Trash2,
   FileAudio,
   FileText,
-  Waves,
   Radio,
   Volume2,
   PenLine,
+  BookOpen,
+  RefreshCw,
+  History,
 } from "lucide-react";
 import {
   Dialog,
@@ -44,10 +44,6 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import ReactMarkdown from "react-markdown";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
 import { useDashboard } from "@/hooks/useDashboard";
 import { StructuredNotes } from "@/components/dashboard/DashboardContext";
 import { ContextDeck } from "@/components/dashboard/ContextDeck";
@@ -61,6 +57,14 @@ interface EnhancedChunk {
   isImportant: boolean;
   concepts: string[];
 }
+
+// Sidebar modes for dynamic UI adaptation
+type SidebarMode =
+  | "idle" // Default - show quick import, record button, history
+  | "recording" // Live recording - show waveform, transcript preview
+  | "uploading" // Uploading file - show progress
+  | "transcribing" // AI processing - show transcription progress
+  | "ready"; // Content ready - show generate notes button
 
 // Helper to get audio duration
 const getAudioDuration = (file: File): Promise<number> => {
@@ -79,7 +83,7 @@ export function RightSidebar() {
   const [isRecording, setIsRecording] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [sessionTranscript, setSessionTranscript] = useState<EnhancedChunk[]>(
-    []
+    [],
   );
   const [permissionState, setPermissionState] = useState<
     "prompt" | "granted" | "denied" | "unknown"
@@ -93,18 +97,21 @@ export function RightSidebar() {
   // AI Generate Notes State
   const [isGeneratingNotes, setIsGeneratingNotes] = useState(false);
   const [generatedNotes, setGeneratedNotes] = useState<StructuredNotes | null>(
-    null
+    null,
   );
 
   // Upload State
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  const [showPastSessions, setShowPastSessions] = useState(false);
+  const [isUploadingTextbook, setIsUploadingTextbook] = useState(false);
+  const [showHistory, setShowHistory] = useState(true);
   const [selectedSession, setSelectedSession] =
     useState<Id<"recordings"> | null>(null);
   const [usedContextName, setUsedContextName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textbookInputRef = useRef<HTMLInputElement>(null);
+  const showTranscriptPreview = false;
 
   // Router and Search Params
   const router = useRouter();
@@ -114,16 +121,25 @@ export function RightSidebar() {
   const saveRecording = useMutation(api.recordings.saveRecording);
   const generateStructuredNotes = useAction(api.ai.generateStructuredNotes);
   const analyzeChunk = useAction(api.ai.analyzeChunk);
-  const generateUploadUrl = useMutation(api.recordings.generateUploadUrl);
-  const saveUploadedRecording = useMutation(
-    api.recordings.saveUploadedRecording
+  const generateRecordingUploadUrl = useMutation(
+    api.recordings.generateUploadUrl,
   );
+  const saveUploadedRecording = useMutation(
+    api.recordings.saveUploadedRecording,
+  );
+  const generateFileUploadUrl = useMutation(api.files.generateUploadUrl);
+  const uploadFile = useMutation(api.files.uploadFile);
   const updateRecordingTranscript = useMutation(
-    api.recordings.updateRecordingTranscript
+    api.recordings.updateRecordingTranscript,
   );
   const transcribeAudio = useAction(api.ai.transcribeAudio);
   const deleteRecording = useMutation(api.recordings.deleteRecording);
+  const cleanupOrphanedRecordings = useMutation(
+    api.recordings.cleanupOrphanedRecordings,
+  );
+  const deleteFile = useMutation(api.files.deleteFile);
   const pastRecordings = useQuery(api.recordings.getRecordings);
+  const files = useQuery(api.files.getFiles);
   const userData = useQuery(api.users.getUser);
   const createNote = useMutation(api.notes.createNote);
 
@@ -131,12 +147,28 @@ export function RightSidebar() {
   const { setPendingNotes, activeContext, setActiveContext } = useDashboard();
   const generateFromPinnedAudio = useAction(api.notes.generateFromPinnedAudio);
 
+  // Computed sidebar mode based on current state
+  // Priority: recording > transcribing > uploading > ready > idle
+  const sidebarMode: SidebarMode = useMemo(() => {
+    if (isRecording) return "recording";
+    if (isTranscribing) return "transcribing"; // AI processing takes priority
+    if (isUploading) return "uploading";
+    if (sessionTranscript.length > 0 || generatedNotes) return "ready";
+    return "idle";
+  }, [
+    isRecording,
+    isUploading,
+    isTranscribing,
+    sessionTranscript.length,
+    generatedNotes,
+  ]);
+
   // Validate active context file still exists
   const contextFile = useQuery(
     api.files.getFile,
     activeContext && activeContext.type === "file"
       ? { fileId: activeContext.id as Id<"files"> }
-      : "skip"
+      : "skip",
   ); // New Phase 2 Action
 
   // Phase 4: Magnetic Drop Zone Logic
@@ -156,7 +188,7 @@ export function RightSidebar() {
     e.preventDefault();
     const resourceId = e.dataTransfer.getData("application/lumina-resource-id");
     const resourceName = e.dataTransfer.getData(
-      "application/lumina-resource-name"
+      "application/lumina-resource-name",
     );
 
     if (resourceId && resourceName) {
@@ -224,7 +256,7 @@ export function RightSidebar() {
 
     // 4. Open modal
     setRecordingTitle(
-      `Session ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`
+      `Session ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
     );
     setIsSaveModalOpen(true);
   };
@@ -369,15 +401,6 @@ export function RightSidebar() {
 
   // Timer Ref
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [sessionTranscript, transcript]);
 
   // Handle hydration mismatch - must be first
   const [isMounted, setIsMounted] = useState(false);
@@ -446,7 +469,7 @@ export function RightSidebar() {
         console.error("Failed to start speech recognition:", error);
         setIsRecording(false);
         alert(
-          "Failed to start speech recognition. Please check microphone permissions."
+          "Failed to start speech recognition. Please check microphone permissions.",
         );
       }
     } else {
@@ -500,10 +523,14 @@ export function RightSidebar() {
 
   // Handle file upload
   const handleFileUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    console.log(
+      `[upload] Start: name=${file.name}, sizeMB=${(file.size / 1024 / 1024).toFixed(2)}, type=${file.type || "unknown"}`,
+    );
 
     // Validate file type
     const validTypes = [
@@ -518,14 +545,14 @@ export function RightSidebar() {
     ];
     if (!validTypes.some((type) => file.type.includes(type.split("/")[1]))) {
       alert(
-        "Please upload a valid audio file (MP3, WAV, M4A, OGG, FLAC, or WebM)"
+        "Please upload a valid audio file (MP3, WAV, M4A, OGG, FLAC, or WebM)",
       );
       return;
     }
 
-    // Check file size (max 20MB for inline data)
-    if (file.size > 20 * 1024 * 1024) {
-      alert("File size must be less than 20MB");
+    // Check file size (max 50MB)
+    if (file.size > 50 * 1024 * 1024) {
+      alert("File size must be less than 50MB");
       return;
     }
 
@@ -533,6 +560,7 @@ export function RightSidebar() {
     setUploadProgress(0);
 
     try {
+      const uploadStartMs = Date.now();
       // Step 1: Read file as base64 for transcription
       setUploadProgress(10);
 
@@ -551,7 +579,7 @@ export function RightSidebar() {
 
       // Step 2: Upload to Convex storage
       setUploadProgress(30);
-      const uploadUrl = await generateUploadUrl();
+      const uploadUrl = await generateRecordingUploadUrl();
       const uploadResponse = await fetch(uploadUrl, {
         method: "POST",
         headers: { "Content-Type": file.type },
@@ -563,6 +591,9 @@ export function RightSidebar() {
       }
 
       const { storageId } = await uploadResponse.json();
+      console.log(
+        `[upload] Storage upload complete in ${Date.now() - uploadStartMs}ms, storageId=${storageId}`,
+      );
       setUploadProgress(50);
 
       // Step 3: Save recording record
@@ -572,51 +603,106 @@ export function RightSidebar() {
         storageId,
         duration,
       });
+      console.log(
+        `[upload] Recording saved: id=${recordingId}, durationSec=${duration}`,
+      );
       setUploadProgress(60);
 
       // Step 4: Transcribe using AI (fetches audio from storage server-side)
+      // Upload is complete, now we're transcribing
+      setIsUploading(false);
       setIsTranscribing(true);
       setUploadProgress(70);
 
-      const transcriptionResult = await transcribeAudio({
-        storageId: storageId as Id<"_storage">,
-        mimeType,
-      });
-
-      setUploadProgress(90);
-
-      if (transcriptionResult.success && transcriptionResult.transcript) {
-        // Update the recording with the transcript
-        await updateRecordingTranscript({
-          recordingId,
-          transcript: transcriptionResult.transcript,
+      try {
+        const transcribeStartMs = Date.now();
+        const transcriptionResult = await transcribeAudio({
+          storageId: storageId as Id<"_storage">,
+          mimeType,
         });
+        console.log(
+          `[upload] Transcription call returned in ${Date.now() - transcribeStartMs}ms, success=${transcriptionResult.success}`,
+        );
 
-        // Load the transcript into the session
-        setSessionTranscript([
-          {
-            text: transcriptionResult.transcript,
-            enhancedText: transcriptionResult.transcript,
-            timestamp: "00:00:00",
-            isImportant: false,
-            concepts: transcriptionResult.keyTopics || [],
-          },
-        ]);
+        setUploadProgress(90);
 
-        setSelectedSession(recordingId);
-        alert("Recording uploaded and transcribed successfully!");
-      } else {
-        const errorMsg =
-          "error" in transcriptionResult
-            ? transcriptionResult.error
-            : "Unknown error";
-        alert(`Upload successful but transcription failed: ${errorMsg}`);
+        if (transcriptionResult.success && transcriptionResult.transcript) {
+          // Update the recording with the transcript
+          await updateRecordingTranscript({
+            recordingId,
+            transcript: transcriptionResult.transcript,
+          });
+
+          // Load the transcript into the session
+          setSessionTranscript([
+            {
+              text: transcriptionResult.transcript,
+              enhancedText: transcriptionResult.transcript,
+              timestamp: "00:00:00",
+              isImportant: false,
+              concepts: transcriptionResult.keyTopics || [],
+            },
+          ]);
+
+          setSelectedSession(recordingId);
+          toast.success("Recording uploaded and transcribed successfully!");
+        } else {
+          console.warn(
+            "[upload] Transcription failed response:",
+            transcriptionResult.error || "Unknown error",
+          );
+          // Transcription failed - delete the orphaned recording
+          await deleteRecording({ recordingId });
+
+          const errorMsg =
+            "error" in transcriptionResult
+              ? transcriptionResult.error
+              : "Unknown error";
+
+          toast.error("Transcription failed", {
+            description:
+              errorMsg ||
+              "The AI couldn't process this audio file. Please try a different file or format.",
+          });
+        }
+      } catch (transcriptionError) {
+        console.error("Transcription error:", transcriptionError);
+        // Delete the orphaned recording since transcription failed
+        try {
+          await deleteRecording({ recordingId });
+        } catch {
+          // Ignore delete errors
+        }
+
+        // Check for specific error types
+        const errorMessage =
+          transcriptionError instanceof Error
+            ? transcriptionError.message
+            : String(transcriptionError);
+
+        if (
+          errorMessage.includes("Connection lost") ||
+          errorMessage.includes("in flight") ||
+          errorMessage.includes("timed out")
+        ) {
+          toast.error("Request timed out", {
+            description:
+              "The transcription took too long. Try a shorter audio file or try again.",
+          });
+        } else {
+          toast.error("Transcription failed", {
+            description:
+              "The AI service is currently unavailable. Please try again later.",
+          });
+        }
       }
 
       setUploadProgress(100);
     } catch (error) {
       console.error("Upload error:", error);
-      alert("Failed to upload recording. Please try again.");
+      toast.error("Failed to upload recording", {
+        description: "Please check your connection and try again.",
+      });
     } finally {
       setIsUploading(false);
       setIsTranscribing(false);
@@ -628,9 +714,51 @@ export function RightSidebar() {
     }
   };
 
+  // Handle textbook (PDF/PPT) upload
+  const handleTextbookUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    const allowed = ["pdf", "ppt", "pptx", "doc", "docx"];
+    if (!ext || !allowed.includes(ext)) {
+      toast.error("Please upload a PDF, PPT, or DOC file.");
+      return;
+    }
+
+    setIsUploadingTextbook(true);
+    try {
+      const postUrl = await generateFileUploadUrl();
+      const result = await fetch(postUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!result.ok) throw new Error("Upload failed");
+      const { storageId } = await result.json();
+
+      await uploadFile({
+        name: file.name,
+        type: "pdf",
+        storageId,
+      });
+      toast.success("Textbook uploaded successfully.");
+    } catch (e) {
+      console.error("Textbook upload error:", e);
+      toast.error("Failed to upload file. Please try again.");
+    } finally {
+      setIsUploadingTextbook(false);
+      if (textbookInputRef.current) textbookInputRef.current.value = "";
+    }
+  };
+
   // Load a past session's transcript
   const handleLoadPastSession = (
-    recording: typeof pastRecordings extends (infer T)[] | undefined ? T : never
+    recording: typeof pastRecordings extends (infer T)[] | undefined
+      ? T
+      : never,
   ) => {
     if (!recording) return;
 
@@ -667,7 +795,6 @@ export function RightSidebar() {
 
     setSessionTranscript(chunks);
     setGeneratedNotes(null);
-    setShowPastSessions(false);
   };
 
   // Delete a recording
@@ -720,7 +847,7 @@ export function RightSidebar() {
       initial={{ x: 320, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="w-[320px] h-screen bg-black/20 backdrop-blur-xl border-l border-white/5 flex flex-col shrink-0 z-50 transition-all duration-300"
+      className="w-[320px] h-screen bg-sidebar backdrop-blur-xl border-l border-sidebar-border flex flex-col shrink-0 z-50 transition-all duration-300 overflow-hidden"
       onDrop={handleNativeDrop}
       onDragOver={handleNativeDragOver}
       style={{
@@ -732,299 +859,474 @@ export function RightSidebar() {
           : "rgba(255, 255, 255, 0.05)",
       }}
     >
-      {/* Top: Recorder Section */}
-      <div className="p-4 border-b border-white/5 relative overflow-hidden">
-        {/* Context Deck */}
-        <ContextDeck />
+      <ScrollArea className="flex-1 min-h-0">
+        {/* Top: Upload & Recording */}
+        <div className="p-4 flex flex-col gap-3 relative overflow-hidden">
+          <ContextDeck />
 
-        {/* Animated gradient border when recording */}
-        <div
-          className={cn(
-            "absolute top-0 left-0 w-full h-1 transition-all duration-500",
-            listening
-              ? "bg-linear-to-r from-red-500 via-orange-500 to-red-500 bg-size-[200%_100%] animate-gradient-x opacity-100"
-              : "bg-linear-to-r from-cyan-500 via-indigo-500 to-purple-500 opacity-30"
-          )}
-        />
-
-        {/* Recording Status Card */}
-        <div
-          className={cn(
-            "relative rounded-2xl p-4 mb-4 transition-all duration-300",
-            listening
-              ? "bg-linear-to-br from-red-500/10 via-orange-500/5 to-transparent border border-red-500/20"
-              : "bg-linear-to-br from-white/5 via-transparent to-transparent border border-white/5"
-          )}
-        >
-          {/* Status Header */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div
+          {/* Dynamic Mode Indicator Header */}
+          <div className="flex items-center justify-between mb-2">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={sidebarMode}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                transition={{ duration: 0.2 }}
                 className={cn(
-                  "relative w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300",
-                  listening
-                    ? "bg-red-500/20 shadow-lg shadow-red-500/20"
-                    : "bg-white/5"
+                  "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border",
+                  sidebarMode === "recording" &&
+                    "bg-red-500/10 text-red-400 border-red-500/20",
+                  sidebarMode === "uploading" &&
+                    "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+                  sidebarMode === "transcribing" &&
+                    "bg-amber-500/10 text-amber-400 border-amber-500/20",
+                  sidebarMode === "ready" &&
+                    "bg-green-500/10 text-green-400 border-green-500/20",
+                  sidebarMode === "idle" &&
+                    "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-gray-400 border-slate-200 dark:border-white/10",
                 )}
               >
-                {listening ? (
+                {sidebarMode === "recording" && (
                   <>
-                    <Radio className="w-6 h-6 text-red-400" />
-                    <div className="absolute inset-0 rounded-xl bg-red-500/20 animate-ping" />
-                  </>
-                ) : (
-                  <Mic className="w-6 h-6 text-gray-400" />
-                )}
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "text-sm font-bold tracking-wide transition-colors",
-                      listening ? "text-red-400" : "text-gray-400"
-                    )}
-                  >
-                    {listening ? "RECORDING" : "READY"}
-                  </span>
-                  {listening && (
-                    <span className="flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
                     </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <Clock className="w-3 h-3 text-gray-500" />
-                  <span className="font-mono text-lg font-bold text-white tabular-nums">
-                    {formatTime(elapsedTime)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            {(elapsedTime > 0 || sessionTranscript.length > 0) && (
-              <div className="flex items-center gap-1">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg"
-                  onClick={() => handleReset(true)}
-                  title="Reset Session"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {/* Waveform Visualization - More refined */}
-          <div className="h-12 flex items-center justify-center gap-[3px] mb-4 px-2">
-            {Array.from({ length: 24 }).map((_, i) => {
-              const baseHeight =
-                20 + Math.sin(i * 0.5) * 15 + Math.random() * 20;
-              return (
-                <motion.div
-                  key={i}
-                  animate={
-                    listening
-                      ? {
-                          scaleY: [1, 0.3 + Math.random() * 0.7, 1],
-                          opacity: [0.5, 1, 0.5],
-                        }
-                      : { scaleY: 0.15, opacity: 0.3 }
-                  }
-                  transition={{
-                    duration: 0.3 + Math.random() * 0.3,
-                    repeat: Infinity,
-                    delay: i * 0.02,
-                    ease: "easeInOut",
-                  }}
-                  className={cn(
-                    "w-1 rounded-full transition-colors origin-center",
-                    listening
-                      ? "bg-linear-to-t from-red-500 to-orange-400"
-                      : "bg-gray-700"
-                  )}
-                  style={{ height: `${baseHeight}%` }}
-                />
-              );
-            })}
-          </div>
-
-          {/* Main Control Button */}
-          <button
-            onClick={handleToggleRecording}
-            className={cn(
-              "w-full h-14 rounded-xl font-semibold text-base flex items-center justify-center gap-3 transition-all duration-300 active:scale-[0.98]",
-              listening
-                ? "bg-linear-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white shadow-lg shadow-red-500/25"
-                : "bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-500/25"
-            )}
-          >
-            {listening ? (
-              <>
-                <Pause className="w-5 h-5 fill-current" />
-                <span>Pause Recording</span>
-              </>
-            ) : (
-              <>
-                <Play className="w-5 h-5 fill-current" />
-                <span>Start Recording</span>
-              </>
-            )}
-          </button>
-
-          {/* Action Buttons Row */}
-          {(elapsedTime > 0 || sessionTranscript.length > 0) && (
-            <div className="grid grid-cols-2 gap-2 mt-3">
-              <Button
-                variant="outline"
-                className="h-10 border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 hover:text-purple-200"
-                onClick={
-                  generatedNotes ? handleInsertNotes : handleGenerateNotes
-                }
-                disabled={isGeneratingNotes}
-              >
-                {isGeneratingNotes ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : generatedNotes ? (
-                  <PenLine className="w-4 h-4 mr-2" />
-                ) : (
-                  <Sparkles className="w-4 h-4 mr-2" />
+                    Recording • {formatTime(elapsedTime)}
+                  </>
                 )}
-                {generatedNotes
-                  ? searchParams.get("noteId")
-                    ? "Insert Notes"
-                    : "Create Note"
-                  : "AI Notes"}
-              </Button>
-              <Button
-                variant="outline"
-                className="h-10 border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-200"
-                onClick={handleSaveClick}
-              >
-                <Save className="w-4 h-4 mr-2" />
-                Save
-              </Button>
-            </div>
-          )}
-        </div>
+                {sidebarMode === "uploading" && (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Uploading... {uploadProgress}%
+                  </>
+                )}
+                {sidebarMode === "transcribing" && (
+                  <>
+                    <Sparkles className="w-3 h-3 animate-pulse" />
+                    Processing with AI...
+                  </>
+                )}
+                {sidebarMode === "ready" && (
+                  <>
+                    <Sparkles className="w-3 h-3" />
+                    Content Ready
+                  </>
+                )}
+                {sidebarMode === "idle" && (
+                  <>
+                    <Radio className="w-3 h-3" />
+                    Lumina Studio
+                  </>
+                )}
+              </motion.div>
+            </AnimatePresence>
 
-        {/* Upload Section - Redesigned */}
-        <div className="space-y-3">
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="audio/*"
-            onChange={handleFileUpload}
-            className="hidden"
+            {/* Reset button only for recording mode (ready mode has its own reset button) */}
+            {sidebarMode === "recording" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-slate-500 dark:text-gray-500 hover:text-slate-700 dark:hover:text-white"
+                onClick={() => handleReset(false)}
+              >
+                <RotateCcw className="w-3 h-3 mr-1" />
+                Reset
+              </Button>
+            )}
+          </div>
+
+          {/* Animated gradient border based on mode */}
+          <div
+            className={cn(
+              "absolute top-0 left-0 w-full h-1 transition-all duration-500",
+              sidebarMode === "recording"
+                ? "bg-linear-to-r from-red-500 via-orange-500 to-red-500 bg-size-[200%_100%] animate-gradient-x opacity-100"
+                : sidebarMode === "uploading" || sidebarMode === "transcribing"
+                  ? "bg-linear-to-r from-cyan-500 via-indigo-500 to-purple-500 animate-pulse opacity-100"
+                  : sidebarMode === "ready"
+                    ? "bg-linear-to-r from-green-500 via-emerald-500 to-green-500 opacity-100"
+                    : "bg-linear-to-r from-cyan-500 via-indigo-500 to-purple-500 opacity-30",
+            )}
           />
 
-          {/* Upload Card */}
+          {/* Quick Import Actions - Only show in idle mode */}
+          <AnimatePresence>
+            {sidebarMode === "idle" && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="audio/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() =>
+                      !isUploading &&
+                      !isTranscribing &&
+                      fileInputRef.current?.click()
+                    }
+                    className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border transition-all duration-200 bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/5 hover:bg-slate-200 dark:hover:bg-white/10 hover:border-slate-300 dark:hover:border-white/10"
+                  >
+                    <FileAudio className="w-5 h-5 text-slate-500 dark:text-gray-400" />
+                    <span className="text-[10px] font-medium text-slate-500 dark:text-gray-400">
+                      Import Audio
+                    </span>
+                  </button>
+
+                  <input
+                    ref={textbookInputRef}
+                    type="file"
+                    accept=".pdf,.ppt,.pptx,.doc,.docx"
+                    onChange={handleTextbookUpload}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() =>
+                      !isUploadingTextbook && textbookInputRef.current?.click()
+                    }
+                    className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border transition-all duration-200 bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/5 hover:bg-slate-200 dark:hover:bg-white/10 hover:border-slate-300 dark:hover:border-white/10"
+                  >
+                    <BookOpen className="w-5 h-5 text-slate-500 dark:text-gray-400" />
+                    <span className="text-[10px] font-medium text-slate-500 dark:text-gray-400">
+                      Import File
+                    </span>
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Recording Card - Mode Aware */}
           <div
-            onClick={() =>
-              !isUploading && !isTranscribing && fileInputRef.current?.click()
-            }
             className={cn(
-              "relative group cursor-pointer overflow-hidden rounded-xl transition-all duration-300",
-              isUploading || isTranscribing
-                ? "bg-linear-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/30"
-                : "bg-white/2 border border-dashed border-white/10 hover:border-cyan-500/50 hover:bg-white/4"
+              "rounded-3xl p-6 flex flex-col items-center gap-6 shadow-2xl shadow-black/50 relative overflow-hidden group transition-all duration-500",
+              sidebarMode === "ready"
+                ? "bg-linear-to-b from-green-900/20 to-slate-900 dark:to-black border border-green-500/20"
+                : "bg-slate-900 dark:bg-black border border-slate-700 dark:border-white/5",
             )}
           >
-            {/* Progress overlay */}
-            {(isUploading || isTranscribing) && (
-              <div
-                className="absolute inset-0 bg-linear-to-r from-cyan-500/20 to-blue-500/20 transition-all duration-300"
-                style={{ width: `${uploadProgress}%` }}
-              />
-            )}
+            {/* Subtle Background Glow */}
+            <div
+              className={cn(
+                "absolute inset-0 bg-linear-to-b opacity-20 pointer-events-none transition-opacity duration-500",
+                sidebarMode === "recording"
+                  ? "from-red-500/30 via-transparent to-transparent"
+                  : sidebarMode === "ready"
+                    ? "from-green-500/20 via-transparent to-transparent"
+                    : "from-blue-500/10 via-transparent to-transparent",
+              )}
+            />
 
-            <div className="relative p-4 flex items-center gap-4">
-              <div
-                className={cn(
-                  "h-12 w-12 shrink-0 rounded-xl flex items-center justify-center transition-all duration-300",
-                  isUploading || isTranscribing
-                    ? "bg-cyan-500/20"
-                    : "bg-white/5 group-hover:bg-cyan-500/10 group-hover:scale-105"
-                )}
-              >
-                {isUploading || isTranscribing ? (
-                  <Loader2 className="h-6 w-6 text-cyan-400 animate-spin" />
-                ) : (
-                  <Upload className="h-6 w-6 text-gray-400 group-hover:text-cyan-400 transition-colors" />
-                )}
-              </div>
-
-              <div className="flex-1 min-w-0">
-                {isUploading || isTranscribing ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-cyan-400">
-                        {isTranscribing
-                          ? "Transcribing audio..."
-                          : "Uploading file..."}
+            {/* Mode-specific content */}
+            <AnimatePresence mode="wait">
+              {/* READY MODE - Show transcript preview and generate button */}
+              {sidebarMode === "ready" && (
+                <motion.div
+                  key="ready-mode"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="w-full flex flex-col gap-4 relative z-10"
+                >
+                  {/* Show Generated Notes Preview if notes are ready */}
+                  {generatedNotes ? (
+                    <div className="bg-green-500/10 rounded-xl p-3 border border-green-500/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Sparkles className="w-3.5 h-3.5 text-green-400" />
+                        <span className="text-[10px] font-semibold text-green-400 uppercase tracking-wider">
+                          Notes Generated ✓
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-300 line-clamp-2">
+                        {recordingTitle || "Your AI-generated notes are ready"}
                       </p>
-                      <span className="text-xs font-mono text-cyan-400">
-                        {uploadProgress}%
-                      </span>
+                      <p className="text-[10px] text-gray-500 mt-1">
+                        {generatedNotes.cornellNotes?.length || 0} key points
+                        extracted
+                      </p>
                     </div>
-                    <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                  ) : showTranscriptPreview && sessionTranscript.length > 0 ? (
+                    /* Transcript Preview */
+                    <div className="bg-black/30 rounded-xl p-3 border border-white/5">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-3.5 h-3.5 text-green-400" />
+                          <span className="text-[10px] font-semibold text-green-400 uppercase tracking-wider">
+                            Transcript Ready
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-gray-500">
+                          {sessionTranscript.reduce(
+                            (acc, chunk) => acc + chunk.text.split(" ").length,
+                            0,
+                          )}{" "}
+                          words
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-300 line-clamp-3">
+                        {sessionTranscript[0]?.text?.slice(0, 200) ||
+                          "No transcript available"}
+                        {(sessionTranscript[0]?.text?.length || 0) > 200 &&
+                          "..."}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {/* Generate Notes Button - Prominent */}
+                  <Button
+                    className={cn(
+                      "w-full h-14 text-white font-semibold shadow-lg",
+                      generatedNotes
+                        ? "bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-indigo-500/20"
+                        : "bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 shadow-green-500/20",
+                    )}
+                    onClick={
+                      generatedNotes ? handleInsertNotes : handleGenerateNotes
+                    }
+                    disabled={isGeneratingNotes}
+                  >
+                    {isGeneratingNotes ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Generating Notes...
+                      </>
+                    ) : generatedNotes ? (
+                      <>
+                        <PenLine className="w-4 h-4 mr-2" />
+                        Insert Notes to Editor
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Generate AI Notes
+                      </>
+                    )}
+                  </Button>
+
+                  {/* Secondary actions */}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      className="flex-1 h-9 bg-white/5 hover:bg-white/10 text-xs font-medium text-gray-300 border border-white/5"
+                      onClick={handleSaveClick}
+                    >
+                      <Save className="w-3 h-3 mr-2" />
+                      Save
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="flex-1 h-9 bg-white/5 hover:bg-white/10 text-xs font-medium text-gray-400 border border-white/5"
+                      onClick={() => handleReset(false)}
+                    >
+                      <RotateCcw className="w-3 h-3 mr-2" />
+                      Reset
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* IDLE/RECORDING MODE - Show standard recording interface */}
+              {(sidebarMode === "idle" || sidebarMode === "recording") && (
+                <motion.div
+                  key="recording-mode"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="w-full flex flex-col items-center gap-6"
+                >
+                  {/* Header Status */}
+                  <div className="w-full flex items-center justify-between relative z-10">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={cn(
+                          "w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300",
+                          listening
+                            ? "bg-red-500/20 text-red-500"
+                            : "bg-white/5 text-gray-400",
+                        )}
+                      >
+                        <Mic className="w-5 h-5 fill-current" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span
+                          className={cn(
+                            "text-[10px] font-bold tracking-wider uppercase",
+                            listening ? "text-red-500" : "text-gray-500",
+                          )}
+                        >
+                          {listening ? "Recording" : "Ready"}
+                        </span>
+                        <span className="font-mono text-sm font-medium text-white tabular-nums">
+                          {formatTime(elapsedTime)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Quick Reset (only visible if content exists) */}
+                    {(elapsedTime > 0 || sessionTranscript.length > 0) && (
+                      <button
+                        onClick={() => handleReset(true)}
+                        className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Waveform Visualizer - Clean & Minimal */}
+                  <div className="w-full h-16 flex items-center justify-center gap-1 relative z-10 my-2">
+                    {Array.from({ length: 20 }).map((_, i) => (
                       <motion.div
+                        key={i}
+                        animate={
+                          listening
+                            ? {
+                                height: [10, 10 + Math.random() * 40, 10],
+                                opacity: [0.3, 1, 0.3],
+                              }
+                            : { height: 6, opacity: 0.2 }
+                        }
+                        transition={{
+                          duration: 0.4,
+                          repeat: Infinity,
+                          repeatType: "reverse",
+                          delay: i * 0.05,
+                        }}
+                        className={cn(
+                          "w-1.5 rounded-full",
+                          listening ? "bg-red-500" : "bg-gray-600",
+                        )}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Main Action Button */}
+                  <button
+                    onClick={handleToggleRecording}
+                    className={cn(
+                      "w-full py-4 rounded-2xl font-semibold text-sm tracking-wide transition-all duration-300 transform active:scale-[0.98] relative z-10 shadow-lg",
+                      listening
+                        ? "bg-white text-black hover:bg-gray-100"
+                        : "bg-[#6366f1] text-white hover:bg-[#5558dd] shadow-indigo-500/25",
+                    )}
+                  >
+                    {listening ? "Pause Recording" : "Start Recording"}
+                  </button>
+                </motion.div>
+              )}
+
+              {/* UPLOADING/TRANSCRIBING MODE - Show progress */}
+              {(sidebarMode === "uploading" ||
+                sidebarMode === "transcribing") && (
+                <motion.div
+                  key="uploading-mode"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="w-full flex flex-col items-center gap-4 py-4 relative z-10"
+                >
+                  <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-cyan-500/20 to-indigo-500/20 flex items-center justify-center">
+                    <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold text-white mb-1">
+                      {sidebarMode === "uploading"
+                        ? "Uploading Audio..."
+                        : "Processing with AI..."}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {sidebarMode === "uploading"
+                        ? `${uploadProgress}% complete`
+                        : "Transcribing your audio..."}
+                    </p>
+                  </div>
+                  {sidebarMode === "uploading" && (
+                    <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full bg-linear-to-r from-cyan-500 to-indigo-500"
                         initial={{ width: 0 }}
                         animate={{ width: `${uploadProgress}%` }}
-                        className="h-full bg-linear-to-r from-cyan-400 to-blue-400 rounded-full"
                         transition={{ duration: 0.3 }}
                       />
                     </div>
-                    <p className="text-[10px] text-gray-500">
-                      {isTranscribing
-                        ? "AI is processing your audio"
-                        : "Please wait..."}
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-sm font-semibold text-gray-200 group-hover:text-white transition-colors">
-                      Upload Audio File
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      MP3, WAV, M4A, OGG, FLAC • Max 20MB
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
-          {/* Past Sessions Section */}
+          {/* Upload & Recording History */}
           <div className="pt-1">
             <button
-              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200"
-              onClick={() => setShowPastSessions(!showPastSessions)}
+              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-all duration-200"
+              onClick={() => setShowHistory(!showHistory)}
             >
               <span className="flex items-center gap-2.5 text-xs font-semibold uppercase tracking-wider">
-                <History className="w-4 h-4" />
-                Recording History
-                {pastRecordings && pastRecordings.length > 0 && (
-                  <span className="px-1.5 py-0.5 rounded-md bg-white/10 text-[10px] font-bold">
-                    {pastRecordings.length}
+                <RefreshCw className="w-4 h-4" />
+                Upload & Recording History
+                {(pastRecordings?.filter(
+                  (r) => r.transcript && r.transcript.trim().length > 0,
+                )?.length ?? 0) +
+                  (files?.length ?? 0) >
+                  0 && (
+                  <span className="px-1.5 py-0.5 rounded-md bg-slate-200 dark:bg-white/10 text-[10px] font-bold">
+                    {(pastRecordings?.filter(
+                      (r) => r.transcript && r.transcript.trim().length > 0,
+                    )?.length ?? 0) + (files?.length ?? 0)}
                   </span>
                 )}
               </span>
               <motion.div
-                animate={{ rotate: showPastSessions ? 180 : 0 }}
+                animate={{ rotate: showHistory ? 180 : 0 }}
                 transition={{ duration: 0.2 }}
               >
                 <ChevronDown className="w-4 h-4" />
               </motion.div>
             </button>
 
-            {/* Past Sessions List */}
+            {/* Cleanup button - shows if there are orphaned recordings */}
+            {pastRecordings &&
+              pastRecordings.filter(
+                (r) => !r.transcript || r.transcript.trim().length === 0,
+              ).length > 0 && (
+                <button
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 mt-1 rounded-lg text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-500/10 hover:bg-amber-200 dark:hover:bg-amber-500/20 border border-amber-200 dark:border-amber-500/20 text-xs font-medium transition-all"
+                  onClick={async () => {
+                    try {
+                      const result = await cleanupOrphanedRecordings();
+                      toast.success(
+                        `Cleaned up ${result.deletedCount} failed recording(s)`,
+                      );
+                    } catch (error) {
+                      console.error("Cleanup error:", error);
+                      toast.error("Failed to cleanup recordings");
+                    }
+                  }}
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Clean up{" "}
+                  {
+                    pastRecordings.filter(
+                      (r) => !r.transcript || r.transcript.trim().length === 0,
+                    ).length
+                  }{" "}
+                  failed upload(s)
+                </button>
+              )}
+
+            {/* History List */}
             <AnimatePresence>
-              {showPastSessions && (
+              {showHistory && (
                 <motion.div
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
@@ -1032,392 +1334,175 @@ export function RightSidebar() {
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden"
                 >
-                  <div className="mt-2 max-h-52 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                    {pastRecordings && pastRecordings.length > 0 ? (
-                      pastRecordings.map((recording) => (
-                        <motion.div
-                          key={recording._id}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          className={cn(
-                            "group relative flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200",
-                            selectedSession === recording._id
-                              ? "bg-linear-to-r from-cyan-500/15 to-transparent border border-cyan-500/30"
-                              : "hover:bg-white/5 border border-transparent"
-                          )}
-                          onClick={() => handleLoadPastSession(recording)}
-                        >
-                          <div
+                  <ScrollArea className="mt-2 max-h-52">
+                    <div className="space-y-1 pr-2">
+                      {/* Processing placeholder removed as it is now shown in the main card */}
+
+                      {[
+                        ...(pastRecordings ?? [])
+                          // Filter out recordings without valid transcripts (empty or just "")
+                          .filter(
+                            (r) =>
+                              r.transcript && r.transcript.trim().length > 0,
+                          )
+                          .map((r) => ({
+                            type: "recording" as const,
+                            id: r._id,
+                            title: r.title,
+                            subtitle: r.duration
+                              ? `Audio - ${Math.floor(r.duration / 60)}:${String(Math.floor(r.duration % 60)).padStart(2, "0")}`
+                              : "Audio Recording",
+                            createdAt: r.createdAt,
+                            status:
+                              selectedSession === r._id
+                                ? ("Active" as const)
+                                : ("Completed" as const),
+                          })),
+                        ...(files ?? []).map((f) => ({
+                          type: "file" as const,
+                          id: f._id,
+                          title: f.name,
+                          subtitle: undefined,
+                          createdAt: f.createdAt,
+                          status:
+                            activeContext?.type === "file" &&
+                            activeContext.id === f._id
+                              ? ("Active" as const)
+                              : f.processingStatus === "pending" ||
+                                  f.processingStatus === "processing"
+                                ? ("Processing" as const)
+                                : ("Completed" as const),
+                        })),
+                      ]
+                        .sort((a, b) => b.createdAt - a.createdAt)
+                        .map((item) => (
+                          <motion.div
+                            key={item.type + item.id}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
                             className={cn(
-                              "h-10 w-10 shrink-0 rounded-lg flex items-center justify-center transition-all duration-200",
-                              selectedSession === recording._id
-                                ? "bg-cyan-500/20 text-cyan-400"
-                                : "bg-white/5 text-gray-500 group-hover:text-gray-300 group-hover:bg-white/10"
+                              "group relative flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200",
+                              item.status === "Active"
+                                ? "bg-linear-to-r from-cyan-500/15 to-transparent border border-cyan-500/30"
+                                : "hover:bg-slate-100 dark:hover:bg-white/5 border border-transparent",
                             )}
-                          >
-                            {selectedSession === recording._id ? (
-                              <Volume2 className="w-5 h-5" />
-                            ) : (
-                              <FileAudio className="w-5 h-5" />
-                            )}
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <p
-                              className={cn(
-                                "text-sm font-medium truncate transition-colors",
-                                selectedSession === recording._id
-                                  ? "text-cyan-100"
-                                  : "text-gray-300 group-hover:text-white"
-                              )}
-                            >
-                              {recording.title}
-                            </p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-[10px] text-gray-500">
-                                {new Date(
-                                  recording.createdAt
-                                ).toLocaleDateString("en-US", {
-                                  month: "short",
-                                  day: "numeric",
-                                })}
-                              </span>
-                              {recording.duration && (
-                                <>
-                                  <span className="text-gray-700">•</span>
-                                  <span className="text-[10px] text-gray-500">
-                                    {Math.floor(recording.duration / 60)}:
-                                    {String(
-                                      Math.floor(recording.duration % 60)
-                                    ).padStart(2, "0")}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all rounded-lg"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteRecording(recording._id);
+                            onClick={() => {
+                              if (item.type === "recording") {
+                                const r = pastRecordings?.find(
+                                  (x) => x._id === item.id,
+                                );
+                                if (r) handleLoadPastSession(r);
+                              } else {
+                                setActiveContext({
+                                  id: item.id,
+                                  name: item.title,
+                                  type: "file",
+                                });
+                              }
                             }}
                           >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </motion.div>
-                      ))
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-8 text-gray-600 gap-3">
-                        <div className="w-14 h-14 rounded-xl bg-white/5 flex items-center justify-center">
-                          <History className="w-7 h-7 opacity-30" />
-                        </div>
-                        <div className="text-center">
-                          <p className="text-xs font-medium text-gray-500">
-                            No recordings yet
-                          </p>
-                          <p className="text-[10px] text-gray-600 mt-0.5">
-                            Your saved sessions will appear here
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                            <div
+                              className={cn(
+                                "h-10 w-10 shrink-0 rounded-lg flex items-center justify-center transition-all duration-200",
+                                item.status === "Active"
+                                  ? "bg-cyan-500/20 text-cyan-400"
+                                  : "bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-gray-500 group-hover:text-slate-700 dark:group-hover:text-gray-300 group-hover:bg-slate-200 dark:group-hover:bg-white/10",
+                              )}
+                            >
+                              {item.type === "recording" ? (
+                                item.status === "Active" ? (
+                                  <Volume2 className="w-5 h-5" />
+                                ) : (
+                                  <FileAudio className="w-5 h-5" />
+                                )
+                              ) : (
+                                <FileText className="w-5 h-5" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p
+                                className={cn(
+                                  "text-sm font-medium truncate transition-colors",
+                                  item.status === "Active"
+                                    ? "text-cyan-700 dark:text-cyan-100"
+                                    : "text-slate-700 dark:text-gray-300 group-hover:text-slate-900 dark:group-hover:text-white",
+                                )}
+                              >
+                                {item.title}
+                              </p>
+                              {item.subtitle && (
+                                <p className="text-[10px] text-slate-500 dark:text-gray-500 truncate">
+                                  {item.subtitle}
+                                </p>
+                              )}
+                            </div>
+                            <span
+                              className={cn(
+                                "text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0",
+                                item.status === "Active"
+                                  ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30"
+                                  : item.status === "Processing"
+                                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                    : "text-gray-500",
+                              )}
+                            >
+                              {item.status}
+                            </span>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all rounded-lg shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (item.type === "recording") {
+                                  handleDeleteRecording(
+                                    item.id as Id<"recordings">,
+                                  );
+                                } else {
+                                  deleteFile({
+                                    fileId: item.id as Id<"files">,
+                                  });
+                                  if (
+                                    activeContext?.type === "file" &&
+                                    activeContext.id === item.id
+                                  ) {
+                                    setActiveContext(null);
+                                  }
+                                }
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </motion.div>
+                        ))}
+
+                      {(pastRecordings?.length ?? 0) + (files?.length ?? 0) ===
+                        0 &&
+                        !isUploading &&
+                        !isTranscribing && (
+                          <div className="flex flex-col items-center justify-center py-8 text-slate-500 dark:text-gray-600 gap-3">
+                            <div className="w-14 h-14 rounded-xl bg-slate-100 dark:bg-white/5 flex items-center justify-center">
+                              <History className="w-7 h-7 opacity-30" />
+                            </div>
+                            <div className="text-center">
+                              <p className="text-xs font-medium text-slate-500 dark:text-gray-500">
+                                No uploads or recordings yet
+                              </p>
+                              <p className="text-[10px] text-slate-400 dark:text-gray-600 mt-0.5">
+                                Your history will appear here
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  </ScrollArea>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
         </div>
-      </div>
+      </ScrollArea>
 
-      {/* Middle: Transcript Feed */}
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="px-4 py-3 flex items-center justify-between border-b border-white/5 bg-black/20">
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-gray-500" />
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-              {selectedSession ? "Session Transcript" : "Live Transcript"}
-            </h3>
-          </div>
-          <div className="flex items-center gap-2">
-            {listening && (
-              <span className="flex items-center gap-1.5 text-[10px] bg-green-500/10 text-green-400 px-2 py-1 rounded-full border border-green-500/20">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
-                </span>
-                Live
-              </span>
-            )}
-            {isAnalyzing && (
-              <span className="flex items-center gap-1.5 text-[10px] bg-purple-500/10 text-purple-400 px-2 py-1 rounded-full border border-purple-500/20">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                Analyzing
-              </span>
-            )}
-          </div>
-        </div>
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4 pr-2">
-            {/* Saved transcript chunks */}
-            {sessionTranscript.map((chunk, idx) => (
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                className={cn(
-                  "relative group rounded-xl p-3 transition-all duration-200",
-                  chunk.isImportant
-                    ? "bg-linear-to-r from-yellow-500/10 to-transparent border border-yellow-500/20"
-                    : "bg-white/2 hover:bg-white/4 border border-transparent hover:border-white/5"
-                )}
-              >
-                {/* Timestamp badge */}
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-gray-500 bg-white/5 px-2 py-0.5 rounded-md">
-                      {chunk.timestamp}
-                    </span>
-                    {chunk.isImportant && (
-                      <span className="flex items-center gap-1 text-[10px] text-yellow-400 bg-yellow-500/10 px-2 py-0.5 rounded-md">
-                        <Pin className="w-3 h-3" />
-                        Important
-                      </span>
-                    )}
-                  </div>
-                  {chunk.concepts.length > 0 && (
-                    <div className="flex items-center gap-1">
-                      {chunk.concepts.slice(0, 2).map((concept, i) => (
-                        <span
-                          key={i}
-                          className="text-[9px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded"
-                        >
-                          {concept}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Content */}
-                <div className="text-sm text-zinc-300 leading-relaxed prose prose-invert prose-sm max-w-none">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkMath]}
-                    rehypePlugins={[rehypeKatex]}
-                  >
-                    {chunk.enhancedText}
-                  </ReactMarkdown>
-                </div>
-              </motion.div>
-            ))}
-
-            {/* Current live transcript */}
-            {transcript && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="relative"
-              >
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-linear-to-b from-cyan-400 to-blue-500 rounded-full" />
-                <div className="ml-4 bg-linear-to-r from-cyan-500/10 to-transparent p-4 rounded-xl border border-cyan-500/20">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/20 px-2 py-0.5 rounded-md font-bold">
-                      {formatTime(elapsedTime)}
-                    </span>
-                    <span className="flex items-center gap-1 text-[10px] text-cyan-400">
-                      <Waves className="w-3 h-3" />
-                      Recording...
-                    </span>
-                  </div>
-                  <p className="text-sm text-zinc-100 leading-relaxed">
-                    {transcript}
-                    <span className="inline-block w-0.5 h-4 bg-cyan-400 ml-0.5 animate-pulse" />
-                  </p>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Empty state */}
-            {!transcript &&
-              sessionTranscript.length === 0 &&
-              !generatedNotes && (
-                <div className="flex flex-col items-center justify-center pt-16 pb-8">
-                  <div className="relative">
-                    <div className="w-20 h-20 rounded-2xl bg-linear-to-br from-white/5 to-transparent flex items-center justify-center mb-4 border border-white/5">
-                      <Mic className="w-10 h-10 text-gray-600" />
-                    </div>
-                    <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
-                      <Sparkles className="w-4 h-4 text-indigo-400" />
-                    </div>
-                  </div>
-                  <h4 className="text-sm font-medium text-gray-400 mb-1">
-                    Ready to Record
-                  </h4>
-                  <p className="text-xs text-gray-600 text-center max-w-[200px]">
-                    Click the record button or upload an audio file to get
-                    started
-                  </p>
-                </div>
-              )}
-
-            {/* Generated Notes Display */}
-            {generatedNotes && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-6 p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg space-y-4"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-purple-400" />
-                    <span className="text-sm font-semibold text-purple-400">
-                      AI Generated Notes
-                    </span>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-xs text-gray-400 hover:text-white"
-                    onClick={() => setGeneratedNotes(null)}
-                  >
-                    Dismiss
-                  </Button>
-                </div>
-
-                {/* Context Attribution */}
-                {usedContextName && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                    <FileText className="w-4 h-4 text-blue-400 shrink-0" />
-                    <span className="text-xs text-blue-300">
-                      Generated with context:{" "}
-                      <span className="font-medium text-blue-200">
-                        {usedContextName}
-                      </span>
-                    </span>
-                  </div>
-                )}
-
-                {/* Summary */}
-                <div className="bg-black/20 p-3 rounded-lg border-l-2 border-purple-500">
-                  <p className="text-sm text-zinc-300">
-                    {generatedNotes.summary}
-                  </p>
-                </div>
-
-                {/* Cornell Notes */}
-                {generatedNotes.cornellCues.length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">
-                      Cornell Notes
-                    </h4>
-                    <div className="space-y-2">
-                      {generatedNotes.cornellCues.map((cue, i) => (
-                        <div
-                          key={i}
-                          className="grid grid-cols-[100px_1fr] gap-2 text-sm"
-                        >
-                          <span className="text-purple-300 font-medium">
-                            {cue}
-                          </span>
-                          <span className="text-zinc-400">
-                            {generatedNotes.cornellNotes[i] || ""}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Action Items */}
-                {generatedNotes.actionItems.length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">
-                      Action Items
-                    </h4>
-                    <ul className="space-y-1">
-                      {generatedNotes.actionItems.map((item, i) => (
-                        <li
-                          key={i}
-                          className="flex items-start gap-2 text-sm text-yellow-300"
-                        >
-                          <span>☐</span>
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Review Questions */}
-                {generatedNotes.reviewQuestions.length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">
-                      Review Questions
-                    </h4>
-                    <ul className="space-y-1">
-                      {generatedNotes.reviewQuestions.map((q, i) => (
-                        <li key={i} className="text-sm text-cyan-300">
-                          • {q}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Insert to Editor Button */}
-                <Button
-                  className="w-full bg-purple-600 hover:bg-purple-500 text-white"
-                  onClick={async () => {
-                    const currentNoteId = searchParams.get("noteId");
-
-                    if (!currentNoteId && generatedNotes) {
-                      // No note is open - create a new one
-                      try {
-                        const title =
-                          recordingTitle || usedContextName
-                            ? `Notes from ${usedContextName || recordingTitle || "Recording"}`
-                            : "Generated Notes";
-
-                        const noteId = await createNote({
-                          title,
-                          major: userData?.major || "general",
-                          style: "standard",
-                        });
-
-                        // Set pending notes and navigate to the new note
-                        setPendingNotes(generatedNotes);
-                        setGeneratedNotes(null);
-                        router.push(`/dashboard?noteId=${noteId}`);
-                        toast.success(
-                          "Created new note with generated content"
-                        );
-                      } catch (error) {
-                        console.error("Failed to create note:", error);
-                        toast.error("Failed to create note. Please try again.");
-                      }
-                    } else {
-                      // Note is already open - just set pending notes
-                      setPendingNotes(generatedNotes);
-                      setGeneratedNotes(null);
-                      toast.success("Content ready to insert");
-                    }
-                  }}
-                >
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  {searchParams.get("noteId")
-                    ? "Insert to Editor"
-                    : "Create Note"}
-                </Button>
-              </motion.div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-        </ScrollArea>
-      </div>
       <Dialog open={isSaveModalOpen} onOpenChange={setIsSaveModalOpen}>
         <DialogContent className="sm:max-w-md bg-zinc-900 border-white/10 text-white">
           <DialogHeader>

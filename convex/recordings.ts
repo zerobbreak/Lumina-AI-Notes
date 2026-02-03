@@ -16,12 +16,19 @@ async function getUserTierAndUsage(ctx: any, tokenIdentifier: string) {
   const user = await ctx.db
     .query("users")
     .withIndex("by_tokenIdentifier", (q: any) =>
-      q.eq("tokenIdentifier", tokenIdentifier)
+      q.eq("tokenIdentifier", tokenIdentifier),
     )
     .unique();
 
   if (!user) {
-    return { tier: "free" as SubscriptionTier, usage: { audioMinutesUsed: 0, notesCreated: 0, lastResetDate: Date.now() } };
+    return {
+      tier: "free" as SubscriptionTier,
+      usage: {
+        audioMinutesUsed: 0,
+        notesCreated: 0,
+        lastResetDate: Date.now(),
+      },
+    };
   }
 
   // Determine effective tier
@@ -29,7 +36,8 @@ async function getUserTierAndUsage(ctx: any, tokenIdentifier: string) {
   const status = user.subscriptionStatus as SubscriptionStatus | undefined;
   const endDate = user.subscriptionEndDate;
   const isActive = status === "active" && (!endDate || endDate > Date.now());
-  const effectiveTier: SubscriptionTier = isActive && tier !== "free" ? tier : "free";
+  const effectiveTier: SubscriptionTier =
+    isActive && tier !== "free" ? tier : "free";
 
   // Get or initialize usage
   const now = Date.now();
@@ -63,9 +71,12 @@ async function getUserTierAndUsage(ctx: any, tokenIdentifier: string) {
 async function checkAndUpdateAudioUsage(
   ctx: any,
   tokenIdentifier: string,
-  durationMinutes: number
+  durationMinutes: number,
 ): Promise<{ allowed: boolean; error?: string; remaining?: number }> {
-  const { tier, usage, userId } = await getUserTierAndUsage(ctx, tokenIdentifier);
+  const { tier, usage, userId } = await getUserTierAndUsage(
+    ctx,
+    tokenIdentifier,
+  );
   const limit = TIER_AUDIO_LIMITS[tier];
 
   if (limit !== Infinity) {
@@ -91,7 +102,10 @@ async function checkAndUpdateAudioUsage(
 
   return {
     allowed: true,
-    remaining: limit === Infinity ? Infinity : limit - usage.audioMinutesUsed - durationMinutes,
+    remaining:
+      limit === Infinity
+        ? Infinity
+        : limit - usage.audioMinutesUsed - durationMinutes,
   };
 }
 
@@ -109,7 +123,10 @@ export const checkAudioLimit = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return { allowed: false, error: "Unauthorized" };
 
-    const { tier, usage } = await getUserTierAndUsage(ctx, identity.tokenIdentifier);
+    const { tier, usage } = await getUserTierAndUsage(
+      ctx,
+      identity.tokenIdentifier,
+    );
     const limit = TIER_AUDIO_LIMITS[tier];
     const estimatedMinutes = args.estimatedMinutes || 0;
 
@@ -151,7 +168,7 @@ export const saveRecording = mutation({
       const usageCheck = await checkAndUpdateAudioUsage(
         ctx,
         identity.tokenIdentifier,
-        durationMinutes
+        durationMinutes,
       );
 
       if (!usageCheck.allowed) {
@@ -189,7 +206,7 @@ export const saveUploadedRecording = mutation({
       const usageCheck = await checkAndUpdateAudioUsage(
         ctx,
         identity.tokenIdentifier,
-        durationMinutes
+        durationMinutes,
       );
 
       if (!usageCheck.allowed) {
@@ -210,6 +227,11 @@ export const saveUploadedRecording = mutation({
       createdAt: Date.now(),
     });
 
+    console.log(`[saveUploadedRecording] Created recording: ${recordingId}`);
+    console.log(
+      `[saveUploadedRecording] With userId: ${identity.tokenIdentifier}`,
+    );
+
     return recordingId;
   },
 });
@@ -224,7 +246,27 @@ export const updateRecordingTranscript = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
 
+    console.log(
+      `[updateRecordingTranscript] Looking for recording: ${args.recordingId}`,
+    );
+    console.log(
+      `[updateRecordingTranscript] Current user tokenIdentifier: ${identity.tokenIdentifier}`,
+    );
+
     const recording = await ctx.db.get(args.recordingId);
+    console.log(
+      `[updateRecordingTranscript] Recording found:`,
+      recording ? "yes" : "no",
+    );
+    if (recording) {
+      console.log(
+        `[updateRecordingTranscript] Recording userId: ${recording.userId}`,
+      );
+      console.log(
+        `[updateRecordingTranscript] Match: ${recording.userId === identity.tokenIdentifier}`,
+      );
+    }
+
     if (!recording || recording.userId !== identity.tokenIdentifier) {
       throw new Error("Recording not found or unauthorized");
     }
@@ -277,5 +319,30 @@ export const deleteRecording = mutation({
     }
 
     await ctx.db.delete(args.recordingId);
+  },
+});
+
+// Cleanup orphaned recordings (those without valid transcripts)
+export const cleanupOrphanedRecordings = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const recordings = await ctx.db
+      .query("recordings")
+      .withIndex("by_userId", (q) => q.eq("userId", identity.tokenIdentifier))
+      .collect();
+
+    let deletedCount = 0;
+    for (const recording of recordings) {
+      // Delete recordings without transcripts (empty or just whitespace)
+      if (!recording.transcript || recording.transcript.trim().length === 0) {
+        await ctx.db.delete(recording._id);
+        deletedCount++;
+      }
+    }
+
+    return { deletedCount };
   },
 });

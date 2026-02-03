@@ -357,7 +357,7 @@ export default function FolderView({
               variants={containerVariants}
               initial="hidden"
               animate="show"
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
             >
               {/* Create New Card */}
               <motion.div
@@ -365,12 +365,12 @@ export default function FolderView({
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleCreateNoteInContext}
-                className="group relative aspect-4/3 rounded-2xl border border-dashed border-white/10 hover:border-cyan-500/30 hover:bg-cyan-500/5 transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 text-gray-500 hover:text-cyan-400"
+                className="rounded-xl border border-dashed border-white/10 hover:border-cyan-500/30 hover:bg-cyan-500/5 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-3 p-8 min-h-[180px]"
               >
-                <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-cyan-500/10 group-hover:scale-110 transition-all duration-300">
-                  <Plus className="w-7 h-7" />
+                <div className="w-16 h-16 rounded-full bg-cyan-500/10 flex items-center justify-center">
+                  <Plus className="w-8 h-8 text-cyan-400" />
                 </div>
-                <span className="text-sm font-medium">Create New Note</span>
+                <span className="text-sm font-medium text-cyan-400">Create New Note</span>
               </motion.div>
 
               {contextNotes
@@ -386,54 +386,52 @@ export default function FolderView({
                     key={n._id}
                     variants={itemVariants}
                     onClick={() => router.push(`/dashboard?noteId=${n._id}`)}
-                    whileHover={{ y: -8 }}
-                    className="group relative aspect-4/3 rounded-3xl border border-white/5 bg-[#121212]/80 backdrop-blur-sm hover:bg-[#18181B] hover:shadow-[0_0_30px_rgba(0,0,0,0.5)] hover:border-white/10 transition-all duration-300 cursor-pointer p-6 flex flex-col justify-between overflow-hidden"
+                    whileHover={{ scale: 1.02 }}
+                    className="group relative rounded-xl border border-white/10 bg-[#121212] hover:bg-[#18181B] hover:border-white/20 cursor-pointer transition-all duration-300 p-5"
                   >
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-2">
-                          {n.isPinned && (
-                            <Pin className="w-3 h-3 text-amber-400" />
-                          )}
-                          <span className="text-[10px] font-mono text-cyan-400/80 bg-cyan-950/30 px-2 py-1 rounded-md border border-cyan-500/10">
-                            {n.style || "NOTE"}
-                          </span>
-                        </div>
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <ActionMenu
-                            onPin={() => togglePinNote({ noteId: n._id })}
-                            isPinned={n.isPinned}
-                            onRename={() =>
-                              setRenameTarget({
-                                id: n._id,
-                                title: n.title,
-                                type: "note",
-                              })
-                            }
-                            onDelete={() => {
-                              if (confirm("Delete this note?")) {
-                                deleteNote({ noteId: n._id });
-                              }
-                            }}
-                            align="right"
-                          />
-                        </div>
+                    {/* Icon in top-left and menu in top-right */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center">
+                        <FileText className="w-5 h-5 text-cyan-400" />
                       </div>
-                      <h3 className="font-bold text-xl text-white line-clamp-2 group-hover:text-cyan-200 transition-colors">
-                        {n.title}
-                      </h3>
-                      <p className="text-sm text-gray-500 line-clamp-3 leading-relaxed">
-                        {n.content
-                          ? n.content
-                              .replace(/<[^>]*>/g, "")
-                              .substring(0, 100) + "..."
-                          : "No additional text..."}
-                      </p>
+                      
+                      <div
+                        className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ActionMenu
+                          onPin={() => togglePinNote({ noteId: n._id })}
+                          isPinned={n.isPinned}
+                          onRename={() =>
+                            setRenameTarget({
+                              id: n._id,
+                              title: n.title,
+                              type: "note",
+                            })
+                          }
+                          onDelete={() => {
+                            if (confirm("Delete this note?")) {
+                              deleteNote({ noteId: n._id });
+                            }
+                          }}
+                          align="right"
+                        />
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs text-gray-600 border-t border-white/5 pt-4 mt-2">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{new Date(n.createdAt).toLocaleDateString()}</span>
+                    {/* Title */}
+                    <h3 className="font-bold text-lg text-white mb-3 line-clamp-2 group-hover:text-cyan-200 transition-colors">
+                      {n.title}
+                    </h3>
+
+                    {/* Identifier badge */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono text-cyan-400 bg-cyan-950/40 px-2 py-1 rounded border border-cyan-500/20">
+                        {n.style?.toUpperCase() || "NOTE"}
+                      </span>
+                      {n.isPinned && (
+                        <Pin className="w-3 h-3 text-amber-400" />
+                      )}
                     </div>
                   </motion.div>
                 ))}

@@ -48,10 +48,8 @@ export function GenerateFlashcardsDialog({
   const [title, setTitle] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [requiresUpgrade, setRequiresUpgrade] = useState(false);
 
   const selectedNote = notes?.find((n) => n._id === selectedNoteId);
-  const isFreeTier = !subscription || subscription.tier === "free";
 
   const handleGenerate = async () => {
     if (!selectedNoteId) {
@@ -60,7 +58,6 @@ export function GenerateFlashcardsDialog({
     }
 
     setError(null);
-    setRequiresUpgrade(false);
     setIsGenerating(true);
 
     try {
@@ -76,9 +73,6 @@ export function GenerateFlashcardsDialog({
         router.push(`/dashboard?view=flashcards&deckId=${result.deckId}`);
       } else {
         setError(result.error || "Failed to generate flashcards");
-        if (result.requiresUpgrade) {
-          setRequiresUpgrade(true);
-        }
       }
     } catch (err) {
       setError(
@@ -96,81 +90,6 @@ export function GenerateFlashcardsDialog({
       setTitle(`${note.title} Flashcards`);
     }
   };
-
-  // Show upgrade prompt for free tier users
-  if (isFreeTier) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="bg-[#0a0a12] border-white/10 text-white sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <div className="relative">
-                <Sparkles className="w-5 h-5 text-indigo-400" />
-                <Lock className="w-3 h-3 text-yellow-400 absolute -top-1 -right-1" />
-              </div>
-              Generate Flashcards
-            </DialogTitle>
-            <DialogDescription className="text-gray-400">
-              AI-generated flashcards are a Scholar feature.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-6">
-            {/* Upgrade Prompt */}
-            <div className="relative overflow-hidden rounded-xl border border-indigo-500/20 bg-linear-to-br from-indigo-500/10 via-purple-500/10 to-indigo-500/10 p-6">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl" />
-              
-              <div className="relative space-y-4">
-                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
-                  <Crown className="w-6 h-6 text-white" />
-                </div>
-                
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-2">
-                    Upgrade to Scholar
-                  </h3>
-                  <p className="text-sm text-gray-400 leading-relaxed">
-                    Get access to AI-generated flashcards, quizzes, unlimited audio processing, and more.
-                  </p>
-                </div>
-
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2 text-gray-300">
-                    <Sparkles className="w-4 h-4 text-indigo-400" />
-                    Auto-generated Flashcards
-                  </li>
-                  <li className="flex items-center gap-2 text-gray-300">
-                    <Sparkles className="w-4 h-4 text-purple-400" />
-                    AI Quiz Generation
-                  </li>
-                  <li className="flex items-center gap-2 text-gray-300">
-                    <Sparkles className="w-4 h-4 text-pink-400" />
-                    Unlimited Audio Processing
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              className="border-white/10 text-gray-300 hover:bg-white/5"
-            >
-              Maybe Later
-            </Button>
-            <Link href="/#pricing">
-              <Button className="bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 gap-2">
-                <Crown className="w-4 h-4" />
-                Upgrade Now
-              </Button>
-            </Link>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -257,20 +176,8 @@ export function GenerateFlashcardsDialog({
 
           {/* Error Message */}
           {error && (
-            <div className={`text-sm rounded-md px-3 py-2 ${
-              requiresUpgrade 
-                ? "text-yellow-400 bg-yellow-500/10 border border-yellow-500/20" 
-                : "text-red-400 bg-red-500/10 border border-red-500/20"
-            }`}>
+            <div className="text-sm rounded-md px-3 py-2 text-red-400 bg-red-500/10 border border-red-500/20">
               {error}
-              {requiresUpgrade && (
-                <Link href="/#pricing" className="block mt-2">
-                  <Button size="sm" className="w-full bg-indigo-600 hover:bg-indigo-500">
-                    <Crown className="w-3 h-3 mr-1" />
-                    Upgrade to Scholar
-                  </Button>
-                </Link>
-              )}
             </div>
           )}
         </div>

@@ -23,11 +23,11 @@ export default defineSchema({
               v.object({
                 id: v.string(),
                 title: v.string(),
-              })
-            )
+              }),
+            ),
           ),
-        })
-      )
+        }),
+      ),
     ),
     noteStyle: v.optional(v.string()), // "cornell" | "outline" | "mindmap"
     theme: v.optional(v.string()), // UI accent color preference (e.g., "indigo", "amber")
@@ -46,10 +46,11 @@ export default defineSchema({
         audioMinutesUsed: v.number(),
         notesCreated: v.number(),
         lastResetDate: v.number(),
-      })
+      }),
     ),
   })
     .index("by_tokenIdentifier", ["tokenIdentifier"])
+    .index("by_email", ["email"])
     .index("by_paystackCustomerId", ["paystackCustomerId"]),
 
   notes: defineTable({
@@ -70,6 +71,9 @@ export default defineSchema({
     embedding: v.optional(v.array(v.float64())),
     // Linked source documents for citations
     linkedDocumentIds: v.optional(v.array(v.id("files"))),
+    // Tags and Stats
+    tagIds: v.optional(v.array(v.id("tags"))),
+    wordCount: v.optional(v.number()),
     // Cornell Notes specific fields
     cornellCues: v.optional(v.string()),
     cornellNotes: v.optional(v.string()),
@@ -81,7 +85,7 @@ export default defineSchema({
         totalItems: v.number(),
         completedTasks: v.number(),
         collapsedNodes: v.array(v.string()), // IDs of collapsed nodes
-      })
+      }),
     ),
   })
     .index("by_userId", ["userId"])
@@ -155,13 +159,31 @@ export default defineSchema({
     }),
 
   flashcards: defineTable({
+    userId: v.optional(v.string()),
     deckId: v.id("flashcardDecks"),
     front: v.string(),
     back: v.string(),
     difficulty: v.optional(v.number()),
     nextReviewAt: v.optional(v.number()),
     reviewCount: v.optional(v.number()),
-  }).index("by_deckId", ["deckId"]),
+    lastReviewedAt: v.optional(v.number()),
+    easeFactor: v.optional(v.number()),
+    interval: v.optional(v.number()),
+    repetitions: v.optional(v.number()),
+    lastRating: v.optional(v.string()),
+  })
+    .index("by_deckId", ["deckId"])
+    .index("by_userId", ["userId"])
+    .index("by_userId_nextReviewAt", ["userId", "nextReviewAt"])
+    .index("by_deckId_nextReviewAt", ["deckId", "nextReviewAt"]),
+
+  flashcardReviewQueues: defineTable({
+    userId: v.string(),
+    date: v.number(),
+    cardIds: v.array(v.id("flashcards")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_userId_date", ["userId", "date"]),
 
   quizDecks: defineTable({
     userId: v.string(),
@@ -222,4 +244,38 @@ export default defineSchema({
     .index("by_noteId", ["noteId"])
     .index("by_userId_noteId", ["userId", "noteId"])
     .index("by_lastSeen", ["lastSeen"]),
+
+  // Note collaboration: explicit collaborators + email-based invites
+  noteCollaborators: defineTable({
+    noteId: v.id("notes"),
+    userId: v.string(), // tokenIdentifier of collaborator
+    role: v.union(v.literal("viewer"), v.literal("editor")),
+    addedAt: v.number(),
+    addedBy: v.string(), // tokenIdentifier of inviter (usually owner)
+  })
+    .index("by_noteId", ["noteId"])
+    .index("by_userId", ["userId"])
+    .index("by_noteId_userId", ["noteId", "userId"])
+    .index("by_userId_noteId", ["userId", "noteId"]),
+
+  noteInvites: defineTable({
+    noteId: v.id("notes"),
+    email: v.string(), // normalized lowercase email
+    role: v.union(v.literal("viewer"), v.literal("editor")),
+    invitedBy: v.string(), // tokenIdentifier of inviter (usually owner)
+    createdAt: v.number(),
+    acceptedAt: v.optional(v.number()),
+    acceptedBy: v.optional(v.string()), // tokenIdentifier of accepter
+  })
+    .index("by_noteId", ["noteId"])
+    .index("by_email", ["email"])
+    .index("by_noteId_email", ["noteId", "email"]),
+
+  tags: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    color: v.string(), // Hex code or preset name
+  })
+    .index("by_userId", ["userId"])
+    .index("by_userId_name", ["userId", "name"]),
 });

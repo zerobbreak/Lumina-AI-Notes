@@ -9,14 +9,14 @@ type SearchScope = "single-note" | "course" | "all";
 // Search scope per tier
 const TIER_SEARCH_SCOPE: Record<SubscriptionTier, SearchScope> = {
   free: "single-note", // Free users: limited results
-  scholar: "all",      // Scholar: full search
-  institution: "all",  // Institution: full search
+  scholar: "all", // Scholar: full search
+  institution: "all", // Institution: full search
 };
 
 // Result limits per tier
 const TIER_RESULT_LIMITS: Record<SubscriptionTier, number> = {
-  free: 5,        // Free users get max 5 results per category
-  scholar: 20,    // Scholar gets 20 results
+  free: 5, // Free users get max 5 results per category
+  scholar: 20, // Scholar gets 20 results
   institution: 50, // Institution gets 50 results
 };
 
@@ -39,8 +39,16 @@ export type SearchResponse = {
 export const search = query({
   args: {
     query: v.string(),
-    type: v.optional(v.union(v.literal("note"), v.literal("file"), v.literal("deck"), v.literal("all"))),
+    type: v.optional(
+      v.union(
+        v.literal("note"),
+        v.literal("file"),
+        v.literal("deck"),
+        v.literal("all"),
+      ),
+    ),
     courseId: v.optional(v.string()), // Optional: restrict to specific course
+    tagIds: v.optional(v.array(v.id("tags"))),
   },
   handler: async (ctx, args): Promise<SearchResponse> => {
     const identity = await ctx.auth.getUserIdentity();
@@ -66,7 +74,8 @@ export const search = query({
       const rawTier = user.subscriptionTier as SubscriptionTier;
       const status = user.subscriptionStatus;
       const endDate = user.subscriptionEndDate;
-      const isActive = status === "active" && (!endDate || endDate > Date.now());
+      const isActive =
+        status === "active" && (!endDate || endDate > Date.now());
       tier = isActive ? rawTier : "free";
     }
 
@@ -81,21 +90,37 @@ export const search = query({
       let notesQuery = ctx.db
         .query("notes")
         .withSearchIndex("search_title", (q) =>
-          q.search("title", args.query).eq("userId", userId)
+          q.search("title", args.query).eq("userId", userId),
         )
         .filter((q) => q.neq(q.field("isArchived"), true));
 
       // For free tier with course restriction, filter by courseId
       if (searchScope === "single-note" && args.courseId) {
         notesQuery = notesQuery.filter((q) =>
-          q.eq(q.field("courseId"), args.courseId)
+          q.eq(q.field("courseId"), args.courseId),
         );
       }
 
-      const notes = await notesQuery.take(resultLimit + 5); // Take a few extra to check if limit reached
-      totalFound += notes.length;
+      const fetchLimit =
+        args.tagIds && args.tagIds.length > 0 ? 50 : resultLimit + 5;
+      const notes = await notesQuery.take(fetchLimit);
 
-      for (const note of notes.slice(0, resultLimit)) {
+      let filteredNotes = notes;
+
+      // Filter by Tags (Intersection)
+      if (args.tagIds && args.tagIds.length > 0) {
+        const requiredTags = new Set(args.tagIds);
+        filteredNotes = notes.filter((n) => {
+          if (!n.tagIds) return false;
+          // Check if note has ALL required tags
+          // Note: n.tagIds is strict array of IDs.
+          return args.tagIds!.every((tId) => n.tagIds!.includes(tId));
+        });
+      }
+
+      totalFound += filteredNotes.length;
+
+      for (const note of filteredNotes.slice(0, resultLimit)) {
         results.push({
           type: "note",
           id: note._id,
@@ -106,18 +131,30 @@ export const search = query({
       }
     }
 
+    // Skip Files and Decks if filtering by tags (as they don't have tags yet)
+    if (args.tagIds && args.tagIds.length > 0) {
+      // Return early or just let the blocks below not run
+      const limitReached = totalFound > results.length;
+      return {
+        results,
+        tier,
+        limitReached,
+        totalFound: limitReached ? totalFound : undefined,
+      };
+    }
+
     // Search Files
     if (searchType === "all" || searchType === "file") {
       let filesQuery = ctx.db
         .query("files")
         .withSearchIndex("search_name", (q) =>
-          q.search("name", args.query).eq("userId", userId)
+          q.search("name", args.query).eq("userId", userId),
         );
 
       // For free tier with course restriction, filter by courseId
       if (searchScope === "single-note" && args.courseId) {
         filesQuery = filesQuery.filter((q) =>
-          q.eq(q.field("courseId"), args.courseId)
+          q.eq(q.field("courseId"), args.courseId),
         );
       }
 
@@ -140,13 +177,13 @@ export const search = query({
       let decksQuery = ctx.db
         .query("flashcardDecks")
         .withSearchIndex("search_title", (q) =>
-          q.search("title", args.query).eq("userId", userId)
+          q.search("title", args.query).eq("userId", userId),
         );
 
       // For free tier with course restriction, filter by courseId
       if (searchScope === "single-note" && args.courseId) {
         decksQuery = decksQuery.filter((q) =>
-          q.eq(q.field("courseId"), args.courseId)
+          q.eq(q.field("courseId"), args.courseId),
         );
       }
 
@@ -204,12 +241,13 @@ export const semanticSearch = query({
       const rawTier = user.subscriptionTier as SubscriptionTier;
       const status = user.subscriptionStatus;
       const endDate = user.subscriptionEndDate;
-      const isActive = status === "active" && (!endDate || endDate > Date.now());
+      const isActive =
+        status === "active" && (!endDate || endDate > Date.now());
       tier = isActive ? rawTier : "free";
     }
 
     // Free tier gets max 3 semantic search results
-    const maxResults = tier === "free" ? 3 : (args.limit || 10);
+    const maxResults = tier === "free" ? 3 : args.limit || 10;
     const limited = tier === "free";
 
     return {

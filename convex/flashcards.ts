@@ -1,5 +1,25 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import {
+  DEFAULT_EASE_FACTOR,
+  scheduleNextReviewFromRating,
+} from "../lib/spacedRepetition";
+
+type Rating = "easy" | "medium" | "hard";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const getStartOfDay = (date: Date) => {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+};
+
+const getEndOfDay = (date: Date) => {
+  const d = new Date(date);
+  d.setHours(23, 59, 59, 999);
+  return d.getTime();
+};
 
 /**
  * Get all flashcard decks for the current user
@@ -93,10 +113,15 @@ export const createDeckWithCards = mutation({
     // Create all flashcards
     for (const card of args.cards) {
       await ctx.db.insert("flashcards", {
+        userId: identity.tokenIdentifier,
         deckId,
         front: card.front,
         back: card.back,
         reviewCount: 0,
+        easeFactor: DEFAULT_EASE_FACTOR,
+        interval: 0,
+        repetitions: 0,
+        nextReviewAt: Date.now(),
       });
     }
 
@@ -197,9 +222,13 @@ export const updateCardReview = mutation({
     }
 
     await ctx.db.patch(args.cardId, {
-      difficulty: args.easeFactor, // Using difficulty field to store easeFactor
+      difficulty: args.easeFactor, // Legacy field (kept for backward compatibility)
       nextReviewAt: args.nextReviewAt,
       reviewCount: (card.reviewCount || 0) + 1,
+      easeFactor: args.easeFactor,
+      interval: args.interval,
+      repetitions: args.repetitions,
+      lastReviewedAt: Date.now(),
     });
 
     // Update deck's lastStudiedAt
@@ -246,9 +275,13 @@ export const batchUpdateCardReviews = mutation({
       if (!deck || deck.userId !== identity.tokenIdentifier) continue;
 
       await ctx.db.patch(review.cardId, {
-        difficulty: review.easeFactor,
+        difficulty: review.easeFactor, // Legacy field
         nextReviewAt: review.nextReviewAt,
         reviewCount: (card.reviewCount || 0) + 1,
+        easeFactor: review.easeFactor,
+        interval: review.interval,
+        repetitions: review.repetitions,
+        lastReviewedAt: Date.now(),
       });
 
       updatedCards.push(review.cardId);
@@ -282,15 +315,13 @@ export const getDueCards = query({
     }
 
     const now = Date.now();
-    const cards = await ctx.db
+    return await ctx.db
       .query("flashcards")
-      .withIndex("by_deckId", (q) => q.eq("deckId", args.deckId))
+      .withIndex("by_deckId_nextReviewAt", (q) =>
+        q.eq("deckId", args.deckId).lte("nextReviewAt", now),
+      )
+      .order("asc")
       .collect();
-
-    // Return cards that are due for review (nextReviewAt <= now or never reviewed)
-    return cards.filter(
-      (card) => !card.nextReviewAt || card.nextReviewAt <= now
-    );
   },
 });
 
@@ -348,8 +379,8 @@ export const getDeckStats = query({
     let cardsWithEaseFactor = 0;
 
     for (const card of cards) {
-      const reviewCount = card.reviewCount || 0;
-      const easeFactor = card.difficulty || 2.5;
+      const reviewCount = card.repetitions ?? card.reviewCount ?? 0;
+      const easeFactor = card.easeFactor ?? card.difficulty ?? 2.5;
       const nextReview = card.nextReviewAt;
 
       // Categorize by learning stage
@@ -374,7 +405,7 @@ export const getDeckStats = query({
       }
 
       // Track ease factor
-      if (card.difficulty) {
+      if (card.easeFactor || card.difficulty) {
         totalEaseFactor += easeFactor;
         cardsWithEaseFactor++;
       }
@@ -540,14 +571,247 @@ export const createDeckWithCardsImmediate = mutation({
     const now = Date.now();
     for (const card of args.cards) {
       await ctx.db.insert("flashcards", {
+        userId: identity.tokenIdentifier,
         deckId,
         front: card.front,
         back: card.back,
         reviewCount: 0,
         nextReviewAt: now,
+        easeFactor: DEFAULT_EASE_FACTOR,
+        interval: 0,
+        repetitions: 0,
       });
     }
 
     return deckId;
+  },
+});
+
+/**
+ * Schedule next review after a user rating
+ */
+export const scheduleNextReview = mutation({
+  args: {
+    cardId: v.id("flashcards"),
+    rating: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const card = await ctx.db.get(args.cardId);
+    if (!card) throw new Error("Card not found");
+
+    const deck = await ctx.db.get(card.deckId);
+    if (!deck || deck.userId !== identity.tokenIdentifier) {
+      throw new Error("Unauthorized");
+    }
+
+    const result = scheduleNextReviewFromRating(args.rating as Rating, {
+      easeFactor: card.easeFactor ?? card.difficulty ?? DEFAULT_EASE_FACTOR,
+      interval: card.interval ?? 0,
+      repetitions: card.repetitions ?? card.reviewCount ?? 0,
+    });
+
+    await ctx.db.patch(args.cardId, {
+      nextReviewAt: result.nextReviewAt,
+      lastReviewedAt: result.lastReviewAt,
+      easeFactor: result.easeFactor,
+      interval: result.interval,
+      repetitions: result.repetitions,
+      lastRating: args.rating,
+      reviewCount: result.repetitions,
+    });
+
+    await ctx.db.patch(deck._id, {
+      lastStudiedAt: Date.now(),
+    });
+
+    return {
+      cardId: args.cardId,
+      nextReviewAt: result.nextReviewAt,
+      interval: result.interval,
+      easeFactor: result.easeFactor,
+      repetitions: result.repetitions,
+    };
+  },
+});
+
+/**
+ * Reset a card's progress to defaults
+ */
+export const resetCardProgress = mutation({
+  args: { cardId: v.id("flashcards") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const card = await ctx.db.get(args.cardId);
+    if (!card) throw new Error("Card not found");
+
+    const deck = await ctx.db.get(card.deckId);
+    if (!deck || deck.userId !== identity.tokenIdentifier) {
+      throw new Error("Unauthorized");
+    }
+
+    await ctx.db.patch(args.cardId, {
+      easeFactor: DEFAULT_EASE_FACTOR,
+      interval: 0,
+      repetitions: 0,
+      lastReviewedAt: undefined,
+      lastRating: undefined,
+      nextReviewAt: Date.now(),
+      reviewCount: 0,
+    });
+  },
+});
+
+/**
+ * Get all due flashcards across all decks for the current user
+ */
+export const getDueFlashcards = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const now = Date.now();
+    return await ctx.db
+      .query("flashcards")
+      .withIndex("by_userId_nextReviewAt", (q) =>
+        q.eq("userId", identity.tokenIdentifier).lte("nextReviewAt", now),
+      )
+      .order("asc")
+      .collect();
+  },
+});
+
+/**
+ * Get today's materialized queue for the current user
+ */
+export const getTodayQueue = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const todayStart = getStartOfDay(new Date());
+    const queue = await ctx.db
+      .query("flashcardReviewQueues")
+      .withIndex("by_userId_date", (q) =>
+        q.eq("userId", identity.tokenIdentifier).eq("date", todayStart),
+      )
+      .unique();
+
+    if (queue) return queue;
+
+    // Fallback: compute on the fly if queue not present yet
+    const endOfDay = getEndOfDay(new Date());
+    const cards = await ctx.db
+      .query("flashcards")
+      .withIndex("by_userId_nextReviewAt", (q) =>
+        q.eq("userId", identity.tokenIdentifier).lte("nextReviewAt", endOfDay),
+      )
+      .collect();
+
+    return {
+      userId: identity.tokenIdentifier,
+      date: todayStart,
+      cardIds: cards.map((c) => c._id),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+  },
+});
+
+/**
+ * Backfill SRS fields for existing cards (internal)
+ */
+export const initializeSrsFieldsInternal = internalMutation({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 200;
+    const cards = await ctx.db.query("flashcards").take(limit * 3);
+
+    let updated = 0;
+
+    for (const card of cards) {
+      if (updated >= limit) break;
+
+      const needsUserId = !card.userId;
+      const needsEase = card.easeFactor === undefined;
+      const needsReps = card.repetitions === undefined;
+
+      if (!needsUserId && !needsEase && !needsReps) continue;
+
+      const deck = await ctx.db.get(card.deckId);
+      if (!deck) continue;
+
+      const nextReviewAt = card.nextReviewAt ?? Date.now();
+      const repetitions = card.repetitions ?? card.reviewCount ?? 0;
+      const easeFactor = card.easeFactor ?? card.difficulty ?? DEFAULT_EASE_FACTOR;
+      const interval =
+        card.interval ??
+        (repetitions > 0 && card.nextReviewAt ? 1 : 0);
+
+      await ctx.db.patch(card._id, {
+        userId: deck.userId,
+        nextReviewAt,
+        easeFactor,
+        repetitions,
+        interval,
+      });
+      updated++;
+    }
+
+    return { updated };
+  },
+});
+
+/**
+ * Build or update today's queues for all users (internal)
+ */
+export const buildDailyQueuesInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+    const todayStart = getStartOfDay(new Date());
+    const todayEnd = getEndOfDay(new Date());
+    const now = Date.now();
+
+    for (const user of users) {
+      const dueCards = await ctx.db
+        .query("flashcards")
+        .withIndex("by_userId_nextReviewAt", (q) =>
+          q.eq("userId", user.tokenIdentifier).lte("nextReviewAt", todayEnd),
+        )
+        .collect();
+
+      const existing = await ctx.db
+        .query("flashcardReviewQueues")
+        .withIndex("by_userId_date", (q) =>
+          q.eq("userId", user.tokenIdentifier).eq("date", todayStart),
+        )
+        .unique();
+
+      const cardIds = dueCards.map((c) => c._id);
+
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          cardIds,
+          updatedAt: now,
+        });
+      } else {
+        await ctx.db.insert("flashcardReviewQueues", {
+          userId: user.tokenIdentifier,
+          date: todayStart,
+          cardIds,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+    }
+
+    return { processedUsers: users.length };
   },
 });

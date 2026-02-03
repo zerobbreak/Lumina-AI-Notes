@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { ResourceMentionNode } from "./ResourceMentionNode";
 import { OutlineExtension } from "./extensions/OutlineExtension";
 import { DiagramExtension } from "./extensions/DiagramExtension";
+import { MathExtensions } from "./extensions/MathExtension";
 import { CornellData, OutlineMetadata, NoteStyleType } from "@/types";
 import "./editor.css";
 
@@ -93,7 +94,7 @@ export default function Editor({
   // State for Cornell Notes sections
   const [cornellCues, setCornellCues] = useState(initialCornellCues || "");
   const [cornellSummary, setCornellSummary] = useState(
-    initialCornellSummary || ""
+    initialCornellSummary || "",
   );
 
   // Build extensions based on style type
@@ -128,6 +129,7 @@ export default function Editor({
     }),
     ResourceMention,
     DiagramExtension, // Always include diagram support
+    ...MathExtensions, // Math formula support (inline $...$ and block $$...$$)
   ];
 
   // Add outline-specific extensions
@@ -148,7 +150,7 @@ export default function Editor({
         color: "#6366f1",
         width: 2,
       }),
-      OutlineExtension
+      OutlineExtension,
     );
   }
 
@@ -165,10 +167,10 @@ export default function Editor({
       handleDrop: (view, event, slice, moved) => {
         if (!moved && event.dataTransfer) {
           const resourceId = event.dataTransfer.getData(
-            "application/lumina-resource-id"
+            "application/lumina-resource-id",
           );
           const resourceName = event.dataTransfer.getData(
-            "application/lumina-resource-name"
+            "application/lumina-resource-name",
           );
 
           if (resourceId && resourceName) {

@@ -20,6 +20,7 @@ import {
   Clock,
   ArrowRight,
   File as FileIcon,
+  Layers,
 } from "lucide-react";
 import { Course } from "@/types";
 import { ActionMenu } from "@/components/shared/ActionMenu";
@@ -83,6 +84,7 @@ export default function SmartFolderHub() {
   const renameCourse = useMutation(api.users.renameCourse);
   const recentNotes = useQuery(api.notes.getRecentNotes);
   const files = useQuery(api.files.getFiles);
+  const todayQueue = useQuery(api.flashcards.getTodayQueue);
   const router = useRouter();
 
   // Rename State
@@ -107,15 +109,16 @@ export default function SmartFolderHub() {
   const moduleCount =
     userData.courses?.reduce(
       (acc: number, curr: Course) => acc + (curr.modules?.length || 0),
-      0
+      0,
     ) || 0;
 
   // Calculate statistics
   const totalNotes = recentNotes?.length || 0;
   const totalFiles = files?.length || 0;
+  const dueTodayCount = todayQueue?.cardIds?.length ?? 0;
 
   return (
-    <ScrollArea className="flex-1 h-full bg-[#050505]">
+    <ScrollArea className="flex-1 h-full bg-background">
       <div className="p-8 max-w-[1600px] mx-auto space-y-12">
         {/* Hero Header */}
         <motion.div
@@ -126,77 +129,37 @@ export default function SmartFolderHub() {
         >
           <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="space-y-2">
-              <h1 className="text-5xl font-bold text-white tracking-tight">
+              <h1 className="text-5xl font-bold text-foreground tracking-tight">
                 Welcome back,{" "}
                 <span className="text-transparent bg-clip-text bg-linear-to-r from-cyan-400 to-blue-500">
                   {userData.name?.split(" ")[0] || "Student"}
                 </span>
               </h1>
-              <p className="text-gray-400 text-lg max-w-xl">
+              <p className="text-muted-foreground text-lg max-w-xl">
                 Your academic workspace is ready. Pick up where you left off or
                 start something new.
               </p>
             </div>
-
-            {/* Quick Stats Pills */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2, duration: 0.5 }}
-              className="flex items-center gap-3 flex-wrap"
-            >
-              {[
-                {
-                  icon: Layout,
-                  label: "Smart Folders",
-                  value: courseCount,
-                  color: "text-cyan-400",
-                  bg: "bg-cyan-500/10",
-                  border: "border-cyan-500/20",
-                },
-                {
-                  icon: FileText,
-                  label: "Modules",
-                  value: moduleCount,
-                  color: "text-purple-400",
-                  bg: "bg-purple-500/10",
-                  border: "border-purple-500/20",
-                },
-                {
-                  icon: FileText,
-                  label: "Notes",
-                  value: totalNotes,
-                  color: "text-amber-400",
-                  bg: "bg-amber-500/10",
-                  border: "border-amber-500/20",
-                },
-                ...(totalFiles > 0
-                  ? [
-                      {
-                        icon: FileIcon,
-                        label: "Files",
-                        value: totalFiles,
-                        color: "text-blue-400",
-                        bg: "bg-blue-500/10",
-                        border: "border-blue-500/20",
-                      },
-                    ]
-                  : []),
-              ].map((stat, i) => (
-                <div
-                  key={i}
-                  className={`px-4 py-2.5 rounded-xl border ${stat.border} ${stat.bg} flex items-center gap-2.5 backdrop-blur-md transition-transform hover:scale-105`}
-                >
-                  <stat.icon className={`w-4 h-4 ${stat.color}`} />
-                  <span className="text-sm text-gray-300">
-                    <span className="text-white font-bold text-base mr-1">
-                      {stat.value}
-                    </span>
-                    {stat.label}
-                  </span>
+            <div className="flex gap-4">
+              <div className="rounded-2xl border border-white/10 bg-black/40 backdrop-blur-md px-5 py-4 min-w-[200px]">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-400">
+                  <Layers className="w-4 h-4" />
+                  Cards Due Today
                 </div>
-              ))}
-            </motion.div>
+                <div className="mt-2 text-3xl font-bold text-white">
+                  {dueTodayCount}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.push("/dashboard?view=flashcards")}
+                  className="mt-3 text-xs text-gray-400 hover:text-white hover:bg-white/5"
+                >
+                  Start reviewing
+                  <ArrowRight className="w-3 h-3 ml-1" />
+                </Button>
+              </div>
+            </div>
           </div>
         </motion.div>
 
@@ -211,7 +174,7 @@ export default function SmartFolderHub() {
               variant="outline"
               size="sm"
               onClick={handleCreateCourse}
-              className="rounded-full text-white bg-white/5 border-white/10 hover:bg-white/10 hover:text-cyan-400 hover:border-cyan-500/30 transition-all duration-300"
+              className="rounded-full text-slate-700 dark:text-white bg-slate-100 dark:bg-white/5 border-slate-300 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-cyan-600 dark:hover:text-cyan-400 hover:border-cyan-500/50 dark:hover:border-cyan-500/30 transition-all duration-300"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add Course
@@ -222,10 +185,9 @@ export default function SmartFolderHub() {
             variants={containerVariants}
             initial="hidden"
             animate="show"
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
           >
             {userData.courses?.map((course: Course) => {
-              const Gradient = getGradient(course.code);
               const Icon = getIcon(course.code);
 
               return (
@@ -234,91 +196,77 @@ export default function SmartFolderHub() {
                   variants={itemVariants}
                   onClick={() =>
                     router.push(
-                      `/dashboard?contextId=${course.id}&contextType=course`
+                      `/dashboard?contextId=${course.id}&contextType=course`,
                     )
                   }
-                  whileHover={{ y: -8, scale: 1.02 }}
-                  className="group relative h-[220px] rounded-3xl cursor-pointer"
+                  whileHover={{ scale: 1.02 }}
+                  className="group relative rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-black/40 shadow-sm dark:shadow-none backdrop-blur-md hover:bg-slate-50 dark:hover:bg-white/10 hover:border-slate-300 dark:hover:border-white/20 cursor-pointer transition-all duration-300 p-5"
                 >
-                  {/* Glass Card Background */}
-                  <div className="absolute inset-0 bg-[#121212]/80 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden transition-all duration-300 group-hover:border-white/20 group-hover:shadow-[0_0_40px_rgba(0,0,0,0.5)]">
-                    {/* Gradient Header */}
+                  {/* Icon in top-left */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-10 h-10 rounded-lg bg-cyan-100 dark:bg-white/5 flex items-center justify-center">
+                      <Icon className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                    </div>
+
+                    {/* Three-dot menu in top-right */}
                     <div
-                      className={`h-[100px] w-full bg-linear-to-br ${Gradient} opacity-60 group-hover:opacity-80 transition-opacity duration-500 relative`}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-40 mix-blend-overlay" />
-                      <div className="absolute inset-0 bg-linear-to-t from-[#121212]/90 to-transparent" />
+                      <ActionMenu
+                        onRename={() =>
+                          setRenameTarget({
+                            id: course.id,
+                            name: course.name,
+                          })
+                        }
+                        onDelete={() => {
+                          if (
+                            confirm(
+                              "Are you sure you want to delete this course?",
+                            )
+                          ) {
+                            deleteCourse({ courseId: course.id });
+                          }
+                        }}
+                        align="right"
+                      />
                     </div>
                   </div>
 
-                  {/* Content */}
-                  <div className="absolute inset-0 p-6 flex flex-col justify-between">
-                    {/* Icon & Menu */}
-                    <div className="flex justify-between items-start">
-                      <motion.div
-                        whileHover={{ rotate: 10, scale: 1.1 }}
-                        className="w-12 h-12 rounded-2xl bg-[#18181B] border border-white/10 flex items-center justify-center shadow-lg group-hover:shadow-cyan-500/20 group-hover:border-cyan-500/30 transition-all duration-300"
-                      >
-                        <Icon className="w-6 h-6 text-gray-300 group-hover:text-cyan-400 transition-colors" />
-                      </motion.div>
+                  {/* Title */}
+                  <h3 className="font-bold text-lg text-foreground mb-3 line-clamp-2 group-hover:text-cyan-600 dark:group-hover:text-cyan-200 transition-colors">
+                    {course.name}
+                  </h3>
 
-                      <div
-                        className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <ActionMenu
-                          onRename={() =>
-                            setRenameTarget({
-                              id: course.id,
-                              name: course.name,
-                            })
-                          }
-                          onDelete={() => {
-                            if (
-                              confirm(
-                                "Are you sure you want to delete this course?"
-                              )
-                            ) {
-                              deleteCourse({ courseId: course.id });
-                            }
-                          }}
-                          align="right"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Text Info */}
-                    <div className="space-y-1 z-10">
-                      <h3 className="font-bold text-xl text-white truncate group-hover:text-cyan-200 transition-colors">
-                        {course.name}
-                      </h3>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-mono text-cyan-400/80 bg-cyan-950/40 px-2 py-1 rounded-lg border border-cyan-500/20">
-                          {course.code}
-                        </span>
-                        <div className="w-1 h-1 rounded-full bg-gray-600" />
-                        <span className="text-xs text-gray-400">
-                          {course.modules?.length || 0} Modules
-                        </span>
-                      </div>
-                    </div>
+                  {/* Identifier badge and module count */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-cyan-700 dark:text-cyan-400 bg-cyan-100 dark:bg-cyan-950/40 px-2 py-1 rounded border border-cyan-300 dark:border-cyan-500/20">
+                      {course.code}
+                    </span>
+                    <span className="text-xs text-slate-500 dark:text-gray-400">
+                      {course.modules?.length || 0}{" "}
+                      {course.modules?.length === 1 ? "Module" : "Modules"}
+                    </span>
                   </div>
                 </motion.div>
               );
             })}
 
-            {/* Add New Card Slot */}
+            {/* Create New Course Card */}
             <motion.div
               variants={itemVariants}
               onClick={handleCreateCourse}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="h-[220px] rounded-3xl border border-dashed border-white/10 flex flex-col items-center justify-center gap-4 text-gray-500 hover:text-cyan-400 hover:border-cyan-500/30 hover:bg-cyan-500/5 cursor-pointer transition-all duration-300 group"
+              className="rounded-xl border border-dashed border-slate-300 dark:border-white/10 hover:border-cyan-500/50 dark:hover:border-cyan-500/30 hover:bg-cyan-50 dark:hover:bg-cyan-500/5 cursor-pointer transition-all duration-300 flex flex-col items-center justify-center gap-3 p-8 min-h-[180px]"
             >
-              <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-cyan-500/10 group-hover:scale-110 transition-all duration-300">
-                <Plus className="w-7 h-7" />
+              <div className="w-16 h-16 rounded-full bg-cyan-100 dark:bg-cyan-500/10 flex items-center justify-center">
+                <Plus className="w-8 h-8 text-cyan-600 dark:text-cyan-400" />
               </div>
-              <span className="text-sm font-medium">Create New Course</span>
+              <span className="text-sm font-medium text-cyan-600 dark:text-cyan-400">
+                Create New Course
+              </span>
             </motion.div>
           </motion.div>
         </div>
@@ -335,7 +283,7 @@ export default function SmartFolderHub() {
                 variant="ghost"
                 size="sm"
                 onClick={() => router.push("/dashboard")}
-                className="text-xs text-gray-400 hover:text-white hover:bg-white/5"
+                className="text-xs text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5"
               >
                 View all
                 <ArrowRight className="w-3 h-3 ml-1" />
@@ -349,14 +297,14 @@ export default function SmartFolderHub() {
                   variants={itemVariants}
                   onClick={() => router.push(`/dashboard?noteId=${note._id}`)}
                   whileHover={{ y: -4, x: 2 }}
-                  className="group relative p-5 rounded-2xl border border-white/5 bg-[#121212]/60 hover:bg-[#18181B]/80 hover:border-white/10 hover:shadow-lg cursor-pointer transition-all duration-300 backdrop-blur-sm"
+                  className="group relative p-5 rounded-2xl border border-slate-200 dark:border-white/5 bg-white dark:bg-[#121212]/60 shadow-sm dark:shadow-none hover:bg-slate-50 dark:hover:bg-[#18181B]/80 hover:border-slate-300 dark:hover:border-white/10 hover:shadow-lg cursor-pointer transition-all duration-300 backdrop-blur-sm"
                 >
                   <div className="flex items-start justify-between gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center shrink-0 group-hover:bg-indigo-500/20 transition-colors">
-                      <FileText className="w-5 h-5 text-indigo-400" />
+                    <div className="w-10 h-10 rounded-lg bg-indigo-100 dark:bg-indigo-500/10 flex items-center justify-center shrink-0 group-hover:bg-indigo-200 dark:group-hover:bg-indigo-500/20 transition-colors">
+                      <FileText className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-bold text-white truncate group-hover:text-indigo-200 transition-colors mb-1">
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-200 transition-colors mb-1">
                         {note.title}
                       </h3>
                       <p className="text-xs text-gray-500 flex items-center gap-2">
@@ -367,7 +315,7 @@ export default function SmartFolderHub() {
                         })}
                       </p>
                     </div>
-                    <ArrowRight className="w-4 h-4 text-gray-700 -rotate-45 opacity-0 group-hover:opacity-100 group-hover:rotate-0 transition-all duration-300" />
+                    <ArrowRight className="w-4 h-4 text-slate-400 dark:text-gray-700 -rotate-45 opacity-0 group-hover:opacity-100 group-hover:rotate-0 transition-all duration-300" />
                   </div>
                 </motion.div>
               ))}

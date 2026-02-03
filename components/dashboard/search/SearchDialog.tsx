@@ -9,15 +9,22 @@ import {
   CornerDownLeft,
   Crown,
   Sparkles,
+  Tag as TagIcon,
+  X,
+  Check,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -38,15 +45,24 @@ export function SearchDialog({
 }) {
   const router = useRouter();
   const [query, setQuery] = React.useState("");
-  const [filterType, setFilterType] = React.useState<"all" | "note" | "file" | "deck">("all");
+  const [filterType, setFilterType] = React.useState<
+    "all" | "note" | "file" | "deck"
+  >("all");
+  const [selectedTags, setSelectedTags] = React.useState<Id<"tags">[]>([]);
+
   const debouncedQuery = useDebounce(query, 300);
+  const tags = useQuery(api.tags.getTags);
 
   // Conditionally fetch results only when query exists
   const searchResponse = useQuery(
     api.search.search,
     debouncedQuery.trim()
-      ? { query: debouncedQuery, type: filterType }
-      : "skip"
+      ? {
+          query: debouncedQuery,
+          type: filterType,
+          tagIds: selectedTags.length > 0 ? selectedTags : undefined,
+        }
+      : "skip",
   );
 
   const results = searchResponse?.results;
@@ -58,12 +74,21 @@ export function SearchDialog({
     if (!open) {
       setQuery("");
       setFilterType("all");
+      setSelectedTags([]);
     }
   }, [open]);
 
   const handleSelect = (url: string) => {
     router.push(url);
     onOpenChange(false);
+  };
+
+  const handleTagToggle = (tagId: Id<"tags">) => {
+    setSelectedTags((prev) =>
+      prev.includes(tagId)
+        ? prev.filter((id) => id !== tagId)
+        : [...prev, tagId],
+    );
   };
 
   return (
@@ -79,7 +104,78 @@ export function SearchDialog({
             onChange={(e) => setQuery(e.target.value)}
             autoFocus
           />
-          <Select value={filterType} onValueChange={(value) => setFilterType(value as typeof filterType)}>
+          {/* Tag Filter */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-8 px-2 mx-1 border border-white/10 bg-white/5 text-xs hover:bg-white/10",
+                  selectedTags.length > 0 &&
+                    "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
+                )}
+              >
+                <TagIcon className="w-3.5 h-3.5 mr-1.5" />
+                {selectedTags.length > 0
+                  ? `${selectedTags.length} Tags`
+                  : "Tags"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-56 p-2 bg-[#111] border border-white/10"
+              align="end"
+            >
+              <div className="space-y-1">
+                <h4 className="text-[10px] uppercase font-bold text-gray-500 px-2 pb-1">
+                  Filter by Tags
+                </h4>
+                <div className="max-h-[200px] overflow-y-auto custom-scrollbar space-y-0.5">
+                  {tags?.map((tag) => (
+                    <button
+                      key={tag._id}
+                      onClick={() => handleTagToggle(tag._id)}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-2 py-1.5 rounded-sm text-xs text-left transition-colors",
+                        selectedTags.includes(tag._id)
+                          ? "bg-white/10 text-white"
+                          : "text-gray-400 hover:bg-white/5 hover:text-gray-200",
+                      )}
+                    >
+                      <div
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: tag.color }}
+                      />
+                      <span className="flex-1 truncate">{tag.name}</span>
+                      {selectedTags.includes(tag._id) && (
+                        <Check className="w-3 h-3 text-emerald-400" />
+                      )}
+                    </button>
+                  ))}
+                  {tags?.length === 0 && (
+                    <p className="text-gray-500 text-xs px-2 italic">
+                      No tags found
+                    </p>
+                  )}
+                </div>
+                {selectedTags.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full h-7 mt-2 text-xs text-gray-400 hover:text-white"
+                    onClick={() => setSelectedTags([])}
+                  >
+                    Clear filters
+                  </Button>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <Select
+            value={filterType}
+            onValueChange={(value) => setFilterType(value as typeof filterType)}
+          >
             <SelectTrigger className="h-8 w-24 border-white/10 bg-white/5 text-xs">
               <SelectValue />
             </SelectTrigger>
@@ -129,7 +225,7 @@ export function SearchDialog({
                         "bg-amber-500/10 text-amber-500",
                       result.type === "file" && "bg-blue-500/10 text-blue-500",
                       result.type === "deck" &&
-                        "bg-indigo-500/10 text-indigo-500"
+                        "bg-indigo-500/10 text-indigo-500",
                     )}
                   >
                     {result.type === "note" && <FileText className="w-4 h-4" />}

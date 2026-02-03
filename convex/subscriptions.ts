@@ -23,20 +23,12 @@ export const getSubscriptionStatus = query({
 
     if (!user) return null;
 
-    // Calculate effective tier based on subscription status
-    const tier = (user.subscriptionTier as SubscriptionTier) || "free";
-    const status = user.subscriptionStatus as SubscriptionStatus | undefined;
-    const endDate = user.subscriptionEndDate;
-
-    // Check if subscription is still valid
-    const isActive =
-      status === "active" && (!endDate || endDate > Date.now());
-    const effectiveTier: SubscriptionTier = isActive ? tier : "free";
-
+    // TEMPORARY: All features are free - return scholar tier for everyone
+    // Payment gateway disabled due to Paystack bug
     return {
-      tier: effectiveTier,
-      rawTier: tier,
-      status: status || "active",
+      tier: "scholar" as SubscriptionTier,
+      rawTier: "scholar" as SubscriptionTier,
+      status: "active",
       paystackCustomerId: user.paystackCustomerId,
       paystackSubscriptionCode: user.paystackSubscriptionCode,
       subscriptionStartDate: user.subscriptionStartDate,
@@ -272,20 +264,10 @@ export const checkUsageLimits = query({
       return { allowed: false, reason: "User not found" };
     }
 
-    // Determine effective tier
-    const tier = (user.subscriptionTier as SubscriptionTier) || "free";
-    const status = user.subscriptionStatus as SubscriptionStatus | undefined;
-    const endDate = user.subscriptionEndDate;
-    const isActive =
-      status === "active" && (!endDate || endDate > Date.now());
-    const effectiveTier: SubscriptionTier =
-      isActive && tier !== "free" ? tier : "free";
-
-    // Get limits based on tier
-    const limits =
-      effectiveTier === "free"
-        ? { audioMinutes: 300, notes: 50 }
-        : { audioMinutes: Infinity, notes: Infinity };
+    // TEMPORARY: All features are free - unlimited access for everyone
+    // Payment gateway disabled due to Paystack bug
+    const effectiveTier: SubscriptionTier = "scholar";
+    const limits = { audioMinutes: Infinity, notes: Infinity };
 
     const currentUsage = user.monthlyUsage || {
       audioMinutesUsed: 0,

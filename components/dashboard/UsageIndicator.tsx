@@ -329,7 +329,7 @@ export function UpgradeBanner({ className }: { className?: string }) {
             <h4 className="text-sm font-medium text-white">
               {percentUsed >= 80
                 ? "Running low on audio time"
-                : "Upgrade to Scholar"}
+                : "Unlimited access"}
             </h4>
             <p className="text-xs text-gray-400">
               {percentUsed >= 80

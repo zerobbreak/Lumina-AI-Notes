@@ -18,7 +18,7 @@ import ArchiveView from "@/components/dashboard/views/ArchiveView";
 
 function DashboardLoading() {
   return (
-    <div className="h-full bg-black flex items-center justify-center text-gray-500">
+    <div className="h-full bg-background flex items-center justify-center text-muted-foreground">
       <div className="flex items-center gap-2 animate-pulse">
         <Sparkles className="w-5 h-5" />
         <span>Loading Workspace...</span>
@@ -59,7 +59,7 @@ function DashboardContent() {
   // Loading State
   if (userData === undefined) {
     return (
-      <div className="h-full bg-black flex items-center justify-center text-gray-500">
+      <div className="h-full bg-background flex items-center justify-center text-muted-foreground">
         <div className="flex items-center gap-2 animate-pulse">
           <Sparkles className="w-5 h-5" />
           <span>Loading Workspace...</span>
@@ -71,7 +71,7 @@ function DashboardContent() {
   // Waiting for redirect to onboarding
   if (userData === null || !userData.onboardingComplete) {
     return (
-      <div className="h-full bg-black flex items-center justify-center text-gray-500">
+      <div className="h-full bg-background flex items-center justify-center text-muted-foreground">
         <div className="flex items-center gap-2 animate-pulse">
           <Sparkles className="w-5 h-5" />
           <span>Redirecting to setup...</span>

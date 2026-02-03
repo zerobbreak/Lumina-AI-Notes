@@ -89,10 +89,16 @@ export interface FlashcardDeck {
 // Flashcard type - represents a single flashcard
 export interface Flashcard {
   _id: string;
+  userId: string;
   deckId: string;
   front: string;
   back: string;
   difficulty?: number;
   nextReviewAt?: number;
   reviewCount?: number;
+  lastReviewedAt?: number;
+  easeFactor?: number;
+  interval?: number;
+  repetitions?: number;
+  lastRating?: "easy" | "medium" | "hard";
 }
