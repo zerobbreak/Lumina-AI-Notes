@@ -72,7 +72,7 @@ export function Sidebar() {
 
   const deleteFile = useMutation(api.files.deleteFile);
   const renameFile = useMutation(api.files.renameFile);
-  const updateFileStatus = useMutation(api.files.updateProcessingStatus);
+  const retryProcessing = useMutation(api.files.retryProcessing);
   const processDocument = useAction(api.ai.processDocument);
 
   // Local State
@@ -350,23 +350,42 @@ export function Sidebar() {
                   <Button
                     variant="ghost"
                     className="w-full justify-start h-9 px-2.5 pr-16 text-[13px] text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/4 gap-3 transition-all"
+                    title={file.errorMessage || undefined}
                   >
                     <File className="w-3.5 h-3.5 text-blue-600 dark:text-blue-500/70 group-hover/file:text-blue-500 dark:group-hover/file:text-blue-400 transition-colors shrink-0" />
                     <span className="truncate flex-1 text-left">
                       {file.name}
                     </span>
-                    <DocumentStatusBadge status={file.processingStatus} />
+                    <DocumentStatusBadge
+                      status={file.processingStatus}
+                      progressPercent={file.progressPercent}
+                      queuePosition={file.queuePosition}
+                    />
                   </Button>
+                  {file.processingStatus === "error" && file.errorMessage && (
+                    <div className="absolute left-10 right-16 top-9 text-[10px] text-red-400 truncate">
+                      {file.errorMessage}
+                    </div>
+                  )}
+                  {(file.processingStatus === "processing" ||
+                    file.processingStatus === "pending") &&
+                    typeof file.progressPercent === "number" && (
+                      <div className="absolute left-10 right-16 bottom-1 h-1 bg-white/10 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-indigo-500 to-cyan-500"
+                          style={{
+                            width: `${Math.min(100, Math.max(0, file.progressPercent))}%`,
+                          }}
+                        />
+                      </div>
+                    )}
                   <div className="absolute right-1 transition-all">
                     <ActionMenu
                       onRename={() => openRename(file._id, "file", file.name)}
                       onDelete={() => deleteFile({ fileId: file._id })}
                       showRetry={file.processingStatus === "error"}
                       onRetry={async () => {
-                        await updateFileStatus({
-                          fileId: file._id,
-                          status: "pending",
-                        });
+                        await retryProcessing({ fileId: file._id });
                         await processDocument({ fileId: file._id });
                       }}
                     />

@@ -278,6 +278,7 @@ export function RightSidebar() {
         sessionId: crypto.randomUUID(),
         title: recordingTitle || `Untitled Session`,
         transcript: JSON.stringify(finalChunks),
+        tzOffsetMinutes: new Date().getTimezoneOffset(),
       });
 
       toast.success("Session saved successfully!");
@@ -602,6 +603,7 @@ export function RightSidebar() {
         title,
         storageId,
         duration,
+        tzOffsetMinutes: new Date().getTimezoneOffset(),
       });
       console.log(
         `[upload] Recording saved: id=${recordingId}, durationSec=${duration}`,

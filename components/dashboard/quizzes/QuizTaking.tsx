@@ -132,6 +132,7 @@ export function QuizTaking({ deckId }: QuizTakingProps) {
         score: correctCount,
         totalQuestions: questions.length,
         answers: userAnswers,
+        tzOffsetMinutes: new Date().getTimezoneOffset(),
       });
 
       setShowResults(true);

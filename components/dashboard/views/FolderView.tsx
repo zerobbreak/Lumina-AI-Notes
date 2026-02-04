@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -84,6 +84,8 @@ export default function FolderView({
   const renameModule = useMutation(api.users.renameModule);
   const deleteModule = useMutation(api.users.deleteModule);
   const deleteFile = useMutation(api.files.deleteFile);
+  const retryProcessing = useMutation(api.files.retryProcessing);
+  const processDocument = useAction(api.ai.processDocument);
   const renameFile = useMutation(api.files.renameFile);
   const togglePinNote = useMutation(api.notes.togglePinNote);
   const deleteNote = useMutation(api.notes.deleteNote);
@@ -481,6 +483,7 @@ export default function FolderView({
                     target="_blank"
                     rel="noreferrer"
                     className="group flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-[#121212]/80 backdrop-blur-sm hover:bg-[#18181B] hover:border-indigo-500/30 hover:shadow-[0_0_20px_rgba(99,102,241,0.15)] transition-all duration-300"
+                    title={f.errorMessage || undefined}
                   >
                     <div className="w-12 h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
                       <File className="w-6 h-6 text-indigo-400" />
@@ -490,13 +493,34 @@ export default function FolderView({
                         <p className="text-sm font-bold text-white truncate group-hover:text-indigo-200 transition-colors">
                           {f.name}
                         </p>
-                        <DocumentStatusBadge status={f.processingStatus} />
+                        <DocumentStatusBadge
+                          status={f.processingStatus}
+                          progressPercent={f.progressPercent}
+                          queuePosition={f.queuePosition}
+                        />
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
                         {f.processingStatus === "done"
                           ? "Drag to generate notes"
                           : new Date(f.createdAt).toLocaleDateString()}
                       </p>
+                      {f.processingStatus === "error" && f.errorMessage && (
+                        <p className="text-[10px] text-red-400 mt-1 line-clamp-1">
+                          {f.errorMessage}
+                        </p>
+                      )}
+                      {(f.processingStatus === "processing" ||
+                        f.processingStatus === "pending") &&
+                        typeof f.progressPercent === "number" && (
+                          <div className="mt-2 h-1 bg-white/10 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-indigo-500 to-cyan-500"
+                              style={{
+                                width: `${Math.min(100, Math.max(0, f.progressPercent))}%`,
+                              }}
+                            />
+                          </div>
+                        )}
                     </div>
                     <div onClick={(e) => e.stopPropagation()}>
                       <ActionMenu
@@ -511,6 +535,11 @@ export default function FolderView({
                           if (confirm(`Delete "${f.name}"?`)) {
                             deleteFile({ fileId: f._id });
                           }
+                        }}
+                        showRetry={f.processingStatus === "error"}
+                        onRetry={async () => {
+                          await retryProcessing({ fileId: f._id });
+                          await processDocument({ fileId: f._id });
                         }}
                         align="right"
                       />

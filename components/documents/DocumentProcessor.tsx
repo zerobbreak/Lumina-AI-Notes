@@ -40,12 +40,18 @@ export function useDocumentProcessor() {
 
 interface DocumentStatusBadgeProps {
   status: string | undefined;
+  progressPercent?: number;
+  queuePosition?: number;
 }
 
 /**
  * Badge component showing document processing status
  */
-export function DocumentStatusBadge({ status }: DocumentStatusBadgeProps) {
+export function DocumentStatusBadge({
+  status,
+  progressPercent,
+  queuePosition,
+}: DocumentStatusBadgeProps) {
   if (!status || status === "done") return null;
 
   const styles: Record<string, { bg: string; text: string; label: string }> = {
@@ -76,6 +82,12 @@ export function DocumentStatusBadge({ status }: DocumentStatusBadgeProps) {
         <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
       )}
       {style.label}
+      {typeof progressPercent === "number" && status !== "error" && (
+        <span className="opacity-70">{Math.round(progressPercent)}%</span>
+      )}
+      {typeof queuePosition === "number" && status === "pending" && (
+        <span className="opacity-70">#{queuePosition}</span>
+      )}
     </span>
   );
 }

@@ -28,6 +28,10 @@ export interface UserFile {
   storageId?: string;
   courseId?: string;
   createdAt: number;
+  processingStatus?: string;
+  progressPercent?: number;
+  queuePosition?: number;
+  errorMessage?: string;
 }
 
 // Note type - represents a note document
@@ -84,6 +88,7 @@ export interface FlashcardDeck {
   cardCount: number;
   createdAt: number;
   lastStudiedAt?: number;
+  examDate?: number;
 }
 
 // Flashcard type - represents a single flashcard

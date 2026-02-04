@@ -1415,6 +1415,7 @@ export const processDocument = action({
       await ctx.runMutation(api.files.updateProcessingStatus, {
         fileId: args.fileId,
         status: "processing",
+        progressPercent: 10,
       });
 
       // Get file info
@@ -1438,6 +1439,12 @@ export const processDocument = action({
 
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
+
+      await ctx.runMutation(api.files.updateProcessingStatus, {
+        fileId: args.fileId,
+        status: "processing",
+        progressPercent: 40,
+      });
 
       // Use Gemini's native PDF processing capability
       const apiKey = process.env.GEMINI_API_KEY;
@@ -1517,6 +1524,12 @@ Return ONLY valid JSON, no markdown code fences or explanation.`,
 
       const extractionText = extractionResult.response.text().trim();
 
+      await ctx.runMutation(api.files.updateProcessingStatus, {
+        fileId: args.fileId,
+        status: "processing",
+        progressPercent: 70,
+      });
+
       // Parse the response
       let extractedText = "";
       let summary = "Document summary unavailable";
@@ -1552,6 +1565,12 @@ Return ONLY valid JSON, no markdown code fences or explanation.`,
         await embeddingModel.embedContent(textForEmbedding);
       const embedding = embeddingResult.embedding.values;
 
+      await ctx.runMutation(api.files.updateProcessingStatus, {
+        fileId: args.fileId,
+        status: "processing",
+        progressPercent: 90,
+      });
+
       // Save extracted content
       await ctx.runMutation(api.files.saveExtractedContent, {
         fileId: args.fileId,
@@ -1559,6 +1578,13 @@ Return ONLY valid JSON, no markdown code fences or explanation.`,
         summary,
         keyTopics,
         embedding,
+      });
+
+      await ctx.runMutation(api.files.updateProcessingStatus, {
+        fileId: args.fileId,
+        status: "done",
+        progressPercent: 100,
+        errorMessage: "",
       });
 
       return { success: true };
@@ -1569,6 +1595,7 @@ Return ONLY valid JSON, no markdown code fences or explanation.`,
       await ctx.runMutation(api.files.updateProcessingStatus, {
         fileId: args.fileId,
         status: "error",
+        errorMessage: error instanceof Error ? error.message : "Processing failed",
       });
 
       return {

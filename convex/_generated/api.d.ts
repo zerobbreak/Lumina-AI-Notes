@@ -9,6 +9,7 @@
  */
 
 import type * as ai from "../ai.js";
+import type * as analytics from "../analytics.js";
 import type * as collaboration from "../collaboration.js";
 import type * as crons from "../crons.js";
 import type * as files from "../files.js";
@@ -30,6 +31,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   ai: typeof ai;
+  analytics: typeof analytics;
   collaboration: typeof collaboration;
   crons: typeof crons;
   files: typeof files;

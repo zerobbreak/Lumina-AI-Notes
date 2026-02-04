@@ -48,6 +48,14 @@ export default defineSchema({
         lastResetDate: v.number(),
       }),
     ),
+    // Study streaks & gamification
+    currentStreak: v.optional(v.number()),
+    longestStreak: v.optional(v.number()),
+    lastStudiedDate: v.optional(v.number()), // local day start timestamp
+    lastTimezoneOffsetMinutes: v.optional(v.number()),
+    badges: v.optional(v.array(v.string())),
+    dailyGoalMinutes: v.optional(v.number()),
+    dailyGoalCards: v.optional(v.number()),
   })
     .index("by_tokenIdentifier", ["tokenIdentifier"])
     .index("by_email", ["email"])
@@ -120,6 +128,9 @@ export default defineSchema({
     embedding: v.optional(v.array(v.float64())),
     processingStatus: v.optional(v.string()), // "pending" | "processing" | "done" | "error"
     processedAt: v.optional(v.number()),
+    queuePosition: v.optional(v.number()),
+    progressPercent: v.optional(v.number()),
+    errorMessage: v.optional(v.string()),
   })
     .index("by_userId", ["userId"])
     .index("by_processingStatus", ["processingStatus"])
@@ -141,7 +152,9 @@ export default defineSchema({
     audioUrl: v.optional(v.string()),
     duration: v.optional(v.number()),
     createdAt: v.number(),
-  }).index("by_userId", ["userId"]),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_userId_createdAt", ["userId", "createdAt"]),
 
   flashcardDecks: defineTable({
     userId: v.string(),
@@ -151,6 +164,7 @@ export default defineSchema({
     cardCount: v.number(),
     createdAt: v.number(),
     lastStudiedAt: v.optional(v.number()),
+    examDate: v.optional(v.number()),
   })
     .index("by_userId", ["userId"])
     .searchIndex("search_title", {
@@ -184,6 +198,16 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_userId_date", ["userId", "date"]),
+
+  flashcardReviewEvents: defineTable({
+    userId: v.string(),
+    deckId: v.id("flashcardDecks"),
+    cardId: v.id("flashcards"),
+    rating: v.string(), // "easy" | "medium" | "hard"
+    reviewedAt: v.number(),
+  })
+    .index("by_userId_reviewedAt", ["userId", "reviewedAt"])
+    .index("by_deckId_reviewedAt", ["deckId", "reviewedAt"]),
 
   quizDecks: defineTable({
     userId: v.string(),
@@ -220,7 +244,9 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_deckId", ["deckId"])
-    .index("by_userId_and_deckId", ["userId", "deckId"]),
+    .index("by_userId_and_deckId", ["userId", "deckId"])
+    .index("by_userId_completedAt", ["userId", "completedAt"])
+    .index("by_deckId_completedAt", ["deckId", "completedAt"]),
 
   documents: defineTable({
     storageId: v.string(),

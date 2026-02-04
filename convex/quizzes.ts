@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { api } from "./_generated/api";
 
 /**
  * Get all quiz decks for the current user
@@ -157,6 +158,7 @@ export const saveResult = mutation({
     totalQuestions: v.number(),
     answers: v.array(v.number()),
     timeSpent: v.optional(v.number()),
+    tzOffsetMinutes: v.number(),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -182,6 +184,10 @@ export const saveResult = mutation({
     // Update deck's lastTakenAt
     await ctx.db.patch(args.deckId, {
       lastTakenAt: Date.now(),
+    });
+
+    await ctx.runMutation(api.users.updateStudyStreak, {
+      tzOffsetMinutes: args.tzOffsetMinutes,
     });
 
     return resultId;

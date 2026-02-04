@@ -95,6 +95,7 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
       scheduleNextReview({
         cardId: card._id,
         rating,
+        tzOffsetMinutes: new Date().getTimezoneOffset(),
       });
     }
     

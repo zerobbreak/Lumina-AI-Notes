@@ -1,5 +1,6 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import { api } from "./_generated/api";
 import {
   DEFAULT_EASE_FACTOR,
   scheduleNextReviewFromRating,
@@ -594,6 +595,7 @@ export const scheduleNextReview = mutation({
   args: {
     cardId: v.id("flashcards"),
     rating: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
+    tzOffsetMinutes: v.number(),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -621,6 +623,18 @@ export const scheduleNextReview = mutation({
       repetitions: result.repetitions,
       lastRating: args.rating,
       reviewCount: result.repetitions,
+    });
+
+    await ctx.db.insert("flashcardReviewEvents", {
+      userId: deck.userId,
+      deckId: deck._id,
+      cardId: args.cardId,
+      rating: args.rating,
+      reviewedAt: Date.now(),
+    });
+
+    await ctx.runMutation(api.users.updateStudyStreak, {
+      tzOffsetMinutes: args.tzOffsetMinutes,
     });
 
     await ctx.db.patch(deck._id, {

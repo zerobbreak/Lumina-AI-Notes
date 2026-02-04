@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { api } from "./_generated/api";
 
 // Tier limits for audio (in minutes)
 const TIER_AUDIO_LIMITS = {
@@ -157,6 +158,7 @@ export const saveRecording = mutation({
     title: v.string(),
     transcript: v.string(),
     duration: v.optional(v.number()), // Duration in seconds
+    tzOffsetMinutes: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -185,6 +187,12 @@ export const saveRecording = mutation({
       createdAt: Date.now(),
     });
 
+    if (args.tzOffsetMinutes !== undefined) {
+      await ctx.runMutation(api.users.updateStudyStreak, {
+        tzOffsetMinutes: args.tzOffsetMinutes,
+      });
+    }
+
     return recordingId;
   },
 });
@@ -195,6 +203,7 @@ export const saveUploadedRecording = mutation({
     title: v.string(),
     storageId: v.string(),
     duration: v.optional(v.number()), // Duration in seconds
+    tzOffsetMinutes: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -231,6 +240,12 @@ export const saveUploadedRecording = mutation({
     console.log(
       `[saveUploadedRecording] With userId: ${identity.tokenIdentifier}`,
     );
+
+    if (args.tzOffsetMinutes !== undefined) {
+      await ctx.runMutation(api.users.updateStudyStreak, {
+        tzOffsetMinutes: args.tzOffsetMinutes,
+      });
+    }
 
     return recordingId;
   },

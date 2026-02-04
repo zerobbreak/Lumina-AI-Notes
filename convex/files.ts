@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 
 export const generateUploadUrl = mutation(async (ctx) => {
   return await ctx.storage.generateUploadUrl();
@@ -186,11 +186,93 @@ export const updateProcessingStatus = mutation({
   args: {
     fileId: v.id("files"),
     status: v.string(), // "pending" | "processing" | "done" | "error"
+    progressPercent: v.optional(v.number()),
+    errorMessage: v.optional(v.string()),
+    queuePosition: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.fileId, {
+    const updates: Record<string, any> = {
       processingStatus: args.status,
+    };
+    if (args.progressPercent !== undefined) {
+      updates.progressPercent = args.progressPercent;
+    }
+    if (args.errorMessage !== undefined) {
+      updates.errorMessage = args.errorMessage;
+    }
+    if (args.queuePosition !== undefined) {
+      updates.queuePosition = args.queuePosition;
+    }
+    await ctx.db.patch(args.fileId, updates);
+  },
+});
+
+export const getFileProcessingStatus = query({
+  args: { fileId: v.id("files") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const file = await ctx.db.get(args.fileId);
+    if (!file || file.userId !== identity.tokenIdentifier) return null;
+
+    return {
+      fileId: file._id,
+      status: file.processingStatus,
+      progressPercent: file.progressPercent,
+      queuePosition: file.queuePosition,
+      errorMessage: file.errorMessage,
+    };
+  },
+});
+
+export const retryProcessing = mutation({
+  args: { fileId: v.id("files") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const file = await ctx.db.get(args.fileId);
+    if (!file || file.userId !== identity.tokenIdentifier) {
+      throw new Error("File not found or unauthorized");
+    }
+
+    await ctx.db.patch(args.fileId, {
+      processingStatus: "pending",
+      progressPercent: 0,
+      errorMessage: undefined,
+      queuePosition: undefined,
     });
+  },
+});
+
+export const recomputeFileQueuePositionsInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const pending = await ctx.db
+      .query("files")
+      .withIndex("by_processingStatus", (q) =>
+        q.eq("processingStatus", "pending"),
+      )
+      .collect();
+    const processing = await ctx.db
+      .query("files")
+      .withIndex("by_processingStatus", (q) =>
+        q.eq("processingStatus", "processing"),
+      )
+      .collect();
+
+    const queue = [...processing, ...pending].sort(
+      (a, b) => a.createdAt - b.createdAt,
+    );
+
+    let position = 1;
+    for (const file of queue.slice(0, 20)) {
+      await ctx.db.patch(file._id, { queuePosition: position });
+      position += 1;
+    }
+
+    return { updated: Math.min(queue.length, 20) };
   },
 });
 
@@ -213,6 +295,8 @@ export const saveExtractedContent = mutation({
       embedding: args.embedding,
       processingStatus: "done",
       processedAt: Date.now(),
+      progressPercent: 100,
+      errorMessage: undefined,
     });
   },
 });

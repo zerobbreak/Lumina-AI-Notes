@@ -1,5 +1,6 @@
-import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { mutation, query, internalMutation } from "./_generated/server";
+import { getLocalDayStart } from "../lib/analytics";
 
 export const getUser = query({
   args: {},
@@ -42,8 +43,6 @@ export const createOrUpdateUser = mutation({
       .unique();
 
     if (user) {
-      // Update existing user if needed (e.g., new image)
-      // For now, we just return the user id, or you could update fields here
       return user._id;
     }
 
@@ -54,6 +53,11 @@ export const createOrUpdateUser = mutation({
       name: args.name,
       image: args.image,
       onboardingComplete: false,
+      currentStreak: 0,
+      longestStreak: 0,
+      badges: [],
+      dailyGoalMinutes: 30,
+      dailyGoalCards: 20,
     });
   },
 });
@@ -92,6 +96,11 @@ export const completeOnboarding = mutation({
       await ctx.db.patch(user._id, {
         ...args,
         onboardingComplete: true,
+        currentStreak: user.currentStreak ?? 0,
+        longestStreak: user.longestStreak ?? 0,
+        badges: user.badges ?? [],
+        dailyGoalMinutes: user.dailyGoalMinutes ?? 30,
+        dailyGoalCards: user.dailyGoalCards ?? 20,
       });
     } else {
       // New user - create with onboarding data
@@ -102,8 +111,155 @@ export const completeOnboarding = mutation({
         image: identity.pictureUrl,
         ...args,
         onboardingComplete: true,
+        currentStreak: 0,
+        longestStreak: 0,
+        badges: [],
+        dailyGoalMinutes: 30,
+        dailyGoalCards: 20,
       });
     }
+  },
+});
+
+export const updateStudyStreak = mutation({
+  args: {
+    timestamp: v.optional(v.number()),
+    tzOffsetMinutes: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_tokenIdentifier", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
+      .unique();
+
+    if (!user) throw new Error("User not found");
+
+    const now = args.timestamp ?? Date.now();
+    const todayStart = getLocalDayStart(now, args.tzOffsetMinutes);
+    const yesterdayStart = todayStart - 24 * 60 * 60 * 1000;
+
+    const lastStudiedDate = user.lastStudiedDate;
+    let currentStreak = user.currentStreak ?? 0;
+
+    if (lastStudiedDate === todayStart) {
+      return {
+        currentStreak,
+        longestStreak: user.longestStreak ?? currentStreak,
+      };
+    }
+
+    if (lastStudiedDate === yesterdayStart) {
+      currentStreak += 1;
+    } else {
+      currentStreak = 1;
+    }
+
+    const longestStreak = Math.max(user.longestStreak ?? 0, currentStreak);
+
+    await ctx.db.patch(user._id, {
+      currentStreak,
+      longestStreak,
+      lastStudiedDate: todayStart,
+      lastTimezoneOffsetMinutes: args.tzOffsetMinutes,
+    });
+
+    return { currentStreak, longestStreak };
+  },
+});
+
+export const awardBadge = mutation({
+  args: { badgeId: v.string() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_tokenIdentifier", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
+      .unique();
+    if (!user) throw new Error("User not found");
+
+    const badges = new Set(user.badges ?? []);
+    badges.add(args.badgeId);
+
+    await ctx.db.patch(user._id, { badges: Array.from(badges) });
+  },
+});
+
+export const setDailyGoal = mutation({
+  args: { minutes: v.number(), cards: v.number() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_tokenIdentifier", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
+      .unique();
+    if (!user) throw new Error("User not found");
+
+    await ctx.db.patch(user._id, {
+      dailyGoalMinutes: args.minutes,
+      dailyGoalCards: args.cards,
+    });
+  },
+});
+
+export const getUserGamificationStats = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_tokenIdentifier", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
+      .unique();
+    if (!user) return null;
+
+    return {
+      currentStreak: user.currentStreak ?? 0,
+      longestStreak: user.longestStreak ?? 0,
+      lastStudiedDate: user.lastStudiedDate,
+      badges: user.badges ?? [],
+      dailyGoalMinutes: user.dailyGoalMinutes ?? 30,
+      dailyGoalCards: user.dailyGoalCards ?? 20,
+    };
+  },
+});
+
+export const resetStreaksInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+    const now = Date.now();
+
+    let resetCount = 0;
+    for (const user of users) {
+      if (!user.lastStudiedDate) continue;
+
+      const tzOffset = user.lastTimezoneOffsetMinutes ?? 0;
+      const todayStart = getLocalDayStart(now, tzOffset);
+      const yesterdayStart = todayStart - 24 * 60 * 60 * 1000;
+
+      if ((user.currentStreak ?? 0) > 0 && user.lastStudiedDate < yesterdayStart) {
+        await ctx.db.patch(user._id, { currentStreak: 0 });
+        resetCount++;
+      }
+    }
+
+    return { resetCount };
   },
 });
 

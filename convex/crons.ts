@@ -18,4 +18,18 @@ crons.interval(
   {},
 );
 
+crons.interval(
+  "file_queue_positions",
+  { hours: 1 },
+  internal.files.recomputeFileQueuePositionsInternal,
+  {},
+);
+
+crons.interval(
+  "streak_reset",
+  { hours: 24 },
+  internal.users.resetStreaksInternal,
+  {},
+);
+
 export default crons;
