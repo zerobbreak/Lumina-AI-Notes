@@ -104,6 +104,10 @@ export default function OnboardingPage() {
         });
 
         const courses = await Promise.all(coursePromises);
+        const coursesWithStyle = courses.map((course) => ({
+          ...course,
+          defaultNoteStyle: formData.noteStyle,
+        }));
 
         // Use the recommendation engine for enabled blocks and theme
         const blocks = getEnabledBlocksForMajor(formData.major);
@@ -112,7 +116,7 @@ export default function OnboardingPage() {
         await completeOnboarding({
           major: formData.major,
           semester: "Fall 2025",
-          courses,
+          courses: coursesWithStyle,
           noteStyle: formData.noteStyle,
           theme: theme.accent,
           enabledBlocks: blocks,
@@ -121,7 +125,7 @@ export default function OnboardingPage() {
         // SPECIAL: If Visual Mode (Mind Map) is selected, generate a Course Roadmap
         if (formData.noteStyle === "mindmap") {
           try {
-            const courseNames = courses.map((c) => c.name);
+            const courseNames = coursesWithStyle.map((c) => c.name);
             // 1. Generate Diagram Data
             const roadmapData = await generateCourseRoadmap({
               major: formData.major,
@@ -135,6 +139,7 @@ export default function OnboardingPage() {
             const roadmapNoteId = await createNote({
               title: "My Course Roadmap",
               noteType: "page",
+              style: "mindmap",
             });
 
             await updateNote({
@@ -151,7 +156,7 @@ export default function OnboardingPage() {
           }
         }
 
-        router.push("/dashboard");
+        router.push("/dashboard?tour=1");
       } catch (error) {
         console.error("Onboarding failed", error);
         setIsInitializing(false);

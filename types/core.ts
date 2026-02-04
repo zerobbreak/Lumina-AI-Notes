@@ -76,6 +76,15 @@ export interface UserData {
   courses?: Course[];
   noteStyle?: string;
   enabledBlocks?: string[];
+  currentStreak?: number;
+  longestStreak?: number;
+  lastStudiedDate?: number;
+  lastTimezoneOffsetMinutes?: number;
+  badges?: string[];
+  dailyGoalMinutes?: number;
+  dailyGoalCards?: number;
+  tourCompleted?: boolean;
+  tourStep?: number;
 }
 
 // Flashcard deck type - represents a collection of flashcards

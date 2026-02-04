@@ -103,6 +103,21 @@ export default function FolderView({
     return userData.courses?.find((c: Course) => c.id === contextId);
   };
 
+  const getDefaultNoteStyle = () => {
+    if (!userData) return "standard";
+    if (contextType === "course") {
+      return getCurrentCourse()?.defaultNoteStyle ?? userData.noteStyle ?? "standard";
+    }
+    if (contextType === "module") {
+      for (const c of userData.courses || []) {
+        if (c.modules?.some((m: Module) => m.id === contextId)) {
+          return c.defaultNoteStyle ?? userData.noteStyle ?? "standard";
+        }
+      }
+    }
+    return userData.noteStyle ?? "standard";
+  };
+
   const getContextName = () => {
     if (!userData || !contextId) return "Folder";
     if (contextType === "course") {
@@ -138,6 +153,7 @@ export default function FolderView({
         title: "Untitled Note",
         courseId: contextType === "course" ? contextId : undefined,
         moduleId: contextType === "module" ? contextId : undefined,
+        style: getDefaultNoteStyle(),
       });
       router.push(`/dashboard?noteId=${newNoteId}`);
     } catch (e) {

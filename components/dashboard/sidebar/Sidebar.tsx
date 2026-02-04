@@ -134,7 +134,7 @@ export function Sidebar() {
       const noteId = await createNote({
         title: "Untitled Note",
         major: userData?.major || "general",
-        style: "standard",
+        style: userData?.noteStyle ?? "standard",
       });
       router.push(`/dashboard?noteId=${noteId}`);
       toast.success("New note created");
@@ -221,6 +221,7 @@ export function Sidebar() {
             }}
             className="p-1.5 rounded-lg text-slate-500 dark:text-gray-600 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
             aria-label="Open settings"
+            data-tour="settings"
           >
             <Settings className="w-4 h-4" />
           </button>
@@ -333,6 +334,7 @@ export function Sidebar() {
               size="icon"
               className="w-5 h-5 text-slate-500 dark:text-gray-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 opacity-40 group-hover:opacity-100 transition-all rounded-md"
               onClick={() => setIsUploadOpen(true)}
+              data-tour="upload-file"
             >
               <Upload className="w-3.5 h-3.5" />
             </Button>
@@ -420,6 +422,7 @@ export function Sidebar() {
               className="w-5 h-5 text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 opacity-70 group-hover:opacity-100 transition-all rounded-md"
               onClick={handleCreateNote}
               title="Create Quick Note"
+              data-tour="quick-note"
             >
               {isCreatingNote ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -460,31 +463,32 @@ export function Sidebar() {
               Study Tools
             </h3>
           </div>
-          <Button
-            variant="ghost"
-            className="w-full justify-start h-9 px-2.5 text-[13px] text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/4 gap-3 transition-all group"
-            onClick={() => router.push("/dashboard?view=flashcards")}
-          >
+            <Button
+              variant="ghost"
+              className="w-full justify-start h-9 px-2.5 text-[13px] text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/4 gap-3 transition-all group"
+              onClick={() => router.push("/dashboard?view=flashcards")}
+              data-tour="flashcards"
+            >
             <div className="p-0.5 rounded bg-indigo-500/10 group-hover:bg-indigo-500/20 transition-colors">
               <Layers className="w-3.5 h-3.5 text-indigo-400 group-hover:text-indigo-300" />
             </div>
             <span>Flashcards</span>
           </Button>
-          <Button
-            variant="ghost"
-            className="w-full justify-start h-9 px-2.5 text-[13px] text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/4 gap-3 transition-all group mt-1"
-            onClick={() => router.push("/dashboard?view=quizzes")}
-          >
+            <Button
+              variant="ghost"
+              className="w-full justify-start h-9 px-2.5 text-[13px] text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/4 gap-3 transition-all group mt-1"
+              onClick={() => router.push("/dashboard?view=quizzes")}
+            >
             <div className="p-0.5 rounded bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors">
               <ClipboardList className="w-3.5 h-3.5 text-purple-400 group-hover:text-purple-300" />
             </div>
             <span>Quizzes</span>
           </Button>
-          <Button
-            variant="ghost"
-            className="w-full justify-start h-9 px-2.5 text-[13px] text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/4 gap-3 transition-all group mt-1"
-            onClick={() => router.push("/dashboard?view=archive")}
-          >
+            <Button
+              variant="ghost"
+              className="w-full justify-start h-9 px-2.5 text-[13px] text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/4 gap-3 transition-all group mt-1"
+              onClick={() => router.push("/dashboard?view=archive")}
+            >
             <div className="p-0.5 rounded bg-orange-500/10 group-hover:bg-orange-500/20 transition-colors">
               <Archive className="w-3.5 h-3.5 text-orange-400 group-hover:text-orange-300" />
             </div>

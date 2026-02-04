@@ -92,7 +92,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           const noteId = await createNote({
             title: "Untitled Note",
             major: userData?.major || "general",
-            style: "standard",
+            style: userData?.noteStyle ?? "standard",
           });
           router.push(`/dashboard?noteId=${noteId}`);
           onOpenChange(false);

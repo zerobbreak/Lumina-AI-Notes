@@ -380,7 +380,7 @@ export function RightSidebar() {
         const noteId = await createNote({
           title,
           major: userData?.major || "general",
-          style: "standard",
+          style: userData?.noteStyle ?? "standard",
         });
 
         // Set pending notes and navigate to the new note

@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   BookOpen,
@@ -36,6 +36,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { TourOverlay, TourStep } from "@/components/dashboard/TourOverlay";
 
 // Helper to get a nice gradient based on course code or name
 const getGradient = (code: string) => {
@@ -97,6 +98,9 @@ export default function SmartFolderHub() {
   const quizDecks = useQuery(api.quizzes.getDecks);
   const gamification = useQuery(api.users.getUserGamificationStats);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const updateTourProgress = useMutation(api.users.updateTourProgress);
+  const [showTour, setShowTour] = useState(false);
 
   // Rename State
   const [renameTarget, setRenameTarget] = useState<{
@@ -176,8 +180,64 @@ export default function SmartFolderHub() {
     return days;
   }, [dailyActivity, heatmapStart, now]);
 
+  useEffect(() => {
+    if (!userData) return;
+    const shouldShow =
+      searchParams.get("tour") === "1" && userData.tourCompleted !== true;
+    setShowTour(shouldShow);
+  }, [searchParams, userData]);
+
+  const tourSteps = useMemo<TourStep[]>(
+    () => [
+      {
+        id: "dashboard",
+        title: "Your Learning Hub",
+        description:
+          "This is your personalized dashboard with analytics, streaks, and daily review counts.",
+        selector: '[data-tour="dashboard-overview"]',
+      },
+      {
+        id: "quick-note",
+        title: "Create a Quick Note",
+        description: "Capture ideas instantly with a new quick note.",
+        selector: '[data-tour="quick-note"]',
+      },
+      {
+        id: "upload",
+        title: "Upload a Resource",
+        description: "Drop a PDF or file to extract notes and generate study tools.",
+        selector: '[data-tour="upload-file"]',
+      },
+      {
+        id: "flashcards",
+        title: "Practice with Flashcards",
+        description: "Review due cards with spaced repetition.",
+        selector: '[data-tour="flashcards"]',
+      },
+      {
+        id: "settings",
+        title: "Personalize Your Workspace",
+        description: "Update your major, note style, and theme anytime.",
+        selector: '[data-tour="settings"]',
+      },
+    ],
+    [],
+  );
+
+  const closeTour = async (completed: boolean) => {
+    setShowTour(false);
+    await updateTourProgress({ completed: completed ? true : false, step: 0 });
+    router.replace("/dashboard");
+  };
+
   return (
     <ScrollArea className="flex-1 h-full bg-background">
+      <TourOverlay
+        steps={tourSteps}
+        open={showTour}
+        onComplete={() => closeTour(true)}
+        onSkip={() => closeTour(true)}
+      />
       <div className="p-8 max-w-[1600px] mx-auto space-y-12">
         {/* Hero Header */}
         <motion.div
@@ -185,6 +245,7 @@ export default function SmartFolderHub() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
           className="relative rounded-3xl p-8 overflow-hidden"
+          data-tour="dashboard-overview"
         >
           <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="space-y-2">

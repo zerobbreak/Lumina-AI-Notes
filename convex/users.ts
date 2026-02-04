@@ -58,6 +58,8 @@ export const createOrUpdateUser = mutation({
       badges: [],
       dailyGoalMinutes: 30,
       dailyGoalCards: 20,
+      tourCompleted: false,
+      tourStep: 0,
     });
   },
 });
@@ -101,6 +103,8 @@ export const completeOnboarding = mutation({
         badges: user.badges ?? [],
         dailyGoalMinutes: user.dailyGoalMinutes ?? 30,
         dailyGoalCards: user.dailyGoalCards ?? 20,
+        tourCompleted: user.tourCompleted ?? false,
+        tourStep: user.tourStep ?? 0,
       });
     } else {
       // New user - create with onboarding data
@@ -116,8 +120,38 @@ export const completeOnboarding = mutation({
         badges: [],
         dailyGoalMinutes: 30,
         dailyGoalCards: 20,
+        tourCompleted: false,
+        tourStep: 0,
       });
     }
+  },
+});
+
+export const updateTourProgress = mutation({
+  args: {
+    completed: v.optional(v.boolean()),
+    step: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_tokenIdentifier", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
+      .unique();
+
+    if (!user) throw new Error("User not found");
+
+    const patch: Record<string, unknown> = {};
+    if (args.completed !== undefined) patch.tourCompleted = args.completed;
+    if (args.step !== undefined) patch.tourStep = args.step;
+
+    if (Object.keys(patch).length === 0) return;
+
+    await ctx.db.patch(user._id, patch);
   },
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
@@ -38,7 +38,7 @@ export function CreateNoteDialog({
   const [title, setTitle] = useState("");
   const [selectedCourse, setSelectedCourse] = useState<string>("");
   const [selectedModule, setSelectedModule] = useState<string>("");
-  const [style, setStyle] = useState("standard");
+  const [style, setStyle] = useState(userData?.noteStyle ?? "standard");
   const [isCreating, setIsCreating] = useState(false);
 
   const courses = userData?.courses || [];
@@ -61,13 +61,18 @@ export function CreateNoteDialog({
       setTitle("");
       setSelectedCourse("");
       setSelectedModule("");
-      setStyle("standard");
+      setStyle(userData?.noteStyle ?? "standard");
     } catch (error) {
       console.error("Create note failed:", error);
     } finally {
       setIsCreating(false);
     }
   };
+
+  useEffect(() => {
+    if (!open) return;
+    setStyle(userData?.noteStyle ?? "standard");
+  }, [open, userData?.noteStyle]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -103,8 +108,11 @@ export function CreateNoteDialog({
                 setSelectedModule("");
                 if (val !== "none") {
                   const course = courses.find((c: Course) => c.id === val);
-                  if (course?.defaultNoteStyle)
+                  if (course?.defaultNoteStyle) {
                     setStyle(course.defaultNoteStyle);
+                  }
+                } else {
+                  setStyle(userData?.noteStyle ?? "standard");
                 }
               }}
             >

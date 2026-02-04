@@ -56,6 +56,9 @@ export default defineSchema({
     badges: v.optional(v.array(v.string())),
     dailyGoalMinutes: v.optional(v.number()),
     dailyGoalCards: v.optional(v.number()),
+    // Product tour
+    tourCompleted: v.optional(v.boolean()),
+    tourStep: v.optional(v.number()),
   })
     .index("by_tokenIdentifier", ["tokenIdentifier"])
     .index("by_email", ["email"])
