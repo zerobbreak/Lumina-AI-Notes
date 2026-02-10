@@ -16,7 +16,7 @@ interface SidebarNoteProps {
     isShared?: boolean;
     isPinned?: boolean;
     noteType?: string;
-    quickCaptureType?: "text" | "voice";
+    quickCaptureType?: string;
   };
   isActive?: boolean;
   isDraggable?: boolean;

@@ -20,7 +20,7 @@ export function useCreateNoteFlow(): {
   createNoteFlow: (
     input: CreateNoteInput,
   ) => Promise<{ noteId: Id<"notes">; style: string } | null>;
-  TemplateSelector: () => JSX.Element;
+  TemplateSelector: () => React.ReactElement;
 } {
   const userData = useQuery(api.users.getUser);
   const createNote = useMutation(api.notes.createNote);
@@ -30,7 +30,7 @@ export function useCreateNoteFlow(): {
   const [isOpen, setIsOpen] = useState(false);
   const resolverRef = useRef<
     ((result: { noteId: Id<"notes">; style: string } | null) => void) | undefined
-  >();
+  >(undefined);
 
   const recommendation = useTemplateRecommendation({
     major: userData?.major,

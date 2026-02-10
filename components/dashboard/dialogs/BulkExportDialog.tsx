@@ -84,9 +84,12 @@ function htmlToMarkdown(html: string): string {
     .replace(/<br[^>]*\/?>/gi, "\n")
     // Code
     .replace(/<code[^>]*>(.*?)<\/code>/gi, "`$1`")
-    .replace(/<pre[^>]*>(.*?)<\/pre>/gis, "```\n$1\n```\n\n")
+    .replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, "```\n$1\n```\n\n")
     // Blockquotes
-    .replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gis, "> $1\n\n")
+    .replace(/<blockquote[^>]*>[\s\S]*?<\/blockquote>/gi, (match) => {
+      const content = match.replace(/<blockquote[^>]*>/, "").replace(/<\/blockquote>/, "");
+      return `> ${content}\n\n`;
+    })
     // Horizontal rules
     .replace(/<hr[^>]*\/?>/gi, "\n---\n\n")
     // Clean up remaining tags
