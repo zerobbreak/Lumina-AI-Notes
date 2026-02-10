@@ -4,14 +4,11 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
   FileText,
@@ -56,10 +53,11 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const quickNotes = useQuery(api.notes.getQuickNotes);
   const recentNotes = useQuery(api.notes.getRecentNotes);
   const files = useQuery(api.files.getFiles);
-  const searchResults = useQuery(
+  const searchResponse = useQuery(
     api.search.search,
     debouncedQuery.trim() ? { query: debouncedQuery } : "skip"
   );
+  const searchResults = searchResponse?.results ?? [];
 
   const { createNoteFlow, TemplateSelector } = useCreateNoteFlow();
 
@@ -246,7 +244,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       ...filteredCommands,
     ];
 
-    if (searchResults && debouncedQuery.trim()) {
+    if (debouncedQuery.trim() && searchResults.length > 0) {
       searchResults.forEach((result) => {
         results.push({
           id: `search-${result.id}`,
@@ -272,30 +270,24 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     return results;
   }, [filteredCommands, searchResults, debouncedQuery, router, onOpenChange]);
 
-  // Reset selected index when results change
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [allResults.length, debouncedQuery]);
-
   // Handle keyboard navigation
   useEffect(() => {
     if (!open) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      const maxIndex = Math.max(allResults.length - 1, 0);
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedIndex((prev) =>
-          prev < allResults.length - 1 ? prev + 1 : 0
-        );
+        setSelectedIndex((prev) => (prev < maxIndex ? prev + 1 : 0));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setSelectedIndex((prev) =>
-          prev > 0 ? prev - 1 : allResults.length - 1
-        );
+        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : maxIndex));
       } else if (e.key === "Enter") {
         e.preventDefault();
-        if (allResults[selectedIndex]) {
-          allResults[selectedIndex].action();
+        const safeIndex =
+          allResults.length === 0 ? 0 : Math.min(selectedIndex, maxIndex);
+        if (allResults[safeIndex]) {
+          allResults[safeIndex].action();
         }
       }
     };
@@ -323,6 +315,10 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
   const hasResults = allResults.length > 0;
   const hasQuery = debouncedQuery.trim().length > 0;
+  const safeIndex =
+    allResults.length === 0
+      ? 0
+      : Math.min(selectedIndex, allResults.length - 1);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -334,7 +330,10 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-gray-600 text-[15px] h-6"
             placeholder="Type a command or search..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSelectedIndex(0);
+            }}
             autoFocus
           />
           <div className="text-[10px] bg-white/5 border border-white/5 px-1.5 py-0.5 rounded text-gray-500 font-mono ml-2">
@@ -352,7 +351,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
           {hasQuery && !hasResults && (
             <div className="text-center py-10 text-gray-600 text-sm">
-              No results found for "{debouncedQuery}"
+              No results found for &quot;{debouncedQuery}&quot;
             </div>
           )}
 
@@ -369,7 +368,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                       <CommandItem
                         key={cmd.id}
                         command={cmd}
-                        isSelected={selectedIndex === globalIdx}
+                        isSelected={safeIndex === globalIdx}
                         index={globalIdx}
                       />
                     );
@@ -388,7 +387,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                       <CommandItem
                         key={cmd.id}
                         command={cmd}
-                        isSelected={selectedIndex === globalIdx}
+                        isSelected={safeIndex === globalIdx}
                         index={globalIdx}
                       />
                     );
@@ -407,7 +406,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                       <CommandItem
                         key={cmd.id}
                         command={cmd}
-                        isSelected={selectedIndex === globalIdx}
+                        isSelected={safeIndex === globalIdx}
                         index={globalIdx}
                       />
                     );
