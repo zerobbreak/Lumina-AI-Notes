@@ -39,6 +39,12 @@ async function requireNoteEdit(ctx: any, noteId: any) {
   return { identity, role, note };
 }
 
+async function requireNoteOwner(ctx: any, noteId: any) {
+  const { identity, role, note } = await requireNoteAccess(ctx, noteId);
+  if (role !== "owner") throw new Error("Forbidden");
+  return { identity, note };
+}
+
 export const createNote = mutation({
   args: {
     title: v.string(),
@@ -50,6 +56,11 @@ export const createNote = mutation({
     noteType: v.optional(v.string()), // "quick" | "page"
     tagIds: v.optional(v.array(v.id("tags"))),
     wordCount: v.optional(v.number()),
+    content: v.optional(v.string()),
+    quickCaptureType: v.optional(v.string()),
+    quickCaptureAudioUrl: v.optional(v.string()),
+    quickCaptureStatus: v.optional(v.string()),
+    quickCaptureExpandedNoteId: v.optional(v.id("notes")),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -70,11 +81,15 @@ export const createNote = mutation({
       moduleId: args.moduleId,
       parentNoteId: args.parentNoteId,
       style: args.style || "standard",
-      content: "",
+      content: args.content ?? "",
       isPinned: false,
       tagIds: args.tagIds || [],
       wordCount: args.wordCount || 0,
       createdAt: Date.now(),
+      quickCaptureType: args.quickCaptureType,
+      quickCaptureAudioUrl: args.quickCaptureAudioUrl,
+      quickCaptureStatus: args.quickCaptureStatus,
+      quickCaptureExpandedNoteId: args.quickCaptureExpandedNoteId,
     });
 
     return noteId;
@@ -314,6 +329,7 @@ export const updateNote = mutation({
     noteId: v.id("notes"),
     title: v.optional(v.string()),
     content: v.optional(v.string()),
+    style: v.optional(v.string()),
     // Cornell Notes specific fields
     cornellCues: v.optional(v.string()),
     cornellNotes: v.optional(v.string()),
@@ -329,6 +345,10 @@ export const updateNote = mutation({
     ),
     tagIds: v.optional(v.array(v.id("tags"))),
     wordCount: v.optional(v.number()),
+    quickCaptureType: v.optional(v.string()),
+    quickCaptureAudioUrl: v.optional(v.string()),
+    quickCaptureStatus: v.optional(v.string()),
+    quickCaptureExpandedNoteId: v.optional(v.id("notes")),
   },
   handler: async (ctx, args) => {
     await requireNoteEdit(ctx, args.noteId);
@@ -336,6 +356,7 @@ export const updateNote = mutation({
     const patch: any = {};
     if (args.title !== undefined) patch.title = args.title;
     if (args.content !== undefined) patch.content = args.content;
+    if (args.style !== undefined) patch.style = args.style;
     if (args.cornellCues !== undefined) patch.cornellCues = args.cornellCues;
     if (args.cornellNotes !== undefined) patch.cornellNotes = args.cornellNotes;
     if (args.cornellSummary !== undefined)
@@ -345,6 +366,14 @@ export const updateNote = mutation({
       patch.outlineMetadata = args.outlineMetadata;
     if (args.tagIds !== undefined) patch.tagIds = args.tagIds;
     if (args.wordCount !== undefined) patch.wordCount = args.wordCount;
+    if (args.quickCaptureType !== undefined)
+      patch.quickCaptureType = args.quickCaptureType;
+    if (args.quickCaptureAudioUrl !== undefined)
+      patch.quickCaptureAudioUrl = args.quickCaptureAudioUrl;
+    if (args.quickCaptureStatus !== undefined)
+      patch.quickCaptureStatus = args.quickCaptureStatus;
+    if (args.quickCaptureExpandedNoteId !== undefined)
+      patch.quickCaptureExpandedNoteId = args.quickCaptureExpandedNoteId;
 
     await ctx.db.patch(args.noteId, patch);
   },
@@ -815,5 +844,217 @@ export const searchNotes = query({
 
       return true;
     });
+  },
+});
+
+// --- Bulk Operations ---
+
+const BULK_UNDO_WINDOW_MS = 30 * 1000;
+
+export const bulkMove = mutation({
+  args: {
+    noteIds: v.array(v.id("notes")),
+    courseId: v.optional(v.string()),
+    moduleId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const previous: Array<{
+      noteId: any;
+      courseId?: string;
+      moduleId?: string;
+    }> = [];
+
+    for (const noteId of args.noteIds) {
+      const { note } = await requireNoteOwner(ctx, noteId);
+      previous.push({
+        noteId,
+        courseId: note.courseId,
+        moduleId: note.moduleId,
+      });
+      await ctx.db.patch(noteId, {
+        courseId: args.courseId,
+        moduleId: args.moduleId,
+        noteType: "page",
+      });
+    }
+
+    const opId = await ctx.db.insert("bulkOperations", {
+      userId: identity.tokenIdentifier,
+      type: "move",
+      noteIds: args.noteIds,
+      payload: { previous },
+      createdAt: Date.now(),
+      expiresAt: Date.now() + BULK_UNDO_WINDOW_MS,
+    });
+
+    return { operationId: opId };
+  },
+});
+
+export const bulkArchive = mutation({
+  args: {
+    noteIds: v.array(v.id("notes")),
+    archived: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const previous: Array<{ noteId: any; isArchived?: boolean }> = [];
+
+    for (const noteId of args.noteIds) {
+      const { note } = await requireNoteOwner(ctx, noteId);
+      previous.push({ noteId, isArchived: note.isArchived });
+      await ctx.db.patch(noteId, { isArchived: args.archived });
+    }
+
+    const opId = await ctx.db.insert("bulkOperations", {
+      userId: identity.tokenIdentifier,
+      type: "archive",
+      noteIds: args.noteIds,
+      payload: { previous },
+      createdAt: Date.now(),
+      expiresAt: Date.now() + BULK_UNDO_WINDOW_MS,
+    });
+
+    return { operationId: opId };
+  },
+});
+
+export const bulkTag = mutation({
+  args: {
+    noteIds: v.array(v.id("notes")),
+    tagIds: v.array(v.id("tags")),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const previous: Array<{ noteId: any; tagIds: any[] }> = [];
+
+    for (const noteId of args.noteIds) {
+      const { note } = await requireNoteOwner(ctx, noteId);
+      const existing = note.tagIds ?? [];
+      previous.push({ noteId, tagIds: existing });
+      const merged = Array.from(new Set([...existing, ...args.tagIds]));
+      await ctx.db.patch(noteId, { tagIds: merged });
+    }
+
+    const opId = await ctx.db.insert("bulkOperations", {
+      userId: identity.tokenIdentifier,
+      type: "tag",
+      noteIds: args.noteIds,
+      payload: { previous },
+      createdAt: Date.now(),
+      expiresAt: Date.now() + BULK_UNDO_WINDOW_MS,
+    });
+
+    return { operationId: opId };
+  },
+});
+
+export const bulkDelete = mutation({
+  args: {
+    noteIds: v.array(v.id("notes")),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const previous: Array<any> = [];
+
+    for (const noteId of args.noteIds) {
+      const { note } = await requireNoteOwner(ctx, noteId);
+      previous.push(note);
+      await ctx.db.delete(noteId);
+    }
+
+    const opId = await ctx.db.insert("bulkOperations", {
+      userId: identity.tokenIdentifier,
+      type: "delete",
+      noteIds: args.noteIds,
+      payload: { previous },
+      createdAt: Date.now(),
+      expiresAt: Date.now() + BULK_UNDO_WINDOW_MS,
+    });
+
+    return { operationId: opId };
+  },
+});
+
+export const bulkUndo = mutation({
+  args: { operationId: v.id("bulkOperations") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const op = await ctx.db.get(args.operationId);
+    if (!op || op.userId !== identity.tokenIdentifier) {
+      throw new Error("Operation not found");
+    }
+
+    if (op.expiresAt < Date.now()) {
+      throw new Error("Undo window expired");
+    }
+
+    if (op.type === "move") {
+      for (const entry of op.payload.previous || []) {
+        await ctx.db.patch(entry.noteId, {
+          courseId: entry.courseId,
+          moduleId: entry.moduleId,
+        });
+      }
+    }
+
+    if (op.type === "archive") {
+      for (const entry of op.payload.previous || []) {
+        await ctx.db.patch(entry.noteId, { isArchived: entry.isArchived });
+      }
+    }
+
+    if (op.type === "tag") {
+      for (const entry of op.payload.previous || []) {
+        await ctx.db.patch(entry.noteId, { tagIds: entry.tagIds });
+      }
+    }
+
+    if (op.type === "delete") {
+      for (const note of op.payload.previous || []) {
+        await ctx.db.insert("notes", {
+          userId: note.userId,
+          title: note.title,
+          content: note.content,
+          noteType: note.noteType,
+          major: note.major,
+          courseId: note.courseId,
+          moduleId: note.moduleId,
+          parentNoteId: note.parentNoteId,
+          style: note.style,
+          isPinned: note.isPinned,
+          isArchived: note.isArchived,
+          isShared: note.isShared,
+          createdAt: note.createdAt,
+          embedding: note.embedding,
+          linkedDocumentIds: note.linkedDocumentIds,
+          tagIds: note.tagIds,
+          wordCount: note.wordCount,
+          cornellCues: note.cornellCues,
+          cornellNotes: note.cornellNotes,
+          cornellSummary: note.cornellSummary,
+          outlineData: note.outlineData,
+          outlineMetadata: note.outlineMetadata,
+          quickCaptureType: note.quickCaptureType,
+          quickCaptureAudioUrl: note.quickCaptureAudioUrl,
+          quickCaptureStatus: note.quickCaptureStatus,
+          quickCaptureExpandedNoteId: note.quickCaptureExpandedNoteId,
+        });
+      }
+    }
+
+    await ctx.db.delete(args.operationId);
+    return { ok: true };
   },
 });

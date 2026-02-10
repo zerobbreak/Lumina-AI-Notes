@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, memo } from "react";
-import { FileText, GripVertical } from "lucide-react";
+import { FileText, GripVertical, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { useRouter } from "next/navigation";
@@ -16,12 +16,14 @@ interface SidebarNoteProps {
     isShared?: boolean;
     isPinned?: boolean;
     noteType?: string;
+    quickCaptureType?: "text" | "voice";
   };
   isActive?: boolean;
   isDraggable?: boolean;
   onRename: () => void;
   onDelete: () => void;
   onArchive?: () => void;
+  onExpand?: () => void;
 }
 
 function SidebarNoteComponent({
@@ -31,6 +33,7 @@ function SidebarNoteComponent({
   onRename,
   onDelete,
   onArchive,
+  onExpand,
 }: SidebarNoteProps) {
   const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
@@ -88,8 +91,27 @@ function SidebarNoteComponent({
           )}
         />
         <span className="truncate">{note.title}</span>
+        {note.quickCaptureType === "voice" && (
+          <span className="ml-2 text-[9px] uppercase tracking-widest text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
+            Voice
+          </span>
+        )}
       </Button>
-      <div className="absolute right-1 transition-all">
+      <div className="absolute right-1 transition-all flex items-center gap-1">
+        {onExpand && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-gray-500 hover:text-cyan-400 hover:bg-cyan-500/10"
+            onClick={(e) => {
+              e.stopPropagation();
+              onExpand();
+            }}
+            title="Expand"
+          >
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </Button>
+        )}
         <ActionMenu
           onRename={onRename}
           onDelete={onDelete}
@@ -109,6 +131,7 @@ export const SidebarNote = memo(
       prevProps.note._id === nextProps.note._id &&
       prevProps.note.title === nextProps.note.title &&
       prevProps.note.isArchived === nextProps.note.isArchived &&
+      prevProps.note.quickCaptureType === nextProps.note.quickCaptureType &&
       prevProps.isActive === nextProps.isActive &&
       prevProps.isDraggable === nextProps.isDraggable
     );

@@ -507,7 +507,11 @@ export const renameModule = mutation({
 });
 
 export const updateCourseStyle = mutation({
-  args: { courseId: v.string(), style: v.string() },
+  args: {
+    courseId: v.string(),
+    style: v.optional(v.string()),
+    templatePromptDisabled: v.optional(v.boolean()),
+  },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
@@ -519,9 +523,15 @@ export const updateCourseStyle = mutation({
       .unique();
     if (!user || !user.courses) return;
 
-    const updatedCourses = user.courses.map((c) =>
-      c.id === args.courseId ? { ...c, defaultNoteStyle: args.style } : c
-    );
+    const updatedCourses = user.courses.map((c) => {
+      if (c.id !== args.courseId) return c;
+      return {
+        ...c,
+        defaultNoteStyle: args.style ?? c.defaultNoteStyle,
+        templatePromptDisabled:
+          args.templatePromptDisabled ?? c.templatePromptDisabled,
+      };
+    });
     await ctx.db.patch(user._id, { courses: updatedCourses });
   },
 });

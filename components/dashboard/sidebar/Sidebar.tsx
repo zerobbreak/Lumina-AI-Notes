@@ -20,7 +20,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { SearchDialog } from "@/components/dashboard/search/SearchDialog";
-import { Course, UserFile } from "@/types";
+import { Course } from "@/types";
 import { Id } from "@/convex/_generated/dataModel";
 import { UploadDialog } from "@/components/dashboard/dialogs/UploadDialog";
 import { SettingsDialog } from "@/components/dashboard/dialogs/SettingsDialog";
@@ -37,6 +37,10 @@ import {
 } from "@/hooks/useKeyboardShortcut";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ThemeToggle } from "@/components/shared/ThemeToggle"; // Import ThemeToggle
+import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 type RenameTarget = {
   id: string;
@@ -50,10 +54,10 @@ export function Sidebar() {
   const router = useRouter();
   const { isLeftSidebarOpen } = useDashboard();
   const searchParams = useSearchParams();
+  const { createNoteFlow, TemplateSelector } = useCreateNoteFlow();
 
   // Queries
   const userData = useQuery(api.users.getUser);
-  const createNote = useMutation(api.notes.createNote);
   const quickNotes = useQuery(api.notes.getQuickNotes);
   const recentFiles = useQuery(api.files.getFiles);
   const pinnedNotes = useQuery(api.notes.getPinnedNotes); // Add query
@@ -62,6 +66,7 @@ export function Sidebar() {
   const deleteNote = useMutation(api.notes.deleteNote);
   const renameNote = useMutation(api.notes.renameNote);
   const toggleArchiveNote = useMutation(api.notes.toggleArchiveNote);
+  const updateNote = useMutation(api.notes.updateNote);
 
   const createCourse = useMutation(api.users.createCourse);
   const renameCourse = useMutation(api.users.renameCourse);
@@ -85,6 +90,13 @@ export function Sidebar() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [expandTarget, setExpandTarget] = useState<{
+    id: Id<"notes">;
+    title: string;
+    content?: string;
+  } | null>(null);
+  const [expandCourse, setExpandCourse] = useState<string>("");
+  const [expandModule, setExpandModule] = useState<string>("");
 
   // Hydration protection
   useEffect(() => {
@@ -131,20 +143,21 @@ export function Sidebar() {
   const handleCreateNote = useCallback(async () => {
     try {
       setIsCreatingNote(true);
-      const noteId = await createNote({
+      const result = await createNoteFlow({
         title: "Untitled Note",
         major: userData?.major || "general",
-        style: userData?.noteStyle ?? "standard",
       });
-      router.push(`/dashboard?noteId=${noteId}`);
-      toast.success("New note created");
+      if (result?.noteId) {
+        router.push(`/dashboard?noteId=${result.noteId}`);
+        toast.success("New note created");
+      }
     } catch (e) {
       console.error(e);
       toast.error("Failed to create note");
     } finally {
       setIsCreatingNote(false);
     }
-  }, [createNote, userData?.major, router]);
+  }, [createNoteFlow, userData?.major, router]);
 
   // Keyboard shortcuts
   useKeyboardShortcut(
@@ -414,7 +427,7 @@ export function Sidebar() {
         <div className="mb-6 min-w-0">
           <div className="flex items-center justify-between px-2 mb-2 group min-w-0">
             <h3 className="text-[10px] font-bold text-slate-500 dark:text-gray-500/80 uppercase tracking-[0.2em] transition-colors group-hover:text-slate-600 dark:group-hover:text-gray-400">
-              Quick Notes
+              Quick Captures
             </h3>
             <Button
               variant="ghost"
@@ -432,15 +445,26 @@ export function Sidebar() {
             </Button>
           </div>
           <div className="space-y-0.5">
-            {quickNotes?.map((note) => (
-              <SidebarNote
-                key={note._id}
-                note={note}
-                onRename={() => openRename(note._id, "note", note.title)}
-                onDelete={() => deleteNote({ noteId: note._id })}
-                onArchive={() => toggleArchiveNote({ noteId: note._id })}
-              />
-            ))}
+            {quickNotes
+              ?.filter((note) => note.quickCaptureStatus !== "expanded")
+              .map((note) => (
+                <SidebarNote
+                  key={note._id}
+                  note={note}
+                  onRename={() => openRename(note._id, "note", note.title)}
+                  onDelete={() => deleteNote({ noteId: note._id })}
+                  onArchive={() => toggleArchiveNote({ noteId: note._id })}
+                  onExpand={() => {
+                    setExpandTarget({
+                      id: note._id,
+                      title: note.title,
+                      content: note.content,
+                    });
+                    setExpandCourse("");
+                    setExpandModule("");
+                  }}
+                />
+              ))}
             {(!quickNotes || quickNotes.length === 0) && (
               <EmptyState
                 icon={<FileText className="w-5 h-5 text-amber-400" />}
@@ -584,6 +608,108 @@ export function Sidebar() {
       )}
       <SearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
       <SettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
+      <TemplateSelector />
+
+      <Dialog open={!!expandTarget} onOpenChange={(open) => !open && setExpandTarget(null)}>
+        <DialogContent className="sm:max-w-md bg-[#0B0B0B] border-white/10 text-white">
+          <DialogHeader>
+            <DialogTitle>Expand Quick Capture</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="text-sm text-gray-400">
+              Choose a course and module for this capture.
+            </div>
+            <div className="space-y-2">
+              <Label className="text-gray-400">Course</Label>
+              <Select value={expandCourse} onValueChange={(val) => {
+                setExpandCourse(val);
+                setExpandModule("");
+              }}>
+                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                  <SelectValue placeholder="Select course" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1A1A1A] border-white/10 text-white">
+                  {userData?.courses?.map((course: Course) => (
+                    <SelectItem key={course.id} value={course.id}>
+                      {course.code} - {course.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {expandCourse && (
+              <div className="space-y-2">
+                <Label className="text-gray-400">Module (optional)</Label>
+                <Select value={expandModule} onValueChange={setExpandModule}>
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                    <SelectValue placeholder="Select module" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1A1A1A] border-white/10 text-white">
+                    {(userData?.courses?.find((c: Course) => c.id === expandCourse)?.modules || []).map(
+                      (mod) => (
+                        <SelectItem key={mod.id} value={mod.id}>
+                          {mod.title}
+                        </SelectItem>
+                      ),
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" className="text-gray-400" onClick={() => setExpandTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-cyan-500 hover:bg-cyan-600 text-white"
+              disabled={!expandCourse || !expandTarget}
+              onClick={async () => {
+                if (!expandTarget) return;
+                const result = await createNoteFlow({
+                  title: expandTarget.title || "Quick Capture",
+                  major: userData?.major || "general",
+                  courseId: expandCourse,
+                  moduleId: expandModule || undefined,
+                  noteType: "page",
+                });
+                if (!result?.noteId) return;
+                const content = expandTarget.content || "";
+                if (result.style === "cornell") {
+                  await updateNote({
+                    noteId: result.noteId,
+                    cornellCues: "",
+                    cornellNotes: content ? `<p>${content}</p>` : "",
+                    cornellSummary: "",
+                  });
+                } else if (result.style === "outline") {
+                  const lines = content.split("\n").filter(Boolean);
+                  const list = lines.map((l) => `<li>${l}</li>`).join("");
+                  await updateNote({
+                    noteId: result.noteId,
+                    content: `<ul>${list}</ul>`,
+                  });
+                } else {
+                  await updateNote({
+                    noteId: result.noteId,
+                    content: content ? `<p>${content}</p>` : "",
+                  });
+                }
+                await updateNote({
+                  noteId: expandTarget.id,
+                  quickCaptureStatus: "expanded",
+                  quickCaptureExpandedNoteId: result.noteId,
+                });
+                setExpandTarget(null);
+                toast.success("Capture expanded into full note");
+                router.push(`/dashboard?noteId=${result.noteId}`);
+              }}
+            >
+              Expand
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

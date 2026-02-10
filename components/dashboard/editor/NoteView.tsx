@@ -61,6 +61,9 @@ import { MathExtensions } from "./extensions/MathExtension";
 import { PresenceIndicator } from "@/components/dashboard/PresenceIndicator";
 import { CollaboratorsDialog } from "@/components/dashboard/dialogs/CollaboratorsDialog";
 import { TagPicker } from "@/components/dashboard/tags/TagPicker";
+import { TemplateConversionModal } from "@/components/dashboard/templates/TemplateConversionModal";
+import type { NoteContentSnapshot } from "@/lib/templates/conversion";
+import { toast } from "sonner";
 import "./editor.css";
 
 // Heartbeat interval for presence tracking (30 seconds)
@@ -108,6 +111,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
   const [isCollaboratorsOpen, setIsCollaboratorsOpen] = useState(false);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
 
   // Parse context (Course / Module)
   const courseName =
@@ -445,6 +449,15 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     setIsExportOpen(true);
   };
 
+  const buildSnapshot = (): NoteContentSnapshot => ({
+    style: (note?.style as any) || "standard",
+    content: note?.content || "",
+    cornellCues: note?.cornellCues || "",
+    cornellNotes: note?.cornellNotes || "",
+    cornellSummary: note?.cornellSummary || "",
+    outlineData: note?.outlineData || "",
+  });
+
   // Handle inserting AI-generated content into the note
   const handleInsertFromAI = useCallback(
     (content: string) => {
@@ -659,6 +672,15 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             ) : (
               <Download className="w-5 h-5 text-gray-400 hover:text-white" />
             )}
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsTemplateModalOpen(true)}
+            title="Change template"
+          >
+            <FileText className="w-5 h-5 text-gray-400 hover:text-white" />
           </Button>
 
           <ActionMenu
@@ -980,6 +1002,43 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         onOpenChange={setIsCollaboratorsOpen}
         noteId={noteId}
       />
+
+      {note && (
+        <TemplateConversionModal
+          open={isTemplateModalOpen}
+          onOpenChange={setIsTemplateModalOpen}
+          noteSnapshot={buildSnapshot()}
+          onConfirm={async (conversion) => {
+            const previous = buildSnapshot();
+            await updateNote({
+              noteId,
+              style: conversion.style,
+              content: conversion.content ?? "",
+              cornellCues: conversion.cornellCues ?? "",
+              cornellNotes: conversion.cornellNotes ?? "",
+              cornellSummary: conversion.cornellSummary ?? "",
+              outlineData: conversion.outlineData ?? "",
+            });
+            setIsTemplateModalOpen(false);
+            toast.success("Template changed", {
+              action: {
+                label: "Undo",
+                onClick: async () => {
+                  await updateNote({
+                    noteId,
+                    style: previous.style,
+                    content: previous.content ?? "",
+                    cornellCues: previous.cornellCues ?? "",
+                    cornellNotes: previous.cornellNotes ?? "",
+                    cornellSummary: previous.cornellSummary ?? "",
+                    outlineData: previous.outlineData ?? "",
+                  });
+                },
+              },
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

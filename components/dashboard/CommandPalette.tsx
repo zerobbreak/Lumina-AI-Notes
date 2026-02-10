@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import {
@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useKeyboardShortcut, formatShortcut } from "@/hooks/useKeyboardShortcut";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
 
 interface Command {
   id: string;
@@ -60,8 +61,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     debouncedQuery.trim() ? { query: debouncedQuery } : "skip"
   );
 
-  // Mutations
-  const createNote = useMutation(api.notes.createNote);
+  const { createNoteFlow, TemplateSelector } = useCreateNoteFlow();
 
   // Close on Escape
   useKeyboardShortcut(
@@ -89,13 +89,14 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       category: "actions",
       action: async () => {
         try {
-          const noteId = await createNote({
+          const result = await createNoteFlow({
             title: "Untitled Note",
             major: userData?.major || "general",
-            style: userData?.noteStyle ?? "standard",
           });
-          router.push(`/dashboard?noteId=${noteId}`);
-          onOpenChange(false);
+          if (result?.noteId) {
+            router.push(`/dashboard?noteId=${result.noteId}`);
+            onOpenChange(false);
+          }
         } catch (error) {
           console.error("Failed to create note:", error);
         }
@@ -219,7 +220,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     }
 
     return cmds;
-  }, [userData, quickNotes, recentNotes, files, router, createNote, onOpenChange]);
+  }, [userData, quickNotes, recentNotes, files, router, createNoteFlow, onOpenChange]);
 
   // Filter commands based on query
   const filteredCommands = useMemo(() => {
@@ -432,6 +433,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           <span>{formatShortcut("Esc")} to close</span>
         </div>
       </DialogContent>
+      <TemplateSelector />
     </Dialog>
   );
 }

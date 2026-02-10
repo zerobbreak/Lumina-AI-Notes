@@ -48,6 +48,7 @@ import { useDashboard } from "@/hooks/useDashboard";
 import { StructuredNotes } from "@/components/dashboard/DashboardContext";
 import { ContextDeck } from "@/components/dashboard/ContextDeck";
 import { useDropzone } from "react-dropzone";
+import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
 
 // Enhanced transcript chunk with AI analysis
 interface EnhancedChunk {
@@ -141,7 +142,7 @@ export function RightSidebar() {
   const pastRecordings = useQuery(api.recordings.getRecordings);
   const files = useQuery(api.files.getFiles);
   const userData = useQuery(api.users.getUser);
-  const createNote = useMutation(api.notes.createNote);
+  const { createNoteFlow, TemplateSelector } = useCreateNoteFlow();
 
   // Get dashboard context for pending notes and active context
   const { setPendingNotes, activeContext, setActiveContext } = useDashboard();
@@ -377,16 +378,16 @@ export function RightSidebar() {
             ? `Notes from ${usedContextName || recordingTitle || "Recording"}`
             : "Generated Notes";
 
-        const noteId = await createNote({
+        const result = await createNoteFlow({
           title,
           major: userData?.major || "general",
-          style: userData?.noteStyle ?? "standard",
         });
+        if (!result?.noteId) return;
 
         // Set pending notes and navigate to the new note
         setPendingNotes(generatedNotes);
         setGeneratedNotes(null);
-        router.push(`/dashboard?noteId=${noteId}`);
+        router.push(`/dashboard?noteId=${result.noteId}`);
         toast.success("Created new note with generated content");
       } catch (error) {
         console.error("Failed to create note:", error);
@@ -1547,6 +1548,7 @@ export function RightSidebar() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <TemplateSelector />
     </motion.div>
   );
 }

@@ -18,6 +18,7 @@ export default defineSchema({
           name: v.string(),
           code: v.string(),
           defaultNoteStyle: v.optional(v.string()), // e.g. "cornell", "outline", "mindmap"
+          templatePromptDisabled: v.optional(v.boolean()),
           modules: v.optional(
             v.array(
               v.object({
@@ -85,6 +86,11 @@ export default defineSchema({
     // Tags and Stats
     tagIds: v.optional(v.array(v.id("tags"))),
     wordCount: v.optional(v.number()),
+    // Quick capture fields
+    quickCaptureType: v.optional(v.string()), // "text" | "voice"
+    quickCaptureAudioUrl: v.optional(v.string()),
+    quickCaptureStatus: v.optional(v.string()), // "draft" | "expanded"
+    quickCaptureExpandedNoteId: v.optional(v.id("notes")),
     // Cornell Notes specific fields
     cornellCues: v.optional(v.string()),
     cornellNotes: v.optional(v.string()),
@@ -307,4 +313,15 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_userId_name", ["userId", "name"]),
+
+  bulkOperations: defineTable({
+    userId: v.string(),
+    type: v.string(), // "move" | "archive" | "delete" | "tag"
+    noteIds: v.array(v.id("notes")),
+    payload: v.any(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_userId_createdAt", ["userId", "createdAt"]),
 });

@@ -15,6 +15,7 @@ export interface Course {
   name: string;
   code: string;
   defaultNoteStyle?: string;
+  templatePromptDisabled?: boolean;
   modules?: Module[];
 }
 
@@ -49,6 +50,11 @@ export interface Note {
   isArchived?: boolean;
   isShared?: boolean;
   createdAt: number;
+  noteType?: string;
+  quickCaptureType?: "text" | "voice";
+  quickCaptureAudioUrl?: string;
+  quickCaptureStatus?: "draft" | "expanded";
+  quickCaptureExpandedNoteId?: string;
 }
 
 // Recording type - represents an audio recording

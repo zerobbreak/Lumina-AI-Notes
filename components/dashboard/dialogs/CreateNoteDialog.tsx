@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useState } from "react";
+import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
   Dialog,
@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Course, Module } from "@/types";
+import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
 
 interface CreateNoteDialogProps {
   open: boolean;
@@ -33,12 +34,11 @@ export function CreateNoteDialog({
   onOpenChange,
 }: CreateNoteDialogProps) {
   const userData = useQuery(api.users.getUser);
-  const createNote = useMutation(api.notes.createNote);
+  const { createNoteFlow, TemplateSelector } = useCreateNoteFlow();
 
   const [title, setTitle] = useState("");
   const [selectedCourse, setSelectedCourse] = useState<string>("");
   const [selectedModule, setSelectedModule] = useState<string>("");
-  const [style, setStyle] = useState(userData?.noteStyle ?? "standard");
   const [isCreating, setIsCreating] = useState(false);
 
   const courses = userData?.courses || [];
@@ -50,29 +50,24 @@ export function CreateNoteDialog({
     if (!title) return;
     setIsCreating(true);
     try {
-      await createNote({
+      const result = await createNoteFlow({
         title,
         major: userData?.major || "general",
         courseId: selectedCourse || undefined,
         moduleId: selectedModule || undefined,
-        style,
       });
-      onOpenChange(false);
-      setTitle("");
-      setSelectedCourse("");
-      setSelectedModule("");
-      setStyle(userData?.noteStyle ?? "standard");
+      if (result?.noteId) {
+        onOpenChange(false);
+        setTitle("");
+        setSelectedCourse("");
+        setSelectedModule("");
+      }
     } catch (error) {
       console.error("Create note failed:", error);
     } finally {
       setIsCreating(false);
     }
   };
-
-  useEffect(() => {
-    if (!open) return;
-    setStyle(userData?.noteStyle ?? "standard");
-  }, [open, userData?.noteStyle]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -104,16 +99,13 @@ export function CreateNoteDialog({
             <Select
               value={selectedCourse}
               onValueChange={(val) => {
+                if (val === "none") {
+                  setSelectedCourse("");
+                  setSelectedModule("");
+                  return;
+                }
                 setSelectedCourse(val);
                 setSelectedModule("");
-                if (val !== "none") {
-                  const course = courses.find((c: Course) => c.id === val);
-                  if (course?.defaultNoteStyle) {
-                    setStyle(course.defaultNoteStyle);
-                  }
-                } else {
-                  setStyle(userData?.noteStyle ?? "standard");
-                }
               }}
             >
               <SelectTrigger className="col-span-3 bg-white/5 border-white/10 text-white">
@@ -130,23 +122,6 @@ export function CreateNoteDialog({
             </Select>
           </div>
 
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="style" className="text-right text-gray-400">
-              Style
-            </Label>
-            <Select value={style} onValueChange={setStyle}>
-              <SelectTrigger className="col-span-3 bg-white/5 border-white/10 text-white">
-                <SelectValue placeholder="Select style" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#1A1A1A] border-white/10 text-white">
-                <SelectItem value="standard">Standard Page</SelectItem>
-                <SelectItem value="cornell">Cornell Notes</SelectItem>
-                <SelectItem value="outline">Outline</SelectItem>
-                <SelectItem value="mindmap">Mind Map</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           {selectedCourse &&
             selectedCourse !== "none" &&
             modules.length > 0 && (
@@ -156,7 +131,13 @@ export function CreateNoteDialog({
                 </Label>
                 <Select
                   value={selectedModule}
-                  onValueChange={setSelectedModule}
+                  onValueChange={(val) => {
+                    if (val === "none") {
+                      setSelectedModule("");
+                      return;
+                    }
+                    setSelectedModule(val);
+                  }}
                 >
                   <SelectTrigger className="col-span-3 bg-white/5 border-white/10 text-white">
                     <SelectValue placeholder="Select module (Optional)" />
@@ -190,6 +171,7 @@ export function CreateNoteDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+      <TemplateSelector />
     </Dialog>
   );
 }

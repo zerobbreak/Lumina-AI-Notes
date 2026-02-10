@@ -12,6 +12,8 @@ import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { Sparkles } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { useSearchParams } from "next/navigation";
+import { QuickCaptureFab } from "@/components/dashboard/quick-capture/QuickCaptureFab";
 
 function DashboardLayoutLoading() {
   return (
@@ -31,6 +33,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     api.collaboration.acceptPendingInvites,
   );
   const userData = useQuery(api.users.getUser);
+  const searchParams = useSearchParams();
+  const hideQuickCapture = Boolean(searchParams.get("noteId"));
 
   // Accept any pending email invites for the signed-in user.
   useEffect(() => {
@@ -65,6 +69,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           {children}
         </main>
         <RightSidebar />
+        <QuickCaptureFab hidden={hideQuickCapture} />
 
         {/* Document Processing Indicator - shows when PDFs are being processed */}
         <DocumentProcessingIndicator />
