@@ -769,7 +769,7 @@ export const generateEmbedding = action({
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "embedding-001" });
+    const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
 
     // Strip HTML tags and limit text length
     const plainText = args.text
