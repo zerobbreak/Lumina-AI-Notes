@@ -7,10 +7,7 @@ import {
   File,
   Layers,
   CornerDownLeft,
-  Crown,
-  Sparkles,
   Tag as TagIcon,
-  X,
   Check,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -34,7 +31,6 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/useDebounce";
-import Link from "next/link";
 
 export function SearchDialog({
   open,
@@ -66,9 +62,6 @@ export function SearchDialog({
   );
 
   const results = searchResponse?.results;
-  const tier = searchResponse?.tier || "free";
-  const limitReached = searchResponse?.limitReached || false;
-  const isFreeTier = tier === "free";
 
   React.useEffect(() => {
     if (!open) {
@@ -244,30 +237,6 @@ export function SearchDialog({
                 </div>
               ))}
 
-              {/* Upgrade prompt when limit reached */}
-              {limitReached && isFreeTier && (
-                <div className="mt-3 p-3 bg-linear-to-r from-purple-500/10 to-indigo-500/10 border border-purple-500/20 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <Sparkles className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-300">
-                        More results available with Scholar
-                      </p>
-                      <p className="text-[10px] text-gray-500 mt-0.5">
-                        Upgrade for unlimited search across all your notes
-                      </p>
-                    </div>
-                    <Link
-                      href="/#pricing"
-                      onClick={() => onOpenChange(false)}
-                      className="shrink-0 flex items-center gap-1 px-2 py-1 text-[10px] font-medium bg-purple-600 hover:bg-purple-500 text-white rounded transition-colors"
-                    >
-                      <Crown className="w-3 h-3" />
-                      Upgrade
-                    </Link>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>

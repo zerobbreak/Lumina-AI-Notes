@@ -1,24 +1,6 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
-import { Doc } from "./_generated/dataModel";
-
-// Subscription tier types for search scope restrictions
-type SubscriptionTier = "free" | "scholar" | "institution";
-type SearchScope = "single-note" | "course" | "all";
-
-// Search scope per tier
-const TIER_SEARCH_SCOPE: Record<SubscriptionTier, SearchScope> = {
-  free: "single-note", // Free users: limited results
-  scholar: "all", // Scholar: full search
-  institution: "all", // Institution: full search
-};
-
-// Result limits per tier
-const TIER_RESULT_LIMITS: Record<SubscriptionTier, number> = {
-  free: 5, // Free users get max 5 results per category
-  scholar: 20, // Scholar gets 20 results
-  institution: 50, // Institution gets 50 results
-};
+const DEFAULT_RESULT_LIMIT = 20;
 
 export type SearchResult = {
   type: "note" | "file" | "deck";
@@ -31,7 +13,6 @@ export type SearchResult = {
 
 export type SearchResponse = {
   results: SearchResult[];
-  tier: SubscriptionTier;
   limitReached: boolean;
   totalFound?: number;
 };
@@ -55,51 +36,26 @@ export const search = query({
     const userId = identity?.tokenIdentifier;
 
     if (!userId) {
-      return { results: [], tier: "free", limitReached: false };
+      return { results: [], limitReached: false };
     }
 
     if (!args.query) {
-      return { results: [], tier: "free", limitReached: false };
+      return { results: [], limitReached: false };
     }
 
-    // Get user's subscription tier
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_tokenIdentifier", (q) => q.eq("tokenIdentifier", userId))
-      .unique();
-
-    // Determine effective tier
-    let tier: SubscriptionTier = "free";
-    if (user?.subscriptionTier) {
-      const rawTier = user.subscriptionTier as SubscriptionTier;
-      const status = user.subscriptionStatus;
-      const endDate = user.subscriptionEndDate;
-      const isActive =
-        status === "active" && (!endDate || endDate > Date.now());
-      tier = isActive ? rawTier : "free";
-    }
-
-    const searchScope = TIER_SEARCH_SCOPE[tier];
-    const resultLimit = TIER_RESULT_LIMITS[tier];
+    const resultLimit = DEFAULT_RESULT_LIMIT;
     const searchType = args.type || "all";
     const results: SearchResult[] = [];
     let totalFound = 0;
 
     // Search Notes
     if (searchType === "all" || searchType === "note") {
-      let notesQuery = ctx.db
+      const notesQuery = ctx.db
         .query("notes")
         .withSearchIndex("search_title", (q) =>
           q.search("title", args.query).eq("userId", userId),
         )
         .filter((q) => q.neq(q.field("isArchived"), true));
-
-      // For free tier with course restriction, filter by courseId
-      if (searchScope === "single-note" && args.courseId) {
-        notesQuery = notesQuery.filter((q) =>
-          q.eq(q.field("courseId"), args.courseId),
-        );
-      }
 
       const fetchLimit =
         args.tagIds && args.tagIds.length > 0 ? 50 : resultLimit + 5;
@@ -137,7 +93,6 @@ export const search = query({
       const limitReached = totalFound > results.length;
       return {
         results,
-        tier,
         limitReached,
         totalFound: limitReached ? totalFound : undefined,
       };
@@ -145,18 +100,11 @@ export const search = query({
 
     // Search Files
     if (searchType === "all" || searchType === "file") {
-      let filesQuery = ctx.db
+      const filesQuery = ctx.db
         .query("files")
         .withSearchIndex("search_name", (q) =>
           q.search("name", args.query).eq("userId", userId),
         );
-
-      // For free tier with course restriction, filter by courseId
-      if (searchScope === "single-note" && args.courseId) {
-        filesQuery = filesQuery.filter((q) =>
-          q.eq(q.field("courseId"), args.courseId),
-        );
-      }
 
       const files = await filesQuery.take(resultLimit + 5);
       totalFound += files.length;
@@ -174,18 +122,11 @@ export const search = query({
 
     // Search Decks (flashcards and quizzes are Scholar features, but still searchable)
     if (searchType === "all" || searchType === "deck") {
-      let decksQuery = ctx.db
+      const decksQuery = ctx.db
         .query("flashcardDecks")
         .withSearchIndex("search_title", (q) =>
           q.search("title", args.query).eq("userId", userId),
         );
-
-      // For free tier with course restriction, filter by courseId
-      if (searchScope === "single-note" && args.courseId) {
-        decksQuery = decksQuery.filter((q) =>
-          q.eq(q.field("courseId"), args.courseId),
-        );
-      }
 
       const decks = await decksQuery.take(resultLimit + 5);
       totalFound += decks.length;
@@ -205,7 +146,6 @@ export const search = query({
 
     return {
       results,
-      tier,
       limitReached,
       totalFound: limitReached ? totalFound : undefined,
     };
@@ -227,32 +167,14 @@ export const semanticSearch = query({
     const userId = identity?.tokenIdentifier;
 
     if (!userId || !args.query) {
-      return { results: [], tier: "free" as SubscriptionTier, limited: false };
+      return { results: [], limited: false, maxResults: args.limit || 10 };
     }
 
-    // Get user's subscription tier
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_tokenIdentifier", (q) => q.eq("tokenIdentifier", userId))
-      .unique();
-
-    let tier: SubscriptionTier = "free";
-    if (user?.subscriptionTier) {
-      const rawTier = user.subscriptionTier as SubscriptionTier;
-      const status = user.subscriptionStatus;
-      const endDate = user.subscriptionEndDate;
-      const isActive =
-        status === "active" && (!endDate || endDate > Date.now());
-      tier = isActive ? rawTier : "free";
-    }
-
-    // Free tier gets max 3 semantic search results
-    const maxResults = tier === "free" ? 3 : args.limit || 10;
-    const limited = tier === "free";
+    const maxResults = args.limit || 10;
+    const limited = false;
 
     return {
       results: [], // Actual semantic search happens in ai.ts action
-      tier,
       limited,
       maxResults,
     };

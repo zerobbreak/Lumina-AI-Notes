@@ -2,18 +2,10 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 
-// Tier limits for audio (in minutes)
-const TIER_AUDIO_LIMITS = {
-  free: 300, // 5 hours
-  scholar: Infinity,
-  institution: Infinity,
-};
+const AUDIO_LIMIT_MINUTES = 300;
 
-type SubscriptionTier = "free" | "scholar" | "institution";
-type SubscriptionStatus = "active" | "cancelled" | "past_due" | "expired";
-
-// Helper function to get user's effective tier and usage
-async function getUserTierAndUsage(ctx: any, tokenIdentifier: string) {
+// Helper function to get user's usage
+async function getUserUsage(ctx: any, tokenIdentifier: string) {
   const user = await ctx.db
     .query("users")
     .withIndex("by_tokenIdentifier", (q: any) =>
@@ -23,7 +15,6 @@ async function getUserTierAndUsage(ctx: any, tokenIdentifier: string) {
 
   if (!user) {
     return {
-      tier: "free" as SubscriptionTier,
       usage: {
         audioMinutesUsed: 0,
         notesCreated: 0,
@@ -31,14 +22,6 @@ async function getUserTierAndUsage(ctx: any, tokenIdentifier: string) {
       },
     };
   }
-
-  // Determine effective tier
-  const tier = (user.subscriptionTier as SubscriptionTier) || "free";
-  const status = user.subscriptionStatus as SubscriptionStatus | undefined;
-  const endDate = user.subscriptionEndDate;
-  const isActive = status === "active" && (!endDate || endDate > Date.now());
-  const effectiveTier: SubscriptionTier =
-    isActive && tier !== "free" ? tier : "free";
 
   // Get or initialize usage
   const now = Date.now();
@@ -65,7 +48,7 @@ async function getUserTierAndUsage(ctx: any, tokenIdentifier: string) {
     await ctx.db.patch(user._id, { monthlyUsage: usage });
   }
 
-  return { tier: effectiveTier, usage, userId: user._id };
+  return { usage, userId: user._id };
 }
 
 // Helper function to check and update audio usage
@@ -74,18 +57,15 @@ async function checkAndUpdateAudioUsage(
   tokenIdentifier: string,
   durationMinutes: number,
 ): Promise<{ allowed: boolean; error?: string; remaining?: number }> {
-  const { tier, usage, userId } = await getUserTierAndUsage(
-    ctx,
-    tokenIdentifier,
-  );
-  const limit = TIER_AUDIO_LIMITS[tier];
+  const { usage, userId } = await getUserUsage(ctx, tokenIdentifier);
+  const limit = AUDIO_LIMIT_MINUTES;
 
   if (limit !== Infinity) {
     const newTotal = usage.audioMinutesUsed + durationMinutes;
     if (newTotal > limit) {
       return {
         allowed: false,
-        error: `Audio limit exceeded. You have ${Math.max(0, limit - usage.audioMinutesUsed).toFixed(1)} minutes remaining this month. Upgrade to Scholar for unlimited audio.`,
+        error: `Audio limit exceeded. You have ${Math.max(0, limit - usage.audioMinutesUsed).toFixed(1)} minutes remaining this month.`,
         remaining: Math.max(0, limit - usage.audioMinutesUsed),
       };
     }
@@ -124,15 +104,12 @@ export const checkAudioLimit = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return { allowed: false, error: "Unauthorized" };
 
-    const { tier, usage } = await getUserTierAndUsage(
-      ctx,
-      identity.tokenIdentifier,
-    );
-    const limit = TIER_AUDIO_LIMITS[tier];
+    const { usage } = await getUserUsage(ctx, identity.tokenIdentifier);
+    const limit = AUDIO_LIMIT_MINUTES;
     const estimatedMinutes = args.estimatedMinutes || 0;
 
     if (limit === Infinity) {
-      return { allowed: true, tier, remaining: Infinity };
+      return { allowed: true, remaining: Infinity };
     }
 
     const remaining = Math.max(0, limit - usage.audioMinutesUsed);
@@ -140,13 +117,12 @@ export const checkAudioLimit = query({
 
     return {
       allowed,
-      tier,
       remaining,
       used: usage.audioMinutesUsed,
       limit,
       error: allowed
         ? undefined
-        : `You have ${remaining.toFixed(1)} minutes remaining this month. Upgrade to Scholar for unlimited audio.`,
+        : `You have ${remaining.toFixed(1)} minutes remaining this month.`,
     };
   },
 });

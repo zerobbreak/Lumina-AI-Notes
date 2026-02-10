@@ -133,7 +133,11 @@ export default function SmartFolderHub() {
   const dueTodayCount = todayQueue?.cardIds?.length ?? 0;
 
   const tzOffsetMinutes = useMemo(() => new Date().getTimezoneOffset(), []);
-  const now = useMemo(() => Date.now(), []);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
   const heatmapStart = useMemo(
     () => now - 84 * 24 * 60 * 60 * 1000,
     [now],

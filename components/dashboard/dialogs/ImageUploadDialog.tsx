@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useAction, useQuery } from "convex/react";
+import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
   Dialog,
@@ -20,11 +20,9 @@ import {
   Copy,
   Check,
   AlertCircle,
-  Crown,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
 import "katex/dist/katex.min.css";
 import katex from "katex";
 
@@ -51,7 +49,6 @@ export function ImageUploadDialog({
 
   // Formula extraction state
   const extractFormula = useAction(api.ai.extractFormulaFromImage);
-  const subscription = useQuery(api.subscriptions.getSubscriptionStatus);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [mimeType, setMimeType] = useState<string>("image/png");

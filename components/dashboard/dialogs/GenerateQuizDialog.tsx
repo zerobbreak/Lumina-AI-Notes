@@ -22,8 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Sparkles, Loader2, FileText, Crown, Lock } from "lucide-react";
-import Link from "next/link";
+import { Sparkles, Loader2, FileText } from "lucide-react";
 
 interface GenerateQuizDialogProps {
   open: boolean;
@@ -38,7 +37,6 @@ export function GenerateQuizDialog({
 }: GenerateQuizDialogProps) {
   const router = useRouter();
   const notes = useQuery(api.notes.getRecentNotes);
-  const subscription = useQuery(api.subscriptions.getSubscriptionStatus);
   const generateQuiz = useAction(api.ai.generateAndSaveQuiz);
 
   const [selectedNoteId, setSelectedNoteId] = useState<string>(

@@ -22,8 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Sparkles, Loader2, FileText, Crown, Lock } from "lucide-react";
-import Link from "next/link";
+import { Sparkles, Loader2, FileText } from "lucide-react";
 
 interface GenerateFlashcardsDialogProps {
   open: boolean;
@@ -38,7 +37,6 @@ export function GenerateFlashcardsDialog({
 }: GenerateFlashcardsDialogProps) {
   const router = useRouter();
   const notes = useQuery(api.notes.getRecentNotes);
-  const subscription = useQuery(api.subscriptions.getSubscriptionStatus);
   const generateFlashcards = useAction(api.ai.generateAndSaveFlashcards);
 
   const [selectedNoteId, setSelectedNoteId] = useState<string>(

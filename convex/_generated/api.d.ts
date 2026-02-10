@@ -19,7 +19,6 @@ import type * as presence from "../presence.js";
 import type * as quizzes from "../quizzes.js";
 import type * as recordings from "../recordings.js";
 import type * as search from "../search.js";
-import type * as subscriptions from "../subscriptions.js";
 import type * as tags from "../tags.js";
 import type * as users from "../users.js";
 
@@ -41,7 +40,6 @@ declare const fullApi: ApiFromModules<{
   quizzes: typeof quizzes;
   recordings: typeof recordings;
   search: typeof search;
-  subscriptions: typeof subscriptions;
   tags: typeof tags;
   users: typeof users;
 }>;

@@ -33,14 +33,6 @@ export default defineSchema({
     noteStyle: v.optional(v.string()), // "cornell" | "outline" | "mindmap"
     theme: v.optional(v.string()), // UI accent color preference (e.g., "indigo", "amber")
     enabledBlocks: v.optional(v.array(v.string())),
-    // Subscription & Payment Fields
-    subscriptionTier: v.optional(v.string()), // "free" | "scholar" | "institution"
-    subscriptionStatus: v.optional(v.string()), // "active" | "cancelled" | "past_due" | "expired"
-    paystackCustomerId: v.optional(v.string()),
-    paystackSubscriptionCode: v.optional(v.string()),
-    paystackAuthorizationCode: v.optional(v.string()), // For recurring charges
-    subscriptionStartDate: v.optional(v.number()),
-    subscriptionEndDate: v.optional(v.number()),
     // Usage Tracking Fields
     monthlyUsage: v.optional(
       v.object({
@@ -62,8 +54,7 @@ export default defineSchema({
     tourStep: v.optional(v.number()),
   })
     .index("by_tokenIdentifier", ["tokenIdentifier"])
-    .index("by_email", ["email"])
-    .index("by_paystackCustomerId", ["paystackCustomerId"]),
+    .index("by_email", ["email"]),
 
   notes: defineTable({
     userId: v.string(), // Storing tokenIdentifier for simplicity

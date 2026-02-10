@@ -25,14 +25,10 @@ import {
   Sparkles,
   Shield,
   Bell,
-  CreditCard,
   LogOut,
   Save,
-  Check,
   Loader2,
   Camera,
-  FileText,
-  Cloud,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
@@ -69,7 +65,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const userData = useQuery(api.users.getUser);
   const updatePreferences = useMutation(api.users.updatePreferences);
 
-  const [activeTab, setActiveTab] = useState("billing"); // Default to match design focus
+  const [activeTab, setActiveTab] = useState("profile");
   const [major, setMajor] = useState(userData?.major ?? "other");
   const [noteStyle, setNoteStyle] = useState(userData?.noteStyle ?? "cornell");
   const [theme, setTheme] = useState(userData?.theme ?? "indigo");
@@ -149,7 +145,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     { id: "profile", label: "Profile", icon: User },
     { id: "security", label: "Security", icon: Shield },
     { id: "notifications", label: "Notifications", icon: Bell },
-    { id: "billing", label: "Billing", icon: CreditCard },
   ];
 
   return (
@@ -161,7 +156,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         {/* Accessibility: Hidden title and description for screen readers */}
         <DialogTitle className="sr-only">Settings</DialogTitle>
         <DialogDescription className="sr-only">
-          Manage your profile, security, notifications, and billing settings.
+          Manage your profile, security, and notification settings.
         </DialogDescription>
 
         {/* Close Button Custom */}
@@ -492,104 +487,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 </div>
               )}
 
-              {/* Billing Tab */}
-              {activeTab === "billing" && (
-                <div className="p-6 rounded-2xl bg-[#0F0F11] border border-white/5">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="w-5 h-5 text-blue-500" />
-                      <h3 className="text-lg font-semibold text-white">
-                        Billing & Subscription
-                      </h3>
-                    </div>
-                    <button
-                      onClick={() => openUserProfile?.()}
-                      className="text-sm font-medium text-blue-500 hover:text-blue-400"
-                    >
-                      Manage Payment Methods
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Current Plan Card */}
-                    <div className="rounded-xl bg-gradient-to-br from-[#1c1c20] to-[#131315] border border-white/5 p-5 relative overflow-hidden group">
-                      {/* Glow effect */}
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
-
-                      <div className="flex justify-between items-start mb-8">
-                        <div>
-                          <p className="text-xs text-gray-500 font-medium mb-1">
-                            Current Plan
-                          </p>
-                          <h4 className="text-2xl font-bold text-white tracking-tight">
-                            Student Pro
-                          </h4>
-                        </div>
-                        <span className="px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-400 text-xs font-bold border border-blue-500/20">
-                          Annual
-                        </span>
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-xs text-gray-400">
-                          <span>Storage Usage</span>
-                          <span className="text-white font-medium">
-                            12.4 GB / 50 GB
-                          </span>
-                        </div>
-                        <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-                          <div className="h-full w-[25%] bg-blue-500 rounded-full" />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Upcoming Invoices */}
-                    <div className="rounded-xl border border-white/5 bg-black/20 p-5">
-                      <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-4">
-                        Upcoming Invoices
-                      </p>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer group">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded bg-gray-800 flex items-center justify-center text-gray-400 group-hover:text-white group-hover:bg-gray-700">
-                              <FileText className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-500">
-                                Oct 12, 2024
-                              </p>
-                              <p className="text-sm font-bold text-white">
-                                $4.99
-                              </p>
-                            </div>
-                          </div>
-                          <span className="text-[10px] font-bold bg-white/10 text-gray-400 px-2 py-1 rounded">
-                            PENDING
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 opacity-50">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded bg-gray-800 flex items-center justify-center text-gray-400">
-                              <FileText className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-500">
-                                Nov 12, 2024
-                              </p>
-                              <p className="text-sm font-bold text-white">
-                                $4.99
-                              </p>
-                            </div>
-                          </div>
-                          <span className="text-[10px] font-bold bg-white/10 text-gray-400 px-2 py-1 rounded">
-                            SCHEDULED
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </ScrollArea>
         </div>
