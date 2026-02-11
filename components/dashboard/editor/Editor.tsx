@@ -96,6 +96,8 @@ export default function Editor({
   const [cornellSummary, setCornellSummary] = useState(
     initialCornellSummary || "",
   );
+  const outlineToolbarRef = useRef<HTMLDivElement | null>(null);
+  const [showOutlineShortcuts, setShowOutlineShortcuts] = useState(false);
 
   // Build extensions based on style type
   const extensions: AnyExtension[] = [
@@ -339,24 +341,21 @@ export default function Editor({
     );
   }
 
+  const handleOutlineBlur = () => {
+    requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (
+        outlineToolbarRef.current &&
+        active &&
+        outlineToolbarRef.current.contains(active)
+      ) {
+        return;
+      }
+      setShowOutlineShortcuts(false);
+    });
+  };
+
   if (styleType === "outline") {
-    const outlineToolbarRef = useRef<HTMLDivElement | null>(null);
-    const [showOutlineShortcuts, setShowOutlineShortcuts] = useState(false);
-
-    const handleOutlineBlur = () => {
-      requestAnimationFrame(() => {
-        const active = document.activeElement;
-        if (
-          outlineToolbarRef.current &&
-          active &&
-          outlineToolbarRef.current.contains(active)
-        ) {
-          return;
-        }
-        setShowOutlineShortcuts(false);
-      });
-    };
-
     return (
       <div className="outline-mode-container">
         {/* Toolbar with outline-specific actions */}
