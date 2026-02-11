@@ -148,6 +148,12 @@ export function RightSidebar() {
   const { setPendingNotes, activeContext, setActiveContext } = useDashboard();
   const generateFromPinnedAudio = useAction(api.notes.generateFromPinnedAudio);
 
+  const { transcript, resetTranscript, browserSupportsSpeechRecognition } =
+    useSpeechRecognition();
+
+  const hasDraftTranscript =
+    sessionTranscript.length > 0 || transcript.trim().length > 0;
+
   // Computed sidebar mode based on current state
   // Priority: recording > transcribing > uploading > ready > idle
   const sidebarMode: SidebarMode = useMemo(() => {
@@ -156,7 +162,13 @@ export function RightSidebar() {
     if (isUploading) return "uploading";
     if (hasDraftTranscript || generatedNotes) return "ready";
     return "idle";
-  }, [isRecording, isUploading, isTranscribing, hasDraftTranscript, generatedNotes]);
+  }, [
+    isRecording,
+    isUploading,
+    isTranscribing,
+    hasDraftTranscript,
+    generatedNotes,
+  ]);
 
   // Validate active context file still exists
   const contextFile = useQuery(
@@ -195,15 +207,6 @@ export function RightSidebar() {
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
   };
-
-  const {
-    transcript,
-    resetTranscript,
-    browserSupportsSpeechRecognition,
-  } = useSpeechRecognition();
-
-  const hasDraftTranscript =
-    sessionTranscript.length > 0 || transcript.trim().length > 0;
 
   // Format seconds to HH:MM:SS (moved up for hoisting)
   const formatTime = (seconds: number) => {
