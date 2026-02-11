@@ -293,6 +293,12 @@ export function RightSidebar() {
   };
 
   const handleGenerateNotes = async () => {
+    // Stop recording if still active
+    if (isRecording) {
+      SpeechRecognition.stopListening();
+      setIsRecording(false);
+    }
+
     const finalChunks = [...sessionTranscript];
     if (transcript.trim()) {
       finalChunks.push({
@@ -312,6 +318,36 @@ export function RightSidebar() {
     }
 
     setIsGeneratingNotes(true);
+
+    // Auto-save the session first (only for new recordings, not loaded past sessions)
+    if (!selectedSession) {
+      try {
+        const autoTitle =
+          recordingTitle ||
+          `Session ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+
+        const savedId = await saveRecording({
+          sessionId: crypto.randomUUID(),
+          title: autoTitle,
+          transcript: JSON.stringify(finalChunks),
+          tzOffsetMinutes: new Date().getTimezoneOffset(),
+        });
+
+        setSelectedSession(savedId);
+        setRecordingTitle(autoTitle);
+        toast.success("Session auto-saved", {
+          description: "Your recording is saved. Generating notes now...",
+          duration: 3000,
+        });
+      } catch (saveError) {
+        console.error("Auto-save failed:", saveError);
+        // Don't block note generation if save fails — just warn
+        toast.warning("Could not auto-save session", {
+          description:
+            "Your recording wasn't saved, but note generation will continue.",
+        });
+      }
+    }
 
     // Track if we're using context for this generation
     const usingContext = activeContext && activeContext.type === "file";
@@ -358,7 +394,8 @@ export function RightSidebar() {
         });
       } else {
         toast.error("Failed to generate notes", {
-          description: "Please check your AI configuration and try again.",
+          description:
+            "Your session is saved. You can retry generating notes from your history.",
         });
       }
     } finally {
