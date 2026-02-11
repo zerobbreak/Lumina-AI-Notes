@@ -154,15 +154,9 @@ export function RightSidebar() {
     if (isRecording) return "recording";
     if (isTranscribing) return "transcribing"; // AI processing takes priority
     if (isUploading) return "uploading";
-    if (sessionTranscript.length > 0 || generatedNotes) return "ready";
+    if (hasDraftTranscript || generatedNotes) return "ready";
     return "idle";
-  }, [
-    isRecording,
-    isUploading,
-    isTranscribing,
-    sessionTranscript.length,
-    generatedNotes,
-  ]);
+  }, [isRecording, isUploading, isTranscribing, hasDraftTranscript, generatedNotes]);
 
   // Validate active context file still exists
   const contextFile = useQuery(
@@ -204,10 +198,12 @@ export function RightSidebar() {
 
   const {
     transcript,
-    listening,
     resetTranscript,
     browserSupportsSpeechRecognition,
   } = useSpeechRecognition();
+
+  const hasDraftTranscript =
+    sessionTranscript.length > 0 || transcript.trim().length > 0;
 
   // Format seconds to HH:MM:SS (moved up for hoisting)
   const formatTime = (seconds: number) => {
@@ -1118,6 +1114,16 @@ export function RightSidebar() {
 
                   {/* Secondary actions */}
                   <div className="flex gap-2">
+                    {!generatedNotes && (
+                      <Button
+                        variant="ghost"
+                        className="flex-1 h-9 bg-white/5 hover:bg-white/10 text-xs font-medium text-gray-300 border border-white/5"
+                        onClick={handleToggleRecording}
+                      >
+                        <Play className="w-3 h-3 mr-2" />
+                        Resume
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       className="flex-1 h-9 bg-white/5 hover:bg-white/10 text-xs font-medium text-gray-300 border border-white/5"
@@ -1153,7 +1159,7 @@ export function RightSidebar() {
                       <div
                         className={cn(
                           "w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300",
-                          listening
+                          isRecording
                             ? "bg-red-500/20 text-red-500"
                             : "bg-white/5 text-gray-400",
                         )}
@@ -1164,10 +1170,10 @@ export function RightSidebar() {
                         <span
                           className={cn(
                             "text-[10px] font-bold tracking-wider uppercase",
-                            listening ? "text-red-500" : "text-gray-500",
+                            isRecording ? "text-red-500" : "text-gray-500",
                           )}
                         >
-                          {listening ? "Recording" : "Ready"}
+                          {isRecording ? "Recording" : "Ready"}
                         </span>
                         <span className="font-mono text-sm font-medium text-white tabular-nums">
                           {formatTime(elapsedTime)}
@@ -1192,7 +1198,7 @@ export function RightSidebar() {
                       <motion.div
                         key={i}
                         animate={
-                          listening
+                          isRecording
                             ? {
                                 height: [10, 10 + Math.random() * 40, 10],
                                 opacity: [0.3, 1, 0.3],
@@ -1207,7 +1213,7 @@ export function RightSidebar() {
                         }}
                         className={cn(
                           "w-1.5 rounded-full",
-                          listening ? "bg-red-500" : "bg-gray-600",
+                          isRecording ? "bg-red-500" : "bg-gray-600",
                         )}
                       />
                     ))}
@@ -1218,12 +1224,16 @@ export function RightSidebar() {
                     onClick={handleToggleRecording}
                     className={cn(
                       "w-full py-4 rounded-2xl font-semibold text-sm tracking-wide transition-all duration-300 transform active:scale-[0.98] relative z-10 shadow-lg",
-                      listening
+                      isRecording
                         ? "bg-white text-black hover:bg-gray-100"
                         : "bg-[#6366f1] text-white hover:bg-[#5558dd] shadow-indigo-500/25",
                     )}
                   >
-                    {listening ? "Pause Recording" : "Start Recording"}
+                    {isRecording
+                      ? "Pause Recording"
+                      : hasDraftTranscript
+                        ? "Resume Recording"
+                        : "Start Recording"}
                   </button>
                 </motion.div>
               )}
