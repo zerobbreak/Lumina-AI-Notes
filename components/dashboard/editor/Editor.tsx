@@ -12,7 +12,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import { Dropcursor } from "@tiptap/extension-dropcursor";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ResourceMentionNode } from "./ResourceMentionNode";
 import { OutlineExtension } from "./extensions/OutlineExtension";
 import { DiagramExtension } from "./extensions/DiagramExtension";
@@ -340,17 +340,41 @@ export default function Editor({
   }
 
   if (styleType === "outline") {
+    const outlineToolbarRef = useRef<HTMLDivElement | null>(null);
+    const [showOutlineShortcuts, setShowOutlineShortcuts] = useState(false);
+
+    const handleOutlineBlur = () => {
+      requestAnimationFrame(() => {
+        const active = document.activeElement;
+        if (
+          outlineToolbarRef.current &&
+          active &&
+          outlineToolbarRef.current.contains(active)
+        ) {
+          return;
+        }
+        setShowOutlineShortcuts(false);
+      });
+    };
+
     return (
       <div className="outline-mode-container">
         {/* Toolbar with outline-specific actions */}
-        <div className="outline-toolbar mb-4 p-3 bg-white/5 border border-white/10 rounded-lg">
-          <div className="flex items-center gap-2 text-xs text-gray-400 mb-2">
-            <span>💡</span>
-            <span>
-              <strong>Shortcuts:</strong> Tab to indent • Shift+Tab to outdent •
-              Cmd+Shift+8 for bullets • Cmd+Shift+9 for tasks
-            </span>
-          </div>
+        <div
+          className="outline-toolbar mb-4 p-3 bg-white/5 border border-white/10 rounded-lg"
+          ref={outlineToolbarRef}
+          onFocusCapture={() => setShowOutlineShortcuts(true)}
+          onBlurCapture={handleOutlineBlur}
+        >
+          {showOutlineShortcuts && (
+            <div className="flex items-center gap-2 text-xs text-gray-400 mb-2">
+              <span>💡</span>
+              <span>
+                <strong>Shortcuts:</strong> Tab to indent • Shift+Tab to outdent
+                • Cmd+Shift+8 for bullets • Cmd+Shift+9 for tasks
+              </span>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <button
               onClick={() => editor?.chain().focus().toggleBulletList().run()}

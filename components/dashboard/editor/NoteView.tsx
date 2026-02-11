@@ -373,7 +373,8 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       html += `<h2>❓ Review Questions</h2>`;
       html += `<ul>`;
       pendingNotes.reviewQuestions.forEach((q) => {
-        html += `<li>${q}</li>`;
+        const cleaned = q.replace(/^[•\u2022\-–]\s+/, "");
+        html += `<li>${cleaned}</li>`;
       });
       html += `</ul>`;
     }

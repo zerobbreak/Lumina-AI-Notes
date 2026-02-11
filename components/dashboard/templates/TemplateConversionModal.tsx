@@ -52,13 +52,13 @@ export function TemplateConversionModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl bg-[#0B0B0B] border-white/10 text-white">
+      <DialogContent className="sm:max-w-2xl bg-[#0B0B0B] border-white/10 text-white max-h-[80vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle>Change Template</DialogTitle>
         </DialogHeader>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 py-2">
-          <div className="space-y-3">
+          <div className="space-y-3 overflow-y-auto max-h-[60vh] pr-1">
             {available.map((option) => {
               const isSelected = selected === option.id;
               return (
@@ -88,11 +88,11 @@ export function TemplateConversionModal({
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4 overflow-hidden">
             <div className="text-xs uppercase tracking-widest text-gray-500 mb-3">
               Preview
             </div>
-            <div className="text-sm text-gray-200 whitespace-pre-wrap min-h-[160px]">
+            <div className="text-sm text-gray-200 whitespace-pre-wrap min-h-[160px] max-h-[60vh] overflow-y-auto pr-1">
               {previewText || "No content to preview"}
             </div>
           </div>
