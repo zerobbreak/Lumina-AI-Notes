@@ -59,6 +59,17 @@ interface EnhancedChunk {
   concepts: string[];
 }
 
+type RecordingDraft = {
+  version: 1;
+  savedAt: number;
+  elapsedTime: number;
+  recordingTitle: string;
+  sessionTranscript: EnhancedChunk[];
+  liveTranscript: string;
+};
+
+const RECORDING_DRAFT_STORAGE_KEY = "lumina:right-sidebar:recording-draft:v1";
+
 // Sidebar modes for dynamic UI adaptation
 type SidebarMode =
   | "idle" // Default - show quick import, record button, history
@@ -81,6 +92,8 @@ const getAudioDuration = (file: File): Promise<number> => {
 };
 
 export function RightSidebar() {
+  // Handle hydration mismatch
+  const [isMounted, setIsMounted] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [sessionTranscript, setSessionTranscript] = useState<EnhancedChunk[]>(
@@ -113,6 +126,7 @@ export function RightSidebar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textbookInputRef = useRef<HTMLInputElement>(null);
   const showTranscriptPreview = false;
+  const restoredDraftRef = useRef(false);
 
   // Router and Search Params
   const router = useRouter();
@@ -218,6 +232,14 @@ export function RightSidebar() {
       .padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
+  const clearRecordingDraft = () => {
+    try {
+      localStorage.removeItem(RECORDING_DRAFT_STORAGE_KEY);
+    } catch (error) {
+      console.warn("[recording-draft] failed to clear local draft:", error);
+    }
+  };
+
   // Reset handler (moved up for hoisting)
   const handleReset = (showToast = false) => {
     setIsRecording(false);
@@ -228,10 +250,94 @@ export function RightSidebar() {
     setSelectedSession(null);
     setActiveContext(null);
     setUsedContextName(null);
+    clearRecordingDraft();
     if (showToast) {
       toast.success("Session reset", { duration: 2000 });
     }
   };
+
+  // Restore local draft after reload/deploy interruption.
+  useEffect(() => {
+    if (!isMounted || restoredDraftRef.current) return;
+    restoredDraftRef.current = true;
+
+    try {
+      const rawDraft = localStorage.getItem(RECORDING_DRAFT_STORAGE_KEY);
+      if (!rawDraft) return;
+
+      const parsed = JSON.parse(rawDraft) as Partial<RecordingDraft>;
+      const recoveredChunks = Array.isArray(parsed.sessionTranscript)
+        ? [...parsed.sessionTranscript]
+        : [];
+
+      const liveTranscript = String(parsed.liveTranscript || "").trim();
+      const draftElapsed = Number(parsed.elapsedTime || 0);
+
+      if (liveTranscript) {
+        recoveredChunks.push({
+          text: liveTranscript,
+          enhancedText: liveTranscript,
+          timestamp: formatTime(draftElapsed),
+          isImportant: false,
+          concepts: [],
+        });
+      }
+
+      if (recoveredChunks.length === 0) return;
+
+      setSessionTranscript(recoveredChunks);
+      setElapsedTime(draftElapsed);
+      if (parsed.recordingTitle) {
+        setRecordingTitle(parsed.recordingTitle);
+      }
+
+      toast.info("Recovered unsaved recording draft", {
+        description: "Your interrupted recording has been restored locally.",
+        duration: 4000,
+      });
+    } catch (error) {
+      console.warn("[recording-draft] failed to restore local draft:", error);
+      clearRecordingDraft();
+    }
+  }, [isMounted, formatTime, clearRecordingDraft]);
+
+  // Persist in-progress recording locally to survive refresh/redeploy.
+  useEffect(() => {
+    if (!isMounted) return;
+    if (selectedSession || generatedNotes) return;
+
+    const hasDraftData =
+      sessionTranscript.length > 0 || transcript.trim().length > 0;
+
+    if (!hasDraftData) {
+      clearRecordingDraft();
+      return;
+    }
+
+    const draft: RecordingDraft = {
+      version: 1,
+      savedAt: Date.now(),
+      elapsedTime,
+      recordingTitle,
+      sessionTranscript,
+      liveTranscript: transcript.trim(),
+    };
+
+    try {
+      localStorage.setItem(RECORDING_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    } catch (error) {
+      console.warn("[recording-draft] failed to save local draft:", error);
+    }
+  }, [
+    isMounted,
+    selectedSession,
+    generatedNotes,
+    sessionTranscript,
+    transcript,
+    elapsedTime,
+    recordingTitle,
+    clearRecordingDraft,
+  ]);
 
   const handleSaveClick = () => {
     // 1. Validate content
@@ -440,8 +546,6 @@ export function RightSidebar() {
   // Timer Ref
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Handle hydration mismatch - must be first
-  const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -801,6 +905,7 @@ export function RightSidebar() {
       : never,
   ) => {
     if (!recording) return;
+    clearRecordingDraft();
 
     setSelectedSession(recording._id);
 
