@@ -168,8 +168,9 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
     action: "simplify" | "expand" | "continue" | "flashcards",
   ) => {
     if (!editor) return;
+    const { from: selectedFrom, to: selectedTo } = editor.state.selection;
     const selectedText = getSelectedText();
-    if (!selectedText.trim()) return;
+    if (!selectedText.trim() || selectedFrom === selectedTo) return;
 
     setIsLoading(true);
     setActiveAction(action);
@@ -185,8 +186,10 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
               editor
                 .chain()
                 .focus()
-                .deleteSelection()
-                .insertContent(result)
+                .insertContentAt(
+                  { from: selectedFrom, to: selectedTo },
+                  result,
+                )
                 .run();
             }
           });
@@ -199,8 +202,10 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
               editor
                 .chain()
                 .focus()
-                .deleteSelection()
-                .insertContent(result)
+                .insertContentAt(
+                  { from: selectedFrom, to: selectedTo },
+                  result,
+                )
                 .run();
             }
           });
@@ -213,11 +218,10 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
           });
           queueMicrotask(() => {
             if (editor && !editor.isDestroyed) {
-              const { to } = editor.state.selection;
               editor
                 .chain()
                 .focus()
-                .insertContentAt(to, " " + result)
+                .insertContentAt(selectedTo, " " + result)
                 .run();
             }
           });
@@ -235,11 +239,10 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
             flashcardHtml += "</ul>";
             queueMicrotask(() => {
               if (editor && !editor.isDestroyed) {
-                const { to } = editor.state.selection;
                 editor
                   .chain()
                   .focus()
-                  .insertContentAt(to, "<br/>" + flashcardHtml)
+                  .insertContentAt(selectedTo, "<br/>" + flashcardHtml)
                   .run();
               }
             });
