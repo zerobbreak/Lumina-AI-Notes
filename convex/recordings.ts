@@ -173,6 +173,47 @@ export const saveRecording = mutation({
   },
 });
 
+// Upsert an in-progress recording draft by sessionId (used for autosave/recovery)
+export const upsertRecordingDraft = mutation({
+  args: {
+    sessionId: v.string(),
+    title: v.string(),
+    transcript: v.string(),
+    duration: v.optional(v.number()), // Duration in seconds
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const existing = await ctx.db
+      .query("recordings")
+      .withIndex("by_userId_sessionId", (q) =>
+        q
+          .eq("userId", identity.tokenIdentifier)
+          .eq("sessionId", args.sessionId),
+      )
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        title: args.title,
+        transcript: args.transcript,
+        duration: args.duration,
+      });
+      return existing._id;
+    }
+
+    return await ctx.db.insert("recordings", {
+      userId: identity.tokenIdentifier,
+      sessionId: args.sessionId,
+      title: args.title,
+      transcript: args.transcript,
+      duration: args.duration,
+      createdAt: Date.now(),
+    });
+  },
+});
+
 // Save an uploaded recording with audio file
 export const saveUploadedRecording = mutation({
   args: {

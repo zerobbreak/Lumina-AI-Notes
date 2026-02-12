@@ -154,6 +154,7 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_userId", ["userId"])
+    .index("by_userId_sessionId", ["userId", "sessionId"])
     .index("by_userId_createdAt", ["userId", "createdAt"]),
 
   flashcardDecks: defineTable({

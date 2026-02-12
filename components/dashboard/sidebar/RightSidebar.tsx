@@ -62,6 +62,7 @@ interface EnhancedChunk {
 type RecordingDraft = {
   version: 1;
   savedAt: number;
+  liveSessionId: string;
   elapsedTime: number;
   recordingTitle: string;
   sessionTranscript: EnhancedChunk[];
@@ -127,13 +128,14 @@ export function RightSidebar() {
   const textbookInputRef = useRef<HTMLInputElement>(null);
   const showTranscriptPreview = false;
   const restoredDraftRef = useRef(false);
+  const liveSessionIdRef = useRef<string>(crypto.randomUUID());
 
   // Router and Search Params
   const router = useRouter();
   const searchParams = useSearchParams();
 
   // API Hooks
-  const saveRecording = useMutation(api.recordings.saveRecording);
+  const upsertRecordingDraft = useMutation(api.recordings.upsertRecordingDraft);
   const generateStructuredNotes = useAction(api.ai.generateStructuredNotes);
   const analyzeChunk = useAction(api.ai.analyzeChunk);
   const generateRecordingUploadUrl = useMutation(
@@ -240,6 +242,21 @@ export function RightSidebar() {
     }
   };
 
+  const buildFinalChunks = useMemo(() => {
+    const chunks = [...sessionTranscript];
+    const liveText = transcript.trim();
+    if (liveText) {
+      chunks.push({
+        text: liveText,
+        enhancedText: liveText,
+        timestamp: formatTime(elapsedTime),
+        isImportant: false,
+        concepts: [],
+      });
+    }
+    return chunks;
+  }, [sessionTranscript, transcript, elapsedTime, formatTime]);
+
   // Reset handler (moved up for hoisting)
   const handleReset = (showToast = false) => {
     setIsRecording(false);
@@ -250,6 +267,7 @@ export function RightSidebar() {
     setSelectedSession(null);
     setActiveContext(null);
     setUsedContextName(null);
+    liveSessionIdRef.current = crypto.randomUUID();
     clearRecordingDraft();
     if (showToast) {
       toast.success("Session reset", { duration: 2000 });
@@ -272,6 +290,9 @@ export function RightSidebar() {
 
       const liveTranscript = String(parsed.liveTranscript || "").trim();
       const draftElapsed = Number(parsed.elapsedTime || 0);
+      if (parsed.liveSessionId && parsed.liveSessionId.trim().length > 0) {
+        liveSessionIdRef.current = parsed.liveSessionId;
+      }
 
       if (liveTranscript) {
         recoveredChunks.push({
@@ -317,6 +338,7 @@ export function RightSidebar() {
     const draft: RecordingDraft = {
       version: 1,
       savedAt: Date.now(),
+      liveSessionId: liveSessionIdRef.current,
       elapsedTime,
       recordingTitle,
       sessionTranscript,
@@ -337,6 +359,36 @@ export function RightSidebar() {
     elapsedTime,
     recordingTitle,
     clearRecordingDraft,
+  ]);
+
+  // Autosave in-progress sessions to backend so power loss doesn't drop content.
+  useEffect(() => {
+    if (!isMounted) return;
+    if (selectedSession || generatedNotes) return;
+    if (!buildFinalChunks.length) return;
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        const recordingId = await upsertRecordingDraft({
+          sessionId: liveSessionIdRef.current,
+          title:
+            recordingTitle ||
+            `Session ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
+          transcript: JSON.stringify(buildFinalChunks),
+        });
+      } catch (error) {
+        console.warn("[recording-draft] backend autosave failed:", error);
+      }
+    }, 2500);
+
+    return () => clearTimeout(timeoutId);
+  }, [
+    isMounted,
+    selectedSession,
+    generatedNotes,
+    buildFinalChunks,
+    recordingTitle,
+    upsertRecordingDraft,
   ]);
 
   const handleSaveClick = () => {
@@ -369,22 +421,15 @@ export function RightSidebar() {
 
   const handleConfirmSave = async () => {
     try {
-      const finalChunks = [...sessionTranscript];
-      if (transcript.trim()) {
-        finalChunks.push({
-          text: transcript.trim(),
-          enhancedText: transcript.trim(),
-          timestamp: formatTime(elapsedTime),
-          isImportant: false,
-          concepts: [],
-        });
+      if (buildFinalChunks.length === 0) {
+        toast.warning("Cannot save empty recording");
+        return;
       }
 
-      await saveRecording({
-        sessionId: crypto.randomUUID(),
+      await upsertRecordingDraft({
+        sessionId: liveSessionIdRef.current,
         title: recordingTitle || `Untitled Session`,
-        transcript: JSON.stringify(finalChunks),
-        tzOffsetMinutes: new Date().getTimezoneOffset(),
+        transcript: JSON.stringify(buildFinalChunks),
       });
 
       toast.success("Session saved successfully!");
@@ -405,18 +450,7 @@ export function RightSidebar() {
       setIsRecording(false);
     }
 
-    const finalChunks = [...sessionTranscript];
-    if (transcript.trim()) {
-      finalChunks.push({
-        text: transcript.trim(),
-        enhancedText: transcript.trim(),
-        timestamp: formatTime(elapsedTime),
-        isImportant: false,
-        concepts: [],
-      });
-    }
-
-    if (finalChunks.length === 0) {
+    if (buildFinalChunks.length === 0) {
       toast.warning("No transcript available", {
         description: "Please record something first to generate notes.",
       });
@@ -432,11 +466,10 @@ export function RightSidebar() {
           recordingTitle ||
           `Session ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
 
-        const savedId = await saveRecording({
-          sessionId: crypto.randomUUID(),
+        const savedId = await upsertRecordingDraft({
+          sessionId: liveSessionIdRef.current,
           title: autoTitle,
-          transcript: JSON.stringify(finalChunks),
-          tzOffsetMinutes: new Date().getTimezoneOffset(),
+          transcript: JSON.stringify(buildFinalChunks),
         });
 
         setSelectedSession(savedId);
@@ -473,7 +506,7 @@ export function RightSidebar() {
 
         // Generate notes with pinned document context
         const notes = await generateFromPinnedAudio({
-          transcript: JSON.stringify(finalChunks),
+          transcript: JSON.stringify(buildFinalChunks),
           pinnedFileId: activeContext.id,
         });
         setGeneratedNotes(notes);
@@ -481,7 +514,7 @@ export function RightSidebar() {
       } else {
         // Standard generation without context
         const notes = await generateStructuredNotes({
-          transcript: JSON.stringify(finalChunks),
+          transcript: JSON.stringify(buildFinalChunks),
           title: recordingTitle || "Recording",
         });
         setGeneratedNotes(notes);
@@ -906,6 +939,7 @@ export function RightSidebar() {
   ) => {
     if (!recording) return;
     clearRecordingDraft();
+    liveSessionIdRef.current = crypto.randomUUID();
 
     setSelectedSession(recording._id);
 
