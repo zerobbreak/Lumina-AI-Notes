@@ -123,6 +123,7 @@ export function QuickCaptureFab({ hidden }: QuickCaptureFabProps) {
       const transcription = await transcribeAudio({
         storageId,
         mimeType: "audio/webm",
+        courseContext: undefined,
       });
       const transcript = transcription.success ? transcription.transcript : "";
       const title = transcript.trim().split(" ").slice(0, 6).join(" ") || "Voice Capture";
@@ -273,3 +274,4 @@ export function QuickCaptureFab({ hidden }: QuickCaptureFabProps) {
     </>
   );
 }
+

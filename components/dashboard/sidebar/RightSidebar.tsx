@@ -658,6 +658,7 @@ export function RightSidebar() {
         const transcriptionResult = await transcribeAudio({
           storageId: storageId as Id<"_storage">,
           mimeType,
+          courseContext: userData?.major || undefined,
         });
         console.log(
           `[upload] Transcription call returned in ${Date.now() - transcribeStartMs}ms, success=${transcriptionResult.success}`,
@@ -1602,3 +1603,4 @@ export function RightSidebar() {
     </motion.div>
   );
 }
+
