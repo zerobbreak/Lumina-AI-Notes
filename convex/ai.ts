@@ -36,6 +36,37 @@ const getGeminiModel = (config?: { responseMimeType: string }) => {
   });
 };
 
+type TranscriptChunkInput = {
+  text?: string;
+  enhancedText?: string;
+  timestamp?: string;
+};
+
+const normalizeTranscriptForPrompt = (rawTranscript: string): string => {
+  const fallback = rawTranscript.trim();
+  if (!fallback) return "";
+
+  try {
+    const parsed = JSON.parse(rawTranscript) as unknown;
+    if (!Array.isArray(parsed)) return fallback;
+
+    const lines = parsed
+      .map((chunk) => {
+        const entry = chunk as TranscriptChunkInput;
+        const content = (entry.enhancedText || entry.text || "").trim();
+        if (!content) return "";
+        const stamp = (entry.timestamp || "").trim();
+        return stamp ? `[${stamp}] ${content}` : content;
+      })
+      .filter((line) => line.length > 0);
+
+    if (lines.length === 0) return fallback;
+    return lines.join("\n");
+  } catch {
+    return fallback;
+  }
+};
+
 /**
  * Refine and improve text - make it cleaner, more structured, and professional
  */
@@ -89,12 +120,13 @@ export const generateNotesFromTranscript = action({
   },
   handler: async (ctx, args) => {
     const model = getGeminiModel();
+    const normalizedTranscript = normalizeTranscriptForPrompt(args.transcript);
 
     const prompt = `You are an expert academic note-taker. Convert the following lecture/recording transcript into well-structured study notes.
 
 Transcript:
 """
-${args.transcript}
+${normalizedTranscript}
 """
 
 Create comprehensive study notes with:
@@ -364,6 +396,7 @@ export const generateStructuredNotes = action({
   },
   handler: async (ctx, args) => {
     const model = getGeminiModel({ responseMimeType: "application/json" });
+    const normalizedTranscript = normalizeTranscriptForPrompt(args.transcript);
 
     const tryParseJson = (text: string) => {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -380,11 +413,79 @@ ${text}`;
       return fixResult.response.text().trim();
     };
 
+    const sentenceCount = (text: string) =>
+      text
+        .split(/[.!?]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0).length;
+
+    const noteLacksDepth = (text: string) => {
+      const lower = text.toLowerCase();
+      const genericSignals = [
+        "will be explored",
+        "in future",
+        "important concept",
+        "key point",
+        "topic is",
+      ];
+      const hasGenericSignal = genericSignals.some((sig) =>
+        lower.includes(sig),
+      );
+      const hasConcreteSignal =
+        /\d/.test(text) ||
+        /(for example|e\.g\.|such as|because|therefore|used to|works by|defined as|means)/i.test(
+          text,
+        );
+      return sentenceCount(text) < 3 || hasGenericSignal || !hasConcreteSignal;
+    };
+
+    const maybeRepairQuality = async (draft: unknown) => {
+      const draftText = JSON.stringify(draft);
+      const repairPrompt = `You are improving generated Cornell lecture notes.
+
+Transcript:
+"""
+${normalizedTranscript}
+"""
+
+Current JSON:
+${draftText}
+
+Rewrite ONLY the weak parts while preserving the original topic coverage and structure.
+
+Return JSON with EXACT keys:
+{
+  "summary": "...",
+  "cornellCues": ["..."],
+  "cornellNotes": ["..."],
+  "actionItems": ["..."],
+  "reviewQuestions": ["..."],
+  "diagramNodes": ["..."],
+  "diagramEdges": ["..."]
+}
+
+Quality requirements:
+- 5-8 cue/note pairs
+- cornellNotes[i] must explain cornellCues[i]
+- Each cornell note must be 3-5 sentences
+- Each note must include at least one concrete example or specific detail from transcript
+- Avoid generic filler wording
+- Return ONLY valid JSON`;
+
+      const repairedResult = await model.generateContent(repairPrompt);
+      const repairedText = repairedResult.response.text().trim();
+      const parsedRepair = tryParseJson(repairedText);
+      if (parsedRepair) return parsedRepair;
+
+      const fixedRepairText = await fixJson(repairedText);
+      return tryParseJson(fixedRepairText);
+    };
+
     let prompt = `You are an expert academic note-taker with years of experience creating comprehensive study materials. Your goal is to transform this lecture transcript into detailed, exam-ready study notes.
 
 Transcript:
 """
-${args.transcript}
+${normalizedTranscript}
 """
 
 ${args.title ? `Lecture Title: ${args.title}` : ""}`;
@@ -434,7 +535,9 @@ Return as HTML with proper <ul>, <ol>, and task list structure using data-type="
 
 IMPORTANT RULES:
 - cornellCues: Extract 5-8 key terms, concepts, or questions from the lecture
-- cornellNotes: Each note should be 2-4 sentences with SPECIFIC details, not generic descriptions
+- cornellNotes: Each note should be 3-5 sentences with SPECIFIC details, not generic descriptions
+- cornellNotes[i] MUST directly explain cornellCues[i] (same index mapping)
+- For each note, cover: what it is, how it works, why it matters, and one concrete example from the lecture
 - Include actual examples, numbers, dates, names, or formulas mentioned in the lecture
 - reviewQuestions: Create 5 varied questions (recall, application, analysis, synthesis, evaluation)
 - diagramNodes: Create 5-8 nodes showing the hierarchical relationship between concepts
@@ -471,62 +574,105 @@ IMPORTANT RULES:
       }
 
       if (parsed) {
+        let workingParsed: any = parsed;
+
+        let normalizedCues = Array.isArray(workingParsed.cornellCues)
+          ? workingParsed.cornellCues
+              .map((cue: unknown) => String(cue || "").trim())
+              .filter((cue: string) => cue.length > 0)
+          : [];
+        let normalizedNotes = Array.isArray(workingParsed.cornellNotes)
+          ? workingParsed.cornellNotes
+              .map((note: unknown) => String(note || "").trim())
+              .filter((note: string) => note.length > 0)
+          : [];
+        let pairCount = Math.min(normalizedCues.length, normalizedNotes.length);
+
+        const needsRepair =
+          pairCount < 3 ||
+          normalizedNotes.some((note: string) => noteLacksDepth(note));
+
+        if (needsRepair) {
+          const repaired = await maybeRepairQuality(workingParsed);
+          if (repaired) {
+            workingParsed = repaired;
+            normalizedCues = Array.isArray(workingParsed.cornellCues)
+              ? workingParsed.cornellCues
+                  .map((cue: unknown) => String(cue || "").trim())
+                  .filter((cue: string) => cue.length > 0)
+              : [];
+            normalizedNotes = Array.isArray(workingParsed.cornellNotes)
+              ? workingParsed.cornellNotes
+                  .map((note: unknown) => String(note || "").trim())
+                  .filter((note: string) => note.length > 0)
+              : [];
+            pairCount = Math.min(normalizedCues.length, normalizedNotes.length);
+          }
+        }
+
+        const diagramNodes = Array.isArray(workingParsed.diagramNodes)
+          ? workingParsed.diagramNodes
+          : [];
+        const diagramEdges = Array.isArray(workingParsed.diagramEdges)
+          ? workingParsed.diagramEdges
+          : [];
+
+        const normalizedActionItems = Array.isArray(workingParsed.actionItems)
+          ? workingParsed.actionItems
+          : [];
+        const normalizedReviewQuestions = Array.isArray(
+          workingParsed.reviewQuestions,
+        )
+          ? workingParsed.reviewQuestions
+          : [];
 
         // Convert simplified diagram format to ReactFlow format
         let diagramData = undefined;
-        if (
-          parsed.diagramNodes &&
-          Array.isArray(parsed.diagramNodes) &&
-          parsed.diagramNodes.length > 0
-        ) {
-          const nodes = parsed.diagramNodes.map(
-            (label: string, index: number) => {
-              // Assign node types and colors based on position
-              let type = "default";
-              let color = "bg-gradient-to-br from-gray-500 to-gray-600";
+        if (diagramNodes.length > 0) {
+          const nodes = diagramNodes.map((label: string, index: number) => {
+            // Assign node types and colors based on position
+            let type = "default";
+            let color = "bg-gradient-to-br from-gray-500 to-gray-600";
 
-              if (index === 0) {
-                type = "concept";
-                color = "bg-gradient-to-br from-purple-500 to-pink-500";
-              } else if (index <= 3) {
-                type = "topic";
-                color = "bg-gradient-to-br from-blue-500 to-cyan-500";
-              } else if (index <= 6) {
-                type = "subtopic";
-                color = "bg-gradient-to-br from-emerald-500 to-teal-500";
-              } else {
-                type = "note";
-                color = "bg-gradient-to-br from-amber-400 to-orange-400";
-              }
+            if (index === 0) {
+              type = "concept";
+              color = "bg-gradient-to-br from-purple-500 to-pink-500";
+            } else if (index <= 3) {
+              type = "topic";
+              color = "bg-gradient-to-br from-blue-500 to-cyan-500";
+            } else if (index <= 6) {
+              type = "subtopic";
+              color = "bg-gradient-to-br from-emerald-500 to-teal-500";
+            } else {
+              type = "note";
+              color = "bg-gradient-to-br from-amber-400 to-orange-400";
+            }
 
-              return {
-                id: String(index),
-                type,
-                data: { label, color },
-                position: {
-                  x: index === 0 ? 400 : 200 + (index % 3) * 200,
-                  y: index === 0 ? 50 : Math.floor(index / 3) * 150 + 200,
-                },
-              };
-            },
-          );
+            return {
+              id: String(index),
+              type,
+              data: { label, color },
+              position: {
+                x: index === 0 ? 400 : 200 + (index % 3) * 200,
+                y: index === 0 ? 50 : Math.floor(index / 3) * 150 + 200,
+              },
+            };
+          });
 
-          const edges = (parsed.diagramEdges || []).map(
-            (edge: string, index: number) => {
-              const [source, target] = edge.split("-");
-              return { id: `e${index}`, source, target, animated: true };
-            },
-          );
+          const edges = diagramEdges.map((edge: string, index: number) => {
+            const [source, target] = edge.split("-");
+            return { id: `e${index}`, source, target, animated: true };
+          });
 
           diagramData = { nodes, edges };
         }
 
         return {
-          summary: parsed.summary || "",
-          cornellCues: parsed.cornellCues || [],
-          cornellNotes: parsed.cornellNotes || [],
-          actionItems: parsed.actionItems || [],
-          reviewQuestions: parsed.reviewQuestions || [],
+          summary: workingParsed.summary || "",
+          cornellCues: normalizedCues.slice(0, pairCount),
+          cornellNotes: normalizedNotes.slice(0, pairCount),
+          actionItems: normalizedActionItems,
+          reviewQuestions: normalizedReviewQuestions,
           diagramData,
         };
       }

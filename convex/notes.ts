@@ -5,6 +5,37 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 type NoteRole = "owner" | "editor" | "viewer";
 
+type TranscriptChunkInput = {
+  text?: string;
+  enhancedText?: string;
+  timestamp?: string;
+};
+
+const normalizeTranscriptForPrompt = (rawTranscript: string): string => {
+  const fallback = rawTranscript.trim();
+  if (!fallback) return "";
+
+  try {
+    const parsed = JSON.parse(rawTranscript) as unknown;
+    if (!Array.isArray(parsed)) return fallback;
+
+    const lines = parsed
+      .map((chunk) => {
+        const entry = chunk as TranscriptChunkInput;
+        const content = (entry.enhancedText || entry.text || "").trim();
+        if (!content) return "";
+        const stamp = (entry.timestamp || "").trim();
+        return stamp ? `[${stamp}] ${content}` : content;
+      })
+      .filter((line) => line.length > 0);
+
+    if (lines.length === 0) return fallback;
+    return lines.join("\n");
+  } catch {
+    return fallback;
+  }
+};
+
 async function getNoteRole(
   ctx: any,
   noteId: any,
@@ -487,8 +518,84 @@ ${text}`;
       return fixResult.response.text().trim();
     };
 
+    const normalizedTranscript = normalizeTranscriptForPrompt(args.transcript);
+
+    const sentenceCount = (text: string) =>
+      text
+        .split(/[.!?]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0).length;
+
+    const noteLacksDepth = (text: string) => {
+      const lower = text.toLowerCase();
+      const genericSignals = [
+        "will be explored",
+        "in future",
+        "important concept",
+        "key point",
+        "topic is",
+      ];
+      const hasGenericSignal = genericSignals.some((sig) =>
+        lower.includes(sig),
+      );
+      const hasConcreteSignal =
+        /\d/.test(text) ||
+        /(for example|e\.g\.|such as|because|therefore|used to|works by|defined as|means)/i.test(
+          text,
+        );
+      return sentenceCount(text) < 3 || hasGenericSignal || !hasConcreteSignal;
+    };
+
+    const maybeRepairQuality = async (draft: unknown) => {
+      const draftText = JSON.stringify(draft);
+      const repairPrompt = `You are improving generated Cornell lecture notes.
+
+Transcript:
+"""
+${normalizedTranscript}
+"""
+
+Pinned document context (may be empty):
+"""
+${contextText}
+"""
+
+Current JSON:
+${draftText}
+
+Rewrite ONLY the weak parts while preserving topic coverage and structure.
+
+Return JSON with EXACT keys:
+{
+  "summary": "...",
+  "cornellCues": ["..."],
+  "cornellNotes": ["..."],
+  "actionItems": ["..."],
+  "reviewQuestions": ["..."],
+  "diagramNodes": ["..."],
+  "diagramEdges": ["..."]
+}
+
+Quality requirements:
+- 5-8 cue/note pairs
+- cornellNotes[i] must explain cornellCues[i]
+- Each cornell note must be 3-5 sentences
+- Each note must include at least one concrete example or specific detail from transcript/context
+- Avoid generic filler wording
+- Return ONLY valid JSON`;
+
+      const repairedResult = await model.generateContent(repairPrompt);
+      const repairedText = repairedResult.response.text().trim();
+      const parsedRepair = tryParseJson(repairedText);
+      if (parsedRepair) return parsedRepair;
+
+      const fixedRepairText = await fixJson(repairedText);
+      return tryParseJson(fixedRepairText);
+    };
+
     // 1. Embed the transcript
-    const embeddingResult = await embeddingModel.embedContent(args.transcript);
+    const embeddingResult =
+      await embeddingModel.embedContent(normalizedTranscript);
     const transcriptEmbedding = embeddingResult.embedding.values;
 
     // 2. Search the pinned file (or all documents if no pin)
@@ -525,27 +632,31 @@ ${text}`;
 
 Transcript:
 """
-${args.transcript}
+${normalizedTranscript}
 """
 
 Instructions:
 1. **Analyze the Core Topic**: Identify the main subject of the lecture immediately.
 2. **Structure**: Organize the output into the EXACT JSON format below.
-3. **Clarity**: Ensure cues are distinct questions or keywords, and notes are detailed explanations.
+3. **Clarity**: Ensure cues are distinct keywords/questions, and notes are detailed explanations.
+4. **Depth**: For each concept include definition, mechanism/process, significance, and one concrete example.
 
 Generate a JSON response with this EXACT structure:
 {
-  "summary": "Start with the MAIN TOPIC. Then provide a 2-3 sentence overview.",
-  "cornellCues": ["Concept 1", "Concept 2", "Concept 3"],
-  "cornellNotes": ["Explanation 1", "Explanation 2", "Explanation 3"],
+  "summary": "Start with the MAIN TOPIC. Then provide a 3-5 sentence overview.",
+  "cornellCues": ["Concept 1", "Concept 2", "Concept 3", "Concept 4", "Concept 5"],
+  "cornellNotes": ["Explanation 1", "Explanation 2", "Explanation 3", "Explanation 4", "Explanation 5"],
   "actionItems": ["Task 1", "Task 2"],
-  "reviewQuestions": ["Question 1?", "Question 2?"],
-  "diagramNodes": ["Main Topic", "Subtopic A", "Subtopic B", "Subtopic C"],
-  "diagramEdges": ["0-1", "0-2", "1-3"]
+  "reviewQuestions": ["Question 1?", "Question 2?", "Question 3?", "Question 4?", "Question 5?"],
+  "diagramNodes": ["Main Topic", "Subtopic A", "Subtopic B", "Subtopic C", "Subtopic D"],
+  "diagramEdges": ["0-1", "0-2", "1-3", "2-4"]
 }
 
 Rules:
+- Return 5-8 cue/note pairs
 - cornellCues and cornellNotes arrays must have the same length
+- cornellNotes[i] MUST explain cornellCues[i] (same index mapping)
+- Each cornell note must be 3-5 sentences and include at least one concrete example from transcript/context
 - diagramNodes is an array of node labels (strings). First item is the central topic.
 - diagramEdges is an array of connections in format "sourceIndex-targetIndex" (e.g., "0-1" means node 0 connects to node 1)
 - actionItems should only include explicitly mentioned tasks (empty array if none)
@@ -578,62 +689,103 @@ Rules:
       }
 
       if (parsed) {
+        let workingParsed: any = parsed;
+
+        let normalizedCues = Array.isArray(workingParsed.cornellCues)
+          ? workingParsed.cornellCues
+              .map((cue: unknown) => String(cue || "").trim())
+              .filter((cue: string) => cue.length > 0)
+          : [];
+        let normalizedNotes = Array.isArray(workingParsed.cornellNotes)
+          ? workingParsed.cornellNotes
+              .map((note: unknown) => String(note || "").trim())
+              .filter((note: string) => note.length > 0)
+          : [];
+        let pairCount = Math.min(normalizedCues.length, normalizedNotes.length);
+
+        const needsRepair =
+          pairCount < 3 ||
+          normalizedNotes.some((note: string) => noteLacksDepth(note));
+        if (needsRepair) {
+          const repaired = await maybeRepairQuality(workingParsed);
+          if (repaired) {
+            workingParsed = repaired;
+            normalizedCues = Array.isArray(workingParsed.cornellCues)
+              ? workingParsed.cornellCues
+                  .map((cue: unknown) => String(cue || "").trim())
+                  .filter((cue: string) => cue.length > 0)
+              : [];
+            normalizedNotes = Array.isArray(workingParsed.cornellNotes)
+              ? workingParsed.cornellNotes
+                  .map((note: unknown) => String(note || "").trim())
+                  .filter((note: string) => note.length > 0)
+              : [];
+            pairCount = Math.min(normalizedCues.length, normalizedNotes.length);
+          }
+        }
+
+        const diagramNodes = Array.isArray(workingParsed.diagramNodes)
+          ? workingParsed.diagramNodes
+          : [];
+        const diagramEdges = Array.isArray(workingParsed.diagramEdges)
+          ? workingParsed.diagramEdges
+          : [];
+        const normalizedActionItems = Array.isArray(workingParsed.actionItems)
+          ? workingParsed.actionItems
+          : [];
+        const normalizedReviewQuestions = Array.isArray(
+          workingParsed.reviewQuestions,
+        )
+          ? workingParsed.reviewQuestions
+          : [];
 
         // Convert simplified diagram format to ReactFlow format
         let diagramData = undefined;
-        if (
-          parsed.diagramNodes &&
-          Array.isArray(parsed.diagramNodes) &&
-          parsed.diagramNodes.length > 0
-        ) {
-          const nodes = parsed.diagramNodes.map(
-            (label: string, index: number) => {
-              // Assign node types and colors based on position
-              let type = "default";
-              let color = "bg-gradient-to-br from-gray-500 to-gray-600";
+        if (diagramNodes.length > 0) {
+          const nodes = diagramNodes.map((label: string, index: number) => {
+            // Assign node types and colors based on position
+            let type = "default";
+            let color = "bg-gradient-to-br from-gray-500 to-gray-600";
 
-              if (index === 0) {
-                type = "concept";
-                color = "bg-gradient-to-br from-purple-500 to-pink-500";
-              } else if (index <= 3) {
-                type = "topic";
-                color = "bg-gradient-to-br from-blue-500 to-cyan-500";
-              } else if (index <= 6) {
-                type = "subtopic";
-                color = "bg-gradient-to-br from-emerald-500 to-teal-500";
-              } else {
-                type = "note";
-                color = "bg-gradient-to-br from-amber-400 to-orange-400";
-              }
+            if (index === 0) {
+              type = "concept";
+              color = "bg-gradient-to-br from-purple-500 to-pink-500";
+            } else if (index <= 3) {
+              type = "topic";
+              color = "bg-gradient-to-br from-blue-500 to-cyan-500";
+            } else if (index <= 6) {
+              type = "subtopic";
+              color = "bg-gradient-to-br from-emerald-500 to-teal-500";
+            } else {
+              type = "note";
+              color = "bg-gradient-to-br from-amber-400 to-orange-400";
+            }
 
-              return {
-                id: String(index),
-                type,
-                data: { label, color },
-                position: {
-                  x: index === 0 ? 400 : 200 + (index % 3) * 200,
-                  y: index === 0 ? 50 : Math.floor(index / 3) * 150 + 200,
-                },
-              };
-            },
-          );
+            return {
+              id: String(index),
+              type,
+              data: { label, color },
+              position: {
+                x: index === 0 ? 400 : 200 + (index % 3) * 200,
+                y: index === 0 ? 50 : Math.floor(index / 3) * 150 + 200,
+              },
+            };
+          });
 
-          const edges = (parsed.diagramEdges || []).map(
-            (edge: string, index: number) => {
-              const [source, target] = edge.split("-");
-              return { id: `e${index}`, source, target, animated: true };
-            },
-          );
+          const edges = diagramEdges.map((edge: string, index: number) => {
+            const [source, target] = edge.split("-");
+            return { id: `e${index}`, source, target, animated: true };
+          });
 
           diagramData = { nodes, edges };
         }
 
         return {
-          summary: parsed.summary || "",
-          cornellCues: parsed.cornellCues || [],
-          cornellNotes: parsed.cornellNotes || [],
-          actionItems: parsed.actionItems || [],
-          reviewQuestions: parsed.reviewQuestions || [],
+          summary: workingParsed.summary || "",
+          cornellCues: normalizedCues.slice(0, pairCount),
+          cornellNotes: normalizedNotes.slice(0, pairCount),
+          actionItems: normalizedActionItems,
+          reviewQuestions: normalizedReviewQuestions,
           diagramData,
         };
       }
