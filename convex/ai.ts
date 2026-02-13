@@ -42,6 +42,16 @@ type TranscriptChunkInput = {
   timestamp?: string;
 };
 
+type StructuredNotesDraft = {
+  summary?: string;
+  cornellCues?: unknown[];
+  cornellNotes?: unknown[];
+  actionItems?: unknown[];
+  reviewQuestions?: unknown[];
+  diagramNodes?: unknown[];
+  diagramEdges?: unknown[];
+};
+
 const normalizeTranscriptForPrompt = (rawTranscript: string): string => {
   const fallback = rawTranscript.trim();
   if (!fallback) return "";
@@ -64,6 +74,54 @@ const normalizeTranscriptForPrompt = (rawTranscript: string): string => {
     return lines.join("\n");
   } catch {
     return fallback;
+  }
+};
+
+/**
+ * Enrich a sparse or fragmented transcript by using AI to reconstruct
+ * a coherent, comprehensive narrative from the raw content.
+ * This dramatically improves downstream note generation quality.
+ */
+const enrichTranscript = async (
+  model: any,
+  normalizedTranscript: string,
+  title?: string,
+): Promise<string> => {
+  // Only enrich if the transcript is likely sparse/fragmented
+  const wordCount = normalizedTranscript.split(/\s+/).length;
+  // If the transcript is already substantial (>500 words), skip enrichment
+  if (wordCount > 500) return normalizedTranscript;
+
+  const enrichPrompt = `You are an expert lecture reconstruction assistant. The following transcript was captured from a live lecture recording using browser speech recognition, which often produces fragmented, incomplete sentences and misses context.
+
+Your job is to reconstruct this into a coherent, comprehensive lecture narrative. You must:
+1. Fix any fragmented or incomplete sentences into proper, full sentences
+2. Infer and fill in likely context that speech recognition may have missed (transitions, linking phrases, elaborations)
+3. Expand abbreviated or unclear references into full explanations
+4. Maintain ALL original facts, concepts, examples, and terminology — do NOT remove or alter any factual content
+5. Add logical connectors and transitions between ideas
+6. If technical terms are mentioned, ensure they are properly contextualized
+
+${title ? `Lecture Title/Topic: "${title}"` : ""}
+
+Original fragmented transcript:
+"""
+${normalizedTranscript}
+"""
+
+Return ONLY the reconstructed, enriched transcript as plain text. Do not add any headers, labels, or meta-commentary. The output should read like a well-captured lecture transcript that a student could study from directly.`;
+
+  try {
+    const result = await model.generateContent(enrichPrompt);
+    const enrichedText = result.response.text().trim();
+    // Only use enriched version if it's meaningfully longer
+    if (enrichedText.length > normalizedTranscript.length * 1.3) {
+      return enrichedText;
+    }
+    return normalizedTranscript;
+  } catch {
+    // On any error, fall back to the original transcript
+    return normalizedTranscript;
   }
 };
 
@@ -419,57 +477,73 @@ ${text}`;
         .map((s) => s.trim())
         .filter((s) => s.length > 0).length;
 
+    const wordCountFn = (text: string) =>
+      text.split(/\s+/).filter((w) => w.length > 0).length;
+
     const noteLacksDepth = (text: string) => {
       const lower = text.toLowerCase();
+      const words = wordCountFn(text);
+      const sentences = sentenceCount(text);
       const genericSignals = [
         "will be explored",
         "in future",
         "important concept",
         "key point",
         "topic is",
+        "it is important",
+        "this concept",
+        "students should",
+        "further study",
+        "as mentioned",
       ];
       const hasGenericSignal = genericSignals.some((sig) =>
         lower.includes(sig),
       );
       const hasConcreteSignal =
         /\d/.test(text) ||
-        /(for example|e\.g\.|such as|because|therefore|used to|works by|defined as|means)/i.test(
+        /(for example|e\.g\.|such as|because|therefore|used to|works by|defined as|means|specifically|in particular|according to|demonstrated by|calculated as|results in|consists of|involves)/i.test(
           text,
         );
-      return sentenceCount(text) < 3 || hasGenericSignal || !hasConcreteSignal;
+      // More aggressive quality check: require 3+ sentences, 40+ words, and concrete content
+      return (
+        sentences < 3 || words < 40 || hasGenericSignal || !hasConcreteSignal
+      );
     };
 
     const maybeRepairQuality = async (draft: unknown) => {
       const draftText = JSON.stringify(draft);
-      const repairPrompt = `You are improving generated Cornell lecture notes.
+      const repairPrompt = `You are a quality assurance specialist improving generated Cornell lecture notes. The current notes are too shallow and lack substantive content.
 
-Transcript:
+Original transcript:
 """
-${normalizedTranscript}
+${enrichedTranscript}
 """
 
-Current JSON:
+Current JSON (needs improvement):
 ${draftText}
 
-Rewrite ONLY the weak parts while preserving the original topic coverage and structure.
+Your task: Rewrite ALL cornell notes to be substantially more detailed and informative. Each note must be a thorough mini-essay on its topic.
 
 Return JSON with EXACT keys:
 {
-  "summary": "...",
-  "cornellCues": ["..."],
-  "cornellNotes": ["..."],
+  "summary": "5-8 sentence comprehensive summary",
+  "cornellCues": ["Specific term/concept 1", ...],
+  "cornellNotes": ["Detailed 5-8 sentence explanation 1", ...],
   "actionItems": ["..."],
   "reviewQuestions": ["..."],
   "diagramNodes": ["..."],
   "diagramEdges": ["..."]
 }
 
-Quality requirements:
-- 5-8 cue/note pairs
-- cornellNotes[i] must explain cornellCues[i]
-- Each cornell note must be 3-5 sentences
-- Each note must include at least one concrete example or specific detail from transcript
-- Avoid generic filler wording
+STRICT quality requirements:
+- 6-8 cue/note pairs
+- cornellNotes[i] must thoroughly explain cornellCues[i]
+- Each cornell note MUST be 5-8 sentences (80-120 words minimum)
+- Each note must follow: Definition → How it works → Specific example → Why it matters
+- Each note must include at least ONE concrete detail: a number, formula, name, or specific example
+- NEVER use generic filler phrases like "this is important", "key concept", "students should understand"
+- Every sentence must add NEW information — no repetition or padding
+- Use your expertise to add academic depth where the transcript was brief
 - Return ONLY valid JSON`;
 
       const repairedResult = await model.generateContent(repairPrompt);
@@ -481,14 +555,29 @@ Quality requirements:
       return tryParseJson(fixedRepairText);
     };
 
-    let prompt = `You are an expert academic note-taker with years of experience creating comprehensive study materials. Your goal is to transform this lecture transcript into detailed, exam-ready study notes.
+    // Enrich the transcript if it's sparse/fragmented (common with browser speech recognition)
+    const enrichedTranscript = await enrichTranscript(
+      model,
+      normalizedTranscript,
+      args.title,
+    );
+
+    let prompt = `You are a world-class academic note-taker and subject matter expert with deep knowledge across all university-level disciplines. You have years of experience transforming lecture recordings into comprehensive, exam-ready study materials that students rely on as their PRIMARY study resource.
+
+Your goal: Create notes so thorough and detailed that a student who MISSED the lecture could study ONLY from your notes and still perform excellently on an exam.
 
 Transcript:
 """
-${normalizedTranscript}
+${enrichedTranscript}
 """
 
-${args.title ? `Lecture Title: ${args.title}` : ""}`;
+${args.title ? `Lecture Title/Topic: "${args.title}"` : ""}
+
+CRITICAL CONTEXT: This transcript was captured via voice recording and may be fragmented or incomplete. You MUST use your subject matter expertise to:
+- Reconstruct incomplete explanations into full, coherent concepts
+- Add relevant academic context that a lecturer would have conveyed through slides, gestures, or board work
+- Infer and include the underlying theory, definitions, and frameworks being discussed
+- Provide the depth of explanation that a textbook would offer for each concept mentioned`;
 
     // Add style-specific instructions
     if (args.style === "outline") {
@@ -512,37 +601,45 @@ Return as HTML with proper <ul>, <ol>, and task list structure using data-type="
     } else {
       prompt += `\n\nGenerate a JSON response with this EXACT structure:
 {
-  "summary": "A comprehensive 4-6 sentence summary that: 1) States the main topic clearly, 2) Explains WHY this topic matters, 3) Lists the key themes covered, 4) Mentions any important conclusions or takeaways.",
-  "cornellCues": ["Concept/Term 1", "Concept/Term 2", "Concept/Term 3", "Concept/Term 4", "Concept/Term 5"],
+  "summary": "A comprehensive 5-8 sentence summary that: 1) Opens with a single clear sentence stating the EXACT main topic, 2) Explains WHY this topic matters in the broader field, 3) Lists ALL key themes and sub-topics covered, 4) Highlights the most important findings, theories, or methods discussed, 5) Concludes with key takeaways or implications.",
+  "cornellCues": ["Precise Concept/Term 1", "Precise Concept/Term 2", "Precise Concept/Term 3", "Precise Concept/Term 4", "Precise Concept/Term 5", "Precise Concept/Term 6", "Precise Concept/Term 7"],
   "cornellNotes": [
-    "Detailed explanation with definition, examples, and context. Include specific facts, figures, or formulas mentioned.",
-    "Thorough explanation covering what it is, how it works, and why it's important. Add any relationships to other concepts.",
-    "Complete explanation with real-world applications or examples from the lecture.",
-    "In-depth coverage including any exceptions, edge cases, or important nuances mentioned.",
-    "Comprehensive notes including comparisons, contrasts, or connections to prior knowledge."
+    "PARAGRAPH 1: Start with a precise one-sentence DEFINITION. Then explain the underlying mechanism or process in 2-3 sentences. Then provide a SPECIFIC example from the lecture with concrete details (numbers, names, formulas). Finally explain why this concept matters and how it connects to the broader topic. (Minimum 5 sentences, ~80-120 words)",
+    "PARAGRAPH 2: Same structure as above — definition, mechanism, specific example, significance. Each note MUST be a self-contained mini-essay on the concept. (Minimum 5 sentences, ~80-120 words)",
+    "PARAGRAPH 3: Continue the pattern. Remember: NO generic filler. Every sentence must add new information. (Minimum 5 sentences, ~80-120 words)",
+    "PARAGRAPH 4: Include any formulas, classifications, or frameworks discussed. Explain step-by-step processes if applicable. (Minimum 5 sentences, ~80-120 words)",
+    "PARAGRAPH 5: Cover real-world applications, historical context, or comparative analysis. Include specific examples. (Minimum 5 sentences, ~80-120 words)",
+    "PARAGRAPH 6: Address nuances, exceptions, common misconceptions, or edge cases. (Minimum 5 sentences, ~80-120 words)",
+    "PARAGRAPH 7: Explain relationships and connections between this concept and others in the lecture. (Minimum 5 sentences, ~80-120 words)"
   ],
   "actionItems": ["Specific task 1 with deadline if mentioned", "Task 2"],
   "reviewQuestions": [
-    "Conceptual question that tests understanding of the main idea?",
-    "Application question: How would you apply [concept] to [scenario]?",
-    "Comparison question: What is the difference between X and Y?",
-    "Analysis question that requires deeper thinking?",
-    "Synthesis question connecting multiple concepts?"
+    "Definition question: What is [concept] and what are its key characteristics?",
+    "Mechanism question: Explain the process/mechanism of [concept] step by step.",
+    "Application question: How would you apply [concept] to [specific real-world scenario]?",
+    "Comparison question: Compare and contrast [concept A] with [concept B]. What are the key differences?",
+    "Analysis question: Why does [phenomenon] occur? What factors contribute to it?",
+    "Synthesis question: How do [concept A] and [concept B] work together to produce [outcome]?",
+    "Evaluation question: What are the strengths and limitations of [theory/approach]?"
   ],
-  "diagramNodes": ["Central Topic", "Key Concept A", "Key Concept B", "Sub-concept A1", "Sub-concept B1", "Related Idea"],
-  "diagramEdges": ["0-1", "0-2", "1-3", "2-4", "0-5"]
+  "diagramNodes": ["Central Topic", "Key Concept A", "Key Concept B", "Key Concept C", "Sub-concept A1", "Sub-concept A2", "Sub-concept B1", "Sub-concept C1", "Related Framework"],
+  "diagramEdges": ["0-1", "0-2", "0-3", "1-4", "1-5", "2-6", "3-7", "0-8"]
 }
 
-IMPORTANT RULES:
-- cornellCues: Extract 5-8 key terms, concepts, or questions from the lecture
-- cornellNotes: Each note should be 3-5 sentences with SPECIFIC details, not generic descriptions
-- cornellNotes[i] MUST directly explain cornellCues[i] (same index mapping)
-- For each note, cover: what it is, how it works, why it matters, and one concrete example from the lecture
-- Include actual examples, numbers, dates, names, or formulas mentioned in the lecture
-- reviewQuestions: Create 5 varied questions (recall, application, analysis, synthesis, evaluation)
-- diagramNodes: Create 5-8 nodes showing the hierarchical relationship between concepts
-- diagramEdges: Connect nodes logically (format: "sourceIndex-targetIndex")
-- actionItems: Only include if explicitly mentioned (homework, readings, deadlines)
+MANDATORY QUALITY REQUIREMENTS:
+- cornellCues: Generate 6-8 cues. Each cue should be a specific academic term, concept name, or focused question — NOT vague phrases like "key concept" or "important idea"
+- cornellNotes: THIS IS THE MOST IMPORTANT PART. Each note MUST be:
+  * A SUBSTANTIAL paragraph of 5-8 sentences (80-120 words minimum per note)
+  * Structured as: Definition → Mechanism/Process → Specific Example → Significance
+  * Include at LEAST one concrete detail: a number, name, date, formula, or specific example
+  * Written as if explaining to a student who wasn't in the lecture
+  * Free of generic filler like "this is an important concept" or "students should understand"
+- cornellNotes[i] MUST directly and thoroughly explain cornellCues[i]
+- If the transcript mentions something briefly, EXPAND it using your subject matter knowledge to give the full academic explanation
+- reviewQuestions: Create 5-7 varied, thought-provoking questions spanning Bloom's taxonomy levels
+- diagramNodes: Create 7-10 nodes showing concept hierarchy and relationships
+- diagramEdges: Connect nodes to show logical relationships (format: "sourceIndex-targetIndex")
+- actionItems: Only include explicitly mentioned tasks (empty array if none)
 - Return ONLY valid JSON, no markdown code fences`;
     }
 
@@ -574,7 +671,8 @@ IMPORTANT RULES:
       }
 
       if (parsed) {
-        let workingParsed: any = parsed;
+        let workingParsed: StructuredNotesDraft =
+          parsed as StructuredNotesDraft;
 
         let normalizedCues = Array.isArray(workingParsed.cornellCues)
           ? workingParsed.cornellCues
@@ -588,8 +686,18 @@ IMPORTANT RULES:
           : [];
         let pairCount = Math.min(normalizedCues.length, normalizedNotes.length);
 
+        // More aggressive quality check: repair if fewer than 5 pairs,
+        // or if ANY note lacks depth, or if average note length is too short
+        const avgNoteWords =
+          normalizedNotes.length > 0
+            ? normalizedNotes.reduce(
+                (sum: number, note: string) => sum + wordCountFn(note),
+                0,
+              ) / normalizedNotes.length
+            : 0;
         const needsRepair =
-          pairCount < 3 ||
+          pairCount < 5 ||
+          avgNoteWords < 50 ||
           normalizedNotes.some((note: string) => noteLacksDepth(note));
 
         if (needsRepair) {
@@ -612,18 +720,26 @@ IMPORTANT RULES:
 
         const diagramNodes = Array.isArray(workingParsed.diagramNodes)
           ? workingParsed.diagramNodes
+              .map((label: unknown) => String(label || "").trim())
+              .filter((label: string) => label.length > 0)
           : [];
         const diagramEdges = Array.isArray(workingParsed.diagramEdges)
           ? workingParsed.diagramEdges
+              .map((edge: unknown) => String(edge || "").trim())
+              .filter((edge: string) => edge.length > 0)
           : [];
 
         const normalizedActionItems = Array.isArray(workingParsed.actionItems)
           ? workingParsed.actionItems
+              .map((item: unknown) => String(item || "").trim())
+              .filter((item: string) => item.length > 0)
           : [];
         const normalizedReviewQuestions = Array.isArray(
           workingParsed.reviewQuestions,
         )
           ? workingParsed.reviewQuestions
+              .map((question: unknown) => String(question || "").trim())
+              .filter((question: string) => question.length > 0)
           : [];
 
         // Convert simplified diagram format to ReactFlow format
@@ -1259,9 +1375,7 @@ Focus on accuracy above all else.`,
       let structureResult: LectureStructureResult = { segments: [] };
 
       try {
-        console.log(
-          "[transcribeAudio] Transcript obtained, now cleaning...",
-        );
+        console.log("[transcribeAudio] Transcript obtained, now cleaning...");
         const cleanupResult = await ctx.runAction(
           api.ai.cleanLectureTranscript,
           {
@@ -1292,7 +1406,10 @@ Focus on accuracy above all else.`,
           `[transcribeAudio] Detected ${structureResult.segments?.length || 0} lecture segments`,
         );
       } catch (cleanupError) {
-        console.error("[transcribeAudio] Cleanup pipeline error:", cleanupError);
+        console.error(
+          "[transcribeAudio] Cleanup pipeline error:",
+          cleanupError,
+        );
       }
 
       // Return the transcription directly as plain text
@@ -2001,7 +2118,8 @@ Return ONLY valid JSON, no markdown code fences or explanation.`,
       await ctx.runMutation(api.files.updateProcessingStatus, {
         fileId: args.fileId,
         status: "error",
-        errorMessage: error instanceof Error ? error.message : "Processing failed",
+        errorMessage:
+          error instanceof Error ? error.message : "Processing failed",
       });
 
       return {
@@ -3083,8 +3201,3 @@ Return ONLY valid JSON.`;
     }
   },
 });
-
-
-
-
-

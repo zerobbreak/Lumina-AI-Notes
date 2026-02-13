@@ -36,6 +36,56 @@ const normalizeTranscriptForPrompt = (rawTranscript: string): string => {
   }
 };
 
+/**
+ * Enrich a sparse or fragmented transcript by using AI to reconstruct
+ * a coherent, comprehensive narrative. Improves downstream note quality.
+ */
+const enrichTranscriptForPinned = async (
+  model: any,
+  normalizedTranscript: string,
+  contextText: string,
+): Promise<string> => {
+  const wordCount = normalizedTranscript.split(/\s+/).length;
+  if (wordCount > 500) return normalizedTranscript;
+
+  const enrichPrompt = `You are an expert lecture reconstruction assistant. The following transcript was captured from a live lecture recording using browser speech recognition, which often produces fragmented, incomplete sentences.
+
+Your job is to reconstruct this into a coherent, comprehensive lecture narrative. You must:
+1. Fix any fragmented or incomplete sentences into proper, full sentences
+2. Infer and fill in likely context that speech recognition may have missed
+3. Expand abbreviated or unclear references into full explanations
+4. Maintain ALL original facts, concepts, examples, and terminology
+5. Add logical connectors and transitions between ideas
+6. Use the provided reference document context to better understand the subject matter and add appropriate academic depth
+
+${
+  contextText
+    ? `Reference document context (use this to understand the subject area):
+"""
+${contextText.substring(0, 3000)}
+"""`
+    : ""
+}
+
+Original fragmented transcript:
+"""
+${normalizedTranscript}
+"""
+
+Return ONLY the reconstructed, enriched transcript as plain text. Do not add headers, labels, or meta-commentary.`;
+
+  try {
+    const result = await model.generateContent(enrichPrompt);
+    const enrichedText = result.response.text().trim();
+    if (enrichedText.length > normalizedTranscript.length * 1.3) {
+      return enrichedText;
+    }
+    return normalizedTranscript;
+  } catch {
+    return normalizedTranscript;
+  }
+};
+
 async function getNoteRole(
   ctx: any,
   noteId: any,
@@ -526,62 +576,80 @@ ${text}`;
         .map((s) => s.trim())
         .filter((s) => s.length > 0).length;
 
+    const wordCountFn = (text: string) =>
+      text.split(/\s+/).filter((w) => w.length > 0).length;
+
     const noteLacksDepth = (text: string) => {
       const lower = text.toLowerCase();
+      const words = wordCountFn(text);
+      const sentences = sentenceCount(text);
       const genericSignals = [
         "will be explored",
         "in future",
         "important concept",
         "key point",
         "topic is",
+        "it is important",
+        "this concept",
+        "students should",
+        "further study",
+        "as mentioned",
       ];
       const hasGenericSignal = genericSignals.some((sig) =>
         lower.includes(sig),
       );
       const hasConcreteSignal =
         /\d/.test(text) ||
-        /(for example|e\.g\.|such as|because|therefore|used to|works by|defined as|means)/i.test(
+        /(for example|e\.g\.|such as|because|therefore|used to|works by|defined as|means|specifically|in particular|according to|demonstrated by|calculated as|results in|consists of|involves)/i.test(
           text,
         );
-      return sentenceCount(text) < 3 || hasGenericSignal || !hasConcreteSignal;
+      return (
+        sentences < 3 || words < 40 || hasGenericSignal || !hasConcreteSignal
+      );
     };
 
-    const maybeRepairQuality = async (draft: unknown) => {
+    const maybeRepairQuality = async (
+      draft: unknown,
+      enrichedTranscript: string,
+    ) => {
       const draftText = JSON.stringify(draft);
-      const repairPrompt = `You are improving generated Cornell lecture notes.
+      const repairPrompt = `You are a quality assurance specialist improving generated Cornell lecture notes. The current notes are too shallow and lack substantive content.
 
-Transcript:
+Original transcript:
 """
-${normalizedTranscript}
+${enrichedTranscript}
 """
 
-Pinned document context (may be empty):
+Pinned document context (use for additional depth):
 """
 ${contextText}
 """
 
-Current JSON:
+Current JSON (needs improvement):
 ${draftText}
 
-Rewrite ONLY the weak parts while preserving topic coverage and structure.
+Your task: Rewrite ALL cornell notes to be substantially more detailed and informative.
 
 Return JSON with EXACT keys:
 {
-  "summary": "...",
-  "cornellCues": ["..."],
-  "cornellNotes": ["..."],
+  "summary": "5-8 sentence comprehensive summary",
+  "cornellCues": ["Specific term/concept 1", ...],
+  "cornellNotes": ["Detailed 5-8 sentence explanation 1", ...],
   "actionItems": ["..."],
   "reviewQuestions": ["..."],
   "diagramNodes": ["..."],
   "diagramEdges": ["..."]
 }
 
-Quality requirements:
-- 5-8 cue/note pairs
-- cornellNotes[i] must explain cornellCues[i]
-- Each cornell note must be 3-5 sentences
-- Each note must include at least one concrete example or specific detail from transcript/context
-- Avoid generic filler wording
+STRICT quality requirements:
+- 6-8 cue/note pairs
+- cornellNotes[i] must thoroughly explain cornellCues[i]
+- Each cornell note MUST be 5-8 sentences (80-120 words minimum)
+- Each note must follow: Definition → How it works → Specific example → Why it matters
+- Each note must include at least ONE concrete detail from transcript or pinned document
+- NEVER use generic filler phrases
+- Every sentence must add NEW information
+- Cross-reference pinned document content where relevant
 - Return ONLY valid JSON`;
 
       const repairedResult = await model.generateContent(repairPrompt);
@@ -623,43 +691,74 @@ Quality requirements:
       contextText = documents.map((doc: any) => doc.text).join("\n\n---\n\n");
     }
 
-    // 4. Generate structured notes with context
+    // 4. Enrich the transcript before note generation
+    const enrichedTranscript = await enrichTranscriptForPinned(
+      model,
+      normalizedTranscript,
+      contextText,
+    );
+
+    // 5. Generate structured notes with context
     const contextSection = contextText
-      ? `\n\nRelevant Context from Pinned Document:\n"""\n${contextText}\n"""\n\nUse this context to enhance your notes. Reference specific information from the document when relevant.`
+      ? `\n\nRelevant Context from Pinned Document:\n"""\n${contextText}\n"""\n\nIMPORTANT: Cross-reference the transcript with this pinned document. Use specific information, definitions, formulas, and examples from the document to enrich your notes. Cite document content when it adds depth to concepts mentioned in the lecture.`
       : "";
 
-    const prompt = `You are an expert academic note-taker. Your goal is to convert the following lecture transcript into clear, structured, and visually distinct study notes.${contextSection}
+    const prompt = `You are a world-class academic note-taker and subject matter expert. You create comprehensive, exam-ready study materials that students rely on as their PRIMARY study resource.
+
+Your goal: Create notes so thorough and detailed that a student who MISSED the lecture could study ONLY from your notes and still perform excellently on an exam.${contextSection}
 
 Transcript:
 """
-${normalizedTranscript}
+${enrichedTranscript}
 """
 
-Instructions:
-1. **Analyze the Core Topic**: Identify the main subject of the lecture immediately.
-2. **Structure**: Organize the output into the EXACT JSON format below.
-3. **Clarity**: Ensure cues are distinct keywords/questions, and notes are detailed explanations.
-4. **Depth**: For each concept include definition, mechanism/process, significance, and one concrete example.
+CRITICAL CONTEXT: This transcript was captured via voice recording and may be fragmented or incomplete. You MUST:
+- Reconstruct incomplete explanations into full, coherent concepts
+- Add relevant academic context from the pinned document
+- Infer and include underlying theory, definitions, and frameworks
+- Provide textbook-level depth for each concept mentioned
 
 Generate a JSON response with this EXACT structure:
 {
-  "summary": "Start with the MAIN TOPIC. Then provide a 3-5 sentence overview.",
-  "cornellCues": ["Concept 1", "Concept 2", "Concept 3", "Concept 4", "Concept 5"],
-  "cornellNotes": ["Explanation 1", "Explanation 2", "Explanation 3", "Explanation 4", "Explanation 5"],
+  "summary": "A comprehensive 5-8 sentence summary that: 1) Opens with the EXACT main topic, 2) Explains WHY this topic matters, 3) Lists ALL key themes covered, 4) Highlights the most important findings/theories, 5) Concludes with key takeaways.",
+  "cornellCues": ["Precise Concept 1", "Precise Concept 2", "Precise Concept 3", "Precise Concept 4", "Precise Concept 5", "Precise Concept 6", "Precise Concept 7"],
+  "cornellNotes": [
+    "PARAGRAPH: Start with a precise DEFINITION. Explain the mechanism/process in 2-3 sentences. Provide a SPECIFIC example with concrete details (numbers, names, formulas). Explain significance and connections. (Minimum 5 sentences, ~80-120 words)",
+    "Each note follows the same structure: Definition → Mechanism → Specific Example → Significance. (Minimum 5 sentences, ~80-120 words)",
+    "Continue pattern. NO generic filler. Every sentence adds new information. (Minimum 5 sentences, ~80-120 words)",
+    "Include formulas, classifications, or frameworks from transcript/document. (Minimum 5 sentences, ~80-120 words)",
+    "Cover real-world applications, historical context, or comparisons. (Minimum 5 sentences, ~80-120 words)",
+    "Address nuances, exceptions, or common misconceptions. (Minimum 5 sentences, ~80-120 words)",
+    "Explain relationships between concepts and connections to broader field. (Minimum 5 sentences, ~80-120 words)"
+  ],
   "actionItems": ["Task 1", "Task 2"],
-  "reviewQuestions": ["Question 1?", "Question 2?", "Question 3?", "Question 4?", "Question 5?"],
-  "diagramNodes": ["Main Topic", "Subtopic A", "Subtopic B", "Subtopic C", "Subtopic D"],
-  "diagramEdges": ["0-1", "0-2", "1-3", "2-4"]
+  "reviewQuestions": [
+    "Definition question about a key concept?",
+    "Mechanism question: Explain the process of X step by step.",
+    "Application question: How would you apply X to Y?",
+    "Comparison question: Compare X and Y.",
+    "Analysis question requiring deeper thinking?",
+    "Synthesis question connecting multiple concepts?",
+    "Evaluation question about strengths/limitations?"
+  ],
+  "diagramNodes": ["Central Topic", "Key Concept A", "Key Concept B", "Key Concept C", "Sub-concept A1", "Sub-concept A2", "Sub-concept B1", "Sub-concept C1", "Related Framework"],
+  "diagramEdges": ["0-1", "0-2", "0-3", "1-4", "1-5", "2-6", "3-7", "0-8"]
 }
 
-Rules:
-- Return 5-8 cue/note pairs
-- cornellCues and cornellNotes arrays must have the same length
-- cornellNotes[i] MUST explain cornellCues[i] (same index mapping)
-- Each cornell note must be 3-5 sentences and include at least one concrete example from transcript/context
-- diagramNodes is an array of node labels (strings). First item is the central topic.
-- diagramEdges is an array of connections in format "sourceIndex-targetIndex" (e.g., "0-1" means node 0 connects to node 1)
-- actionItems should only include explicitly mentioned tasks (empty array if none)
+MANDATORY QUALITY REQUIREMENTS:
+- cornellCues: Generate 6-8 specific academic terms or focused questions
+- cornellNotes: THIS IS THE MOST IMPORTANT PART. Each note MUST be:
+  * A SUBSTANTIAL paragraph of 5-8 sentences (80-120 words minimum)
+  * Structured as: Definition → Mechanism/Process → Specific Example → Significance
+  * Include at LEAST one concrete detail from the transcript or pinned document
+  * Written as if explaining to a student who wasn't in the lecture
+  * Free of generic filler phrases
+- cornellNotes[i] MUST directly explain cornellCues[i]
+- If pinned document provides additional depth, INCORPORATE it into relevant notes
+- reviewQuestions: Create 5-7 varied questions spanning Bloom's taxonomy
+- diagramNodes: Create 7-10 nodes showing concept hierarchy
+- diagramEdges: Connect nodes logically (format: "sourceIndex-targetIndex")
+- actionItems: Only include explicitly mentioned tasks (empty array if none)
 - Return ONLY valid JSON, no markdown code fences`;
 
     try {
@@ -703,11 +802,23 @@ Rules:
           : [];
         let pairCount = Math.min(normalizedCues.length, normalizedNotes.length);
 
+        // More aggressive quality check
+        const avgNoteWords =
+          normalizedNotes.length > 0
+            ? normalizedNotes.reduce(
+                (sum: number, note: string) => sum + wordCountFn(note),
+                0,
+              ) / normalizedNotes.length
+            : 0;
         const needsRepair =
-          pairCount < 3 ||
+          pairCount < 5 ||
+          avgNoteWords < 50 ||
           normalizedNotes.some((note: string) => noteLacksDepth(note));
         if (needsRepair) {
-          const repaired = await maybeRepairQuality(workingParsed);
+          const repaired = await maybeRepairQuality(
+            workingParsed,
+            enrichedTranscript,
+          );
           if (repaired) {
             workingParsed = repaired;
             normalizedCues = Array.isArray(workingParsed.cornellCues)
@@ -726,17 +837,25 @@ Rules:
 
         const diagramNodes = Array.isArray(workingParsed.diagramNodes)
           ? workingParsed.diagramNodes
+              .map((label: unknown) => String(label || "").trim())
+              .filter((label: string) => label.length > 0)
           : [];
         const diagramEdges = Array.isArray(workingParsed.diagramEdges)
           ? workingParsed.diagramEdges
+              .map((edge: unknown) => String(edge || "").trim())
+              .filter((edge: string) => edge.length > 0)
           : [];
         const normalizedActionItems = Array.isArray(workingParsed.actionItems)
           ? workingParsed.actionItems
+              .map((item: unknown) => String(item || "").trim())
+              .filter((item: string) => item.length > 0)
           : [];
         const normalizedReviewQuestions = Array.isArray(
           workingParsed.reviewQuestions,
         )
           ? workingParsed.reviewQuestions
+              .map((question: unknown) => String(question || "").trim())
+              .filter((question: string) => question.length > 0)
           : [];
 
         // Convert simplified diagram format to ReactFlow format
