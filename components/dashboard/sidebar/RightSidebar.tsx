@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import SpeechRecognition, {
   useSpeechRecognition,
@@ -31,6 +31,8 @@ import {
   BookOpen,
   RefreshCw,
   History,
+  Code2,
+  Zap,
 } from "lucide-react";
 import {
   Dialog,
@@ -49,6 +51,11 @@ import { StructuredNotes } from "@/components/dashboard/DashboardContext";
 import { ContextDeck } from "@/components/dashboard/ContextDeck";
 import { useDropzone } from "react-dropzone";
 import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
+import { useNotesStream } from "@/hooks/useNotesStream";
+import { StreamingNotesDisplay } from "@/components/dashboard/streaming/StreamingNotesDisplay";
+import { CodeBlockPanel } from "@/components/dashboard/streaming/CodeBlockPanel";
+import { CodeExtractorDialog } from "@/components/dashboard/dialogs/CodeExtractorDialog";
+import type { CodeBlock, CodeLanguage } from "@/types/streaming";
 
 // Enhanced transcript chunk with AI analysis
 interface EnhancedChunk {
@@ -114,6 +121,15 @@ export function RightSidebar() {
   const [generatedNotes, setGeneratedNotes] = useState<StructuredNotes | null>(
     null,
   );
+
+  // Streaming Notes State
+  const [useStreamingMode, setUseStreamingMode] = useState(true);
+  const streamingNotes = useNotesStream();
+
+  // Code Block Extraction State
+  const [codeBlocks, setCodeBlocks] = useState<CodeBlock[]>([]);
+  const [selectedText, setSelectedText] = useState("");
+  const [isCodeExtractorOpen, setIsCodeExtractorOpen] = useState(false);
 
   // Upload State
   const [isUploading, setIsUploading] = useState(false);
@@ -542,6 +558,82 @@ export function RightSidebar() {
     }
   };
 
+  // Streaming notes: generate with animated typing effect
+  const handleGenerateStreamingNotes = async () => {
+    if (isRecording) {
+      SpeechRecognition.stopListening();
+      setIsRecording(false);
+    }
+
+    if (buildFinalChunks.length === 0) {
+      toast.warning("No transcript available", {
+        description: "Please record something first to generate notes.",
+      });
+      return;
+    }
+
+    // Auto-save session first (same as structured)
+    if (!selectedSession) {
+      try {
+        const autoTitle =
+          recordingTitle ||
+          `Session ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+        const savedId = await upsertRecordingDraft({
+          sessionId: liveSessionIdRef.current,
+          title: autoTitle,
+          transcript: JSON.stringify(buildFinalChunks),
+        });
+        setSelectedSession(savedId);
+        setRecordingTitle(autoTitle);
+      } catch {
+        toast.warning("Could not auto-save session");
+      }
+    }
+
+    streamingNotes.startGeneration({
+      transcript: JSON.stringify(buildFinalChunks),
+      title: recordingTitle || undefined,
+      codeBlocks: codeBlocks.length > 0 ? codeBlocks : undefined,
+    });
+  };
+
+  // Handle streaming notes insertion into the editor
+  const handleInsertStreamingNotes = async (markdownContent: string) => {
+    const currentNoteId = searchParams.get("noteId");
+    // Wrap markdown in a StructuredNotes shape for compatibility
+    const wrappedNotes: StructuredNotes = {
+      summary: markdownContent,
+      cornellCues: [],
+      cornellNotes: [],
+      actionItems: [],
+      reviewQuestions: [],
+    };
+
+    if (!currentNoteId) {
+      try {
+        const title = recordingTitle
+          ? `Notes from ${recordingTitle}`
+          : "Generated Notes";
+        const result = await createNoteFlow({
+          title,
+          major: userData?.major || "general",
+        });
+        if (!result?.noteId) return;
+        setPendingNotes(wrappedNotes);
+        streamingNotes.reset();
+        router.push(`/dashboard?noteId=${result.noteId}`);
+        toast.success("Created new note with generated content");
+      } catch (error) {
+        console.error("Failed to create note:", error);
+        toast.error("Failed to create note. Please try again.");
+      }
+    } else {
+      setPendingNotes(wrappedNotes);
+      streamingNotes.reset();
+      toast.success("Content ready to insert");
+    }
+  };
+
   const handleInsertNotes = async () => {
     const currentNoteId = searchParams.get("noteId");
 
@@ -575,6 +667,40 @@ export function RightSidebar() {
       toast.success("Content ready to insert");
     }
   };
+
+  // Code block extraction handlers
+  const handleTextSelection = useCallback(() => {
+    const selection = window.getSelection();
+    const text = selection?.toString()?.trim();
+    if (text && text.length > 5) {
+      setSelectedText(text);
+    }
+  }, []);
+
+  const handleExtractCode = useCallback(
+    (language: CodeLanguage, label?: string) => {
+      const newBlock: CodeBlock = {
+        id: crypto.randomUUID(),
+        language,
+        content: selectedText,
+        startIndex: 0,
+        endIndex: selectedText.length,
+        label,
+      };
+      setCodeBlocks((prev) => [...prev, newBlock]);
+      setSelectedText("");
+      toast.success(`Code block extracted (${language})`);
+    },
+    [selectedText],
+  );
+
+  const handleRemoveCodeBlock = useCallback((id: string) => {
+    setCodeBlocks((prev) => prev.filter((b) => b.id !== id));
+  }, []);
+
+  const handleClearCodeBlocks = useCallback(() => {
+    setCodeBlocks([]);
+  }, []);
 
   // Timer Ref
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -1029,6 +1155,7 @@ export function RightSidebar() {
       className="w-[320px] h-screen bg-sidebar backdrop-blur-xl border-l border-sidebar-border flex flex-col shrink-0 z-50 transition-all duration-300 overflow-hidden"
       onDrop={handleNativeDrop}
       onDragOver={handleNativeDragOver}
+      onMouseUp={handleTextSelection}
       style={{
         boxShadow: activeContext
           ? "inset 0 0 40px rgba(59, 130, 246, 0.1)"
@@ -1217,8 +1344,41 @@ export function RightSidebar() {
                   exit={{ opacity: 0, y: -20 }}
                   className="w-full flex flex-col gap-4 relative z-10"
                 >
-                  {/* Show Generated Notes Preview if notes are ready */}
-                  {generatedNotes ? (
+                  {/* Code Block Panel */}
+                  {codeBlocks.length > 0 && (
+                    <CodeBlockPanel
+                      codeBlocks={codeBlocks}
+                      onRemove={handleRemoveCodeBlock}
+                      onClear={handleClearCodeBlocks}
+                    />
+                  )}
+
+                  {/* Extract Code Button — shown when text is selected */}
+                  {selectedText && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setIsCodeExtractorOpen(true)}
+                      className="w-full h-8 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs border border-emerald-500/20"
+                    >
+                      <Code2 className="w-3.5 h-3.5 mr-1.5" />
+                      Extract Selection as Code Block
+                    </Button>
+                  )}
+
+                  {/* Streaming Notes Display */}
+                  {streamingNotes.state.phase !== "idle" &&
+                    useStreamingMode && (
+                      <StreamingNotesDisplay
+                        state={streamingNotes.state}
+                        onInsert={handleInsertStreamingNotes}
+                        onCancel={() => streamingNotes.cancel()}
+                        onSkip={() => streamingNotes.skipAnimation()}
+                      />
+                    )}
+
+                  {/* Show Generated Notes Preview if notes are ready (structured mode) */}
+                  {generatedNotes && streamingNotes.state.phase === "idle" ? (
                     <div className="bg-green-500/10 rounded-xl p-3 border border-green-500/20">
                       <div className="flex items-center gap-2 mb-2">
                         <Sparkles className="w-3.5 h-3.5 text-green-400" />
@@ -1234,7 +1394,9 @@ export function RightSidebar() {
                         extracted
                       </p>
                     </div>
-                  ) : showTranscriptPreview && sessionTranscript.length > 0 ? (
+                  ) : showTranscriptPreview &&
+                    sessionTranscript.length > 0 &&
+                    streamingNotes.state.phase === "idle" ? (
                     /* Transcript Preview */
                     <div className="bg-black/30 rounded-xl p-3 border border-white/5">
                       <div className="flex items-center justify-between mb-2">
@@ -1261,6 +1423,27 @@ export function RightSidebar() {
                     </div>
                   ) : null}
 
+                  {/* Mode toggle: Streaming vs Structured */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setUseStreamingMode(!useStreamingMode)}
+                      className={cn(
+                        "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium border transition-all",
+                        useStreamingMode
+                          ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
+                          : "bg-white/5 text-gray-500 border-white/10",
+                      )}
+                    >
+                      <Zap className="w-3 h-3" />
+                      {useStreamingMode ? "Streaming" : "Structured"}
+                    </button>
+                    <span className="text-[9px] text-gray-600">
+                      {useStreamingMode
+                        ? "Animated markdown output"
+                        : "Cornell-style JSON output"}
+                    </span>
+                  </div>
+
                   {/* Generate Notes Button - Prominent */}
                   <Button
                     className={cn(
@@ -1270,11 +1453,17 @@ export function RightSidebar() {
                         : "bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 shadow-green-500/20",
                     )}
                     onClick={
-                      generatedNotes ? handleInsertNotes : handleGenerateNotes
+                      generatedNotes
+                        ? handleInsertNotes
+                        : useStreamingMode
+                          ? handleGenerateStreamingNotes
+                          : handleGenerateNotes
                     }
-                    disabled={isGeneratingNotes}
+                    disabled={
+                      isGeneratingNotes || streamingNotes.state.isStreaming
+                    }
                   >
-                    {isGeneratingNotes ? (
+                    {isGeneratingNotes || streamingNotes.state.isStreaming ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         Generating Notes...
@@ -1738,8 +1927,13 @@ export function RightSidebar() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <CodeExtractorDialog
+        isOpen={isCodeExtractorOpen}
+        onClose={() => setIsCodeExtractorOpen(false)}
+        selectedText={selectedText}
+        onExtract={handleExtractCode}
+      />
       <TemplateSelector />
     </motion.div>
   );
 }
-

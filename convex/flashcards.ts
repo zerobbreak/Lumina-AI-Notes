@@ -94,7 +94,7 @@ export const createDeckWithCards = mutation({
       v.object({
         front: v.string(),
         back: v.string(),
-      })
+      }),
     ),
   },
   handler: async (ctx, args) => {
@@ -258,7 +258,7 @@ export const batchUpdateCardReviews = mutation({
         interval: v.number(),
         repetitions: v.number(),
         nextReviewAt: v.number(),
-      })
+      }),
     ),
   },
   handler: async (ctx, args) => {
@@ -420,9 +420,8 @@ export const getDeckStats = query({
       dueNow,
       dueToday,
       masteredCards,
-      averageEaseFactor: cardsWithEaseFactor > 0 
-        ? totalEaseFactor / cardsWithEaseFactor 
-        : 2.5,
+      averageEaseFactor:
+        cardsWithEaseFactor > 0 ? totalEaseFactor / cardsWithEaseFactor : 2.5,
       lastStudiedAt: deck.lastStudiedAt,
     };
   },
@@ -430,6 +429,7 @@ export const getDeckStats = query({
 
 /**
  * Get study summary across all decks for a user
+ * Optimized: uses compound index instead of N+1 per-deck card queries
  */
 export const getStudySummary = query({
   args: {},
@@ -437,39 +437,36 @@ export const getStudySummary = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
 
+    const now = Date.now();
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const startOfDayTimestamp = startOfDay.getTime();
+
+    // Fetch decks (lightweight, just metadata)
     const decks = await ctx.db
       .query("flashcardDecks")
       .withIndex("by_userId", (q) => q.eq("userId", identity.tokenIdentifier))
       .collect();
 
-    const now = Date.now();
-    let totalDue = 0;
-    let totalCards = 0;
-    let studiedToday = 0;
+    // Use the cardCount field on decks instead of fetching all cards
+    const totalCards = decks.reduce(
+      (sum, deck) => sum + (deck.cardCount || 0),
+      0,
+    );
 
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-    const startOfDayTimestamp = startOfDay.getTime();
+    // Count due cards in a single query using the compound index
+    const dueCards = await ctx.db
+      .query("flashcards")
+      .withIndex("by_userId_nextReviewAt", (q) =>
+        q.eq("userId", identity.tokenIdentifier).lte("nextReviewAt", now),
+      )
+      .collect();
+    const totalDue = dueCards.length;
 
-    for (const deck of decks) {
-      const cards = await ctx.db
-        .query("flashcards")
-        .withIndex("by_deckId", (q) => q.eq("deckId", deck._id))
-        .collect();
-
-      totalCards += cards.length;
-
-      for (const card of cards) {
-        if (!card.nextReviewAt || card.nextReviewAt <= now) {
-          totalDue++;
-        }
-      }
-
-      // Check if studied today
-      if (deck.lastStudiedAt && deck.lastStudiedAt >= startOfDayTimestamp) {
-        studiedToday++;
-      }
-    }
+    // Count decks studied today from deck metadata (no extra card reads)
+    const studiedToday = decks.filter(
+      (deck) => deck.lastStudiedAt && deck.lastStudiedAt >= startOfDayTimestamp,
+    ).length;
 
     return {
       totalDecks: decks.length,
@@ -511,7 +508,7 @@ export const deleteMultipleDecks = mutation({
     if (!identity) throw new Error("Not authenticated");
 
     let deletedCount = 0;
-    
+
     for (const deckId of args.deckIds) {
       // Verify ownership
       const deck = await ctx.db.get(deckId);
@@ -533,7 +530,7 @@ export const deleteMultipleDecks = mutation({
       await ctx.db.delete(deckId);
       deletedCount++;
     }
-    
+
     return { deletedCount };
   },
 });
@@ -552,7 +549,7 @@ export const createDeckWithCardsImmediate = mutation({
       v.object({
         front: v.string(),
         back: v.string(),
-      })
+      }),
     ),
   },
   handler: async (ctx, args) => {
@@ -763,10 +760,10 @@ export const initializeSrsFieldsInternal = internalMutation({
 
       const nextReviewAt = card.nextReviewAt ?? Date.now();
       const repetitions = card.repetitions ?? card.reviewCount ?? 0;
-      const easeFactor = card.easeFactor ?? card.difficulty ?? DEFAULT_EASE_FACTOR;
+      const easeFactor =
+        card.easeFactor ?? card.difficulty ?? DEFAULT_EASE_FACTOR;
       const interval =
-        card.interval ??
-        (repetitions > 0 && card.nextReviewAt ? 1 : 0);
+        card.interval ?? (repetitions > 0 && card.nextReviewAt ? 1 : 0);
 
       await ctx.db.patch(card._id, {
         userId: deck.userId,

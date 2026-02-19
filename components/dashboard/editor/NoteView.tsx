@@ -66,8 +66,8 @@ import type { NoteContentSnapshot } from "@/lib/templates/conversion";
 import { toast } from "sonner";
 import "./editor.css";
 
-// Heartbeat interval for presence tracking (30 seconds)
-const PRESENCE_HEARTBEAT_INTERVAL = 30 * 1000;
+// Heartbeat interval for presence tracking (120 seconds - reduced for DB usage)
+const PRESENCE_HEARTBEAT_INTERVAL = 120 * 1000;
 
 // Props for the NoteView
 interface NoteViewProps {
@@ -104,7 +104,11 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   // Editor State
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [debouncedContent, setDebouncedContent] = useState<string | { cornellCues: string; cornellNotes: string; cornellSummary: string } | null>(null);
+  const [debouncedContent, setDebouncedContent] = useState<
+    | string
+    | { cornellCues: string; cornellNotes: string; cornellSummary: string }
+    | null
+  >(null);
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [isFlashcardsOpen, setIsFlashcardsOpen] = useState(false);
   const [isQuizOpen, setIsQuizOpen] = useState(false);
@@ -409,7 +413,13 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingNotes, editor, clearPendingNotes, loadedNoteId, scheduleEditorUpdate]);
+  }, [
+    pendingNotes,
+    editor,
+    clearPendingNotes,
+    loadedNoteId,
+    scheduleEditorUpdate,
+  ]);
 
   // --- Handlers ---
   const handleDelete = async () => {

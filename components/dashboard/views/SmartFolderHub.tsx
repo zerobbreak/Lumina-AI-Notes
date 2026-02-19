@@ -92,15 +92,15 @@ export default function SmartFolderHub() {
   const deleteCourse = useMutation(api.users.deleteCourse);
   const renameCourse = useMutation(api.users.renameCourse);
   const recentNotes = useQuery(api.notes.getRecentNotes);
-  const files = useQuery(api.files.getFiles);
   const todayQueue = useQuery(api.flashcards.getTodayQueue);
-  const flashcardDecks = useQuery(api.flashcards.getDecks);
-  const quizDecks = useQuery(api.quizzes.getDecks);
   const gamification = useQuery(api.users.getUserGamificationStats);
   const router = useRouter();
   const searchParams = useSearchParams();
   const updateTourProgress = useMutation(api.users.updateTourProgress);
   const [showTour, setShowTour] = useState(false);
+
+  // Analytics lazy-loading — only subscribe when user expands the section
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   // Rename State
   const [renameTarget, setRenameTarget] = useState<{
@@ -129,45 +129,51 @@ export default function SmartFolderHub() {
 
   // Calculate statistics
   const totalNotes = recentNotes?.length || 0;
-  const totalFiles = files?.length || 0;
   const dueTodayCount = todayQueue?.cardIds?.length ?? 0;
 
   const tzOffsetMinutes = useMemo(() => new Date().getTimezoneOffset(), []);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
+    // Only tick when analytics are visible
+    if (!showAnalytics) return;
     const id = setInterval(() => setNow(Date.now()), 60 * 1000);
     return () => clearInterval(id);
-  }, []);
-  const heatmapStart = useMemo(
-    () => now - 84 * 24 * 60 * 60 * 1000,
-    [now],
+  }, [showAnalytics]);
+  const heatmapStart = useMemo(() => now - 84 * 24 * 60 * 60 * 1000, [now]);
+
+  // --- Analytics queries: only subscribe when expanded ---
+  const dailyActivity = useQuery(
+    api.analytics.getDailyStudyActivity,
+    showAnalytics ? { start: heatmapStart, end: now, tzOffsetMinutes } : "skip",
   );
 
-  const dailyActivity = useQuery(api.analytics.getDailyStudyActivity, {
-    start: heatmapStart,
-    end: now,
-    tzOffsetMinutes,
-  });
+  const burnoutStats = useQuery(
+    api.analytics.getBurnoutStats,
+    showAnalytics ? { tzOffsetMinutes } : "skip",
+  );
 
-  const burnoutStats = useQuery(api.analytics.getBurnoutStats, {
-    tzOffsetMinutes,
-  });
+  // Only fetch deck lists when analytics are open (needed for performance/readiness)
+  const flashcardDecks = useQuery(
+    api.flashcards.getDecks,
+    showAnalytics ? {} : "skip",
+  );
+  const quizDecks = useQuery(api.quizzes.getDecks, showAnalytics ? {} : "skip");
 
   const primaryDeckId = flashcardDecks?.[0]?._id;
   const primaryQuizDeckId = quizDecks?.[0]?._id;
   const deckPerformance = useQuery(
     api.analytics.getDeckPerformance,
-    primaryQuizDeckId ? { deckId: primaryQuizDeckId } : "skip",
+    showAnalytics && primaryQuizDeckId ? { deckId: primaryQuizDeckId } : "skip",
   );
 
   const readinessForecast = useQuery(
     api.analytics.getReadinessForecast,
-    primaryDeckId ? { deckId: primaryDeckId } : "skip",
+    showAnalytics && primaryDeckId ? { deckId: primaryDeckId } : "skip",
   );
 
   const weakTopics = useQuery(
     api.analytics.getWeakTopics,
-    primaryDeckId ? { deckId: primaryDeckId } : "skip",
+    showAnalytics && primaryDeckId ? { deckId: primaryDeckId } : "skip",
   );
 
   const heatmapDays = useMemo(() => {
@@ -209,7 +215,8 @@ export default function SmartFolderHub() {
       {
         id: "upload",
         title: "Upload a Resource",
-        description: "Drop a PDF or file to extract notes and generate study tools.",
+        description:
+          "Drop a PDF or file to extract notes and generate study tools.",
         selector: '[data-tour="upload-file"]',
       },
       {
@@ -299,190 +306,218 @@ export default function SmartFolderHub() {
           </div>
         </motion.div>
 
-        {/* Analytics Section */}
+        {/* Analytics Section — lazy-loaded to save DB reads */}
         <div className="space-y-6">
           <div className="flex items-center justify-between mb-2 px-1">
             <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-emerald-500" />
               Study Analytics
             </h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAnalytics((prev) => !prev)}
+              className="text-xs text-gray-400 hover:text-white hover:bg-white/5"
+            >
+              {showAnalytics ? "Hide" : "Show"}
+              <ArrowRight
+                className={`w-3 h-3 ml-1 transition-transform ${showAnalytics ? "rotate-90" : ""}`}
+              />
+            </Button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Heatmap */}
-            <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-black/40 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  Study Heatmap
-                </p>
-                <span className="text-[10px] text-gray-500">
-                  Last 12 weeks
-                </span>
-              </div>
-              <div className="grid grid-cols-14 gap-1">
-                {heatmapDays.map((day) => {
-                  const count = day.count;
-                  const intensity =
-                    count === 0
-                      ? "bg-white/5"
-                      : count < 3
-                        ? "bg-emerald-500/20"
-                        : count < 6
-                          ? "bg-emerald-500/40"
-                          : "bg-emerald-500/70";
-                  return (
-                    <div
-                      key={day.date}
-                      title={`${new Date(day.date).toLocaleDateString()} · ${count} activities`}
-                      className={`h-3 w-3 rounded-sm ${intensity}`}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Burnout Indicator */}
-            <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                Burnout Risk
+          {!showAnalytics && (
+            <div className="rounded-2xl border border-white/10 bg-black/40 p-6 text-center">
+              <p className="text-sm text-gray-400">
+                Click &quot;Show&quot; to load your study analytics.
               </p>
-              <div className="mt-3 text-3xl font-bold text-white">
-                {burnoutStats?.streakDays ?? 0} days
-              </div>
-              <div className="mt-2 text-xs">
-                {burnoutStats?.level === "high" ? (
-                  <span className="px-2 py-1 rounded bg-red-500/20 text-red-400">
-                    High risk — consider a rest day
-                  </span>
-                ) : burnoutStats?.level === "medium" ? (
-                  <span className="px-2 py-1 rounded bg-amber-500/20 text-amber-400">
-                    Moderate — balance your workload
-                  </span>
-                ) : (
-                  <span className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-400">
-                    Healthy pace
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Performance + Readiness */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-black/40 p-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                Deck Performance
+              <p className="text-xs text-gray-600 mt-1">
+                Analytics are loaded on-demand to optimize performance.
               </p>
-              {deckPerformance && deckPerformance.length > 0 ? (
-                <div className="h-48">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={deckPerformance}>
-                      <XAxis
-                        dataKey="date"
-                        tickFormatter={(v) =>
-                          new Date(v).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                          })
-                        }
-                        stroke="#64748b"
-                        fontSize={10}
-                      />
-                      <YAxis
-                        domain={[0, 100]}
-                        stroke="#64748b"
-                        fontSize={10}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          background: "#0b0b12",
-                          border: "1px solid rgba(255,255,255,0.1)",
-                          fontSize: "12px",
-                        }}
-                        labelFormatter={(v) =>
-                          new Date(v).toLocaleDateString()
-                        }
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="scorePercent"
-                        stroke="#6366f1"
-                        strokeWidth={2}
-                        dot={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <p className="text-xs text-gray-500">
-                  No quiz results yet for performance tracking.
-                </p>
-              )}
             </div>
+          )}
 
-            <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                Readiness Forecast
-              </p>
-              <div className="mt-3 text-sm text-gray-300">
-                {readinessForecast?.predictedReadyDate ? (
-                  <>
-                    At your current pace, you&apos;ll be ready by{" "}
-                    <span className="text-emerald-400 font-semibold">
-                      {new Date(
-                        readinessForecast.predictedReadyDate,
-                      ).toLocaleDateString()}
-                    </span>
-                  </>
-                ) : (
-                  "Not enough study data to forecast readiness."
-                )}
-              </div>
-              <div className="mt-3 text-xs text-gray-500">
-                Cards remaining: {readinessForecast?.cardsRemaining ?? 0}
-              </div>
-            </div>
-          </div>
-
-          {/* Weak Topics */}
-          <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                Weak Topics
-              </p>
-              {primaryDeckId && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    router.push(`/dashboard?view=flashcards&deckId=${primaryDeckId}`)
-                  }
-                  className="text-xs text-gray-400 hover:text-white hover:bg-white/5"
-                >
-                  Review weak cards
-                </Button>
-              )}
-            </div>
-            <div className="mt-3 space-y-2">
-              {weakTopics && weakTopics.length > 0 ? (
-                weakTopics.map((t) => (
-                  <div
-                    key={t.cardId}
-                    className="flex items-center justify-between text-xs text-gray-300"
-                  >
-                    <span className="truncate max-w-[70%]">{t.topic}</span>
-                    <span className="text-amber-400">
-                      EF {t.easeFactor.toFixed(2)}
+          {showAnalytics && (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Heatmap */}
+                <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-black/40 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                      Study Heatmap
+                    </p>
+                    <span className="text-[10px] text-gray-500">
+                      Last 12 weeks
                     </span>
                   </div>
-                ))
-              ) : (
-                <p className="text-xs text-gray-500">
-                  No weak topics identified yet.
-                </p>
-              )}
-            </div>
-          </div>
+                  <div className="grid grid-cols-14 gap-1">
+                    {heatmapDays.map((day) => {
+                      const count = day.count;
+                      const intensity =
+                        count === 0
+                          ? "bg-white/5"
+                          : count < 3
+                            ? "bg-emerald-500/20"
+                            : count < 6
+                              ? "bg-emerald-500/40"
+                              : "bg-emerald-500/70";
+                      return (
+                        <div
+                          key={day.date}
+                          title={`${new Date(day.date).toLocaleDateString()} · ${count} activities`}
+                          className={`h-3 w-3 rounded-sm ${intensity}`}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Burnout Indicator */}
+                <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    Burnout Risk
+                  </p>
+                  <div className="mt-3 text-3xl font-bold text-white">
+                    {burnoutStats?.streakDays ?? 0} days
+                  </div>
+                  <div className="mt-2 text-xs">
+                    {burnoutStats?.level === "high" ? (
+                      <span className="px-2 py-1 rounded bg-red-500/20 text-red-400">
+                        High risk — consider a rest day
+                      </span>
+                    ) : burnoutStats?.level === "medium" ? (
+                      <span className="px-2 py-1 rounded bg-amber-500/20 text-amber-400">
+                        Moderate — balance your workload
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-400">
+                        Healthy pace
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Performance + Readiness */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-black/40 p-4">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                    Deck Performance
+                  </p>
+                  {deckPerformance && deckPerformance.length > 0 ? (
+                    <div className="h-48">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={deckPerformance}>
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(v) =>
+                              new Date(v).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                              })
+                            }
+                            stroke="#64748b"
+                            fontSize={10}
+                          />
+                          <YAxis
+                            domain={[0, 100]}
+                            stroke="#64748b"
+                            fontSize={10}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              background: "#0b0b12",
+                              border: "1px solid rgba(255,255,255,0.1)",
+                              fontSize: "12px",
+                            }}
+                            labelFormatter={(v) =>
+                              new Date(v).toLocaleDateString()
+                            }
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="scorePercent"
+                            stroke="#6366f1"
+                            strokeWidth={2}
+                            dot={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      No quiz results yet for performance tracking.
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    Readiness Forecast
+                  </p>
+                  <div className="mt-3 text-sm text-gray-300">
+                    {readinessForecast?.predictedReadyDate ? (
+                      <>
+                        At your current pace, you&apos;ll be ready by{" "}
+                        <span className="text-emerald-400 font-semibold">
+                          {new Date(
+                            readinessForecast.predictedReadyDate,
+                          ).toLocaleDateString()}
+                        </span>
+                      </>
+                    ) : (
+                      "Not enough study data to forecast readiness."
+                    )}
+                  </div>
+                  <div className="mt-3 text-xs text-gray-500">
+                    Cards remaining: {readinessForecast?.cardsRemaining ?? 0}
+                  </div>
+                </div>
+              </div>
+
+              {/* Weak Topics */}
+              <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    Weak Topics
+                  </p>
+                  {primaryDeckId && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        router.push(
+                          `/dashboard?view=flashcards&deckId=${primaryDeckId}`,
+                        )
+                      }
+                      className="text-xs text-gray-400 hover:text-white hover:bg-white/5"
+                    >
+                      Review weak cards
+                    </Button>
+                  )}
+                </div>
+                <div className="mt-3 space-y-2">
+                  {weakTopics && weakTopics.length > 0 ? (
+                    weakTopics.map((t) => (
+                      <div
+                        key={t.cardId}
+                        className="flex items-center justify-between text-xs text-gray-300"
+                      >
+                        <span className="truncate max-w-[70%]">{t.topic}</span>
+                        <span className="text-amber-400">
+                          EF {t.easeFactor.toFixed(2)}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      No weak topics identified yet.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Courses Grid */}

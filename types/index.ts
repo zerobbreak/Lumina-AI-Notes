@@ -27,3 +27,16 @@ export type {
   LayoutOptions,
   ExportOptions,
 } from "./diagram";
+
+// Streaming notes & code extraction types
+export type {
+  StreamingPhase,
+  StreamingNotesState,
+  CodeLanguage,
+  CodeBlock,
+} from "./streaming";
+export {
+  INITIAL_STREAMING_STATE,
+  CODE_LANGUAGES,
+  buildEnrichedTranscript,
+} from "./streaming";

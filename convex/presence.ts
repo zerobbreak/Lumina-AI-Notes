@@ -1,8 +1,8 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
-// How long before a presence entry is considered stale (60 seconds)
-const PRESENCE_TIMEOUT_MS = 60 * 1000;
+// How long before a presence entry is considered stale (3 minutes, matches 120s heartbeat interval)
+const PRESENCE_TIMEOUT_MS = 180 * 1000;
 
 async function requireNoteAccess(ctx: any, noteId: any) {
   const identity = await ctx.auth.getUserIdentity();
@@ -13,7 +13,7 @@ async function requireNoteAccess(ctx: any, noteId: any) {
   const collab = await ctx.db
     .query("noteCollaborators")
     .withIndex("by_noteId_userId", (q: any) =>
-      q.eq("noteId", noteId).eq("userId", identity.tokenIdentifier)
+      q.eq("noteId", noteId).eq("userId", identity.tokenIdentifier),
     )
     .unique();
   if (!collab) throw new Error("Unauthorized");
@@ -38,7 +38,7 @@ export const heartbeat = mutation({
     const existing = await ctx.db
       .query("presence")
       .withIndex("by_userId_noteId", (q) =>
-        q.eq("userId", userId).eq("noteId", args.noteId)
+        q.eq("userId", userId).eq("noteId", args.noteId),
       )
       .unique();
 
@@ -123,7 +123,7 @@ export const leave = mutation({
     const existing = await ctx.db
       .query("presence")
       .withIndex("by_userId_noteId", (q) =>
-        q.eq("userId", userId).eq("noteId", args.noteId)
+        q.eq("userId", userId).eq("noteId", args.noteId),
       )
       .unique();
 
@@ -182,7 +182,7 @@ export const getViewerCount = query({
 
     // Count active viewers excluding current user
     const count = presenceEntries.filter(
-      (entry) => entry.lastSeen > cutoff && entry.userId !== currentUserId
+      (entry) => entry.lastSeen > cutoff && entry.userId !== currentUserId,
     ).length;
 
     return count;

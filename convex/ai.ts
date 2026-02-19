@@ -202,6 +202,93 @@ Format the output as clean markdown suitable for studying.`;
 });
 
 /**
+ * Generate notes from transcript using streaming API for faster response.
+ * Accumulates all chunks server-side and returns the full markdown text.
+ * The frontend animates the reveal for a streaming UX.
+ *
+ * Optionally accepts extracted code blocks to enrich the transcript context.
+ */
+export const generateNotesStreamingText = action({
+  args: {
+    transcript: v.string(),
+    title: v.optional(v.string()),
+    codeBlocks: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const model = getGeminiModel();
+    const normalizedTranscript = normalizeTranscriptForPrompt(args.transcript);
+
+    // Build enriched transcript with code blocks if provided
+    let enrichedTranscript = normalizedTranscript;
+    if (args.codeBlocks) {
+      try {
+        const blocks = JSON.parse(args.codeBlocks);
+        if (Array.isArray(blocks) && blocks.length > 0) {
+          const codeSection = blocks
+            .map(
+              (
+                block: { label?: string; language: string; content: string },
+                i: number,
+              ) => {
+                const label = block.label ? ` (${block.label})` : "";
+                return `--- Code Block ${i + 1}${label} [${block.language}] ---\n\`\`\`${block.language}\n${block.content}\n\`\`\``;
+              },
+            )
+            .join("\n\n");
+          enrichedTranscript += `\n\n=== EXTRACTED CODE BLOCKS FROM LECTURE ===\n${codeSection}`;
+        }
+      } catch {
+        // Ignore malformed codeBlocks JSON
+      }
+    }
+
+    const titleContext = args.title ? `\nLecture Title: "${args.title}"` : "";
+    const hasCodeBlocks = enrichedTranscript.includes(
+      "=== EXTRACTED CODE BLOCKS",
+    );
+
+    const codeInstructions = hasCodeBlocks
+      ? `\n6. **Code Examples** - Explain each extracted code block: what it does, key patterns used, and how it connects to the lecture concepts. Use proper markdown code fences.`
+      : "";
+
+    const prompt = `You are an expert academic note-taker. Convert the following lecture/recording transcript into well-structured, comprehensive study notes.${titleContext}
+
+Transcript:
+"""
+${enrichedTranscript}
+"""
+
+Create detailed study notes with the following sections:
+1. **Summary** - A concise overview (3-4 sentences capturing the key message)
+2. **Key Concepts** - Main ideas, definitions, and theories with explanations
+3. **Important Details** - Supporting information, examples, and illustrations
+4. **Action Items** - Tasks, assignments, deadlines, or things to remember
+5. **Questions to Review** - Key questions for self-testing and exam preparation${codeInstructions}
+
+Requirements:
+- Use clear markdown formatting with headers, bullet points, and bold/italic emphasis
+- Be thorough — expand on concepts, don't just list keywords
+- Include specific examples, numbers, and quotes from the transcript when available
+- Make notes self-contained: a student should understand the material from these notes alone
+- Use LaTeX notation ($$...$$) for any mathematical formulas mentioned
+
+Format the output as clean, well-organized markdown suitable for studying.`;
+
+    // Use streaming API for faster first-byte-to-completion
+    const streamResult = await model.generateContentStream(prompt);
+    let fullText = "";
+    for await (const chunk of streamResult.stream) {
+      const chunkText = chunk.text();
+      if (chunkText) {
+        fullText += chunkText;
+      }
+    }
+
+    return fullText;
+  },
+});
+
+/**
  * Answer questions about provided context (notes or transcripts)
  */
 /**
