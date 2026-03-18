@@ -133,6 +133,7 @@ export default defineSchema({
     errorMessage: v.optional(v.string()),
   })
     .index("by_userId", ["userId"])
+    .index("by_userId_courseId", ["userId", "courseId"])
     .index("by_processingStatus", ["processingStatus"])
     .searchIndex("search_name", {
       searchField: "name",
@@ -305,15 +306,4 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_userId_name", ["userId", "name"]),
-
-  bulkOperations: defineTable({
-    userId: v.string(),
-    type: v.string(), // "move" | "archive" | "delete" | "tag"
-    noteIds: v.array(v.id("notes")),
-    payload: v.any(),
-    createdAt: v.number(),
-    expiresAt: v.number(),
-  })
-    .index("by_userId", ["userId"])
-    .index("by_userId_createdAt", ["userId", "createdAt"]),
 });

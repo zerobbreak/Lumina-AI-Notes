@@ -2,6 +2,8 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 
 export const generateUploadUrl = mutation(async (ctx) => {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error("Unauthorized");
   return await ctx.storage.generateUploadUrl();
 });
 
@@ -62,7 +64,7 @@ export const getFiles = query({
           };
         }
         return file;
-      })
+      }),
     );
   },
 });
@@ -86,8 +88,9 @@ export const getFilesByContext = query({
     // Actually, I can filter by userId then filter by courseId.
     const files = await ctx.db
       .query("files")
-      .withIndex("by_userId", (q) => q.eq("userId", identity.tokenIdentifier))
-      .filter((q) => q.eq(q.field("courseId"), args.courseId))
+      .withIndex("by_userId_courseId", (q) =>
+        q.eq("userId", identity.tokenIdentifier).eq("courseId", args.courseId),
+      )
       .collect();
 
     return Promise.all(
@@ -99,7 +102,7 @@ export const getFilesByContext = query({
           };
         }
         return file;
-      })
+      }),
     );
   },
 });
@@ -172,7 +175,7 @@ export const getPendingFiles = query({
     return await ctx.db
       .query("files")
       .withIndex("by_processingStatus", (q) =>
-        q.eq("processingStatus", "pending")
+        q.eq("processingStatus", "pending"),
       )
       .filter((q) => q.eq(q.field("userId"), identity.tokenIdentifier))
       .take(10);
@@ -182,7 +185,7 @@ export const getPendingFiles = query({
 /**
  * Update file processing status
  */
-export const updateProcessingStatus = mutation({
+export const updateProcessingStatus = internalMutation({
   args: {
     fileId: v.id("files"),
     status: v.string(), // "pending" | "processing" | "done" | "error"
@@ -279,7 +282,7 @@ export const recomputeFileQueuePositionsInternal = internalMutation({
 /**
  * Save extracted content from document processing
  */
-export const saveExtractedContent = mutation({
+export const saveExtractedContent = internalMutation({
   args: {
     fileId: v.id("files"),
     extractedText: v.string(),

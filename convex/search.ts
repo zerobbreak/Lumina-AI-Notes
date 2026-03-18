@@ -65,7 +65,6 @@ export const search = query({
 
       // Filter by Tags (Intersection)
       if (args.tagIds && args.tagIds.length > 0) {
-        const requiredTags = new Set(args.tagIds);
         filteredNotes = notes.filter((n) => {
           if (!n.tagIds) return false;
           // Check if note has ALL required tags
@@ -157,6 +156,7 @@ export const search = query({
  * Free tier: limited to 3 results
  * Scholar/Institution: full semantic search
  */
+// TODO: Wire up to ai.ts semantic search action — currently a stub
 export const semanticSearch = query({
   args: {
     query: v.string(),

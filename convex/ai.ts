@@ -1,10 +1,22 @@
 "use node";
 
 import { action } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import {
+  TranscriptChunkInput,
+  normalizeTranscriptForPrompt,
+  ENRICHMENT_WORD_THRESHOLD,
+} from "./shared/transcript";
+import {
+  tryParseJson,
+  sentenceCount,
+  wordCountFn,
+  noteLacksDepth,
+} from "./shared/noteQuality";
+import { buildDiagramData } from "./shared/diagram";
 
 // Types for subscription tier checking
 type SubscriptionTier = "free" | "scholar" | "institution";
@@ -23,6 +35,16 @@ async function checkTierAccess(): Promise<{
   return { allowed: true, tier: "scholar" as SubscriptionTier };
 }
 
+type StructuredNotesDraft = {
+  summary?: string;
+  cornellCues?: unknown[];
+  cornellNotes?: unknown[];
+  actionItems?: unknown[];
+  reviewQuestions?: unknown[];
+  diagramNodes?: unknown[];
+  diagramEdges?: unknown[];
+};
+
 // Initialize Gemini client
 const getGeminiModel = (config?: { responseMimeType: string }) => {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -34,47 +56,6 @@ const getGeminiModel = (config?: { responseMimeType: string }) => {
     model: "gemini-2.5-flash",
     generationConfig: config,
   });
-};
-
-type TranscriptChunkInput = {
-  text?: string;
-  enhancedText?: string;
-  timestamp?: string;
-};
-
-type StructuredNotesDraft = {
-  summary?: string;
-  cornellCues?: unknown[];
-  cornellNotes?: unknown[];
-  actionItems?: unknown[];
-  reviewQuestions?: unknown[];
-  diagramNodes?: unknown[];
-  diagramEdges?: unknown[];
-};
-
-const normalizeTranscriptForPrompt = (rawTranscript: string): string => {
-  const fallback = rawTranscript.trim();
-  if (!fallback) return "";
-
-  try {
-    const parsed = JSON.parse(rawTranscript) as unknown;
-    if (!Array.isArray(parsed)) return fallback;
-
-    const lines = parsed
-      .map((chunk) => {
-        const entry = chunk as TranscriptChunkInput;
-        const content = (entry.enhancedText || entry.text || "").trim();
-        if (!content) return "";
-        const stamp = (entry.timestamp || "").trim();
-        return stamp ? `[${stamp}] ${content}` : content;
-      })
-      .filter((line) => line.length > 0);
-
-    if (lines.length === 0) return fallback;
-    return lines.join("\n");
-  } catch {
-    return fallback;
-  }
 };
 
 /**
@@ -90,7 +71,7 @@ const enrichTranscript = async (
   // Only enrich if the transcript is likely sparse/fragmented
   const wordCount = normalizedTranscript.split(/\s+/).length;
   // If the transcript is already substantial (>500 words), skip enrichment
-  if (wordCount > 500) return normalizedTranscript;
+  if (wordCount > ENRICHMENT_WORD_THRESHOLD) return normalizedTranscript;
 
   const enrichPrompt = `You are an expert lecture reconstruction assistant. The following transcript was captured from a live lecture recording using browser speech recognition, which often produces fragmented, incomplete sentences and misses context.
 
@@ -543,12 +524,6 @@ export const generateStructuredNotes = action({
     const model = getGeminiModel({ responseMimeType: "application/json" });
     const normalizedTranscript = normalizeTranscriptForPrompt(args.transcript);
 
-    const tryParseJson = (text: string) => {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) return null;
-      return JSON.parse(jsonMatch[0]);
-    };
-
     const fixJson = async (text: string) => {
       const fixPrompt = `Fix the following JSON. Return ONLY valid JSON with the same structure and content, no markdown.
 
@@ -556,45 +531,6 @@ JSON:
 ${text}`;
       const fixResult = await model.generateContent(fixPrompt);
       return fixResult.response.text().trim();
-    };
-
-    const sentenceCount = (text: string) =>
-      text
-        .split(/[.!?]+/)
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0).length;
-
-    const wordCountFn = (text: string) =>
-      text.split(/\s+/).filter((w) => w.length > 0).length;
-
-    const noteLacksDepth = (text: string) => {
-      const lower = text.toLowerCase();
-      const words = wordCountFn(text);
-      const sentences = sentenceCount(text);
-      const genericSignals = [
-        "will be explored",
-        "in future",
-        "important concept",
-        "key point",
-        "topic is",
-        "it is important",
-        "this concept",
-        "students should",
-        "further study",
-        "as mentioned",
-      ];
-      const hasGenericSignal = genericSignals.some((sig) =>
-        lower.includes(sig),
-      );
-      const hasConcreteSignal =
-        /\d/.test(text) ||
-        /(for example|e\.g\.|such as|because|therefore|used to|works by|defined as|means|specifically|in particular|according to|demonstrated by|calculated as|results in|consists of|involves)/i.test(
-          text,
-        );
-      // More aggressive quality check: require 3+ sentences, 40+ words, and concrete content
-      return (
-        sentences < 3 || words < 40 || hasGenericSignal || !hasConcreteSignal
-      );
     };
 
     const maybeRepairQuality = async (draft: unknown) => {
@@ -829,46 +765,7 @@ MANDATORY QUALITY REQUIREMENTS:
               .filter((question: string) => question.length > 0)
           : [];
 
-        // Convert simplified diagram format to ReactFlow format
-        let diagramData = undefined;
-        if (diagramNodes.length > 0) {
-          const nodes = diagramNodes.map((label: string, index: number) => {
-            // Assign node types and colors based on position
-            let type = "default";
-            let color = "bg-gradient-to-br from-gray-500 to-gray-600";
-
-            if (index === 0) {
-              type = "concept";
-              color = "bg-gradient-to-br from-purple-500 to-pink-500";
-            } else if (index <= 3) {
-              type = "topic";
-              color = "bg-gradient-to-br from-blue-500 to-cyan-500";
-            } else if (index <= 6) {
-              type = "subtopic";
-              color = "bg-gradient-to-br from-emerald-500 to-teal-500";
-            } else {
-              type = "note";
-              color = "bg-gradient-to-br from-amber-400 to-orange-400";
-            }
-
-            return {
-              id: String(index),
-              type,
-              data: { label, color },
-              position: {
-                x: index === 0 ? 400 : 200 + (index % 3) * 200,
-                y: index === 0 ? 50 : Math.floor(index / 3) * 150 + 200,
-              },
-            };
-          });
-
-          const edges = diagramEdges.map((edge: string, index: number) => {
-            const [source, target] = edge.split("-");
-            return { id: `e${index}`, source, target, animated: true };
-          });
-
-          diagramData = { nodes, edges };
-        }
+        const diagramData = buildDiagramData(diagramNodes, diagramEdges);
 
         return {
           summary: workingParsed.summary || "",
@@ -2022,7 +1919,7 @@ export const processDocument = action({
   }> => {
     try {
       // Update status to processing
-      await ctx.runMutation(api.files.updateProcessingStatus, {
+      await ctx.runMutation(internal.files.updateProcessingStatus, {
         fileId: args.fileId,
         status: "processing",
         progressPercent: 10,
@@ -2050,7 +1947,7 @@ export const processDocument = action({
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      await ctx.runMutation(api.files.updateProcessingStatus, {
+      await ctx.runMutation(internal.files.updateProcessingStatus, {
         fileId: args.fileId,
         status: "processing",
         progressPercent: 40,
@@ -2134,7 +2031,7 @@ Return ONLY valid JSON, no markdown code fences or explanation.`,
 
       const extractionText = extractionResult.response.text().trim();
 
-      await ctx.runMutation(api.files.updateProcessingStatus, {
+      await ctx.runMutation(internal.files.updateProcessingStatus, {
         fileId: args.fileId,
         status: "processing",
         progressPercent: 70,
@@ -2175,14 +2072,14 @@ Return ONLY valid JSON, no markdown code fences or explanation.`,
         await embeddingModel.embedContent(textForEmbedding);
       const embedding = embeddingResult.embedding.values;
 
-      await ctx.runMutation(api.files.updateProcessingStatus, {
+      await ctx.runMutation(internal.files.updateProcessingStatus, {
         fileId: args.fileId,
         status: "processing",
         progressPercent: 90,
       });
 
       // Save extracted content
-      await ctx.runMutation(api.files.saveExtractedContent, {
+      await ctx.runMutation(internal.files.saveExtractedContent, {
         fileId: args.fileId,
         extractedText: extractedText.substring(0, 50000), // Limit stored text
         summary,
@@ -2190,7 +2087,7 @@ Return ONLY valid JSON, no markdown code fences or explanation.`,
         embedding,
       });
 
-      await ctx.runMutation(api.files.updateProcessingStatus, {
+      await ctx.runMutation(internal.files.updateProcessingStatus, {
         fileId: args.fileId,
         status: "done",
         progressPercent: 100,
@@ -2202,7 +2099,7 @@ Return ONLY valid JSON, no markdown code fences or explanation.`,
       console.error("processDocument error:", error);
 
       // Update status to error
-      await ctx.runMutation(api.files.updateProcessingStatus, {
+      await ctx.runMutation(internal.files.updateProcessingStatus, {
         fileId: args.fileId,
         status: "error",
         errorMessage:

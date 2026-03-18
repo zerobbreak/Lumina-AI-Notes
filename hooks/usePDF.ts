@@ -65,11 +65,11 @@ function convertCornellToLinear(element: HTMLElement): HTMLElement {
   if (!cornellContainer) return clone;
 
   const cuesTextarea = clone.querySelector(
-    'textarea[placeholder*="Key terms"]'
+    'textarea[placeholder*="Key terms"]',
   ) as HTMLTextAreaElement;
   const notesSection = clone.querySelector(".ProseMirror");
   const summaryTextarea = clone.querySelector(
-    'textarea[placeholder*="Summarize"]'
+    'textarea[placeholder*="Summarize"]',
   ) as HTMLTextAreaElement;
 
   const linearContainer = document.createElement("div");
@@ -118,12 +118,12 @@ function convertOutlineForPDF(element: HTMLElement): HTMLElement {
   const clone = element.cloneNode(true) as HTMLElement;
 
   const taskItems = clone.querySelectorAll(
-    '.outline-task-item, [data-type="taskItem"]'
+    '.outline-task-item, [data-type="taskItem"]',
   );
 
   taskItems.forEach((item) => {
     const checkbox = item.querySelector(
-      'input[type="checkbox"]'
+      'input[type="checkbox"]',
     ) as HTMLInputElement;
     if (checkbox) {
       const isChecked = checkbox.checked;
@@ -164,7 +164,7 @@ export function usePDF() {
     async (
       elementId: string,
       title?: string,
-      onProgress?: (progress: number) => void
+      onProgress?: (progress: number) => void,
     ): Promise<void> => {
       onProgress?.(10);
 
@@ -196,7 +196,7 @@ export function usePDF() {
       const printWindow = window.open("", "_blank", "width=800,height=600");
       if (!printWindow) {
         throw new Error(
-          "Could not open print window. Please check popup blocker settings."
+          "Could not open print window. Please check popup blocker settings.",
         );
       }
 
@@ -251,7 +251,7 @@ export function usePDF() {
         }, 250);
       };
     },
-    []
+    [],
   );
 
   /**
@@ -262,7 +262,7 @@ export function usePDF() {
       elementId: string,
       filename: string,
       title?: string,
-      onProgress?: (progress: number) => void
+      onProgress?: (progress: number) => void,
     ): Promise<void> => {
       onProgress?.(5);
 
@@ -305,7 +305,6 @@ export function usePDF() {
       const contentWidth = pageWidth - margin * 2;
 
       let currentY = margin;
-      const lineHeightMm = 5;
 
       // Check page break
       const checkPageBreak = (requiredHeight: number): void => {
@@ -320,7 +319,7 @@ export function usePDF() {
         text: string,
         fontSize: number,
         fontStyle: "normal" | "bold" | "italic" = "normal",
-        indent: number = 0
+        indent: number = 0,
       ): void => {
         const cleanText = stripEmojis(text).trim();
         if (!cleanText) return;
@@ -452,7 +451,7 @@ export function usePDF() {
               doc.setFillColor(245, 245, 245);
               const codeLines = doc.splitTextToSize(
                 codeText,
-                contentWidth - 10
+                contentWidth - 10,
               );
               const codeHeight = codeLines.length * codeLh + 6;
               checkPageBreak(codeHeight);
@@ -491,7 +490,7 @@ export function usePDF() {
               cells.forEach((cell, cellIdx) => {
                 const cellText = (cell.textContent?.trim() || "").substring(
                   0,
-                  35
+                  35,
                 );
                 const isHeader = cell.tagName.toLowerCase() === "th";
                 doc.setFontSize(9);
@@ -525,7 +524,7 @@ export function usePDF() {
       doc.save(filename);
       onProgress?.(100);
     },
-    []
+    [],
   );
 
   /**
@@ -535,7 +534,7 @@ export function usePDF() {
     async (
       elementId: string,
       filename: string,
-      options: ExportOptions = {}
+      options: ExportOptions = {},
     ): Promise<void> => {
       const { method = "auto", title, onProgress } = options;
 
@@ -559,7 +558,7 @@ export function usePDF() {
           // Auto-detect: use print for complex content
           const hasComplex =
             element.querySelector(
-              "svg, canvas, .mermaid, .diagram, [data-type='diagram']"
+              "svg, canvas, .mermaid, .diagram, [data-type='diagram']",
             ) !== null;
           selectedMethod = hasComplex ? "print" : "jspdf";
         } else {
@@ -574,7 +573,7 @@ export function usePDF() {
           } catch (jspdfError) {
             console.warn(
               "jsPDF export failed, falling back to print:",
-              jspdfError
+              jspdfError,
             );
             await printExport(elementId, title, progressHandler);
           }
@@ -584,14 +583,14 @@ export function usePDF() {
         alert(
           "PDF export failed. Please try using your browser's print function (Ctrl+P or Cmd+P) and save as PDF.\n\n" +
             "Error: " +
-            (error instanceof Error ? error.message : String(error))
+            (error instanceof Error ? error.message : String(error)),
         );
       } finally {
         setIsLoading(false);
         setProgress(0);
       }
     },
-    [printExport, jspdfExport]
+    [printExport, jspdfExport],
   );
 
   // Legacy function for backwards compatibility
@@ -599,7 +598,7 @@ export function usePDF() {
     async (elementId: string, filename: string, title?: string) => {
       await exportPDF(elementId, filename, { method: "auto", title });
     },
-    [exportPDF]
+    [exportPDF],
   );
 
   return {

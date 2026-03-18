@@ -1,98 +1,96 @@
-# Lumina Notes AI 🧠✨
+# Lumina Notes AI
 
-**Lumina Notes AI** is an intelligent study assistant designed to supercharge your learning process. Built with **Next.js 16** and **Convex**, it leverages **Google Gemini 2.5 Flash** to transform how you capture, organize, and review information.
+Lumina Notes AI is a Next.js + Convex study platform for AI-assisted note taking, transcription, flashcards, quizzes, and semantic search.
 
-## 🚀 Key Features
+## Stack
 
-### 📝 AI-Powered Note Taking
+- Next.js 16 (App Router)
+- React 19 + TypeScript
+- Convex (backend/database/functions)
+- Clerk (authentication)
+- Google Gemini API (LLM + embeddings)
+- UploadThing (file uploads)
 
-- **Structured Notes**: Convert messy transcripts into organized Cornell notes with summaries, action items, and review questions.
-- **Smart Editing**: Refine text style (academic, casual), fix grammar, simplify complex topics, or expand on brief points.
-- **Auto-Complete**: Let AI help you finish your sentences based on context.
-- **Rich Text Editor**: Powered by **Tiptap**, supporting code blocks, math (LaTeX), and diagrams (Mermaid.js).
+## Prerequisites
 
-### 🎙️ Audio Transcription & Analysis
+- Node.js 20+
+- npm 10+
+- A Convex account
+- A Clerk account
+- A Google AI Studio API key (`GEMINI_API_KEY`)
+- An UploadThing token (`UPLOADTHING_TOKEN`)
 
-- **High-Fidelity Transcription**: Upload or record lectures and get accurate transcripts with speaker detection.
-- **Real-time Analysis**: Detect key concepts and "exam-worthy" points as you record.
+## Local Setup (Functioning App)
 
-### 📚 Document Intelligence
+1. Install dependencies:
 
-- **PDF Processing**: Upload course materials to extract text, generate summaries, and identify key topics.
-- **Chat with Context**: Ask questions about specific notes, transcripts, or documents.
+```bash
+npm install
+```
 
-### 🧠 Smart Study Tools
+2. Create `.env.local` in the project root:
 
-- **Instant Flashcards**: Generate flashcard decks from any note or document tailored to your needs.
-- **Semantic Search**: Find exactly what you're looking for using vector embeddings—search by meaning, not just keywords.
-- **Spaced Repetition**: Track your review progress with built-in study modes.
+```env
+# Clerk
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_xxx
+CLERK_SECRET_KEY=sk_test_xxx
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/dashboard
+NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/dashboard
 
-## 🛠️ Tech Stack
+# Convex
+CONVEX_DEPLOYMENT=dev:your-deployment-name
+NEXT_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud
 
-- **Framework**: [Next.js 16](https://nextjs.org/) (App Router)
-- **Language**: TypeScript
-- **Backend & Database**: [Convex](https://convex.dev/)
-- **AI Model**: Google Gemini 2.5 Flash & `text-embedding-004`
-- **Authentication**: [Clerk](https://clerk.com/)
-- **Styling**: Tailwind CSS v4, Framer Motion, Lucide React
-- **Editor**: Tiptap
+# Gemini
+GEMINI_API_KEY=your_gemini_api_key
 
-## 🏁 Getting Started
+# UploadThing
+UPLOADTHING_TOKEN=your_uploadthing_token
 
-### Prerequisites
+# Optional (currently not required to use the app)
+NEXT_PUBLIC_PAYSTACK_SCHOLAR_PLAN_CODE=
+```
 
-- Node.js (v18 or higher)
-- npm, pnpm, or bun
+3. Configure Clerk for Convex:
 
-### Installation
+- Open `convex/auth.config.ts` and set `domain` to your Clerk frontend API URL.
+- Keep `applicationID` as `convex` unless you intentionally changed your Convex auth integration.
 
-1. **Clone the repository**
+4. Start Convex in terminal 1:
 
-   ```bash
-   git clone https://github.com/yourusername/lumina-notes-ai.git
-   cd lumina-notes-ai
-   ```
+```bash
+npx convex dev
+```
 
-2. **Install dependencies**
+Notes:
+- The first run will prompt login/project selection.
+- This command syncs backend functions and updates generated files.
 
-   ```bash
-   npm install
-   # or
-   pnpm install
-   ```
+5. Start Next.js in terminal 2:
 
-3. **Set up Environment Variables**
-   Create a `.env.local` file in the root directory and add the following:
+```bash
+npm run dev
+```
 
-   ```env
-   # Convex
-   CONVEX_DEPLOYMENT=...
-   NEXT_PUBLIC_CONVEX_URL=...
+6. Open the app:
 
-   # Clerk Auth
-   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
-   CLERK_SECRET_KEY=...
+- [http://localhost:3000](http://localhost:3000)
 
-   # Google Gemini AI
-   GEMINI_API_KEY=...
-   ```
+## Scripts
 
-4. **Run the Development Server**
-   Start the Next.js app and the Convex backend:
+- `npm run dev` - start Next.js dev server
+- `npx convex dev` - start/sync Convex backend
+- `npm run build` - production build
+- `npm run start` - run production server
+- `npm run lint` - run ESLint
+- `npm test` - run Vitest once
+- `npm run test:watch` - run Vitest in watch mode
 
-   ```bash
-   npm run dev
-   ```
+## Troubleshooting
 
-   Run Convex in a separate terminal if needed (usually handled by `npm run dev` if configured, otherwise `npx convex dev`):
-
-   ```bash
-   npx convex dev
-   ```
-
-5. **Open the App**
-   Visit [http://localhost:3000](http://localhost:3000) to see the application in action.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+- If auth fails, verify Clerk keys in `.env.local` and the Clerk `domain` in `convex/auth.config.ts`.
+- If Convex calls fail, verify both `CONVEX_DEPLOYMENT` and `NEXT_PUBLIC_CONVEX_URL` match the same deployment.
+- If AI features fail, verify `GEMINI_API_KEY` is present.
+- If image uploads fail, verify `UPLOADTHING_TOKEN` and that `/api/uploadthing` remains publicly reachable (see `proxy.ts`).

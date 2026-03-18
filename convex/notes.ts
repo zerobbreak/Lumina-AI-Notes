@@ -2,39 +2,19 @@ import { v } from "convex/values";
 import { mutation, query, action } from "./_generated/server";
 import { api } from "./_generated/api";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import {
+  normalizeTranscriptForPrompt,
+  ENRICHMENT_WORD_THRESHOLD,
+} from "./shared/transcript";
+import {
+  tryParseJson,
+  sentenceCount,
+  wordCountFn,
+  noteLacksDepth,
+} from "./shared/noteQuality";
+import { buildDiagramData } from "./shared/diagram";
 
 type NoteRole = "owner" | "editor" | "viewer";
-
-type TranscriptChunkInput = {
-  text?: string;
-  enhancedText?: string;
-  timestamp?: string;
-};
-
-const normalizeTranscriptForPrompt = (rawTranscript: string): string => {
-  const fallback = rawTranscript.trim();
-  if (!fallback) return "";
-
-  try {
-    const parsed = JSON.parse(rawTranscript) as unknown;
-    if (!Array.isArray(parsed)) return fallback;
-
-    const lines = parsed
-      .map((chunk) => {
-        const entry = chunk as TranscriptChunkInput;
-        const content = (entry.enhancedText || entry.text || "").trim();
-        if (!content) return "";
-        const stamp = (entry.timestamp || "").trim();
-        return stamp ? `[${stamp}] ${content}` : content;
-      })
-      .filter((line) => line.length > 0);
-
-    if (lines.length === 0) return fallback;
-    return lines.join("\n");
-  } catch {
-    return fallback;
-  }
-};
 
 /**
  * Enrich a sparse or fragmented transcript by using AI to reconstruct
@@ -46,7 +26,7 @@ const enrichTranscriptForPinned = async (
   contextText: string,
 ): Promise<string> => {
   const wordCount = normalizedTranscript.split(/\s+/).length;
-  if (wordCount > 500) return normalizedTranscript;
+  if (wordCount > ENRICHMENT_WORD_THRESHOLD) return normalizedTranscript;
 
   const enrichPrompt = `You are an expert lecture reconstruction assistant. The following transcript was captured from a live lecture recording using browser speech recognition, which often produces fragmented, incomplete sentences.
 
@@ -335,8 +315,22 @@ export const getNotesByContext = query({
 export const deleteNote = mutation({
   args: { noteId: v.id("notes") },
   handler: async (ctx, args) => {
-    const { identity, role } = await requireNoteAccess(ctx, args.noteId);
+    const { role } = await requireNoteAccess(ctx, args.noteId);
     if (role !== "owner") throw new Error("Forbidden");
+
+    // Cascade: clean up collaborators
+    const collabs = await ctx.db
+      .query("noteCollaborators")
+      .withIndex("by_noteId", (q: any) => q.eq("noteId", args.noteId))
+      .collect();
+    for (const c of collabs) await ctx.db.delete(c._id);
+
+    // Cascade: clean up invites
+    const invites = await ctx.db
+      .query("noteInvites")
+      .withIndex("by_noteId", (q: any) => q.eq("noteId", args.noteId))
+      .collect();
+    for (const i of invites) await ctx.db.delete(i._id);
 
     await ctx.db.delete(args.noteId);
   },
@@ -553,11 +547,7 @@ export const generateFromPinnedAudio = action({
       model: "text-embedding-004",
     });
 
-    const tryParseJson = (text: string) => {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) return null;
-      return JSON.parse(jsonMatch[0]);
-    };
+    const normalizedTranscript = normalizeTranscriptForPrompt(args.transcript);
 
     const fixJson = async (text: string) => {
       const fixPrompt = `Fix the following JSON. Return ONLY valid JSON with the same structure and content, no markdown.
@@ -566,46 +556,6 @@ JSON:
 ${text}`;
       const fixResult = await model.generateContent(fixPrompt);
       return fixResult.response.text().trim();
-    };
-
-    const normalizedTranscript = normalizeTranscriptForPrompt(args.transcript);
-
-    const sentenceCount = (text: string) =>
-      text
-        .split(/[.!?]+/)
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0).length;
-
-    const wordCountFn = (text: string) =>
-      text.split(/\s+/).filter((w) => w.length > 0).length;
-
-    const noteLacksDepth = (text: string) => {
-      const lower = text.toLowerCase();
-      const words = wordCountFn(text);
-      const sentences = sentenceCount(text);
-      const genericSignals = [
-        "will be explored",
-        "in future",
-        "important concept",
-        "key point",
-        "topic is",
-        "it is important",
-        "this concept",
-        "students should",
-        "further study",
-        "as mentioned",
-      ];
-      const hasGenericSignal = genericSignals.some((sig) =>
-        lower.includes(sig),
-      );
-      const hasConcreteSignal =
-        /\d/.test(text) ||
-        /(for example|e\.g\.|such as|because|therefore|used to|works by|defined as|means|specifically|in particular|according to|demonstrated by|calculated as|results in|consists of|involves)/i.test(
-          text,
-        );
-      return (
-        sentences < 3 || words < 40 || hasGenericSignal || !hasConcreteSignal
-      );
     };
 
     const maybeRepairQuality = async (
@@ -858,46 +808,7 @@ MANDATORY QUALITY REQUIREMENTS:
               .filter((question: string) => question.length > 0)
           : [];
 
-        // Convert simplified diagram format to ReactFlow format
-        let diagramData = undefined;
-        if (diagramNodes.length > 0) {
-          const nodes = diagramNodes.map((label: string, index: number) => {
-            // Assign node types and colors based on position
-            let type = "default";
-            let color = "bg-gradient-to-br from-gray-500 to-gray-600";
-
-            if (index === 0) {
-              type = "concept";
-              color = "bg-gradient-to-br from-purple-500 to-pink-500";
-            } else if (index <= 3) {
-              type = "topic";
-              color = "bg-gradient-to-br from-blue-500 to-cyan-500";
-            } else if (index <= 6) {
-              type = "subtopic";
-              color = "bg-gradient-to-br from-emerald-500 to-teal-500";
-            } else {
-              type = "note";
-              color = "bg-gradient-to-br from-amber-400 to-orange-400";
-            }
-
-            return {
-              id: String(index),
-              type,
-              data: { label, color },
-              position: {
-                x: index === 0 ? 400 : 200 + (index % 3) * 200,
-                y: index === 0 ? 50 : Math.floor(index / 3) * 150 + 200,
-              },
-            };
-          });
-
-          const edges = diagramEdges.map((edge: string, index: number) => {
-            const [source, target] = edge.split("-");
-            return { id: `e${index}`, source, target, animated: true };
-          });
-
-          diagramData = { nodes, edges };
-        }
+        const diagramData = buildDiagramData(diagramNodes, diagramEdges);
 
         return {
           summary: workingParsed.summary || "",
@@ -979,93 +890,6 @@ export const unassignNoteFromFolder = mutation({
   },
 });
 
-/**
- * Get multiple notes by IDs for bulk export
- */
-export const getNotesByIds = query({
-  args: {
-    noteIds: v.array(v.id("notes")),
-  },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-
-    const notes = [];
-    for (const noteId of args.noteIds) {
-      const role = await getNoteRole(ctx, noteId, identity.tokenIdentifier);
-      if (role) {
-        const note = await ctx.db.get(noteId);
-        if (!note) continue;
-        notes.push(note);
-      }
-    }
-
-    return notes;
-  },
-});
-
-/**
- * Get all notes for a course (for bulk export)
- */
-export const getNotesByCourse = query({
-  args: {
-    courseId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-
-    const notes = await ctx.db
-      .query("notes")
-      .withIndex("by_courseId", (q) => q.eq("courseId", args.courseId))
-      .collect();
-
-    const accessible = [];
-    for (const n of notes) {
-      if (n.isArchived) continue;
-      const role = await getNoteRole(ctx, n._id, identity.tokenIdentifier);
-      if (role) accessible.push(n);
-    }
-    return accessible;
-  },
-});
-
-/**
- * Get all notes for the user (for bulk export)
- */
-export const getAllNotesForExport = query({
-  args: {
-    includeArchived: v.optional(v.boolean()),
-  },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-
-    let notesQuery = ctx.db
-      .query("notes")
-      .withIndex("by_userId", (q) => q.eq("userId", identity.tokenIdentifier));
-
-    if (!args.includeArchived) {
-      notesQuery = notesQuery.filter((q) => q.neq(q.field("isArchived"), true));
-    }
-
-    const notes = await notesQuery.order("desc").collect();
-
-    return notes.map((note) => ({
-      _id: note._id,
-      title: note.title,
-      content: note.content,
-      courseId: note.courseId,
-      moduleId: note.moduleId,
-      noteType: note.noteType,
-      style: note.style,
-      createdAt: note.createdAt,
-      isPinned: note.isPinned,
-      isArchived: note.isArchived,
-    }));
-  },
-});
-
 export const searchNotes = query({
   args: {
     query: v.optional(v.string()),
@@ -1090,8 +914,8 @@ export const searchNotes = query({
       notes = await ctx.db
         .query("notes")
         .withIndex("by_userId", (q) => q.eq("userId", identity.tokenIdentifier))
-        .order("desc") // Most recent first for non-search views
-        .collect();
+        .order("desc")
+        .take(200);
     }
 
     // In-memory filtering
@@ -1115,217 +939,5 @@ export const searchNotes = query({
 
       return true;
     });
-  },
-});
-
-// --- Bulk Operations ---
-
-const BULK_UNDO_WINDOW_MS = 30 * 1000;
-
-export const bulkMove = mutation({
-  args: {
-    noteIds: v.array(v.id("notes")),
-    courseId: v.optional(v.string()),
-    moduleId: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
-
-    const previous: Array<{
-      noteId: any;
-      courseId?: string;
-      moduleId?: string;
-    }> = [];
-
-    for (const noteId of args.noteIds) {
-      const { note } = await requireNoteOwner(ctx, noteId);
-      previous.push({
-        noteId,
-        courseId: note.courseId,
-        moduleId: note.moduleId,
-      });
-      await ctx.db.patch(noteId, {
-        courseId: args.courseId,
-        moduleId: args.moduleId,
-        noteType: "page",
-      });
-    }
-
-    const opId = await ctx.db.insert("bulkOperations", {
-      userId: identity.tokenIdentifier,
-      type: "move",
-      noteIds: args.noteIds,
-      payload: { previous },
-      createdAt: Date.now(),
-      expiresAt: Date.now() + BULK_UNDO_WINDOW_MS,
-    });
-
-    return { operationId: opId };
-  },
-});
-
-export const bulkArchive = mutation({
-  args: {
-    noteIds: v.array(v.id("notes")),
-    archived: v.boolean(),
-  },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
-
-    const previous: Array<{ noteId: any; isArchived?: boolean }> = [];
-
-    for (const noteId of args.noteIds) {
-      const { note } = await requireNoteOwner(ctx, noteId);
-      previous.push({ noteId, isArchived: note.isArchived });
-      await ctx.db.patch(noteId, { isArchived: args.archived });
-    }
-
-    const opId = await ctx.db.insert("bulkOperations", {
-      userId: identity.tokenIdentifier,
-      type: "archive",
-      noteIds: args.noteIds,
-      payload: { previous },
-      createdAt: Date.now(),
-      expiresAt: Date.now() + BULK_UNDO_WINDOW_MS,
-    });
-
-    return { operationId: opId };
-  },
-});
-
-export const bulkTag = mutation({
-  args: {
-    noteIds: v.array(v.id("notes")),
-    tagIds: v.array(v.id("tags")),
-  },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
-
-    const previous: Array<{ noteId: any; tagIds: any[] }> = [];
-
-    for (const noteId of args.noteIds) {
-      const { note } = await requireNoteOwner(ctx, noteId);
-      const existing = note.tagIds ?? [];
-      previous.push({ noteId, tagIds: existing });
-      const merged = Array.from(new Set([...existing, ...args.tagIds]));
-      await ctx.db.patch(noteId, { tagIds: merged });
-    }
-
-    const opId = await ctx.db.insert("bulkOperations", {
-      userId: identity.tokenIdentifier,
-      type: "tag",
-      noteIds: args.noteIds,
-      payload: { previous },
-      createdAt: Date.now(),
-      expiresAt: Date.now() + BULK_UNDO_WINDOW_MS,
-    });
-
-    return { operationId: opId };
-  },
-});
-
-export const bulkDelete = mutation({
-  args: {
-    noteIds: v.array(v.id("notes")),
-  },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
-
-    const previous: Array<any> = [];
-
-    for (const noteId of args.noteIds) {
-      const { note } = await requireNoteOwner(ctx, noteId);
-      previous.push(note);
-      await ctx.db.delete(noteId);
-    }
-
-    const opId = await ctx.db.insert("bulkOperations", {
-      userId: identity.tokenIdentifier,
-      type: "delete",
-      noteIds: args.noteIds,
-      payload: { previous },
-      createdAt: Date.now(),
-      expiresAt: Date.now() + BULK_UNDO_WINDOW_MS,
-    });
-
-    return { operationId: opId };
-  },
-});
-
-export const bulkUndo = mutation({
-  args: { operationId: v.id("bulkOperations") },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
-
-    const op = await ctx.db.get(args.operationId);
-    if (!op || op.userId !== identity.tokenIdentifier) {
-      throw new Error("Operation not found");
-    }
-
-    if (op.expiresAt < Date.now()) {
-      throw new Error("Undo window expired");
-    }
-
-    if (op.type === "move") {
-      for (const entry of op.payload.previous || []) {
-        await ctx.db.patch(entry.noteId, {
-          courseId: entry.courseId,
-          moduleId: entry.moduleId,
-        });
-      }
-    }
-
-    if (op.type === "archive") {
-      for (const entry of op.payload.previous || []) {
-        await ctx.db.patch(entry.noteId, { isArchived: entry.isArchived });
-      }
-    }
-
-    if (op.type === "tag") {
-      for (const entry of op.payload.previous || []) {
-        await ctx.db.patch(entry.noteId, { tagIds: entry.tagIds });
-      }
-    }
-
-    if (op.type === "delete") {
-      for (const note of op.payload.previous || []) {
-        await ctx.db.insert("notes", {
-          userId: note.userId,
-          title: note.title,
-          content: note.content,
-          noteType: note.noteType,
-          major: note.major,
-          courseId: note.courseId,
-          moduleId: note.moduleId,
-          parentNoteId: note.parentNoteId,
-          style: note.style,
-          isPinned: note.isPinned,
-          isArchived: note.isArchived,
-          isShared: note.isShared,
-          createdAt: note.createdAt,
-          embedding: note.embedding,
-          linkedDocumentIds: note.linkedDocumentIds,
-          tagIds: note.tagIds,
-          wordCount: note.wordCount,
-          cornellCues: note.cornellCues,
-          cornellNotes: note.cornellNotes,
-          cornellSummary: note.cornellSummary,
-          outlineData: note.outlineData,
-          outlineMetadata: note.outlineMetadata,
-          quickCaptureType: note.quickCaptureType,
-          quickCaptureAudioUrl: note.quickCaptureAudioUrl,
-          quickCaptureStatus: note.quickCaptureStatus,
-          quickCaptureExpandedNoteId: note.quickCaptureExpandedNoteId,
-        });
-      }
-    }
-
-    await ctx.db.delete(args.operationId);
-    return { ok: true };
   },
 });

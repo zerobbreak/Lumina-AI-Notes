@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "convex:dev": "convex dev",
+    "convex:deploy": "convex deploy"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.36.5",

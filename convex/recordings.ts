@@ -92,6 +92,8 @@ async function checkAndUpdateAudioUsage(
 
 // Generate upload URL for audio files
 export const generateUploadUrl = mutation(async (ctx) => {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error("Unauthorized");
   return await ctx.storage.generateUploadUrl();
 });
 
