@@ -201,30 +201,6 @@ export function Sidebar() {
     <div className="w-full h-full min-h-0 bg-sidebar flex flex-col group/sidebar overflow-hidden">
       {/* Header */}
       <div className="p-3 sm:p-4 space-y-3">
-        {/* Workspace header */}
-        <div className="flex items-center gap-3.5 p-2 rounded-xl hover:bg-sidebar-accent transition-all duration-300 cursor-pointer group">
-          <div className="w-9 h-9 bg-zinc-800 rounded-lg flex items-center justify-center text-zinc-400 font-bold">
-            <span>U</span>
-          </div>
-          <div className="flex-1 overflow-hidden min-w-0">
-            <h2 className="font-semibold text-sidebar-foreground text-[13px] tracking-wide truncate">
-              University of Tech
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsSettingsOpen(true);
-            }}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-            aria-label="Open settings"
-            data-tour="settings"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
-        </div>
-
         {/* Search */}
         <Button
           variant="ghost"
