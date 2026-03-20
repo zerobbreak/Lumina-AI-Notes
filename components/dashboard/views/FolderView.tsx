@@ -98,7 +98,7 @@ export default function FolderView({
     contextId && contextType === "course" ? { courseId: contextId } : "skip",
   );
 
-  const { createNoteFlow, TemplateSelector } = useCreateNoteFlow();
+  const { createNoteFlow } = useCreateNoteFlow();
   const addModule = useMutation(api.users.addModuleToCourse);
   const renameModule = useMutation(api.users.renameModule);
   const deleteModule = useMutation(api.users.deleteModule);
@@ -122,23 +122,6 @@ export default function FolderView({
   const getCurrentCourse = () => {
     if (!userData || contextType !== "course") return null;
     return userData.courses?.find((c: Course) => c.id === contextId);
-  };
-
-  const getDefaultNoteStyle = () => {
-    if (!userData) return "standard";
-    if (contextType === "course") {
-      return (
-        getCurrentCourse()?.defaultNoteStyle ?? userData.noteStyle ?? "standard"
-      );
-    }
-    if (contextType === "module") {
-      for (const c of userData.courses || []) {
-        if (c.modules?.some((m: Module) => m.id === contextId)) {
-          return c.defaultNoteStyle ?? userData.noteStyle ?? "standard";
-        }
-      }
-    }
-    return userData.noteStyle ?? "standard";
   };
 
   const getContextName = () => {
@@ -174,9 +157,9 @@ export default function FolderView({
     try {
       const result = await createNoteFlow({
         title: "Untitled Note",
+        major: userData?.major || "general",
         courseId: contextType === "course" ? contextId : undefined,
         moduleId: contextType === "module" ? contextId : undefined,
-        styleOverride: getDefaultNoteStyle(),
       });
       if (result?.noteId) {
         router.push(`/dashboard?noteId=${result.noteId}`);
@@ -613,8 +596,6 @@ export default function FolderView({
         title={renameTarget?.type === "file" ? "File" : "Module"}
         onConfirm={handleRenameConfirm}
       />
-
-      <TemplateSelector />
     </div>
   );
 }

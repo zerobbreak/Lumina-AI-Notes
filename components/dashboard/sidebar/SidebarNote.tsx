@@ -77,8 +77,8 @@ function SidebarNoteComponent({
           "w-full justify-start h-9 px-2.5 pr-16 text-[13px] gap-3 transition-all",
           isDraggable && "pl-5", // Extra padding for drag handle
           isActive
-            ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-medium"
-            : "text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/4",
+            ? "bg-sidebar-accent text-sidebar-foreground font-medium"
+            : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent",
         )}
         onClick={handleClick}
       >
@@ -86,13 +86,13 @@ function SidebarNoteComponent({
           className={cn(
             "w-3.5 h-3.5 transition-colors shrink-0",
             isActive
-              ? "text-indigo-600 dark:text-indigo-400"
-              : "text-amber-600 dark:text-amber-500/70 group-hover/note:text-amber-500 dark:group-hover/note:text-amber-400",
+              ? "text-sidebar-foreground"
+              : "text-zinc-500 group-hover/note:text-zinc-400",
           )}
         />
         <span className="truncate">{note.title}</span>
         {note.quickCaptureType === "voice" && (
-          <span className="ml-2 text-[9px] uppercase tracking-widest text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
+          <span className="ml-2 text-[9px] uppercase tracking-widest text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded border border-sidebar-border">
             Voice
           </span>
         )}

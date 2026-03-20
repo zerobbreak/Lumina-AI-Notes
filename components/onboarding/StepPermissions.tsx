@@ -1,9 +1,10 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Mic, Lock, CheckCircle2 } from "lucide-react";
+import { Mic, Shield, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { toast } from "sonner";
 
 interface StepPermissionsProps {
   onPermissionGranted: () => void;
@@ -18,48 +19,71 @@ export function StepPermissions({ onPermissionGranted }: StepPermissionsProps) {
       setGranted(true);
       setTimeout(() => {
         onPermissionGranted();
-      }, 1000);
+      }, 600);
     } catch (err) {
       console.error("Permission denied", err);
-      alert("Microphone access is required for recording lectures.");
+      toast.error("Microphone access is needed for voice capture.", {
+        description: "Allow the prompt in your browser, or enable it in site settings.",
+      });
     }
   };
 
   return (
-    <div className="space-y-8 text-center">
-      <div className="space-y-4">
-        <div className="w-20 h-20 bg-indigo-500/20 rounded-full flex items-center justify-center mx-auto ring-1 ring-indigo-500/50 shadow-[0_0_40px_rgba(99,102,241,0.2)]">
+    <div className="flex flex-col items-center text-center flex-1 justify-center gap-8 py-2">
+      <motion.div
+        initial={{ scale: 0.92, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="relative"
+      >
+        <div className="absolute inset-0 rounded-full bg-indigo-500/25 blur-2xl scale-150" />
+        <div
+          className={`relative flex h-24 w-24 items-center justify-center rounded-full ring-1 transition-colors duration-300 ${
+            granted
+              ? "bg-emerald-500/15 ring-emerald-500/40"
+              : "bg-indigo-500/15 ring-indigo-400/30"
+          }`}
+        >
           {granted ? (
-            <CheckCircle2 className="w-10 h-10 text-green-400" />
+            <CheckCircle2 className="h-11 w-11 text-emerald-400" strokeWidth={1.5} />
           ) : (
-            <Mic className="w-10 h-10 text-indigo-400" />
+            <Mic className="h-11 w-11 text-indigo-300" strokeWidth={1.5} />
           )}
         </div>
-        <h2 className="text-2xl font-bold text-white">Enable Audio Capture</h2>
-        <p className="text-muted-foreground max-w-sm mx-auto">
-          Lumina needs microphone access to record and transcribe your lectures
-          in real-time.
+      </motion.div>
+
+      <div className="space-y-2 max-w-sm mx-auto">
+        <p className="text-sm text-zinc-400 leading-relaxed">
+          Used when you record or transcribe lectures. You can change this anytime
+          in your browser settings.
         </p>
       </div>
 
-      <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-lg flex items-start gap-3 text-left max-w-sm mx-auto">
-        <Lock className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
-        <p className="text-sm text-yellow-200/80">
-          Your recordings are processed securely and never used for training
-          public models without your consent.
+      <div className="w-full max-w-sm rounded-xl border border-white/[0.08] bg-zinc-900/50 p-4 flex gap-3 text-left">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-800 ring-1 ring-white/[0.06]">
+          <Shield className="h-4 w-4 text-zinc-400" />
+        </div>
+        <p className="text-xs text-zinc-400 leading-relaxed">
+          Audio is processed for your workspace. We don&apos;t use your recordings
+          to train public models without your consent.
         </p>
       </div>
 
-      <div className="flex flex-col gap-3">
-        <Button
-          size="lg"
-          className="w-full h-12 text-base"
-          onClick={requestMicrophone}
-          disabled={granted}
-        >
-          {granted ? "Access Granted" : "Allow Microphone Access"}
-        </Button>
-      </div>
+      <Button
+        type="button"
+        size="lg"
+        className="w-full max-w-sm h-12 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white border border-white/10 shadow-lg shadow-indigo-500/20"
+        onClick={requestMicrophone}
+        disabled={granted}
+      >
+        {granted ? (
+          <span className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4" />
+            You&apos;re set
+          </span>
+        ) : (
+          "Allow microphone"
+        )}
+      </Button>
     </div>
   );
 }

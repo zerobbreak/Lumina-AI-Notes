@@ -77,9 +77,6 @@ const editor = useEditor({
 });
 ```
 
-### Onboarding Integration
-When users select "Mind Mapping" as their note style during onboarding, a course roadmap is automatically generated using AI and inserted as a diagram node.
-
 ## Keyboard Shortcuts
 - `Delete` / `Backspace`: Delete selected nodes/edges
 - `N`: Add new topic node

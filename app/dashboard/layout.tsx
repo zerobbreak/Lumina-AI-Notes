@@ -14,6 +14,9 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useSearchParams } from "next/navigation";
 import { QuickCaptureFab } from "@/components/dashboard/quick-capture/QuickCaptureFab";
+import { Button } from "@/components/ui/button";
+import { PanelLeft } from "lucide-react";
+import { useDashboard } from "@/hooks/useDashboard";
 
 function DashboardLayoutLoading() {
   return (
@@ -35,6 +38,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const userData = useQuery(api.users.getUser);
   const searchParams = useSearchParams();
   const hideQuickCapture = Boolean(searchParams.get("noteId"));
+  const { toggleLeftSidebar, isLeftSidebarOpen } = useDashboard();
 
   // Accept any pending email invites for the signed-in user.
   useEffect(() => {
@@ -65,8 +69,27 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         data-theme={userData?.theme || "indigo"}
       >
         <Sidebar />
-        <main className="flex-1 h-full overflow-hidden relative z-0">
-          {children}
+        <main className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden relative z-0">
+          {/* Mobile: opens navigation when note hub and other views have no header toggle */}
+          <div className="flex md:hidden items-center h-11 shrink-0 px-2 border-b border-border bg-background/95 backdrop-blur-sm">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleLeftSidebar}
+              className={
+                isLeftSidebarOpen
+                  ? "text-muted-foreground"
+                  : "text-foreground bg-accent"
+              }
+              aria-label={isLeftSidebarOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-expanded={isLeftSidebarOpen}
+            >
+              <PanelLeft className="w-5 h-5" />
+            </Button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            {children}
+          </div>
         </main>
         <RightSidebar />
         <QuickCaptureFab hidden={hideQuickCapture} />

@@ -34,7 +34,7 @@ export function CreateNoteDialog({
   onOpenChange,
 }: CreateNoteDialogProps) {
   const userData = useQuery(api.users.getUser);
-  const { createNoteFlow, TemplateSelector } = useCreateNoteFlow();
+  const { createNoteFlow } = useCreateNoteFlow();
 
   const [title, setTitle] = useState("");
   const [selectedCourse, setSelectedCourse] = useState<string>("");
@@ -171,7 +171,6 @@ export function CreateNoteDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
-      <TemplateSelector />
     </Dialog>
   );
 }

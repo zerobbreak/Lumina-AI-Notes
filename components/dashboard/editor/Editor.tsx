@@ -12,7 +12,13 @@ import Placeholder from "@tiptap/extension-placeholder";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import { Dropcursor } from "@tiptap/extension-dropcursor";
-import { useEffect, useRef, useState } from "react";
+import { BubbleMenu } from "@tiptap/extension-bubble-menu";
+import { FloatingMenu as FloatingMenuExtension } from "@tiptap/extension-floating-menu";
+import { FloatingMenu } from "@tiptap/react/menus";
+import { SlashCommand, renderItems } from "./extensions/SlashCommand";
+import { SlashCommandMenu } from "./SlashCommandMenu";
+import { Plus, GripVertical } from "lucide-react";
+import { useEffect, useState } from "react";
 import { ResourceMentionNode } from "./ResourceMentionNode";
 import { OutlineExtension } from "./extensions/OutlineExtension";
 import { DiagramExtension } from "./extensions/DiagramExtension";
@@ -96,9 +102,6 @@ export default function Editor({
   const [cornellSummary, setCornellSummary] = useState(
     initialCornellSummary || "",
   );
-  const outlineToolbarRef = useRef<HTMLDivElement | null>(null);
-  const [showOutlineShortcuts, setShowOutlineShortcuts] = useState(false);
-
   // Build extensions based on style type
   const extensions: AnyExtension[] = [
     StarterKit.configure({
@@ -129,6 +132,13 @@ export default function Editor({
     Placeholder.configure({
       placeholder,
     }),
+    SlashCommand.configure({
+      suggestion: {
+        render: renderItems,
+      },
+    }),
+    BubbleMenu,
+    FloatingMenuExtension,
     ResourceMention,
     DiagramExtension, // Always include diagram support
     ...MathExtensions, // Math formula support (inline $...$ and block $$...$$)
@@ -285,12 +295,12 @@ export default function Editor({
         {/* Main Grid */}
         <div className="grid grid-cols-[300px_1fr] gap-6 flex-1 min-h-0">
           {/* Left Column - Cues */}
-          <div className="border-r border-white/10 p-6 bg-linear-to-br from-white/5 to-transparent">
+          <div className="border-r border-border p-6 bg-accent/30">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
                 <span className="text-lg">💡</span>
               </div>
-              <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                 Cues & Questions
               </h3>
             </div>
@@ -298,7 +308,7 @@ export default function Editor({
               value={cornellCues}
               onChange={(e) => setCornellCues(e.target.value)}
               disabled={!isEditable}
-              className="w-full h-[calc(100%-3rem)] bg-transparent resize-none focus:outline-none text-gray-300 text-sm leading-relaxed placeholder:text-gray-600"
+              className="w-full h-[calc(100%-3rem)] bg-transparent resize-none focus:outline-none text-foreground text-sm leading-relaxed placeholder:text-muted-foreground/50"
               placeholder="• Key terms&#10;• Important concepts&#10;• Review questions&#10;• Main ideas"
             />
           </div>
@@ -306,10 +316,10 @@ export default function Editor({
           {/* Right Column - Main Notes */}
           <div className="p-6 flex flex-col min-h-0">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
                 <span className="text-lg">📝</span>
               </div>
-              <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                 Notes
               </h3>
             </div>
@@ -320,12 +330,12 @@ export default function Editor({
         </div>
 
         {/* Bottom Row - Summary */}
-        <div className="border-t border-white/10 p-6 bg-linear-to-br from-white/5 to-transparent">
+        <div className="border-t border-border p-6 bg-accent/30">
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
               <span className="text-lg">📋</span>
             </div>
-            <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
               Summary
             </h3>
           </div>
@@ -333,7 +343,7 @@ export default function Editor({
             value={cornellSummary}
             onChange={(e) => setCornellSummary(e.target.value)}
             disabled={!isEditable}
-            className="w-full bg-transparent resize-none focus:outline-none text-gray-300 text-sm h-24 leading-relaxed placeholder:text-gray-600"
+            className="w-full bg-transparent resize-none focus:outline-none text-foreground text-sm h-24 leading-relaxed placeholder:text-muted-foreground/50"
             placeholder="Summarize the main points in 2-3 sentences..."
           />
         </div>
@@ -341,79 +351,9 @@ export default function Editor({
     );
   }
 
-  const handleOutlineBlur = () => {
-    requestAnimationFrame(() => {
-      const active = document.activeElement;
-      if (
-        outlineToolbarRef.current &&
-        active &&
-        outlineToolbarRef.current.contains(active)
-      ) {
-        return;
-      }
-      setShowOutlineShortcuts(false);
-    });
-  };
-
   if (styleType === "outline") {
     return (
       <div className="outline-mode-container">
-        {/* Toolbar with outline-specific actions */}
-        <div
-          className="outline-toolbar mb-4 p-3 bg-white/5 border border-white/10 rounded-lg"
-          ref={outlineToolbarRef}
-          onFocusCapture={() => setShowOutlineShortcuts(true)}
-          onBlurCapture={handleOutlineBlur}
-        >
-          {showOutlineShortcuts && (
-            <div className="flex items-center gap-2 text-xs text-gray-400 mb-2">
-              <span>💡</span>
-              <span>
-                <strong>Shortcuts:</strong> Tab to indent • Shift+Tab to outdent
-                • Cmd+Shift+8 for bullets • Cmd+Shift+9 for tasks
-              </span>
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => editor?.chain().focus().toggleBulletList().run()}
-              className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                editor?.isActive("bulletList")
-                  ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
-                  : "bg-white/5 text-gray-400 hover:bg-white/10 border border-transparent"
-              }`}
-            >
-              • Bullets
-            </button>
-            <button
-              onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-              className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                editor?.isActive("orderedList")
-                  ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
-                  : "bg-white/5 text-gray-400 hover:bg-white/10 border border-transparent"
-              }`}
-            >
-              1. Numbers
-            </button>
-            <button
-              onClick={() => editor?.chain().focus().toggleTaskList().run()}
-              className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                editor?.isActive("taskList")
-                  ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
-                  : "bg-white/5 text-gray-400 hover:bg-white/10 border border-transparent"
-              }`}
-            >
-              ☐ Tasks
-            </button>
-            <div className="ml-auto flex items-center gap-4 text-xs text-gray-500">
-              <span>{outlineMetadata?.totalItems || 0} items</span>
-              {outlineMetadata && outlineMetadata.completedTasks > 0 && (
-                <span>{outlineMetadata.completedTasks} completed</span>
-              )}
-            </div>
-          </div>
-        </div>
-
         {/* Editor */}
         <div className="outline-editor-content">
           <EditorContent editor={editor} />
@@ -423,5 +363,64 @@ export default function Editor({
   }
 
   // Default Standard
-  return <EditorContent editor={editor} />;
+  return (
+    <div className="relative group/editor">
+      {editor && (
+        <FloatingMenu
+          editor={editor}
+          options={{
+            placement: "left-start",
+            offset: [12, 8], // 12px from the text, 8px down from the top of the line
+          }}
+          shouldShow={({ state }) => {
+            const { selection } = state;
+            const { $from } = selection;
+            const isRootDepth = $from.depth === 1;
+            const isEmpty = $from.parent.content.size === 0;
+            const isParagraph = $from.parent.type.name === "paragraph";
+
+            return isRootDepth && isEmpty && isParagraph;
+          }}
+        >
+          <div className="flex items-center gap-0.5 opacity-0 group-hover/editor:opacity-100 transition-opacity pr-2">
+            <button
+              className="flex h-5 w-5 items-center justify-center rounded-md text-zinc-500 hover:bg-white/10 hover:text-zinc-300 transition-colors"
+              onClick={() => {
+                editor.chain().focus().insertContent("/").run();
+              }}
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+            <div className="flex h-5 w-5 items-center justify-center rounded-md text-zinc-600 cursor-grab active:cursor-grabbing hover:bg-white/10 hover:text-zinc-400 transition-colors">
+              <GripVertical className="w-3.5 h-3.5" />
+            </div>
+          </div>
+        </FloatingMenu>
+      )}
+
+      {editor && editor.slashCommandProps && (() => {
+        const sc = editor.slashCommandProps;
+        if (!sc) return null;
+        const parentEl = editor.view.dom.parentElement;
+        const parentRect = parentEl?.getBoundingClientRect();
+        const cr = sc.clientRect?.() ?? null;
+        const top = cr
+          ? cr.top -
+            (parentRect?.top ?? 0) +
+            (parentEl?.scrollTop ?? 0) +
+            24
+          : 0;
+        const left = cr
+          ? cr.left - (parentRect?.left ?? 0)
+          : 0;
+        return (
+          <div className="absolute z-50" style={{ top, left }}>
+            <SlashCommandMenu editor={editor} range={sc.range} />
+          </div>
+        );
+      })()}
+
+      <EditorContent editor={editor} />
+    </div>
+  );
 }

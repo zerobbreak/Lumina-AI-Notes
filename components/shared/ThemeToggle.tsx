@@ -15,25 +15,25 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <div className="flex items-center gap-1 p-1 bg-white/5 rounded-lg border border-white/10">
+      <div className="flex items-center gap-1 p-1 bg-zinc-800/50 rounded-lg border border-sidebar-border">
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 rounded-md text-gray-400"
+          className="h-7 w-7 rounded-md text-muted-foreground"
         >
           <Sun className="h-4 w-4" />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 rounded-md text-gray-400"
+          className="h-7 w-7 rounded-md text-muted-foreground"
         >
           <Laptop className="h-4 w-4" />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 rounded-md text-gray-400"
+          className="h-7 w-7 rounded-md text-muted-foreground"
         >
           <Moon className="h-4 w-4" />
         </Button>
@@ -42,11 +42,11 @@ export function ThemeToggle() {
   }
 
   return (
-    <div className="flex items-center gap-1 p-1 bg-white/5 rounded-lg border border-white/10">
+    <div className="flex items-center gap-1 p-1 bg-zinc-800/50 rounded-lg border border-sidebar-border">
       <Button
         variant="ghost"
         size="icon"
-        className={`h-7 w-7 rounded-md ${theme === "light" ? "bg-white text-black shadow-sm" : "text-gray-400 hover:text-white"}`}
+        className={`h-7 w-7 rounded-md ${theme === "light" ? "bg-zinc-200 text-black shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
         onClick={() => setTheme("light")}
         title="Light Mode"
       >
@@ -56,7 +56,7 @@ export function ThemeToggle() {
       <Button
         variant="ghost"
         size="icon"
-        className={`h-7 w-7 rounded-md ${theme === "system" ? "bg-white/10 text-white shadow-sm" : "text-gray-400 hover:text-white"}`}
+        className={`h-7 w-7 rounded-md ${theme === "system" ? "bg-zinc-800 text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
         onClick={() => setTheme("system")}
         title="System Preference"
       >
@@ -66,7 +66,7 @@ export function ThemeToggle() {
       <Button
         variant="ghost"
         size="icon"
-        className={`h-7 w-7 rounded-md ${theme === "dark" ? "bg-white/10 text-white shadow-sm" : "text-gray-400 hover:text-white"}`}
+        className={`h-7 w-7 rounded-md ${theme === "dark" ? "bg-zinc-800 text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
         onClick={() => setTheme("dark")}
         title="Dark Mode"
       >

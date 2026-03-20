@@ -174,10 +174,15 @@ export function RightSidebar() {
   const pastRecordings = useQuery(api.recordings.getRecordings);
   const files = useQuery(api.files.getFiles);
   const userData = useQuery(api.users.getUser);
-  const { createNoteFlow, TemplateSelector } = useCreateNoteFlow();
+  const { createNoteFlow } = useCreateNoteFlow();
 
   // Get dashboard context for pending notes and active context
-  const { setPendingNotes, activeContext, setActiveContext } = useDashboard();
+  const {
+    setPendingNotes,
+    activeContext,
+    setActiveContext,
+    isRightSidebarOpen,
+  } = useDashboard();
   const generateFromPinnedAudio = useAction(api.notes.generateFromPinnedAudio);
 
   const { transcript, resetTranscript, browserSupportsSpeechRecognition } =
@@ -1118,6 +1123,10 @@ export function RightSidebar() {
   // Don't render until mounted (hydration fix)
   if (!isMounted) return null;
 
+  if (!isRightSidebarOpen) {
+    return null;
+  }
+
   // Check browser support
   if (!browserSupportsSpeechRecognition) {
     return (
@@ -1933,7 +1942,6 @@ export function RightSidebar() {
         selectedText={selectedText}
         onExtract={handleExtractCode}
       />
-      <TemplateSelector />
     </motion.div>
   );
 }

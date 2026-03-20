@@ -3,37 +3,76 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery, useConvexAuth, useAction } from "convex/react";
+import { useMutation, useQuery, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
+import {
+  ChevronRight,
+  ChevronLeft,
+  Sparkles,
+  GraduationCap,
+  FolderOpen,
+  Mic2,
+  type LucideIcon,
+} from "lucide-react";
 
 import { StepMajor } from "@/components/onboarding/StepMajor";
 import { StepCourses } from "@/components/onboarding/StepCourses";
-import { StepNoteStyle } from "@/components/onboarding/StepNoteStyle";
 import { StepPermissions } from "@/components/onboarding/StepPermissions";
 import { InitializationScreen } from "@/components/onboarding/InitializationScreen";
 import {
+  OnboardingBackdrop,
+  OnboardingProgress,
+} from "@/components/onboarding/OnboardingChrome";
+import {
   getEnabledBlocksForMajor,
   getMajorTheme,
+  getStyleRecommendation,
 } from "@/lib/noteStyleRecommendations";
-import Image from "next/image";
+
+const STEP_HINTS: Record<
+  number,
+  { title: string; body: string; icon: LucideIcon }
+> = {
+  1: {
+    title: "Built for how you study",
+    body: "A calm, focused workspace for notes, courses, and AI help—without the clutter.",
+    icon: Sparkles,
+  },
+  2: {
+    title: "We adapt to your field",
+    body: "Your major shapes themes, shortcuts, and how the assistant reasons about your material.",
+    icon: GraduationCap,
+  },
+  3: {
+    title: "Ground your courses",
+    body: "Syllabus PDFs give Lumina context—dates, terms, and structure—for smarter answers.",
+    icon: FolderOpen,
+  },
+  4: {
+    title: "Capture lectures in the moment",
+    body: "Microphone access unlocks voice capture and transcription when you’re ready to record.",
+    icon: Mic2,
+  },
+};
+
+function formatMajorLabel(id: string) {
+  if (!id) return "Your major";
+  if (id === "cs") return "Computer Science";
+  return id.charAt(0).toUpperCase() + id.slice(1);
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
   const completeOnboarding = useMutation(api.users.completeOnboarding);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const uploadFile = useMutation(api.files.uploadFile);
-  const createNote = useMutation(api.notes.createNote); // NEW
-  const updateNote = useMutation(api.notes.updateNote); // NEW
-  const generateCourseRoadmap = useAction(api.ai.generateCourseRoadmap); // NEW
   const userData = useQuery(api.users.getUser);
 
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     major: "",
     files: [] as File[],
-    noteStyle: "",
     permissionsGranted: false,
   });
 
@@ -41,7 +80,6 @@ export default function OnboardingPage() {
 
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
 
-  // Redirect to dashboard if user has already completed onboarding
   useEffect(() => {
     if (userData && userData.onboardingComplete) {
       router.replace("/dashboard");
@@ -54,7 +92,7 @@ export default function OnboardingPage() {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  const totalSteps = 5;
+  const totalSteps = 4;
 
   const handleNext = async () => {
     if (step === totalSteps) {
@@ -67,15 +105,11 @@ export default function OnboardingPage() {
   const handleFinish = async () => {
     setIsInitializing(true);
 
-    // Simulate "Artificial Delay" for the cool animation
     setTimeout(async () => {
       try {
-        // Upload each file to Convex storage and create courses
         const coursePromises = formData.files.map(async (file) => {
-          // Generate upload URL
           const postUrl = await generateUploadUrl();
 
-          // Upload file to Convex storage
           const result = await fetch(postUrl, {
             method: "POST",
             headers: { "Content-Type": file.type || "application/pdf" },
@@ -85,10 +119,8 @@ export default function OnboardingPage() {
           if (!result.ok) throw new Error(`Failed to upload ${file.name}`);
           const { storageId } = await result.json();
 
-          // Create course ID
           const courseId = Math.random().toString(36).substring(7);
 
-          // Save file metadata to Convex
           await uploadFile({
             name: file.name,
             type: "pdf",
@@ -104,354 +136,359 @@ export default function OnboardingPage() {
         });
 
         const courses = await Promise.all(coursePromises);
-        const coursesWithStyle = courses.map((course) => ({
-          ...course,
-          defaultNoteStyle: formData.noteStyle,
+        const defaultTemplate = getStyleRecommendation(formData.major).primary;
+        const coursesWithDefaults = courses.map((c) => ({
+          ...c,
+          defaultNoteStyle: defaultTemplate,
         }));
 
-        // Use the recommendation engine for enabled blocks and theme
         const blocks = getEnabledBlocksForMajor(formData.major);
         const theme = getMajorTheme(formData.major);
 
         await completeOnboarding({
           major: formData.major,
           semester: "Fall 2025",
-          courses: coursesWithStyle,
-          noteStyle: formData.noteStyle,
+          courses: coursesWithDefaults,
+          noteStyle: defaultTemplate,
           theme: theme.accent,
           enabledBlocks: blocks,
         });
-
-        // SPECIAL: If Visual Mode (Mind Map) is selected, generate a Course Roadmap
-        if (formData.noteStyle === "mindmap") {
-          try {
-            const courseNames = coursesWithStyle.map((c) => c.name);
-            // 1. Generate Diagram Data
-            const roadmapData = await generateCourseRoadmap({
-              major: formData.major,
-              courses: courseNames,
-            });
-
-            // 2. Create the Roadmap Note
-            // Format specifically for the Diagram Node
-            const diagramHtml = `<div data-type="diagram" data-nodes='${JSON.stringify(roadmapData.nodes)}' data-edges='${JSON.stringify(roadmapData.edges)}'></div>`;
-
-            const roadmapNoteId = await createNote({
-              title: "My Course Roadmap",
-              noteType: "page",
-              style: "mindmap",
-            });
-
-            await updateNote({
-              noteId: roadmapNoteId,
-              content: `
-                  <h2>🎓 '${formData.major}' Learning Path</h2>
-                  <p>Here is your personalized roadmap generated based on your major and enrolled courses.</p>
-                  ${diagramHtml}
-                  <p><em>Use this map to track your progress and see connections between subjects.</em></p>
-                `,
-            });
-          } catch (e) {
-            console.error("Failed to generate roadmap", e);
-          }
-        }
 
         router.push("/dashboard?tour=1");
       } catch (error) {
         console.error("Onboarding failed", error);
         setIsInitializing(false);
       }
-    }, 5500); // 5.5s delay to let animations play out
+    }, 5500);
   };
+
+  const hint = STEP_HINTS[step] ?? STEP_HINTS[1];
+  const HintIcon = hint.icon;
 
   if (isInitializing) {
     return <InitializationScreen />;
   }
 
-  // Loading state while checking user data
   if (authLoading || userData === undefined) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center text-gray-500">
-        <div className="flex items-center gap-2 animate-pulse">
-          <Sparkles className="w-5 h-5" />
-          <span>Loading...</span>
+      <div className="relative min-h-screen flex items-center justify-center text-zinc-400">
+        <OnboardingBackdrop />
+        <div className="relative z-10 flex flex-col items-center gap-3">
+          <div className="h-10 w-10 rounded-full border-2 border-indigo-500/30 border-t-indigo-400 animate-spin" />
+          <p className="text-sm tracking-wide">Loading workspace…</p>
         </div>
       </div>
     );
   }
 
-  // Waiting for redirect if already completed onboarding
   if (userData && userData.onboardingComplete) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center text-gray-500">
-        <div className="flex items-center gap-2 animate-pulse">
-          <Sparkles className="w-5 h-5" />
-          <span>Redirecting to dashboard...</span>
+      <div className="relative min-h-screen flex items-center justify-center text-zinc-400">
+        <OnboardingBackdrop />
+        <div className="relative z-10 flex items-center gap-2 text-sm">
+          <Sparkles className="w-4 h-4 text-indigo-400" />
+          Redirecting…
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      {/* Ambient Background */}
-      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-900/30 rounded-full blur-[120px]" />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-purple-900/20 rounded-full blur-[120px]" />
+    <div className="relative min-h-screen text-zinc-100 flex flex-col">
+      <OnboardingBackdrop />
 
-      <motion.div layout className="w-full max-w-6xl relative z-10">
-        {/* Progress Bar */}
-        <div className="w-full max-w-md mx-auto h-1 bg-white/10 rounded-full mb-12 overflow-hidden">
-          <motion.div
-            className="h-full bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.5)]"
-            initial={{ width: 0 }}
-            animate={{ width: `${(step / totalSteps) * 100}%` }}
-          />
+      <header className="relative z-10 shrink-0 px-6 pt-8 pb-2 md:px-10">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-500/25">
+              <Sparkles className="h-4 w-4 text-white" strokeWidth={2.2} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold tracking-tight text-white">
+                Lumina
+              </p>
+              <p className="text-[11px] text-zinc-500 uppercase tracking-[0.2em]">
+                Setup
+              </p>
+            </div>
+          </div>
+          <p className="hidden sm:block text-xs text-zinc-500">
+            ~2 minutes · You can add more later
+          </p>
         </div>
+      </header>
 
-        {/* Content Container */}
-        <div className="grid lg:grid-cols-12 gap-12 items-center">
-          {/* Left: Interactive Form */}
-          <div className="lg:col-span-5 bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-8 min-h-[500px] flex flex-col justify-between shadow-2xl relative overflow-hidden group">
-            <div className="absolute inset-0 bg-linear-to-br from-white/5 to-transparent pointer-events-none group-hover:from-white/10 transition-colors duration-500" />
+      <main className="relative z-10 flex flex-1 flex-col items-center px-4 pb-10 pt-4 md:px-8">
+        <OnboardingProgress step={step} total={totalSteps} />
 
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={step}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
-                className="flex-1"
-              >
-                {step === 1 && (
-                  <div className="text-center h-full flex flex-col items-center justify-center space-y-6">
-                    <div className="w-16 h-16 bg-linear-to-tr from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center shadow-lg mb-4">
-                      <span className="text-3xl">✨</span>
-                    </div>
-                    <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-linear-to-r from-white to-gray-400">
-                      Welcome to Lumina
-                    </h1>
-                    <p className="text-gray-400 text-lg">
-                      Let's tailor your collaborative workspace to your unique
-                      learning journey.
+        <motion.div
+          layout
+          className="w-full max-w-6xl grid lg:grid-cols-12 gap-8 lg:gap-10 items-stretch"
+        >
+          {/* Form column */}
+          <div className="lg:col-span-5 flex flex-col min-h-0">
+            <div
+              className="flex flex-col flex-1 rounded-[1.75rem] border border-white/[0.08] bg-zinc-900/40 backdrop-blur-xl shadow-[0_24px_80px_-20px_rgba(0,0,0,0.65)] ring-1 ring-white/[0.04] overflow-hidden"
+            >
+              <div className="px-6 pt-6 md:px-8 md:pt-8 pb-2 border-b border-white/[0.06]">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={step}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.22 }}
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-indigo-300/90 mb-1">
+                      {step === 1 && "Welcome"}
+                      {step === 2 && "Your focus"}
+                      {step === 3 && "Materials"}
+                      {step === 4 && "Permissions"}
                     </p>
-                  </div>
-                )}
-                {step === 2 && (
-                  <StepMajor
-                    value={formData.major}
-                    onChange={(val) => setFormData({ ...formData, major: val })}
-                    files={undefined}
-                    setFiles={function (files: any): void {
-                      throw new Error("Function not implemented.");
-                    }}
-                  />
-                )}
-                {step === 3 && (
-                  <StepCourses
-                    value={formData.files}
-                    onChange={(val) => setFormData({ ...formData, files: val })}
-                  />
-                )}
-                {step === 4 && (
-                  <StepNoteStyle
-                    value={formData.noteStyle}
-                    onChange={(val) =>
-                      setFormData({ ...formData, noteStyle: val })
-                    }
-                    major={formData.major}
-                  />
-                )}
-                {step === 5 && (
-                  <StepPermissions
-                    onPermissionGranted={() =>
-                      setFormData({ ...formData, permissionsGranted: true })
-                    }
-                  />
-                )}
-              </motion.div>
-            </AnimatePresence>
+                    <h1 className="text-xl md:text-2xl font-semibold text-white tracking-tight">
+                      {step === 1 && "Start your workspace"}
+                      {step === 2 && "What do you study?"}
+                      {step === 3 && "Add syllabus PDFs"}
+                      {step === 4 && "Enable microphone"}
+                    </h1>
+                  </motion.div>
+                </AnimatePresence>
+              </div>
 
-            {/* Navigation Buttons */}
-            <div className="flex justify-between mt-8 pt-6 border-t border-white/5 relative z-10">
-              <Button
-                variant="ghost"
-                onClick={() => setStep(Math.max(1, step - 1))}
-                disabled={step === 1}
-                className="text-gray-400 hover:text-white hover:bg-white/5"
-              >
-                <ChevronLeft className="mr-2 w-4 h-4" /> Back
-              </Button>
+              <div className="flex-1 flex flex-col min-h-[min(420px,55vh)] md:min-h-[460px] px-6 py-6 md:px-8 md:py-8">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={step}
+                    initial={{ opacity: 0, x: 16 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -16 }}
+                    transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                    className="flex-1 flex flex-col"
+                  >
+                    {step === 1 && (
+                      <div className="flex flex-col items-center justify-center text-center flex-1 gap-8 py-4">
+                        <motion.div
+                          initial={{ scale: 0.9, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          transition={{ delay: 0.05, type: "spring", damping: 18 }}
+                          className="relative"
+                        >
+                          <div className="absolute inset-0 rounded-3xl bg-indigo-500/20 blur-2xl scale-150" />
+                          <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-xl shadow-indigo-500/30 ring-1 ring-white/20">
+                            <Sparkles
+                              className="h-9 w-9 text-white"
+                              strokeWidth={1.5}
+                            />
+                          </div>
+                        </motion.div>
+                        <div className="space-y-3 max-w-sm">
+                          <p className="text-zinc-300 text-[15px] leading-relaxed">
+                            Notes, courses, and AI assistance in one place—so
+                            you spend less time switching tools and more time
+                            learning.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {step === 2 && (
+                      <StepMajor
+                        value={formData.major}
+                        onChange={(val) =>
+                          setFormData({ ...formData, major: val })
+                        }
+                      />
+                    )}
+                    {step === 3 && (
+                      <StepCourses
+                        value={formData.files}
+                        onChange={(val) =>
+                          setFormData({ ...formData, files: val })
+                        }
+                      />
+                    )}
+                    {step === 4 && (
+                      <StepPermissions
+                        onPermissionGranted={() =>
+                          setFormData({ ...formData, permissionsGranted: true })
+                        }
+                      />
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
 
-              <Button
-                onClick={handleNext}
-                disabled={
-                  (step === 2 && !formData.major) ||
-                  (step === 4 && !formData.noteStyle) ||
-                  (step === 5 && !formData.permissionsGranted)
-                }
-                className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 shadow-[0_0_20px_rgba(79,70,229,0.3)] transition-all hover:scale-105 active:scale-95"
-              >
-                {step === totalSteps ? "Finish Customization" : "Next"}
-                {step !== totalSteps && (
-                  <ChevronRight className="ml-2 w-4 h-4" />
-                )}
-              </Button>
+              <div className="mt-auto flex items-center justify-between gap-3 px-6 py-5 md:px-8 border-t border-white/[0.06] bg-black/20">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setStep(Math.max(1, step - 1))}
+                  disabled={step === 1}
+                  className="text-zinc-400 hover:text-white hover:bg-white/[0.06] rounded-xl px-4"
+                >
+                  <ChevronLeft className="mr-1 h-4 w-4" />
+                  Back
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={handleNext}
+                  disabled={
+                    (step === 2 && !formData.major) ||
+                    (step === 4 && !formData.permissionsGranted)
+                  }
+                  className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white px-7 shadow-lg shadow-indigo-500/25 border border-white/10"
+                >
+                  {step === totalSteps ? "Finish & open Lumina" : "Continue"}
+                  {step !== totalSteps && (
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
 
-          {/* Right: Dynamic Preview */}
-          <div className="hidden lg:block lg:col-span-7 relative h-[600px] w-full perspective-[2000px]">
-            {/* Glowing orb behind the card */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-[80%] bg-indigo-500/20 rounded-full blur-[100px]" />
-
-            {/* Glass Mockup */}
+          {/* Preview column */}
+          <div className="hidden lg:flex lg:col-span-7 flex-col min-h-[560px]">
             <motion.div
-              initial={{ opacity: 0, rotateY: -10, scale: 0.95 }}
-              animate={{ opacity: 1, rotateY: 0, scale: 1 }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
-              className="relative w-full h-full bg-[#0F0F12]/80 backdrop-blur-md rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl p-8 flex flex-col"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="flex flex-1 flex-col rounded-[1.75rem] border border-white/[0.08] bg-zinc-950/50 backdrop-blur-md overflow-hidden shadow-[0_32px_100px_-24px_rgba(0,0,0,0.75)] ring-1 ring-inset ring-white/[0.04]"
             >
-              {/* Fake Window Controls */}
-              <div className="flex gap-2 mb-6 absolute top-6 left-6">
-                <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50" />
-                <div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50" />
-                <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50" />
+              <div className="flex items-center gap-2 px-5 py-4 border-b border-white/[0.06] bg-black/30">
+                <div className="flex gap-1.5">
+                  <span className="h-3 w-3 rounded-full bg-red-500/35 ring-1 ring-red-500/40" />
+                  <span className="h-3 w-3 rounded-full bg-amber-500/35 ring-1 ring-amber-500/40" />
+                  <span className="h-3 w-3 rounded-full bg-emerald-500/35 ring-1 ring-emerald-500/40" />
+                </div>
+                <span className="ml-3 text-[11px] text-zinc-500 font-medium tracking-wide">
+                  Preview
+                </span>
               </div>
 
-              {/* Fake Header */}
-              <div className="flex items-center justify-between mb-8 pl-16">
-                <div className="flex items-center gap-4 text-white/20 text-sm font-medium">
-                  <span className="hover:text-white/40 cursor-default transition-colors">
-                    Dashboard
-                  </span>
-                  <span className="hover:text-white/40 cursor-default transition-colors">
-                    Courses
-                  </span>
-                  <span className="hover:text-white/40 cursor-default transition-colors">
-                    Calendar
-                  </span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-64 h-9 bg-white/5 rounded-full border border-white/5 flex items-center px-4">
-                    <div className="w-4 h-4 rounded-full bg-white/10 mr-2" />
-                    <div className="h-2 w-24 bg-white/10 rounded-full" />
-                  </div>
-                  <div className="w-9 h-9 rounded-full bg-linear-to-tr from-indigo-500 to-purple-600 border border-white/20 shadow-lg" />
-                </div>
-              </div>
+              <div className="flex-1 p-6 md:p-8 flex flex-col gap-6 overflow-hidden">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={step}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -12 }}
+                    transition={{ duration: 0.28 }}
+                    className="rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-500/10 via-violet-500/5 to-transparent p-6 flex gap-4"
+                  >
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 ring-1 ring-indigo-400/25">
+                      <HintIcon className="h-5 w-5 text-indigo-300" />
+                    </div>
+                    <div className="min-w-0 space-y-1.5">
+                      <h3 className="text-base font-semibold text-white leading-snug">
+                        {hint.title}
+                      </h3>
+                      <p className="text-sm text-zinc-400 leading-relaxed">
+                        {hint.body}
+                      </p>
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
 
-              {/* Dynamic Content Preview based on Step */}
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={step}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="space-y-6 flex-1"
-                >
-                  <div className="h-48 w-full bg-linear-to-r from-indigo-600/20 via-purple-600/20 to-pink-600/20 rounded-3xl border border-white/5 p-8 flex flex-col justify-between relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                    <div className="flex justify-between items-start z-10">
-                      <div>
-                        <h3 className="text-3xl font-bold text-white mb-2">
-                          {formData.major
-                            ? `${formData.major.charAt(0).toUpperCase() + formData.major.slice(1)}`
-                            : "Select Major..."}
-                        </h3>
-                        <div className="inline-flex items-center px-3 py-1 rounded-full bg-white/10 text-xs text-indigo-200 border border-white/5 backdrop-blur-sm">
-                          Fall Semester 2025
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm text-gray-400 mb-1">
-                          GPA Goal
-                        </div>
-                        <div className="text-2xl font-bold text-emerald-400">
-                          4.0
-                        </div>
+                <div className="rounded-2xl border border-white/[0.06] bg-zinc-900/40 p-6 flex flex-col gap-5 flex-1 min-h-0">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-2xl font-semibold text-white tracking-tight">
+                        {formatMajorLabel(formData.major)}
+                      </h3>
+                      <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-white/[0.06] px-3 py-1 text-xs text-zinc-300 ring-1 ring-white/[0.08]">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+                        Fall 2025
                       </div>
                     </div>
-
-                    <div className="space-y-2 z-10 w-2/3">
-                      <div className="flex justify-between text-xs text-gray-400 mb-1">
-                        <span>Progress</span>
-                        <span>15%</span>
-                      </div>
-                      <div className="h-2 w-full bg-gray-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-indigo-500 w-[15%]" />
-                      </div>
+                    <div className="text-right">
+                      <p className="text-xs text-zinc-500 uppercase tracking-wider">
+                        This week
+                      </p>
+                      <p className="text-2xl font-semibold tabular-nums text-white">
+                        {formData.files.length > 0
+                          ? `${formData.files.length} PDF${formData.files.length > 1 ? "s" : ""}`
+                          : "—"}
+                      </p>
+                      <p className="text-[11px] text-zinc-500 mt-0.5">
+                        {step >= 3 ? "Syllabus files" : "Course files"}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-6 h-40">
-                    {/* Recent Note Card */}
-                    <div className="bg-[#1A1A1E] rounded-3xl border border-white/5 p-5 flex flex-col relative overflow-hidden">
-                      <div className="flex items-center gap-3 mb-auto">
-                        <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center text-orange-400">
-                          <span className="text-lg">📝</span>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs text-zinc-500">
+                      <span>Workspace readiness</span>
+                      <span className="tabular-nums text-zinc-400">
+                        {Math.round((step / totalSteps) * 100)}%
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
+                      <motion.div
+                        className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-400"
+                        initial={false}
+                        animate={{ width: `${(step / totalSteps) * 100}%` }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 100,
+                          damping: 20,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 flex-1 min-h-[140px]">
+                    <div className="rounded-xl border border-white/[0.06] bg-black/25 p-4 flex flex-col justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-lg bg-orange-500/15 flex items-center justify-center text-lg">
+                          📝
                         </div>
-                        <div>
-                          <div className="h-3 w-20 bg-white/20 rounded mb-1.5" />
-                          <div className="h-2 w-12 bg-white/10 rounded" />
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                          <div className="h-2 w-16 bg-white/15 rounded-full" />
+                          <div className="h-1.5 w-10 bg-white/10 rounded-full" />
                         </div>
                       </div>
-
-                      <div className="space-y-2">
-                        <div className="h-1.5 w-full bg-white/10 rounded-full" />
-                        <div className="h-1.5 w-[90%] bg-white/10 rounded-full" />
-                        <div className="h-1.5 w-[75%] bg-white/10 rounded-full" />
+                      <div className="space-y-1.5 mt-4">
+                        <div className="h-1.5 w-full bg-white/[0.08] rounded-full" />
+                        <div className="h-1.5 w-[88%] bg-white/[0.06] rounded-full" />
+                        <div className="h-1.5 w-[72%] bg-white/[0.06] rounded-full" />
                       </div>
-
-                      {formData.noteStyle && (
-                        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center">
-                          <div className="text-center">
-                            <span className="text-white font-medium bg-white/10 px-4 py-2 rounded-full border border-white/10 capitalize">
-                              {formData.noteStyle} Layout
-                            </span>
-                            {formData.major && (
-                              <p className="text-gray-400 text-xs mt-2">
-                                Optimized for{" "}
-                                {formData.major.charAt(0).toUpperCase() +
-                                  formData.major.slice(1)}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )}
                     </div>
 
-                    {/* Stats Card */}
-                    <div className="bg-[#1A1A1E] rounded-3xl border border-white/5 p-5 flex flex-col justify-between">
-                      <div className="flex justify-between items-center mb-2">
-                        <div className="text-sm text-gray-400">
-                          Weekly Focus
-                        </div>
-                        <div className="text-xs text-green-400">+12%</div>
+                    <div className="rounded-xl border border-white/[0.06] bg-black/25 p-4 flex flex-col">
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-xs text-zinc-500">Activity</span>
+                        <span className="text-[11px] font-medium text-emerald-400/90">
+                          +12%
+                        </span>
                       </div>
-
-                      <div className="flex items-end justify-between gap-2 h-20">
+                      <div className="flex flex-1 items-end gap-1.5 min-h-[72px]">
                         {[40, 70, 45, 90, 60, 80, 50].map((h, i) => (
                           <div
                             key={i}
-                            className="w-full bg-indigo-500/20 rounded-t-sm relative group"
+                            className="flex-1 rounded-t-sm bg-indigo-500/15 relative overflow-hidden"
                           >
-                            <div
-                              className="absolute bottom-0 left-0 right-0 bg-indigo-500 rounded-t-sm transition-all duration-500 group-hover:bg-indigo-400"
-                              style={{ height: `${h}%` }}
+                            <motion.div
+                              className="absolute bottom-0 left-0 right-0 rounded-t-sm bg-gradient-to-t from-indigo-600 to-violet-500"
+                              initial={{ height: 0 }}
+                              animate={{ height: `${h}%` }}
+                              transition={{
+                                delay: i * 0.04,
+                                duration: 0.5,
+                                ease: "easeOut",
+                              }}
                             />
                           </div>
                         ))}
                       </div>
                     </div>
                   </div>
-                </motion.div>
-              </AnimatePresence>
+                </div>
+              </div>
             </motion.div>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      </main>
     </div>
   );
 }

@@ -15,6 +15,7 @@ import type * as aiTranscription from "../aiTranscription.js";
 import type * as analytics from "../analytics.js";
 import type * as collaboration from "../collaboration.js";
 import type * as crons from "../crons.js";
+import type * as encoding from "../encoding.js";
 import type * as files from "../files.js";
 import type * as flashcards from "../flashcards.js";
 import type * as notes from "../notes.js";
@@ -43,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   analytics: typeof analytics;
   collaboration: typeof collaboration;
   crons: typeof crons;
+  encoding: typeof encoding;
   files: typeof files;
   flashcards: typeof flashcards;
   notes: typeof notes;

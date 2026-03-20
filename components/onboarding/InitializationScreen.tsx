@@ -2,49 +2,55 @@
 
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
+import { OnboardingBackdrop } from "@/components/onboarding/OnboardingChrome";
+
+const STEPS = [
+  "Saving your profile…",
+  "Linking course files…",
+  "Applying workspace theme…",
+  "Opening your dashboard…",
+] as const;
 
 export function InitializationScreen() {
   return (
-    <div className="min-h-screen w-full bg-black text-white flex flex-col items-center justify-center relative overflow-hidden p-6">
-      {/* Ambient Background */}
-      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-900/30 rounded-full blur-[120px]" />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-purple-900/20 rounded-full blur-[120px]" />
+    <div className="relative min-h-screen w-full text-zinc-100 flex flex-col items-center justify-center p-6">
+      <OnboardingBackdrop />
 
-      <div className="flex flex-col items-center justify-center space-y-8 relative z-10">
-        <div className="relative">
-          {/* Pulsing rings */}
+      <div className="relative z-10 flex flex-col items-center max-w-md w-full">
+        <div className="relative mb-12">
           <motion.div
-            animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute inset-0 bg-indigo-500/30 rounded-full blur-xl"
+            animate={{ scale: [1, 1.4, 1], opacity: [0.4, 0, 0.4] }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute inset-0 rounded-full bg-indigo-500/30 blur-2xl"
           />
           <motion.div
-            animate={{ scale: [1, 2, 1], opacity: [0.3, 0, 0.3] }}
+            animate={{ scale: [1, 1.6, 1], opacity: [0.25, 0, 0.25] }}
             transition={{
-              duration: 2,
+              duration: 2.2,
               repeat: Infinity,
               ease: "easeInOut",
-              delay: 0.5,
+              delay: 0.4,
             }}
-            className="absolute inset-0 bg-purple-500/20 rounded-full blur-2xl"
+            className="absolute inset-0 rounded-full bg-violet-500/20 blur-3xl"
           />
 
-          <div className="relative z-10 w-24 h-24 bg-black rounded-full border border-indigo-500/50 flex items-center justify-center shadow-[0_0_30px_rgba(99,102,241,0.5)]">
-            <Sparkles className="w-10 h-10 text-indigo-400" />
+          <div className="relative z-10 flex h-28 w-28 items-center justify-center rounded-full border border-white/[0.12] bg-zinc-950/80 shadow-[0_0_60px_-10px_rgba(99,102,241,0.5)] backdrop-blur-sm">
+            <Sparkles className="h-11 w-11 text-indigo-300" strokeWidth={1.25} />
           </div>
         </div>
 
-        <div className="space-y-4 max-w-md mx-auto">
-          <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-linear-to-r from-indigo-400 to-purple-400">
-            Tuning Gemini to your Academic DNA...
-          </h2>
+        <motion.h2
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-xl md:text-2xl font-semibold text-center text-white tracking-tight mb-8"
+        >
+          Setting up Lumina
+        </motion.h2>
 
-          <div className="space-y-2">
-            <LoadingStep label="Analyzing Major Requirements..." delay={0} />
-            <LoadingStep label="Building Vocabulary Glossary..." delay={1.5} />
-            <LoadingStep label="Configuring Note Templates..." delay={3} />
-            <LoadingStep label="Setting up Vector Database..." delay={4.5} />
-          </div>
+        <div className="w-full space-y-3">
+          {STEPS.map((label, i) => (
+            <LoadingStep key={label} label={label} delay={i * 0.35} />
+          ))}
         </div>
       </div>
     </div>
@@ -54,17 +60,17 @@ export function InitializationScreen() {
 function LoadingStep({ label, delay }: { label: string; delay: number }) {
   return (
     <motion.div
-      initial={{ opacity: 0, x: -10 }}
+      initial={{ opacity: 0, x: -12 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ delay }}
-      className="flex items-center justify-center gap-3 text-sm text-gray-400"
+      transition={{ delay, duration: 0.35 }}
+      className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3"
     >
       <motion.div
         animate={{ rotate: 360 }}
-        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-        className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full"
+        transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
+        className="h-4 w-4 shrink-0 rounded-full border-2 border-indigo-400/40 border-t-indigo-300"
       />
-      {label}
+      <span className="text-sm text-zinc-400">{label}</span>
     </motion.div>
   );
 }

@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
+import type { NoteBootstrap } from "@/components/dashboard/DashboardContext";
 import { useRouter } from "next/navigation";
 import {
   ChevronRight,
@@ -69,6 +70,25 @@ import "./editor.css";
 // Heartbeat interval for presence tracking (120 seconds - reduced for DB usage)
 const PRESENCE_HEARTBEAT_INTERVAL = 120 * 1000;
 
+function buildBootstrapDoc(
+  noteId: Id<"notes">,
+  b: NoteBootstrap,
+  userId: string,
+): Doc<"notes"> {
+  return {
+    _id: noteId,
+    _creationTime: Date.now(),
+    userId,
+    title: b.title,
+    content: "",
+    style: b.style ?? "standard",
+    courseId: b.courseId,
+    moduleId: b.moduleId,
+    createdAt: Date.now(),
+    noteType: "quick",
+  } as Doc<"notes">;
+}
+
 // Props for the NoteView
 interface NoteViewProps {
   noteId: Id<"notes">;
@@ -84,11 +104,13 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     isRightSidebarOpen,
     pendingNotes,
     clearPendingNotes,
+    noteBootstrap,
+    setNoteBootstrap,
   } = useDashboard();
   const { isLoading: isExporting } = usePDF();
 
   // Fetch data
-  const note = useQuery(api.notes.getNote, { noteId });
+  const noteQuery = useQuery(api.notes.getNote, { noteId });
   const userData = useQuery(api.users.getUser);
   const updateNote = useMutation(api.notes.updateNote);
   const deleteNote = useMutation(api.notes.deleteNote);
@@ -117,14 +139,40 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const [isCollaboratorsOpen, setIsCollaboratorsOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
 
+  const syntheticNote = useMemo((): Doc<"notes"> | null => {
+    if (!userData || noteBootstrap?.noteId !== noteId) return null;
+    return buildBootstrapDoc(noteId, noteBootstrap, userData.tokenIdentifier);
+  }, [noteId, noteBootstrap, userData]);
+
+  const displayNote = useMemo((): Doc<"notes"> | null | undefined => {
+    if (noteQuery === null) return null;
+    if (noteQuery !== undefined) return noteQuery;
+    return syntheticNote ?? undefined;
+  }, [noteQuery, syntheticNote]);
+
   // Parse context (Course / Module)
-  const courseName =
-    userData?.courses?.find(
-      (c: { id: string; name: string }) => c.id === note?.courseId,
-    )?.name || "General";
+  const courseName = useMemo(() => {
+    if (!userData?.courses) return "General";
+    const cid = displayNote?.courseId;
+    const mid = displayNote?.moduleId;
+    if (cid) {
+      return (
+        userData.courses.find((c: { id: string; name: string }) => c.id === cid)
+          ?.name || "General"
+      );
+    }
+    if (mid) {
+      for (const c of userData.courses) {
+        if (c.modules?.some((m: { id: string }) => m.id === mid)) {
+          return c.name;
+        }
+      }
+    }
+    return "General";
+  }, [userData?.courses, displayNote?.courseId, displayNote?.moduleId]);
 
   // Calculate word count and reading time
-  const noteContent = note?.content;
+  const noteContent = displayNote?.content;
   const { wordCount, readingTime } = useMemo(() => {
     if (!noteContent) return { wordCount: 0, readingTime: "< 1 min" };
 
@@ -144,10 +192,23 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     return { wordCount: count, readingTime: time };
   }, [noteContent]);
 
+  useEffect(() => {
+    if (noteBootstrap && noteBootstrap.noteId !== noteId) {
+      setNoteBootstrap(null);
+    }
+  }, [noteId, noteBootstrap, setNoteBootstrap]);
+
+  useEffect(() => {
+    if (noteQuery && noteBootstrap?.noteId === noteId) {
+      setNoteBootstrap(null);
+    }
+  }, [noteQuery, noteId, noteBootstrap, setNoteBootstrap]);
+
   // Debounce Save Effect
   useEffect(() => {
     if (debouncedContent === null) return;
-    if (!note) return;
+    if (noteQuery === null) return;
+    if (noteQuery === undefined && noteBootstrap?.noteId !== noteId) return;
 
     const handler = setTimeout(() => {
       // Check if this is Cornell data (object with cornellCues, cornellNotes, cornellSummary)
@@ -164,7 +225,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
           setIsSaving(false);
         });
       } else if (
-        note?.style === "outline" &&
+        displayNote?.style === "outline" &&
         typeof debouncedContent === "string"
       ) {
         // Extract outline structure and metadata
@@ -205,7 +266,14 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     }, 1000);
 
     return () => clearTimeout(handler);
-  }, [debouncedContent, note, noteId, updateNote, note?.style]);
+  }, [
+    debouncedContent,
+    noteQuery,
+    noteId,
+    noteBootstrap?.noteId,
+    updateNote,
+    displayNote?.style,
+  ]);
 
   // Presence Heartbeat Effect - sends heartbeat on mount and every 30 seconds
   useEffect(() => {
@@ -257,6 +325,10 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     noteIdRef.current = noteId;
   }, [noteId]);
 
+  useEffect(() => {
+    setLoadedNoteId(null);
+  }, [noteId]);
+
   const scheduleEditorUpdate = useCallback((fn: () => void) => {
     queueMicrotask(() => {
       requestAnimationFrame(() => {
@@ -292,14 +364,35 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   // Sync content when note loads OR when noteId changes (switching between notes)
   useEffect(() => {
     const loadContent = async () => {
-      if (note && editor && !editor.isDestroyed) {
+      if (noteQuery && editor && !editor.isDestroyed) {
         // Only load content if we haven't loaded for this noteId yet
         if (noteId !== loadedNoteId) {
-          const htmlContent = await convertMarkdownIfNeeded(note.content || "");
-          // Use queueMicrotask to schedule setContent outside of React's commit phase
-          // This avoids the flushSync error since TipTap internally uses flushSync
+          const htmlContent = await convertMarkdownIfNeeded(
+            noteQuery.content || "",
+          );
+          const raw = noteQuery.content || "";
+          const serverEmpty =
+            !raw.trim() ||
+            raw === "<p></p>" ||
+            raw === "<p><br></p>";
           scheduleEditorUpdate(() => {
             if (editor && !editor.isDestroyed) {
+              if (serverEmpty && editor.getText().trim().length > 0) {
+                const html = editor.getHTML();
+                const plainText = html
+                  .replace(/<[^>]*>/g, " ")
+                  .replace(/\s+/g, " ")
+                  .trim();
+                const count =
+                  plainText.length > 0
+                    ? plainText.split(/\s+/).filter((w) => w.length > 0).length
+                    : 0;
+                setLoadedNoteId(noteId);
+                updateNote({ noteId, content: html, wordCount: count }).catch(
+                  () => {},
+                );
+                return;
+              }
               editor.commands.setContent(htmlContent);
               setLoadedNoteId(noteId);
             }
@@ -308,7 +401,14 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       }
     };
     loadContent();
-  }, [note, noteId, editor, loadedNoteId, scheduleEditorUpdate]); // Note: loadedNoteId prevents re-runs after initial load
+  }, [
+    noteQuery,
+    noteId,
+    editor,
+    loadedNoteId,
+    scheduleEditorUpdate,
+    updateNote,
+  ]);
 
   // Inject structured notes from RightSidebar when pendingNotes changes
   // Wait for note to be loaded (loadedNoteId === noteId) to avoid conflicts
@@ -318,7 +418,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     if (loadedNoteId !== noteIdRef.current) return;
 
     // If this is a Cornell note, update the Cornell fields directly
-    if (note?.style === "cornell") {
+    if (displayNote?.style === "cornell") {
       const cornellCuesText = pendingNotes.cornellCues.join("\n\n");
       const cornellNotesHtml = pendingNotes.cornellNotes
         .map(
@@ -428,8 +528,8 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     setIsDeleting(true);
 
     // Store context before deletion for smart navigation
-    const courseId = note?.courseId;
-    const moduleId = note?.moduleId;
+    const courseId = displayNote?.courseId;
+    const moduleId = displayNote?.moduleId;
 
     try {
       await deleteNote({ noteId });
@@ -461,12 +561,12 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   };
 
   const buildSnapshot = (): NoteContentSnapshot => ({
-    style: (note?.style as any) || "standard",
-    content: note?.content || "",
-    cornellCues: note?.cornellCues || "",
-    cornellNotes: note?.cornellNotes || "",
-    cornellSummary: note?.cornellSummary || "",
-    outlineData: note?.outlineData || "",
+    style: (displayNote?.style as any) || "standard",
+    content: displayNote?.content || "",
+    cornellCues: displayNote?.cornellCues || "",
+    cornellNotes: displayNote?.cornellNotes || "",
+    cornellSummary: displayNote?.cornellSummary || "",
+    outlineData: displayNote?.outlineData || "",
   });
 
   // Handle inserting AI-generated content into the note
@@ -523,8 +623,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     );
   }
 
-  // --- Loading State ---
-  if (note === undefined || !userData) {
+  if (!userData || displayNote === undefined) {
     return (
       <div className="h-full flex flex-col bg-[#0A0A0A]">
         {/* Skeleton Navigation */}
@@ -578,8 +677,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     );
   }
 
-  // --- Note Not Found State ---
-  if (note === null) {
+  if (displayNote === null) {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-[#0A0A0A] text-gray-400 gap-4">
         <FileText className="w-12 h-12 text-gray-600" />
@@ -594,32 +692,34 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     );
   }
 
+  const note = displayNote;
+
   return (
     <div className="h-full flex flex-col bg-background relative animate-in fade-in duration-500">
       {/* 1. Top Navigation / Breadcrumbs */}
-      <div className="h-16 flex items-center px-4 lg:px-8 border-b border-border bg-background/80 backdrop-blur top-0 z-20 sticky justify-between">
+      <div className="h-16 flex items-center px-4 lg:px-8 bg-background top-0 z-20 sticky justify-between">
         <div className="flex items-center gap-4">
           {/* Left Sidebar Toggle */}
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleLeftSidebar}
-            className={`hidden md:flex ${!isLeftSidebarOpen ? "text-cyan-400 bg-cyan-500/10" : "text-gray-500"}`}
+            className={`hidden md:flex ${!isLeftSidebarOpen ? "text-foreground bg-accent" : "text-muted-foreground"}`}
             title="Toggle Sidebar"
           >
             <PanelLeft className="w-5 h-5" />
           </Button>
 
-          <div className="h-4 w-px bg-white/10 hidden md:block" />
+          <div className="h-4 w-px bg-border hidden md:block" />
 
-          <div className="flex items-center text-sm font-medium text-gray-500 gap-2">
+          <div className="flex items-center text-sm font-medium text-muted-foreground gap-2">
             <span
               onClick={onBack}
-              className="hover:text-white cursor-pointer transition-colors"
+              className="hover:text-foreground cursor-pointer transition-colors"
             >
               Dashboard
             </span>
-            <ChevronRight className="w-4 h-4 text-gray-700" />
+            <ChevronRight className="w-4 h-4 text-zinc-700" />
             <span
               onClick={() => {
                 // Navigate back to course/module context
@@ -635,12 +735,12 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                   onBack();
                 }
               }}
-              className="hover:text-white cursor-pointer transition-colors"
+              className="hover:text-foreground cursor-pointer transition-colors"
             >
               {courseName}
             </span>
-            <ChevronRight className="w-4 h-4 text-gray-700" />
-            <span className="text-cyan-400">
+            <ChevronRight className="w-4 h-4 text-zinc-700" />
+            <span className="text-foreground">
               {note.title.length > 20
                 ? note.title.substring(0, 20) + "..."
                 : note.title}
@@ -653,7 +753,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
           <PresenceIndicator noteId={noteId} className="hidden md:flex mr-2" />
 
           {/* Word count and reading time */}
-          <div className="hidden lg:flex items-center gap-3 text-xs text-gray-500 mr-3">
+          <div className="hidden lg:flex items-center gap-3 text-xs text-muted-foreground mr-3">
             <span className="flex items-center gap-1" title="Word count">
               <Type className="w-3 h-3" />
               {wordCount.toLocaleString()} words
@@ -667,7 +767,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             </span>
           </div>
 
-          <span className="text-xs font-mono text-gray-600 uppercase tracking-widest hidden lg:block mr-2">
+          <span className="text-xs font-mono text-muted-foreground uppercase tracking-widest hidden lg:block mr-2">
             {isSaving ? "Saving..." : "Saved"}
           </span>
 
@@ -681,7 +781,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             {isExporting ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <Download className="w-5 h-5 text-gray-400 hover:text-white" />
+              <Download className="w-5 h-5 text-muted-foreground hover:text-foreground" />
             )}
           </Button>
 
@@ -691,7 +791,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             onClick={() => setIsTemplateModalOpen(true)}
             title="Change template"
           >
-            <FileText className="w-5 h-5 text-gray-400 hover:text-white" />
+            <FileText className="w-5 h-5 text-muted-foreground hover:text-foreground" />
           </Button>
 
           <ActionMenu
@@ -708,7 +808,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             variant="ghost"
             size="icon"
             onClick={toggleRightSidebar}
-            className={`hidden md:flex ${!isRightSidebarOpen ? "text-indigo-400 bg-indigo-500/10" : "text-gray-500"}`}
+            className={`hidden md:flex ${!isRightSidebarOpen ? "text-foreground bg-accent" : "text-muted-foreground"}`}
             title="Toggle Assistant"
           >
             <PanelRight className="w-5 h-5" />
@@ -718,16 +818,16 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
       {/* 2. Main Scrollable Content */}
       <ScrollArea className="flex-1">
-        <div className="max-w-5xl mx-auto py-12 px-12">
+        <div className="max-w-5xl mx-auto py-6 sm:py-8 px-4 sm:px-8 lg:px-16">
           {/* Header Section - Not included in PDF export */}
-          <div className="mb-8" data-html2canvas-ignore>
+          <div className="mb-5 sm:mb-6" data-html2canvas-ignore>
             {/* Title & Actions */}
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex-1 min-w-0">
                 <EditableTitle
                   initialValue={note.title || ""}
                   onSave={handleRenameConfirm}
-                  className="text-5xl font-bold text-white leading-tight tracking-tight px-0 -ml-0.5 hover:bg-transparent hover:text-gray-200 transition-colors cursor-text"
+                  className="text-4xl font-bold text-foreground leading-tight px-0 -ml-0.5 hover:bg-transparent hover:text-foreground transition-colors cursor-text"
                   placeholder="Untitled Note"
                 />
               </div>
@@ -738,7 +838,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                   variant="ghost"
                   size="sm"
                   onClick={() => setIsCollaboratorsOpen(true)}
-                  className="text-gray-400 hover:text-white hover:bg-white/10"
+                  className="text-muted-foreground hover:text-foreground hover:bg-accent"
                 >
                   <User className="w-4 h-4 mr-2" />
                   Collaborate
@@ -749,7 +849,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                   onClick={async () => {
                     await togglePinNote({ noteId });
                   }}
-                  className={`${note.isPinned ? "text-rose-400 bg-rose-500/10 hover:bg-rose-500/20" : "text-gray-400 hover:text-white hover:bg-white/10"}`}
+                  className={`${note.isPinned ? "text-foreground bg-accent hover:bg-accent/80" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}
                   title={note.isPinned ? "Unpin note" : "Pin note"}
                 >
                   <Pin
@@ -758,7 +858,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                   {note.isPinned ? "Pinned" : "Pin"}
                 </Button>
                 <Button
-                  variant={note.isShared ? "default" : "ghost"}
+                  variant={note.isShared ? "secondary" : "ghost"}
                   size="sm"
                   onClick={async () => {
                     try {
@@ -772,14 +872,14 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                       console.error("Failed to share", e);
                     }
                   }}
-                  className={`${note.isShared ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20" : "text-gray-400 hover:text-white hover:bg-white/10"}`}
+                  className={`${note.isShared ? "bg-accent text-foreground border border-border hover:bg-accent/80" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}
                 >
                   <Share2 className="w-4 h-4 mr-2" />
                   {note.isShared ? "Shared" : "Share"}
                 </Button>
 
                 {/* Tag Picker */}
-                <div className="h-6 w-px bg-white/10 mx-1 hidden sm:block" />
+                <div className="h-6 w-px bg-border mx-1 hidden sm:block" />
                 <TagPicker
                   selectedTagIds={note.tagIds || []}
                   onTagToggle={async (tagId) => {
@@ -794,7 +894,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             </div>
 
             {/* Metadata */}
-            <div className="flex items-center gap-6 mt-6 text-sm text-gray-400">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 mt-3 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
                 <span>
@@ -812,88 +912,10 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             </div>
           </div>
 
-          <Separator className="bg-white/10 mb-6" data-html2canvas-ignore />
+          <Separator className="bg-border mb-4 sm:mb-5" data-html2canvas-ignore />
 
           {/* PDF Export Area - This is what gets exported */}
           <div id="note-content-area">
-            {/* Toolbar */}
-            {editor && (
-              // Hide toolbar during export to clean up the PDF
-              <div
-                data-html2canvas-ignore
-                className="flex items-center justify-between mb-6 sticky top-0 bg-[#0A0A0A] py-4 z-10 border-b border-transparent data-[stuck=true]:border-white/10 transition-colors"
-              >
-                <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1 border border-white/5">
-                  <ToolbarButton
-                    isActive={editor.isActive("bold")}
-                    onClick={() => editor.chain().focus().toggleBold().run()}
-                    icon={<Bold className="w-4 h-4" />}
-                  />
-                  <ToolbarButton
-                    isActive={editor.isActive("italic")}
-                    onClick={() => editor.chain().focus().toggleItalic().run()}
-                    icon={<Italic className="w-4 h-4" />}
-                  />
-                  <ToolbarButton
-                    isActive={editor.isActive("strike")}
-                    onClick={() => editor.chain().focus().toggleStrike().run()}
-                    icon={<Strikethrough className="w-4 h-4" />}
-                  />
-                  <div className="w-px h-4 bg-white/10 mx-1" />
-                  <ToolbarButton
-                    isActive={editor.isActive("bulletList")}
-                    onClick={() =>
-                      editor.chain().focus().toggleBulletList().run()
-                    }
-                    icon={<List className="w-4 h-4" />}
-                  />
-                  <ToolbarButton
-                    isActive={false}
-                    onClick={() => setIsImageUploadOpen(true)}
-                    icon={<ImageIcon className="w-4 h-4" />}
-                  />
-                  <div className="w-px h-4 bg-white/10 mx-1" />
-                  <ToolbarButton
-                    isActive={false}
-                    onClick={() =>
-                      editor.chain().focus().insertGraphCalculator().run()
-                    }
-                    icon={<Calculator className="w-4 h-4" />}
-                  />
-                  <ToolbarButton
-                    isActive={false}
-                    onClick={() => editor.chain().focus().insertChart().run()}
-                    icon={<BarChart3 className="w-4 h-4" />}
-                  />
-                  <ToolbarButton
-                    isActive={false}
-                    onClick={() => {
-                      // Insert a sample inline math formula
-                      editor
-                        .chain()
-                        .focus()
-                        .setInlineMath("x^2 + y^2 = z^2")
-                        .run();
-                    }}
-                    icon={<Sigma className="w-4 h-4" />}
-                  />
-                </div>
-                {/* Math formula hint */}
-                <div className="hidden lg:flex items-center gap-2 text-[10px] text-gray-500 bg-white/5 px-2 py-1 rounded">
-                  <Sigma className="w-3 h-3" />
-                  <span>
-                    Use{" "}
-                    <code className="bg-white/10 px-1 rounded">$formula$</code>{" "}
-                    for inline or{" "}
-                    <code className="bg-white/10 px-1 rounded">
-                      $$formula$$
-                    </code>{" "}
-                    for block math
-                  </span>
-                </div>
-              </div>
-            )}
-
             {/* Editor Content - Wrapped with DocumentDropZone for drag-drop note generation */}
             <DocumentDropZone
               onNotesGenerated={(content, title, sourceDoc) => {
@@ -1006,6 +1028,25 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             }
           });
         }}
+      />
+
+      {/* Listen for custom event to open image upload */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            window.addEventListener('open-image-upload', () => {
+              // This is a bit of a hack to trigger the state change from outside React
+              // In a real app, we'd use a more robust state management solution
+              const btn = document.querySelector('[data-image-upload-trigger]');
+              if (btn) btn.click();
+            });
+          `,
+        }}
+      />
+      <button
+        data-image-upload-trigger
+        className="hidden"
+        onClick={() => setIsImageUploadOpen(true)}
       />
 
       <CollaboratorsDialog

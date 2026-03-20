@@ -2,6 +2,15 @@
 
 Lumina Notes AI is a Next.js + Convex study platform for AI-assisted note taking, transcription, flashcards, quizzes, and semantic search.
 
+## Features
+
+- AI note generation from audio, PDFs, and pasted text
+- Structured note styles (standard, Cornell, outline, mind map)
+- Flashcards and quiz generation
+- Semantic search and resource mentions
+- Realtime collaboration and presence
+- Public share links for notes
+
 ## Stack
 
 - Next.js 16 (App Router)
@@ -10,6 +19,17 @@ Lumina Notes AI is a Next.js + Convex study platform for AI-assisted note taking
 - Clerk (authentication)
 - Google Gemini API (LLM + embeddings)
 - UploadThing (file uploads)
+- Tiptap editor + Radix UI
+
+## Project Structure
+
+- `app/` Next.js routes, layouts, and API handlers
+- `convex/` backend functions, schema, and actions
+- `components/` UI and dashboard components
+- `lib/` shared helpers and domain logic
+- `hooks/` custom React hooks
+- `types/` shared TypeScript types
+- `tests/` Vitest tests
 
 ## Prerequisites
 
@@ -53,6 +73,22 @@ UPLOADTHING_TOKEN=your_uploadthing_token
 NEXT_PUBLIC_PAYSTACK_SCHOLAR_PLAN_CODE=
 ```
 
+### Environment Variables
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Yes | Clerk frontend key |
+| `CLERK_SECRET_KEY` | Yes | Clerk backend key |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Yes | Sign-in route |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | Yes | Sign-up route |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | Yes | Post sign-in redirect |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | Yes | Post sign-up redirect |
+| `CONVEX_DEPLOYMENT` | Yes | Convex deployment name |
+| `NEXT_PUBLIC_CONVEX_URL` | Yes | Convex URL |
+| `GEMINI_API_KEY` | Yes | Google AI Studio key |
+| `UPLOADTHING_TOKEN` | Yes | UploadThing API token |
+| `NEXT_PUBLIC_PAYSTACK_SCHOLAR_PLAN_CODE` | No | Paystack plan code (optional) |
+
 3. Configure Clerk for Convex:
 
 - Open `convex/auth.config.ts` and set `domain` to your Clerk frontend API URL.
@@ -61,7 +97,7 @@ NEXT_PUBLIC_PAYSTACK_SCHOLAR_PLAN_CODE=
 4. Start Convex in terminal 1:
 
 ```bash
-npx convex dev
+npm run convex:dev
 ```
 
 Notes:
@@ -81,12 +117,19 @@ npm run dev
 ## Scripts
 
 - `npm run dev` - start Next.js dev server
-- `npx convex dev` - start/sync Convex backend
+- `npm run convex:dev` - start/sync Convex backend
+- `npm run convex:deploy` - deploy Convex functions
 - `npm run build` - production build
 - `npm run start` - run production server
 - `npm run lint` - run ESLint
 - `npm test` - run Vitest once
 - `npm run test:watch` - run Vitest in watch mode
+
+## Deployment Notes
+
+- Deploy the Next.js app (e.g., Vercel) and set all environment variables.
+- Deploy Convex separately with `npm run convex:deploy`.
+- Ensure your Clerk domain and Convex auth settings align with the deployed URLs.
 
 ## Troubleshooting
 

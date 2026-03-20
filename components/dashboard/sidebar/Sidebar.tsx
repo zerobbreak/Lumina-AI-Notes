@@ -52,9 +52,9 @@ type RenameTarget = {
 export function Sidebar() {
   const { user } = useUser();
   const router = useRouter();
-  const { isLeftSidebarOpen } = useDashboard();
+  const { isLeftSidebarOpen, toggleLeftSidebar } = useDashboard();
   const searchParams = useSearchParams();
-  const { createNoteFlow, TemplateSelector } = useCreateNoteFlow();
+  const { createNoteFlow } = useCreateNoteFlow();
 
   // Queries
   const userData = useQuery(api.users.getUser);
@@ -101,6 +101,16 @@ export function Sidebar() {
   // Hydration protection
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  // Mobile vs desktop: only mount one sidebar panel so state stays single-instance
+  const [isNarrowViewport, setIsNarrowViewport] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsNarrowViewport(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
   }, []);
 
   const toggleCourse = (courseId: string) => {
@@ -187,52 +197,27 @@ export function Sidebar() {
     }
   };
 
-  if (!isLeftSidebarOpen) return null;
-
-  return (
-    <div className="w-[280px] h-screen bg-sidebar backdrop-blur-2xl border-r border-sidebar-border flex flex-col shrink-0 z-50 relative group/sidebar shadow-2xl shadow-black/50 dark:shadow-black/50 overflow-hidden">
+  const sidebarInner = (
+    <div className="w-full h-full min-h-0 bg-sidebar flex flex-col group/sidebar overflow-hidden">
       {/* Header */}
-      <div className="p-4 space-y-4">
-        {/* Profile Card */}
-        <div className="flex items-center gap-3.5 p-2 rounded-xl bg-slate-100 dark:bg-white/3 border border-slate-200 dark:border-white/5 hover:bg-slate-200 dark:hover:bg-white/6 hover:border-slate-300 dark:hover:border-white/8 transition-all duration-300 cursor-pointer group shadow-sm">
-          <div className="w-9 h-9 bg-linear-to-br from-indigo-500 via-indigo-600 to-violet-600 rounded-lg flex items-center justify-center text-white font-bold shadow-[0_0_15px_-3px_rgba(99,102,241,0.4)] group-hover:shadow-[0_0_20px_-3px_rgba(99,102,241,0.5)] transition-shadow">
-            <span className="drop-shadow-md">U</span>
+      <div className="p-3 sm:p-4 space-y-3">
+        {/* Workspace header */}
+        <div className="flex items-center gap-3.5 p-2 rounded-xl hover:bg-sidebar-accent transition-all duration-300 cursor-pointer group">
+          <div className="w-9 h-9 bg-zinc-800 rounded-lg flex items-center justify-center text-zinc-400 font-bold">
+            <span>U</span>
           </div>
-          <div className="flex-1 overflow-hidden">
-            <h2 className="font-semibold text-slate-900 dark:text-white text-[13px] tracking-wide truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-100 transition-colors">
+          <div className="flex-1 overflow-hidden min-w-0">
+            <h2 className="font-semibold text-sidebar-foreground text-[13px] tracking-wide truncate">
               University of Tech
             </h2>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
-              <p className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-gray-400 font-medium truncate">
-                {userData?.onboardingComplete ? "Pro Plan" : "Free"}
-              </p>
-            </div>
           </div>
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              // #region agent log
-              fetch(
-                "http://127.0.0.1:7242/ingest/8626f50f-15c3-4d25-a870-15d8a0db509b",
-                {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    location: "Sidebar.tsx:profile-settings-click",
-                    message: "Profile settings button clicked",
-                    data: { which: "profile", beforeOpen: false },
-                    timestamp: Date.now(),
-                    sessionId: "debug-session",
-                    hypothesisId: "A",
-                  }),
-                },
-              ).catch(() => {});
-              // #endregion
               setIsSettingsOpen(true);
             }}
-            className="p-1.5 rounded-lg text-slate-500 dark:text-gray-600 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
             aria-label="Open settings"
             data-tour="settings"
           >
@@ -243,14 +228,14 @@ export function Sidebar() {
         {/* Search */}
         <Button
           variant="ghost"
-          className="w-full justify-between bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/5 hover:border-slate-300 dark:hover:border-white/20 h-10 px-3 transition-all duration-200"
+          className="w-full justify-between bg-zinc-800/50 border border-sidebar-border text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent h-10 px-3 transition-all duration-200"
           onClick={() => setIsSearchOpen(true)}
         >
           <span className="flex items-center gap-2.5 text-xs font-medium">
             <Search className="w-3.5 h-3.5 opacity-70" />
             <span className="opacity-80">Search notes...</span>
           </span>
-          <span className="text-[10px] font-bold bg-slate-200 dark:bg-white/10 px-1.5 py-0.5 rounded-[4px] border border-slate-300 dark:border-white/5 text-slate-500 dark:text-gray-300">
+          <span className="text-[10px] font-bold bg-zinc-800 px-1.5 py-0.5 rounded-[4px] border border-sidebar-border text-muted-foreground">
             {formatShortcut("cmd+k")}
           </span>
         </Button>
@@ -259,7 +244,7 @@ export function Sidebar() {
         {/* FAVORITES */}
         <div className="mb-6 min-w-0">
           <div className="flex items-center justify-between px-2 mb-2 group min-w-0">
-            <h3 className="text-[10px] font-bold text-slate-500 dark:text-gray-500/80 uppercase tracking-[0.2em] transition-colors group-hover:text-slate-600 dark:group-hover:text-gray-400">
+            <h3 className="text-[10px] font-bold text-muted-foreground uppercase transition-colors group-hover:text-sidebar-foreground">
               Favorites
             </h3>
           </div>
@@ -275,7 +260,7 @@ export function Sidebar() {
             ))}
             {(!pinnedNotes || pinnedNotes.length === 0) && (
               <EmptyState
-                icon={<Pin className="w-5 h-5 text-rose-400" />}
+                icon={<Pin className="w-5 h-5 text-zinc-500" />}
                 title="No favorites"
                 description="Pin important notes to access them quickly"
                 className="py-6 px-2"
@@ -287,13 +272,13 @@ export function Sidebar() {
         {/* COURSES */}
         <div className="mb-6 min-w-0">
           <div className="flex items-center justify-between px-2 mb-2 group min-w-0">
-            <h3 className="text-[10px] font-bold text-slate-500 dark:text-gray-500/80 uppercase tracking-[0.2em] transition-colors group-hover:text-slate-600 dark:group-hover:text-gray-400">
+            <h3 className="text-[10px] font-bold text-muted-foreground uppercase transition-colors group-hover:text-sidebar-foreground">
               Smart Folders
             </h3>
             <Button
               variant="ghost"
               size="icon"
-              className="w-5 h-5 text-slate-500 dark:text-gray-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 opacity-40 group-hover:opacity-100 transition-all rounded-md"
+              className="w-5 h-5 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent opacity-40 group-hover:opacity-100 transition-all rounded-md"
               onClick={handleCreateCourse}
             >
               <Plus className="w-3.5 h-3.5" />
@@ -323,7 +308,7 @@ export function Sidebar() {
             ))}
             {(!userData?.courses || userData.courses.length === 0) && (
               <EmptyState
-                icon={<FolderOpen className="w-5 h-5 text-indigo-400" />}
+                icon={<FolderOpen className="w-5 h-5 text-zinc-500" />}
                 title="No Smart Folders yet"
                 description="Create a smart folder to organize your notes by course or topic"
                 action={{
@@ -339,13 +324,13 @@ export function Sidebar() {
         {/* FILES */}
         <div className="mb-6 min-w-0">
           <div className="flex items-center justify-between px-2 mb-2 group min-w-0">
-            <h3 className="text-[10px] font-bold text-slate-500 dark:text-gray-500/80 uppercase tracking-[0.2em] transition-colors group-hover:text-slate-600 dark:group-hover:text-gray-400">
+            <h3 className="text-[10px] font-bold text-muted-foreground uppercase transition-colors group-hover:text-sidebar-foreground">
               Resource Library
             </h3>
             <Button
               variant="ghost"
               size="icon"
-              className="w-5 h-5 text-slate-500 dark:text-gray-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 opacity-40 group-hover:opacity-100 transition-all rounded-md"
+              className="w-5 h-5 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent opacity-40 group-hover:opacity-100 transition-all rounded-md"
               onClick={() => setIsUploadOpen(true)}
               data-tour="upload-file"
             >
@@ -364,10 +349,10 @@ export function Sidebar() {
                 <div className="relative group/file flex items-center">
                   <Button
                     variant="ghost"
-                    className="w-full justify-start h-9 px-2.5 pr-16 text-[13px] text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/4 gap-3 transition-all"
+                    className="w-full justify-start h-9 px-2.5 pr-16 text-[13px] text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent gap-3 transition-all"
                     title={file.errorMessage || undefined}
                   >
-                    <File className="w-3.5 h-3.5 text-blue-600 dark:text-blue-500/70 group-hover/file:text-blue-500 dark:group-hover/file:text-blue-400 transition-colors shrink-0" />
+                    <File className="w-3.5 h-3.5 text-zinc-500 group-hover/file:text-zinc-400 transition-colors shrink-0" />
                     <span className="truncate flex-1 text-left">
                       {file.name}
                     </span>
@@ -378,16 +363,16 @@ export function Sidebar() {
                     />
                   </Button>
                   {file.processingStatus === "error" && file.errorMessage && (
-                    <div className="absolute left-10 right-16 top-9 text-[10px] text-red-400 truncate">
+                    <div className="absolute left-10 right-16 top-9 text-[10px] text-red-500/70 truncate">
                       {file.errorMessage}
                     </div>
                   )}
                   {(file.processingStatus === "processing" ||
                     file.processingStatus === "pending") &&
                     typeof file.progressPercent === "number" && (
-                      <div className="absolute left-10 right-16 bottom-1 h-1 bg-white/10 rounded-full overflow-hidden">
+                      <div className="absolute left-10 right-16 bottom-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-indigo-500 to-cyan-500"
+                          className="h-full bg-zinc-600"
                           style={{
                             width: `${Math.min(100, Math.max(0, file.progressPercent))}%`,
                           }}
@@ -410,7 +395,7 @@ export function Sidebar() {
             ))}
             {(!recentFiles || recentFiles.length === 0) && (
               <EmptyState
-                icon={<File className="w-5 h-5 text-blue-400" />}
+                icon={<File className="w-5 h-5 text-zinc-500" />}
                 title="No files yet"
                 description="Upload PDFs, documents, or audio files to enhance your notes"
                 action={{
@@ -426,13 +411,13 @@ export function Sidebar() {
         {/* NOTES */}
         <div className="mb-6 min-w-0">
           <div className="flex items-center justify-between px-2 mb-2 group min-w-0">
-            <h3 className="text-[10px] font-bold text-slate-500 dark:text-gray-500/80 uppercase tracking-[0.2em] transition-colors group-hover:text-slate-600 dark:group-hover:text-gray-400">
+            <h3 className="text-[10px] font-bold text-muted-foreground uppercase transition-colors group-hover:text-sidebar-foreground">
               Quick Captures
             </h3>
             <Button
               variant="ghost"
               size="icon"
-              className="w-5 h-5 text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 opacity-70 group-hover:opacity-100 transition-all rounded-md"
+              className="w-5 h-5 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent opacity-70 group-hover:opacity-100 transition-all rounded-md"
               onClick={handleCreateNote}
               title="Create Quick Note"
               data-tour="quick-note"
@@ -467,7 +452,7 @@ export function Sidebar() {
               ))}
             {(!quickNotes || quickNotes.length === 0) && (
               <EmptyState
-                icon={<FileText className="w-5 h-5 text-amber-400" />}
+                icon={<FileText className="w-5 h-5 text-zinc-500" />}
                 title="No quick notes"
                 description="Create a quick note for ideas, reminders, or quick thoughts"
                 action={{
@@ -483,44 +468,44 @@ export function Sidebar() {
         {/* FLASHCARDS */}
         <div className="mb-6">
           <div className="flex items-center justify-between px-2 mb-2 group">
-            <h3 className="text-[10px] font-bold text-slate-500 dark:text-gray-500/80 uppercase tracking-[0.2em] transition-colors group-hover:text-slate-600 dark:group-hover:text-gray-400">
+            <h3 className="text-[10px] font-bold text-muted-foreground uppercase transition-colors group-hover:text-sidebar-foreground">
               Study Tools
             </h3>
           </div>
             <Button
               variant="ghost"
-              className="w-full justify-start h-9 px-2.5 text-[13px] text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/4 gap-3 transition-all group"
+              className="w-full justify-start h-9 px-2.5 text-[13px] text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent gap-3 transition-all group"
               onClick={() => router.push("/dashboard?view=flashcards")}
               data-tour="flashcards"
             >
-            <div className="p-0.5 rounded bg-indigo-500/10 group-hover:bg-indigo-500/20 transition-colors">
-              <Layers className="w-3.5 h-3.5 text-indigo-400 group-hover:text-indigo-300" />
+            <div className="p-0.5 rounded bg-zinc-800 group-hover:bg-zinc-700 transition-colors">
+              <Layers className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-300" />
             </div>
             <span>Flashcards</span>
           </Button>
             <Button
               variant="ghost"
-              className="w-full justify-start h-9 px-2.5 text-[13px] text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/4 gap-3 transition-all group mt-1"
+              className="w-full justify-start h-9 px-2.5 text-[13px] text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent gap-3 transition-all group mt-1"
               onClick={() => router.push("/dashboard?view=quizzes")}
             >
-            <div className="p-0.5 rounded bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors">
-              <ClipboardList className="w-3.5 h-3.5 text-purple-400 group-hover:text-purple-300" />
+            <div className="p-0.5 rounded bg-zinc-800 group-hover:bg-zinc-700 transition-colors">
+              <ClipboardList className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-300" />
             </div>
             <span>Quizzes</span>
           </Button>
             <Button
               variant="ghost"
-              className="w-full justify-start h-9 px-2.5 text-[13px] text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/4 gap-3 transition-all group mt-1"
+              className="w-full justify-start h-9 px-2.5 text-[13px] text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent gap-3 transition-all group mt-1"
               onClick={() => router.push("/dashboard?view=archive")}
             >
-            <div className="p-0.5 rounded bg-orange-500/10 group-hover:bg-orange-500/20 transition-colors">
-              <Archive className="w-3.5 h-3.5 text-orange-400 group-hover:text-orange-300" />
+            <div className="p-0.5 rounded bg-zinc-800 group-hover:bg-zinc-700 transition-colors">
+              <Archive className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-300" />
             </div>
             <span>Trash & Archive</span>
           </Button>
         </div>
       </ScrollArea>
-      <div className="p-4 border-t border-slate-200 dark:border-white/6 bg-slate-50 dark:bg-black/20 backdrop-blur-md space-y-3">
+      <div className="p-4 border-t border-sidebar-border bg-sidebar space-y-3">
         {/* User Card */}
         <div className="flex items-center gap-3 group cursor-pointer">
           <div className="relative">
@@ -528,48 +513,31 @@ export function Sidebar() {
               <UserButton
                 appearance={{
                   elements: {
-                    avatarBox: "w-9 h-9 rounded-xl ring-2 ring-white/5",
+                    avatarBox: "w-9 h-9 rounded-xl ring-1 ring-sidebar-border",
                   },
                 }}
               />
             ) : (
-              <div className="w-9 h-9 rounded-xl bg-slate-200 dark:bg-white/10 animate-pulse" />
+              <div className="w-9 h-9 rounded-xl bg-zinc-800 animate-pulse" />
             )}
             {mounted && (
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-[#121212] rounded-full"></div>
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-zinc-500 border-2 border-sidebar rounded-full"></div>
             )}
           </div>
           <div className="flex-1 overflow-hidden">
-            <p className="text-[13px] font-medium text-slate-900 dark:text-white truncate group-hover:text-slate-700 dark:group-hover:text-gray-200 transition-colors">
+            <p className="text-[13px] font-medium text-sidebar-foreground truncate">
               {user?.fullName}
             </p>
-            <p className="text-[11px] text-slate-500 dark:text-gray-500 truncate group-hover:text-slate-600 dark:group-hover:text-gray-400 transition-colors">
+            <p className="text-[11px] text-muted-foreground truncate">
               Student Account
             </p>
           </div>
           <button
             type="button"
-            onClick={(e) => {
-              // #region agent log
-              fetch(
-                "http://127.0.0.1:7242/ingest/8626f50f-15c3-4d25-a870-15d8a0db509b",
-                {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    location: "Sidebar.tsx:footer-settings-click",
-                    message: "Footer settings button clicked",
-                    data: { which: "footer" },
-                    timestamp: Date.now(),
-                    sessionId: "debug-session",
-                    hypothesisId: "B",
-                  }),
-                },
-              ).catch(() => {});
-              // #endregion
+            onClick={() => {
               setIsSettingsOpen(true);
             }}
-            className="p-1.5 rounded-lg text-slate-500 dark:text-gray-600 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors opacity-0 group-hover:opacity-100"
             aria-label="Open settings"
           >
             <Settings className="w-4 h-4" />
@@ -579,6 +547,39 @@ export function Sidebar() {
         {/* Theme Toggle */}
         <ThemeToggle />
       </div>
+    </div>
+    );
+
+  return (
+    <>
+      {/* Desktop / tablet: in-flow sidebar */}
+      {!isNarrowViewport && (
+        <div
+          className={`h-screen shrink-0 z-50 relative overflow-hidden border-sidebar-border transition-[width] duration-200 ease-out ${
+            isLeftSidebarOpen
+              ? "w-[280px] border-r"
+              : "w-0 border-transparent pointer-events-none"
+          }`}
+        >
+          {isLeftSidebarOpen ? sidebarInner : null}
+        </div>
+      )}
+
+      {/* Mobile: overlay drawer (single mounted instance) */}
+      {isNarrowViewport && isLeftSidebarOpen ? (
+        <div className="fixed inset-0 z-[100] flex">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
+            aria-label="Close sidebar"
+            onClick={toggleLeftSidebar}
+          />
+          <div className="relative h-full w-[min(280px,92vw)] max-w-[100vw] shadow-2xl border-r border-sidebar-border bg-sidebar">
+            {sidebarInner}
+          </div>
+        </div>
+      ) : null}
+
       <UploadDialog
         open={isUploadOpen}
         onOpenChange={setIsUploadOpen}
@@ -608,7 +609,6 @@ export function Sidebar() {
       )}
       <SearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
       <SettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
-      <TemplateSelector />
 
       <Dialog open={!!expandTarget} onOpenChange={(open) => !open && setExpandTarget(null)}>
         <DialogContent className="sm:max-w-md bg-[#0B0B0B] border-white/10 text-white">
@@ -675,26 +675,10 @@ export function Sidebar() {
                 });
                 if (!result?.noteId) return;
                 const content = expandTarget.content || "";
-                if (result.style === "cornell") {
-                  await updateNote({
-                    noteId: result.noteId,
-                    cornellCues: "",
-                    cornellNotes: content ? `<p>${content}</p>` : "",
-                    cornellSummary: "",
-                  });
-                } else if (result.style === "outline") {
-                  const lines = content.split("\n").filter(Boolean);
-                  const list = lines.map((l) => `<li>${l}</li>`).join("");
-                  await updateNote({
-                    noteId: result.noteId,
-                    content: `<ul>${list}</ul>`,
-                  });
-                } else {
-                  await updateNote({
-                    noteId: result.noteId,
-                    content: content ? `<p>${content}</p>` : "",
-                  });
-                }
+                await updateNote({
+                  noteId: result.noteId,
+                  content: content ? `<p>${content}</p>` : "",
+                });
                 await updateNote({
                   noteId: expandTarget.id,
                   quickCaptureStatus: "expanded",
@@ -710,6 +694,6 @@ export function Sidebar() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

@@ -59,7 +59,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   );
   const searchResults = searchResponse?.results ?? [];
 
-  const { createNoteFlow, TemplateSelector } = useCreateNoteFlow();
+  const { createNoteFlow } = useCreateNoteFlow();
 
   // Close on Escape
   useKeyboardShortcut(
@@ -432,7 +432,6 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           <span>{formatShortcut("Esc")} to close</span>
         </div>
       </DialogContent>
-      <TemplateSelector />
     </Dialog>
   );
 }

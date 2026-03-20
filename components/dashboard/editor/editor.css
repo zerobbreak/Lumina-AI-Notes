@@ -3,6 +3,42 @@
   color: #d1d5db;
 }
 
+/* Hide scrollbar for slash menu */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Notion-like block hover effect */
+.ProseMirror > * {
+  position: relative;
+  transition: background-color 0.2s ease;
+  border-radius: 4px;
+  padding: 3px 6px;
+  margin-left: -6px;
+  margin-right: -6px;
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
+.ProseMirror > *:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Floating Menu Styling */
+[data-tippy-root] {
+  max-width: none !important;
+}
+
+.tippy-box[data-theme~='bubble-menu'] {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
 /* Override any inline black colors from AI content */
 .ProseMirror * {
   color: inherit;
@@ -10,17 +46,17 @@
 
 /* Text selection highlight - make it visible on dark background */
 .ProseMirror ::selection {
-  background-color: rgba(99, 102, 241, 0.5); /* indigo with 50% opacity */
+  background-color: rgba(99, 102, 241, 0.4); /* indigo with 40% opacity */
   color: #ffffff;
 }
 
 .ProseMirror ::-moz-selection {
-  background-color: rgba(99, 102, 241, 0.5); /* indigo with 50% opacity */
+  background-color: rgba(99, 102, 241, 0.4); /* indigo with 40% opacity */
   color: #ffffff;
 }
 
 .ProseMirror p.is-editor-empty:first-child::before {
-  color: #6b7280;
+  color: #4b5563;
   content: attr(data-placeholder);
   float: left;
   height: 0;
@@ -28,58 +64,62 @@
 }
 
 .ProseMirror h1 {
-  font-size: 2.25rem;
+  font-size: 2rem;
   font-weight: 700;
-  margin-bottom: 0.5em;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
   color: #ffffff;
 }
 
 .ProseMirror h2 {
   font-size: 1.5rem;
   font-weight: 600;
-  margin-top: 1.5em;
-  margin-bottom: 0.5em;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
   color: #ffffff !important;
 }
 
 .ProseMirror h3 {
   font-size: 1.25rem;
   font-weight: 600;
-  margin-top: 1.25em;
-  margin-bottom: 0.5em;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
   color: #ffffff !important;
 }
 
 .ProseMirror h4 {
   font-size: 1.1rem;
   font-weight: 600;
-  margin-top: 1em;
-  margin-bottom: 0.5em;
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
   color: #e5e7eb !important;
 }
 
 .ProseMirror hr {
   border: none;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
-  margin: 1.5em 0;
+  margin: 1.5rem 0;
 }
 
 .ProseMirror p {
-  margin-bottom: 1em;
+  margin-top: 2px;
+  margin-bottom: 2px;
   color: #d1d5db !important;
-  line-height: 1.75;
+  line-height: 1.6;
 }
 
 .ProseMirror ul {
   list-style-type: disc;
-  padding-left: 1.5em;
-  margin-bottom: 1em;
+  padding-left: 1.5rem;
+  margin-top: 4px;
+  margin-bottom: 4px;
 }
 
 .ProseMirror ol {
   list-style-type: decimal;
-  padding-left: 1.5em;
-  margin-bottom: 1em;
+  padding-left: 1.5rem;
+  margin-top: 4px;
+  margin-bottom: 4px;
 }
 
 .ProseMirror blockquote {

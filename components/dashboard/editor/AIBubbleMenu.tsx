@@ -6,170 +6,52 @@ import { api } from "@/convex/_generated/api";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Minimize2, Maximize2, Wand2, Layers, Loader2 } from "lucide-react";
+import {
+  Minimize2,
+  Maximize2,
+  Wand2,
+  Layers,
+  Loader2,
+  Bold,
+  Italic,
+  Strikethrough,
+  Code,
+  Link as LinkIcon,
+  ChevronDown,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BubbleMenu } from "@tiptap/react/menus";
 
 interface AIBubbleMenuProps {
   editor: Editor | null;
 }
 
 export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
-  const [isVisible, setIsVisible] = useState(false);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
   const [isLoading, setIsLoading] = useState(false);
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const isMouseDownRef = useRef(false);
-  const showTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showAI, setShowAI] = useState(false);
 
   const simplifyText = useAction(api.ai.simplifyText);
   const expandText = useAction(api.ai.expandText);
   const continueText = useAction(api.ai.continueText);
   const generateFlashcards = useAction(api.ai.generateFlashcards);
 
-  // Track mount state for portal rendering
   useEffect(() => {
     setIsMounted(true);
     return () => setIsMounted(false);
   }, []);
-
-  // Calculate and show the menu at the right position
-  const showMenuAtSelection = useCallback(() => {
-    if (!editor) return;
-
-    const { from, to } = editor.state.selection;
-    const selectedText = editor.state.doc.textBetween(from, to, " ");
-
-    if (selectedText.trim().length <= 3) {
-      setIsVisible(false);
-      return;
-    }
-
-    // Get the DOM coordinates of the selection
-    const { view } = editor;
-    try {
-      const start = view.coordsAtPos(from);
-      const end = view.coordsAtPos(to);
-
-      // Center the menu above the selection
-      let left = (start.left + end.left) / 2;
-      const menuWidth = 380; // approximate menu width
-      const menuHeight = 48; // approximate menu height
-      const padding = 8;
-
-      // Position above the selection
-      let top = start.top - menuHeight - padding;
-
-      // Clamp to viewport bounds
-      if (top < padding) {
-        // If not enough space above, show below the selection
-        top = end.bottom + padding;
-      }
-      if (left - menuWidth / 2 < padding) {
-        left = menuWidth / 2 + padding;
-      }
-      if (left + menuWidth / 2 > window.innerWidth - padding) {
-        left = window.innerWidth - menuWidth / 2 - padding;
-      }
-
-      setPosition({ top, left });
-      setIsVisible(true);
-    } catch {
-      // coordsAtPos can throw if the position is invalid
-      setIsVisible(false);
-    }
-  }, [editor]);
-
-  useEffect(() => {
-    if (!editor) return;
-
-    const handleSelectionUpdate = () => {
-      // Clear any pending show timeout
-      if (showTimeoutRef.current) {
-        clearTimeout(showTimeoutRef.current);
-        showTimeoutRef.current = null;
-      }
-
-      // Don't show while actively dragging mouse
-      if (isMouseDownRef.current) return;
-
-      const { from, to } = editor.state.selection;
-      const selectedText = editor.state.doc.textBetween(from, to, " ");
-
-      if (selectedText.trim().length <= 3) {
-        setIsVisible(false);
-        return;
-      }
-
-      // Show with a small delay to avoid flickering during keyboard selection
-      showTimeoutRef.current = setTimeout(() => {
-        showMenuAtSelection();
-      }, 300);
-    };
-
-    const handleBlur = ({ event }: { event: FocusEvent }) => {
-      // Don't hide if clicking on the bubble menu itself
-      const relatedTarget = event.relatedTarget as HTMLElement;
-      if (relatedTarget && relatedTarget.closest("[data-bubble-menu]")) {
-        return;
-      }
-      // Delay hiding to allow button clicks to register
-      setTimeout(() => setIsVisible(false), 200);
-    };
-
-    // Track mouse state on the editor DOM element
-    const editorDom = editor.view.dom;
-
-    const handleMouseDown = () => {
-      isMouseDownRef.current = true;
-      // Hide menu when starting a new selection
-      setIsVisible(false);
-      if (showTimeoutRef.current) {
-        clearTimeout(showTimeoutRef.current);
-        showTimeoutRef.current = null;
-      }
-    };
-
-    const handleMouseUp = () => {
-      isMouseDownRef.current = false;
-      // After mouse release, check if we have a valid selection
-      // Use a small delay to let TipTap process the selection first
-      setTimeout(() => {
-        showMenuAtSelection();
-      }, 50);
-    };
-
-    editor.on("selectionUpdate", handleSelectionUpdate);
-    editor.on("blur", handleBlur);
-    editorDom.addEventListener("mousedown", handleMouseDown);
-    // Listen on document for mouseup in case mouse is released outside the editor
-    document.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      editor.off("selectionUpdate", handleSelectionUpdate);
-      editor.off("blur", handleBlur);
-      editorDom.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("mouseup", handleMouseUp);
-
-      if (showTimeoutRef.current) {
-        clearTimeout(showTimeoutRef.current);
-      }
-    };
-  }, [editor, showMenuAtSelection]);
-
-  const getSelectedText = () => {
-    if (!editor) return "";
-    const { from, to } = editor.state.selection;
-    return editor.state.doc.textBetween(from, to, " ");
-  };
 
   const handleAction = async (
     action: "simplify" | "expand" | "continue" | "flashcards",
   ) => {
     if (!editor) return;
     const { from: selectedFrom, to: selectedTo } = editor.state.selection;
-    const selectedText = getSelectedText();
+    const selectedText = editor.state.doc.textBetween(
+      selectedFrom,
+      selectedTo,
+      " ",
+    );
     if (!selectedText.trim() || selectedFrom === selectedTo) return;
 
     setIsLoading(true);
@@ -181,34 +63,20 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
       switch (action) {
         case "simplify":
           result = await simplifyText({ text: selectedText });
-          queueMicrotask(() => {
-            if (editor && !editor.isDestroyed) {
-              editor
-                .chain()
-                .focus()
-                .insertContentAt(
-                  { from: selectedFrom, to: selectedTo },
-                  result,
-                )
-                .run();
-            }
-          });
+          editor
+            .chain()
+            .focus()
+            .insertContentAt({ from: selectedFrom, to: selectedTo }, result)
+            .run();
           break;
 
         case "expand":
           result = await expandText({ text: selectedText });
-          queueMicrotask(() => {
-            if (editor && !editor.isDestroyed) {
-              editor
-                .chain()
-                .focus()
-                .insertContentAt(
-                  { from: selectedFrom, to: selectedTo },
-                  result,
-                )
-                .run();
-            }
-          });
+          editor
+            .chain()
+            .focus()
+            .insertContentAt({ from: selectedFrom, to: selectedTo }, result)
+            .run();
           break;
 
         case "continue":
@@ -216,15 +84,7 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
             text: selectedText,
             fullContext: editor.getText(),
           });
-          queueMicrotask(() => {
-            if (editor && !editor.isDestroyed) {
-              editor
-                .chain()
-                .focus()
-                .insertContentAt(selectedTo, " " + result)
-                .run();
-            }
-          });
+          editor.chain().focus().insertContentAt(selectedTo, " " + result).run();
           break;
 
         case "flashcards":
@@ -237,15 +97,11 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
               },
             );
             flashcardHtml += "</ul>";
-            queueMicrotask(() => {
-              if (editor && !editor.isDestroyed) {
-                editor
-                  .chain()
-                  .focus()
-                  .insertContentAt(selectedTo, "<br/>" + flashcardHtml)
-                  .run();
-              }
-            });
+            editor
+              .chain()
+              .focus()
+              .insertContentAt(selectedTo, "<br/>" + flashcardHtml)
+              .run();
           }
           break;
       }
@@ -254,102 +110,132 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
     } finally {
       setIsLoading(false);
       setActiveAction(null);
-      setIsVisible(false);
+      setShowAI(false);
     }
   };
 
   if (!editor || !isMounted) return null;
 
-  // Use a portal to render at document body level, escaping any overflow:hidden containers
-  return createPortal(
-    <AnimatePresence>
-      {isVisible && (
-        <motion.div
-          ref={menuRef}
-          data-bubble-menu
-          initial={{ opacity: 0, y: 5, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 5, scale: 0.95 }}
-          transition={{ duration: 0.15 }}
-          style={{
-            position: "fixed",
-            top: position.top,
-            left: position.left,
-            transform: "translateX(-50%)",
-            zIndex: 9999,
-            pointerEvents: "auto",
-          }}
-          className="flex items-center gap-1 p-1.5 bg-zinc-900/95 backdrop-blur-sm border border-white/10 rounded-lg shadow-xl"
+  return (
+    <BubbleMenu
+      editor={editor}
+      options={{
+        placement: "top",
+        offset: 8,
+      }}
+      className="flex max-w-none items-center gap-0.5 p-1 bg-zinc-900 border border-white/10 rounded-lg shadow-xl overflow-hidden"
+    >
+      {/* Formatting Tools */}
+      <div className="flex items-center gap-0.5 pr-1 border-r border-white/10">
+        <Button
+          size="sm"
+          variant="ghost"
+          className={`h-8 w-8 p-0 ${editor.isActive("bold") ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/5"}`}
+          onClick={() => editor.chain().focus().toggleBold().run()}
         >
-          {isLoading ? (
-            <div className="flex items-center gap-2 px-3 py-1.5 text-purple-400">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-xs capitalize">{activeAction}ing...</span>
-            </div>
-          ) : (
-            <>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-8 px-2 text-xs text-zinc-300 hover:text-white hover:bg-white/10"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleAction("simplify");
-                }}
-                title="Simplify selected text"
-              >
-                <Minimize2 className="w-3.5 h-3.5 mr-1" />
-                Simplify
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-8 px-2 text-xs text-zinc-300 hover:text-white hover:bg-white/10"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleAction("expand");
-                }}
-                title="Expand with more detail"
-              >
-                <Maximize2 className="w-3.5 h-3.5 mr-1" />
-                Expand
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-8 px-2 text-xs text-zinc-300 hover:text-white hover:bg-white/10"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleAction("continue");
-                }}
-                title="Continue writing"
-              >
-                <Wand2 className="w-3.5 h-3.5 mr-1" />
-                Continue
-              </Button>
-              <div className="w-px h-5 bg-white/10" />
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-8 px-2 text-xs text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleAction("flashcards");
-                }}
-                title="Create flashcards"
-              >
-                <Layers className="w-3.5 h-3.5 mr-1" />
-                Flashcards
-              </Button>
-            </>
-          )}
-        </motion.div>
-      )}
-    </AnimatePresence>,
-    document.body,
+          <Bold className="w-4 h-4" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className={`h-8 w-8 p-0 ${editor.isActive("italic") ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/5"}`}
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+        >
+          <Italic className="w-4 h-4" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className={`h-8 w-8 p-0 ${editor.isActive("strike") ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/5"}`}
+          onClick={() => editor.chain().focus().toggleStrike().run()}
+        >
+          <Strikethrough className="w-4 h-4" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className={`h-8 w-8 p-0 ${editor.isActive("code") ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/5"}`}
+          onClick={() => editor.chain().focus().toggleCode().run()}
+        >
+          <Code className="w-4 h-4" />
+        </Button>
+      </div>
+
+      {/* AI Tools Toggle */}
+      <div className="flex items-center gap-0.5 pl-1">
+        <Button
+          size="sm"
+          variant="ghost"
+          className={`h-8 px-2 text-xs gap-1.5 ${showAI ? "bg-purple-500/20 text-purple-300" : "text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"}`}
+          onClick={() => setShowAI(!showAI)}
+        >
+          <Wand2 className="w-3.5 h-3.5" />
+          Ask AI
+          <ChevronDown
+            className={`w-3 h-3 transition-transform ${showAI ? "rotate-180" : ""}`}
+          />
+        </Button>
+      </div>
+
+      {/* AI Actions Dropdown/Overlay */}
+      <AnimatePresence>
+        {showAI && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="absolute top-full left-0 right-0 mt-1 p-1 bg-zinc-900 border border-white/10 rounded-lg shadow-xl flex flex-col gap-0.5"
+          >
+            {isLoading ? (
+              <div className="flex items-center gap-2 px-3 py-2 text-purple-400">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-xs capitalize">
+                  {activeAction}ing...
+                </span>
+              </div>
+            ) : (
+              <>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 justify-start px-2 text-xs text-zinc-300 hover:text-white hover:bg-white/10"
+                  onClick={() => handleAction("simplify")}
+                >
+                  <Minimize2 className="w-3.5 h-3.5 mr-2" />
+                  Simplify
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 justify-start px-2 text-xs text-zinc-300 hover:text-white hover:bg-white/10"
+                  onClick={() => handleAction("expand")}
+                >
+                  <Maximize2 className="w-3.5 h-3.5 mr-2" />
+                  Expand
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 justify-start px-2 text-xs text-zinc-300 hover:text-white hover:bg-white/10"
+                  onClick={() => handleAction("continue")}
+                >
+                  <Wand2 className="w-3.5 h-3.5 mr-2" />
+                  Continue writing
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 justify-start px-2 text-xs text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                  onClick={() => handleAction("flashcards")}
+                >
+                  <Layers className="w-3.5 h-3.5 mr-2" />
+                  Create flashcards
+                </Button>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </BubbleMenu>
   );
 }

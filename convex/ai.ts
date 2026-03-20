@@ -17,6 +17,7 @@ import {
   noteLacksDepth,
 } from "./shared/noteQuality";
 import { buildDiagramData } from "./shared/diagram";
+import { arrayBufferToBase64 } from "./encoding";
 
 // Types for subscription tier checking
 type SubscriptionTier = "free" | "scholar" | "institution";
@@ -1250,15 +1251,9 @@ export const transcribeAudio = action({
 
       const genAI = new GoogleGenerativeAI(apiKey);
 
-      // Convert blob to base64
       const encodeStartMs = Date.now();
       const arrayBuffer = await audioBlob.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      let binary = "";
-      for (let i = 0; i < uint8Array.length; i++) {
-        binary += String.fromCharCode(uint8Array[i]);
-      }
-      const audioBase64 = btoa(binary);
+      const audioBase64 = arrayBufferToBase64(arrayBuffer);
       console.log(
         `[transcribeAudio] Base64 encode time: ${Date.now() - encodeStartMs}ms, base64Bytes=${audioBase64.length}`,
       );
@@ -1945,7 +1940,6 @@ export const processDocument = action({
       }
 
       const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
 
       await ctx.runMutation(internal.files.updateProcessingStatus, {
         fileId: args.fileId,
@@ -1962,8 +1956,7 @@ export const processDocument = action({
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-      // Convert buffer to base64 for Gemini
-      const base64Data = buffer.toString("base64");
+      const base64Data = arrayBufferToBase64(arrayBuffer);
 
       // Extract text and generate summary using Gemini's PDF understanding
       const extractionResult = await model.generateContent([
@@ -2631,7 +2624,7 @@ export const ingestAndGenerateFlashcards = action({
           throw new Error("Failed to retrieve file from storage");
         }
         const arrayBuffer = await blob.arrayBuffer();
-        pdfBase64 = Buffer.from(arrayBuffer).toString("base64");
+        pdfBase64 = arrayBufferToBase64(arrayBuffer);
       }
 
       if (!pdfBase64) {
@@ -2863,7 +2856,7 @@ export const ingestAndGenerateNote = action({
           throw new Error("Failed to retrieve file from storage");
         }
         const arrayBuffer = await blob.arrayBuffer();
-        pdfBase64 = Buffer.from(arrayBuffer).toString("base64");
+        pdfBase64 = arrayBufferToBase64(arrayBuffer);
       }
 
       if (!pdfBase64) {

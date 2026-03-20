@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getGeminiModel } from "./shared/aiClient";
 import { api } from "./_generated/api";
+import { arrayBufferToBase64 } from "./encoding";
 
 type CleanupMetadata = {
   fillerWordsRemoved: number;
@@ -114,12 +115,7 @@ export const transcribeAudio = action({
 
       const encodeStartMs = Date.now();
       const arrayBuffer = await audioBlob.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      let binary = "";
-      for (let i = 0; i < uint8Array.length; i++) {
-        binary += String.fromCharCode(uint8Array[i]);
-      }
-      const audioBase64 = btoa(binary);
+      const audioBase64 = arrayBufferToBase64(arrayBuffer);
       console.log(
         `[transcribeAudio] Base64 encode time: ${Date.now() - encodeStartMs}ms, base64Bytes=${audioBase64.length}`,
       );

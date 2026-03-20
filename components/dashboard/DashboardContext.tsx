@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useState, ReactNode } from "react";
+import type { Id } from "@/convex/_generated/dataModel";
 
 // Structured notes type for passing between components
 export interface StructuredNotes {
@@ -21,9 +22,20 @@ export interface PinnedContext {
   type: "file" | "note";
 }
 
+/** Shown in NoteView while Convex getNote subscription catches up after createNote */
+export interface NoteBootstrap {
+  noteId: Id<"notes">;
+  title: string;
+  courseId?: string;
+  moduleId?: string;
+  style?: string;
+}
+
 interface DashboardContextType {
   isLeftSidebarOpen: boolean;
   isRightSidebarOpen: boolean;
+  setLeftSidebarOpen: (open: boolean) => void;
+  setRightSidebarOpen: (open: boolean) => void;
   toggleLeftSidebar: () => void;
   toggleRightSidebar: () => void;
   closeAllSidebars: () => void;
@@ -35,6 +47,8 @@ interface DashboardContextType {
   // Active context for recording
   activeContext: PinnedContext | null;
   setActiveContext: (context: PinnedContext | null) => void;
+  noteBootstrap: NoteBootstrap | null;
+  setNoteBootstrap: (b: NoteBootstrap | null) => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(
@@ -53,6 +67,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [activeContext, setActiveContext] = useState<PinnedContext | null>(
     null
   );
+  const [noteBootstrap, setNoteBootstrap] = useState<NoteBootstrap | null>(
+    null,
+  );
+
+  const setLeftSidebarOpen = (open: boolean) => setIsLeftSidebarOpen(open);
+  const setRightSidebarOpen = (open: boolean) => setIsRightSidebarOpen(open);
 
   const toggleLeftSidebar = () => setIsLeftSidebarOpen((prev) => !prev);
   const toggleRightSidebar = () => setIsRightSidebarOpen((prev) => !prev);
@@ -76,6 +96,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       value={{
         isLeftSidebarOpen,
         isRightSidebarOpen,
+        setLeftSidebarOpen,
+        setRightSidebarOpen,
         toggleLeftSidebar,
         toggleRightSidebar,
         closeAllSidebars,
@@ -85,6 +107,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         clearPendingNotes,
         activeContext,
         setActiveContext,
+        noteBootstrap,
+        setNoteBootstrap,
       }}
     >
       {children}
