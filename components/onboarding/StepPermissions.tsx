@@ -58,8 +58,8 @@ export function StepPermissions({ onPermissionGranted }: StepPermissionsProps) {
         </p>
       </div>
 
-      <div className="w-full max-w-sm rounded-xl border border-white/[0.08] bg-zinc-900/50 p-4 flex gap-3 text-left">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-800 ring-1 ring-white/[0.06]">
+      <div className="w-full max-w-sm rounded-xl border border-white/8 bg-zinc-900/50 p-4 flex gap-3 text-left">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-800 ring-1 ring-white/6">
           <Shield className="h-4 w-4 text-zinc-400" />
         </div>
         <p className="text-xs text-zinc-400 leading-relaxed">
@@ -71,7 +71,7 @@ export function StepPermissions({ onPermissionGranted }: StepPermissionsProps) {
       <Button
         type="button"
         size="lg"
-        className="w-full max-w-sm h-12 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white border border-white/10 shadow-lg shadow-indigo-500/20"
+        className="w-full max-w-sm h-12 rounded-xl bg-linear-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white border border-white/10 shadow-lg shadow-indigo-500/20"
         onClick={requestMicrophone}
         disabled={granted}
       >

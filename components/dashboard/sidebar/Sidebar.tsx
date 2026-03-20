@@ -543,7 +543,7 @@ export function Sidebar() {
 
       {/* Mobile: overlay drawer (single mounted instance) */}
       {isNarrowViewport && isLeftSidebarOpen ? (
-        <div className="fixed inset-0 z-[100] flex">
+        <div className="fixed inset-0 z-100 flex">
           <button
             type="button"
             className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"

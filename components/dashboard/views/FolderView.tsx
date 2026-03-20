@@ -14,8 +14,6 @@ import {
   Plus,
   File,
   Pin,
-  CheckSquare,
-  Square,
 } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import { Course, Module } from "@/types";
@@ -24,24 +22,7 @@ import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { EditableTitle } from "@/components/shared/EditableTitle";
 import { DraggableDocument, DocumentStatusBadge } from "@/components/documents";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
+import { useState } from "react";
 import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
 
 interface FolderViewProps {
@@ -109,8 +90,6 @@ export default function FolderView({
   const togglePinNote = useMutation(api.notes.togglePinNote);
   const deleteNote = useMutation(api.notes.deleteNote);
   const renameNote = useMutation(api.notes.renameNote);
-  const tags = useQuery(api.tags.getTags);
-  const createTag = useMutation(api.tags.createTag);
 
   const [renameTarget, setRenameTarget] = useState<{
     id: string | Id<"files"> | Id<"notes">;
@@ -542,7 +521,7 @@ export default function FolderView({
                         typeof f.progressPercent === "number" && (
                           <div className="mt-2 h-1 bg-white/10 rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-gradient-to-r from-indigo-500 to-cyan-500"
+                              className="h-full bg-linear-to-r from-indigo-500 to-cyan-500"
                               style={{
                                 width: `${Math.min(100, Math.max(0, f.progressPercent))}%`,
                               }}

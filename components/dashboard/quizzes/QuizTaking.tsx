@@ -56,7 +56,7 @@ export function QuizTaking({ deckId }: QuizTakingProps) {
 
   if (!deck || !questions) {
     return (
-      <div className="h-full flex items-center justify-center bg-gradient-to-br from-[#050505] to-[#0a0a12]">
+      <div className="h-full flex items-center justify-center bg-linear-to-br from-[#050505] to-[#0a0a12]">
         <div className="flex items-center gap-2 text-gray-500 animate-pulse">
           <Loader2 className="w-5 h-5 animate-spin" />
           <span>Loading quiz...</span>
@@ -145,7 +145,7 @@ export function QuizTaking({ deckId }: QuizTakingProps) {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-[#050505] to-[#0a0a12]">
+    <div className="h-full flex flex-col bg-linear-to-br from-[#050505] to-[#0a0a12]">
       {/* Header */}
       <div className="flex items-center justify-between p-6 border-b border-white/5">
         <div className="flex items-center gap-3">
@@ -175,7 +175,7 @@ export function QuizTaking({ deckId }: QuizTakingProps) {
       {/* Progress Bar */}
       <div className="w-full h-1 bg-white/5">
         <div
-          className="h-full bg-gradient-to-r from-purple-600 to-pink-600 transition-all duration-300"
+          className="h-full bg-linear-to-r from-purple-600 to-pink-600 transition-all duration-300"
           style={{
             width: `${((currentQuestionIndex + 1) / questions.length) * 100}%`,
           }}
@@ -259,7 +259,7 @@ export function QuizTaking({ deckId }: QuizTakingProps) {
           <Button
             onClick={handleSubmit}
             disabled={!allQuestionsAnswered || isSubmitting}
-            className="gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500"
+            className="gap-2 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500"
           >
             {isSubmitting ? (
               <>
@@ -277,7 +277,7 @@ export function QuizTaking({ deckId }: QuizTakingProps) {
           <Button
             onClick={handleNext}
             disabled={selectedAnswer === null}
-            className="gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
+            className="gap-2 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
           >
             Next
             <ArrowRight className="w-4 h-4" />

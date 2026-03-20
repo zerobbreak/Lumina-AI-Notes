@@ -200,7 +200,7 @@ export default function OnboardingPage() {
       <header className="relative z-10 shrink-0 px-6 pt-8 pb-2 md:px-10">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-500/25">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-500/25">
               <Sparkles className="h-4 w-4 text-white" strokeWidth={2.2} />
             </div>
             <div>
@@ -228,9 +228,9 @@ export default function OnboardingPage() {
           {/* Form column */}
           <div className="lg:col-span-5 flex flex-col min-h-0">
             <div
-              className="flex flex-col flex-1 rounded-[1.75rem] border border-white/[0.08] bg-zinc-900/40 backdrop-blur-xl shadow-[0_24px_80px_-20px_rgba(0,0,0,0.65)] ring-1 ring-white/[0.04] overflow-hidden"
+              className="flex flex-col flex-1 rounded-[1.75rem] border border-white/8 bg-zinc-900/40 backdrop-blur-xl shadow-[0_24px_80px_-20px_rgba(0,0,0,0.65)] ring-1 ring-white/4 overflow-hidden"
             >
-              <div className="px-6 pt-6 md:px-8 md:pt-8 pb-2 border-b border-white/[0.06]">
+              <div className="px-6 pt-6 md:px-8 md:pt-8 pb-2 border-b border-white/6">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={step}
@@ -274,7 +274,7 @@ export default function OnboardingPage() {
                           className="relative"
                         >
                           <div className="absolute inset-0 rounded-3xl bg-indigo-500/20 blur-2xl scale-150" />
-                          <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-xl shadow-indigo-500/30 ring-1 ring-white/20">
+                          <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-linear-to-br from-indigo-500 to-violet-600 shadow-xl shadow-indigo-500/30 ring-1 ring-white/20">
                             <Sparkles
                               className="h-9 w-9 text-white"
                               strokeWidth={1.5}
@@ -317,13 +317,13 @@ export default function OnboardingPage() {
                 </AnimatePresence>
               </div>
 
-              <div className="mt-auto flex items-center justify-between gap-3 px-6 py-5 md:px-8 border-t border-white/[0.06] bg-black/20">
+              <div className="mt-auto flex items-center justify-between gap-3 px-6 py-5 md:px-8 border-t border-white/6 bg-black/20">
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={() => setStep(Math.max(1, step - 1))}
                   disabled={step === 1}
-                  className="text-zinc-400 hover:text-white hover:bg-white/[0.06] rounded-xl px-4"
+                  className="text-zinc-400 hover:text-white hover:bg-white/6 rounded-xl px-4"
                 >
                   <ChevronLeft className="mr-1 h-4 w-4" />
                   Back
@@ -336,7 +336,7 @@ export default function OnboardingPage() {
                     (step === 2 && !formData.major) ||
                     (step === 4 && !formData.permissionsGranted)
                   }
-                  className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white px-7 shadow-lg shadow-indigo-500/25 border border-white/10"
+                  className="rounded-xl bg-linear-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white px-7 shadow-lg shadow-indigo-500/25 border border-white/10"
                 >
                   {step === totalSteps ? "Finish & open Lumina" : "Continue"}
                   {step !== totalSteps && (
@@ -353,9 +353,9 @@ export default function OnboardingPage() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, ease: "easeOut" }}
-              className="flex flex-1 flex-col rounded-[1.75rem] border border-white/[0.08] bg-zinc-950/50 backdrop-blur-md overflow-hidden shadow-[0_32px_100px_-24px_rgba(0,0,0,0.75)] ring-1 ring-inset ring-white/[0.04]"
+              className="flex flex-1 flex-col rounded-[1.75rem] border border-white/8 bg-zinc-950/50 backdrop-blur-md overflow-hidden shadow-[0_32px_100px_-24px_rgba(0,0,0,0.75)] ring-1 ring-inset ring-white/4"
             >
-              <div className="flex items-center gap-2 px-5 py-4 border-b border-white/[0.06] bg-black/30">
+              <div className="flex items-center gap-2 px-5 py-4 border-b border-white/6 bg-black/30">
                 <div className="flex gap-1.5">
                   <span className="h-3 w-3 rounded-full bg-red-500/35 ring-1 ring-red-500/40" />
                   <span className="h-3 w-3 rounded-full bg-amber-500/35 ring-1 ring-amber-500/40" />
@@ -374,7 +374,7 @@ export default function OnboardingPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -12 }}
                     transition={{ duration: 0.28 }}
-                    className="rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-500/10 via-violet-500/5 to-transparent p-6 flex gap-4"
+                    className="rounded-2xl border border-indigo-500/20 bg-linear-to-br from-indigo-500/10 via-violet-500/5 to-transparent p-6 flex gap-4"
                   >
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 ring-1 ring-indigo-400/25">
                       <HintIcon className="h-5 w-5 text-indigo-300" />
@@ -390,13 +390,13 @@ export default function OnboardingPage() {
                   </motion.div>
                 </AnimatePresence>
 
-                <div className="rounded-2xl border border-white/[0.06] bg-zinc-900/40 p-6 flex flex-col gap-5 flex-1 min-h-0">
+                <div className="rounded-2xl border border-white/6 bg-zinc-900/40 p-6 flex flex-col gap-5 flex-1 min-h-0">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                       <h3 className="text-2xl font-semibold text-white tracking-tight">
                         {formatMajorLabel(formData.major)}
                       </h3>
-                      <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-white/[0.06] px-3 py-1 text-xs text-zinc-300 ring-1 ring-white/[0.08]">
+                      <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-white/6 px-3 py-1 text-xs text-zinc-300 ring-1 ring-white/8">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
                         Fall 2025
                       </div>
@@ -425,7 +425,7 @@ export default function OnboardingPage() {
                     </div>
                     <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
                       <motion.div
-                        className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-400"
+                        className="h-full rounded-full bg-linear-to-r from-indigo-500 to-violet-400"
                         initial={false}
                         animate={{ width: `${(step / totalSteps) * 100}%` }}
                         transition={{
@@ -438,7 +438,7 @@ export default function OnboardingPage() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 flex-1 min-h-[140px]">
-                    <div className="rounded-xl border border-white/[0.06] bg-black/25 p-4 flex flex-col justify-between">
+                    <div className="rounded-xl border border-white/6 bg-black/25 p-4 flex flex-col justify-between">
                       <div className="flex items-center gap-2">
                         <div className="h-8 w-8 rounded-lg bg-orange-500/15 flex items-center justify-center text-lg">
                           📝
@@ -449,13 +449,13 @@ export default function OnboardingPage() {
                         </div>
                       </div>
                       <div className="space-y-1.5 mt-4">
-                        <div className="h-1.5 w-full bg-white/[0.08] rounded-full" />
-                        <div className="h-1.5 w-[88%] bg-white/[0.06] rounded-full" />
-                        <div className="h-1.5 w-[72%] bg-white/[0.06] rounded-full" />
+                        <div className="h-1.5 w-full bg-white/8 rounded-full" />
+                        <div className="h-1.5 w-[88%] bg-white/6 rounded-full" />
+                        <div className="h-1.5 w-[72%] bg-white/6 rounded-full" />
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-white/[0.06] bg-black/25 p-4 flex flex-col">
+                    <div className="rounded-xl border border-white/6 bg-black/25 p-4 flex flex-col">
                       <div className="flex justify-between items-center mb-3">
                         <span className="text-xs text-zinc-500">Activity</span>
                         <span className="text-[11px] font-medium text-emerald-400/90">
@@ -469,7 +469,7 @@ export default function OnboardingPage() {
                             className="flex-1 rounded-t-sm bg-indigo-500/15 relative overflow-hidden"
                           >
                             <motion.div
-                              className="absolute bottom-0 left-0 right-0 rounded-t-sm bg-gradient-to-t from-indigo-600 to-violet-500"
+                              className="absolute bottom-0 left-0 right-0 rounded-t-sm bg-linear-to-br from-indigo-600 to-violet-500"
                               initial={{ height: 0 }}
                               animate={{ height: `${h}%` }}
                               transition={{

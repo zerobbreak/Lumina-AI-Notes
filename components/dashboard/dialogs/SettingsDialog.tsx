@@ -150,7 +150,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="!max-w-[1050px] w-[95vw] h-[85vh] p-0 flex gap-0 bg-[#060606] border-white/10 text-white overflow-hidden shadow-2xl rounded-2xl data-[state=open]:slide-in-from-bottom-2 sm:rounded-2xl"
+        className="max-w-[1050px]! w-[95vw] h-[85vh] p-0 flex gap-0 bg-[#060606] border-white/10 text-white overflow-hidden shadow-2xl rounded-2xl data-[state=open]:slide-in-from-bottom-2 sm:rounded-2xl"
         showCloseButton={false}
       >
         {/* Accessibility: Hidden title and description for screen readers */}
