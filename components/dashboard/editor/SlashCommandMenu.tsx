@@ -3,10 +3,7 @@
 import React, {
   useState,
   useEffect,
-  useCallback,
   useRef,
-  forwardRef,
-  useImperativeHandle,
 } from "react";
 import { Editor } from "@tiptap/react";
 import {
@@ -156,33 +153,49 @@ export const SlashCommandMenu = ({ editor, range }: SlashCommandMenuProps) => {
     },
   ];
 
+  const itemCount = items.length;
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const rangeRef = useRef(range);
+  rangeRef.current = range;
+  const editorRef = useRef(editor);
+  editorRef.current = editor;
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [range.from, range.to]);
+
   const selectItem = (index: number) => {
-    const item = items[index];
+    const item = itemsRef.current[index];
     if (item) {
-      item.command({ editor, range });
+      item.command({ editor: editorRef.current, range: rangeRef.current });
     }
   };
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "ArrowUp") {
-        setSelectedIndex((selectedIndex + items.length - 1) % items.length);
-        return true;
+        e.preventDefault();
+        setSelectedIndex((i) => (i + itemCount - 1) % itemCount);
+        return;
       }
       if (e.key === "ArrowDown") {
-        setSelectedIndex((selectedIndex + 1) % items.length);
-        return true;
+        e.preventDefault();
+        setSelectedIndex((i) => (i + 1) % itemCount);
+        return;
       }
       if (e.key === "Enter") {
-        selectItem(selectedIndex);
-        return true;
+        e.preventDefault();
+        setSelectedIndex((current) => {
+          selectItem(current);
+          return current;
+        });
       }
-      return false;
     };
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [selectedIndex, items]);
+  }, [itemCount]);
 
   return (
     <div className="z-50 h-auto max-h-[330px] w-72 overflow-y-auto rounded-lg border border-white/10 bg-zinc-900 p-1 shadow-xl scrollbar-hide">

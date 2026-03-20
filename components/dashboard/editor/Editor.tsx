@@ -5,6 +5,7 @@ import {
   EditorContent,
   ReactNodeViewRenderer,
   AnyExtension,
+  type Editor as TiptapEditor,
 } from "@tiptap/react";
 import { Node, mergeAttributes } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
@@ -18,13 +19,33 @@ import { FloatingMenu } from "@tiptap/react/menus";
 import { SlashCommand, renderItems } from "./extensions/SlashCommand";
 import { SlashCommandMenu } from "./SlashCommandMenu";
 import { Plus, GripVertical } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ResourceMentionNode } from "./ResourceMentionNode";
 import { OutlineExtension } from "./extensions/OutlineExtension";
 import { DiagramExtension } from "./extensions/DiagramExtension";
 import { MathExtensions } from "./extensions/MathExtension";
 import { CornellData, OutlineMetadata, NoteStyleType } from "@/types";
 import "./editor.css";
+
+function SlashCommandLayer({ editor }: { editor: TiptapEditor }) {
+  if (!editor.slashCommandProps) return null;
+  const sc = editor.slashCommandProps;
+  const parentEl = editor.view.dom.parentElement;
+  const parentRect = parentEl?.getBoundingClientRect();
+  const cr = sc.clientRect?.() ?? null;
+  const top = cr
+    ? cr.top -
+      (parentRect?.top ?? 0) +
+      (parentEl?.scrollTop ?? 0) +
+      24
+    : 0;
+  const left = cr ? cr.left - (parentRect?.left ?? 0) : 0;
+  return (
+    <div className="absolute z-50" style={{ top, left }}>
+      <SlashCommandMenu editor={editor} range={sc.range} />
+    </div>
+  );
+}
 
 const ResourceMention = Node.create({
   name: "resourceMention",
@@ -102,6 +123,10 @@ export default function Editor({
   const [cornellSummary, setCornellSummary] = useState(
     initialCornellSummary || "",
   );
+  const [slashUiTick, setSlashUiTick] = useState(0);
+  const bumpSlashUi = useCallback(() => {
+    setSlashUiTick((n) => n + 1);
+  }, []);
   // Build extensions based on style type
   const extensions: AnyExtension[] = [
     StarterKit.configure({
@@ -134,7 +159,7 @@ export default function Editor({
     }),
     SlashCommand.configure({
       suggestion: {
-        render: renderItems,
+        render: () => renderItems(bumpSlashUi),
       },
     }),
     BubbleMenu,
@@ -323,7 +348,8 @@ export default function Editor({
                 Notes
               </h3>
             </div>
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-auto relative min-h-0">
+              <SlashCommandLayer editor={editor} />
               <EditorContent editor={editor} />
             </div>
           </div>
@@ -355,7 +381,8 @@ export default function Editor({
     return (
       <div className="outline-mode-container">
         {/* Editor */}
-        <div className="outline-editor-content">
+        <div className="outline-editor-content relative">
+          <SlashCommandLayer editor={editor} />
           <EditorContent editor={editor} />
         </div>
       </div>
@@ -364,13 +391,13 @@ export default function Editor({
 
   // Default Standard
   return (
-    <div className="relative group/editor">
+    <div className="relative group/editor" data-slash-ui={slashUiTick}>
       {editor && (
         <FloatingMenu
           editor={editor}
           options={{
             placement: "left-start",
-            offset: [12, 8], // 12px from the text, 8px down from the top of the line
+            offset: { mainAxis: 12, crossAxis: 8 }, // gap from text; vertical skid along the line
           }}
           shouldShow={({ state }) => {
             const { selection } = state;
@@ -398,27 +425,7 @@ export default function Editor({
         </FloatingMenu>
       )}
 
-      {editor && editor.slashCommandProps && (() => {
-        const sc = editor.slashCommandProps;
-        if (!sc) return null;
-        const parentEl = editor.view.dom.parentElement;
-        const parentRect = parentEl?.getBoundingClientRect();
-        const cr = sc.clientRect?.() ?? null;
-        const top = cr
-          ? cr.top -
-            (parentRect?.top ?? 0) +
-            (parentEl?.scrollTop ?? 0) +
-            24
-          : 0;
-        const left = cr
-          ? cr.left - (parentRect?.left ?? 0)
-          : 0;
-        return (
-          <div className="absolute z-50" style={{ top, left }}>
-            <SlashCommandMenu editor={editor} range={sc.range} />
-          </div>
-        );
-      })()}
+      <SlashCommandLayer editor={editor} />
 
       <EditorContent editor={editor} />
     </div>
