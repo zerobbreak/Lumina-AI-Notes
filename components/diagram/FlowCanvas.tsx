@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ReactFlow,
   Controls,
@@ -47,6 +53,29 @@ const nodeTypes = {
   note: NoteNode,
 };
 
+/** Serializable subset for comparing external props (avoids handler churn). */
+function serializeDiagramPropsForSync(
+  nodes: Node[] | undefined,
+  edges: Edge[] | undefined,
+): string {
+  const cleanNodes = (nodes ?? []).map((n) => ({
+    id: n.id,
+    type: n.type,
+    position: n.position,
+    data: {
+      label: String((n.data as { label?: string })?.label ?? ""),
+      color: String((n.data as { color?: string })?.color ?? ""),
+    },
+  }));
+  const cleanEdges = (edges ?? []).map((e) => ({
+    id: e.id,
+    source: e.source,
+    target: e.target,
+    animated: e.animated,
+  }));
+  return JSON.stringify({ nodes: cleanNodes, edges: cleanEdges });
+}
+
 function FlowCanvasInner({
   initialNodes = [],
   initialEdges = [],
@@ -57,8 +86,75 @@ function FlowCanvasInner({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const lastAppliedPropsRef = useRef<string>("");
   const { fitView, getNodes, getEdges } = useReactFlow();
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
+
+  const attachLabelHandlers = useCallback(
+    (rawNodes: Node[]): Node[] =>
+      rawNodes.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          onLabelChange: (newLabel: string) => {
+            setNodes((innerNds) =>
+              innerNds.map((n) =>
+                n.id === node.id
+                  ? { ...n, data: { ...n.data, label: newLabel } }
+                  : n
+              )
+            );
+          },
+        },
+      })),
+    [setNodes],
+  );
+
+  // Keep canvas in sync when parent-provided nodes/edges change (e.g. AI insert, load note).
+  useLayoutEffect(() => {
+    const incoming = serializeDiagramPropsForSync(initialNodes, initialEdges);
+    if (incoming === lastAppliedPropsRef.current) return;
+
+    const prevSnap = lastAppliedPropsRef.current;
+    lastAppliedPropsRef.current = incoming;
+
+    setNodes(attachLabelHandlers(initialNodes ?? []));
+    setEdges(initialEdges ?? []);
+
+    let shouldFit = false;
+    if (prevSnap === "") {
+      shouldFit = (initialNodes?.length ?? 0) > 0;
+    } else {
+      try {
+        const prev = JSON.parse(prevSnap) as {
+          nodes: unknown[];
+          edges: unknown[];
+        };
+        const oldN = Array.isArray(prev.nodes) ? prev.nodes.length : 0;
+        const newN = initialNodes?.length ?? 0;
+        const oldE = Array.isArray(prev.edges) ? prev.edges.length : 0;
+        const newE = initialEdges?.length ?? 0;
+        shouldFit = oldN !== newN || oldE !== newE;
+      } catch {
+        shouldFit = true;
+      }
+    }
+
+    if (shouldFit) {
+      const t = setTimeout(
+        () => fitView({ duration: 300, padding: 0.2 }),
+        50,
+      );
+      return () => clearTimeout(t);
+    }
+  }, [
+    initialNodes,
+    initialEdges,
+    attachLabelHandlers,
+    setNodes,
+    setEdges,
+    fitView,
+  ]);
 
   // Sync changes back to parent - use queueMicrotask to avoid flushSync error
   useEffect(() => {
@@ -247,27 +343,6 @@ function FlowCanvasInner({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isReadOnly, handleDeleteSelected, handleAddNode]);
-
-  // Update node data with label change handler
-  useEffect(() => {
-    setNodes((nds) =>
-      nds.map((node) => ({
-        ...node,
-        data: {
-          ...node.data,
-          onLabelChange: (newLabel: string) => {
-            setNodes((innerNds) =>
-              innerNds.map((n) =>
-                n.id === node.id
-                  ? { ...n, data: { ...n.data, label: newLabel } }
-                  : n
-              )
-            );
-          },
-        },
-      }))
-    );
-  }, []);
 
   return (
     <div

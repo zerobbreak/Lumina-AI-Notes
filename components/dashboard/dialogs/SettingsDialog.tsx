@@ -67,7 +67,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   const [activeTab, setActiveTab] = useState("profile");
   const [major, setMajor] = useState(userData?.major ?? "other");
-  const [noteStyle, setNoteStyle] = useState(userData?.noteStyle ?? "cornell");
+  const [noteStyle, setNoteStyle] = useState(userData?.noteStyle ?? "standard");
   const [theme, setTheme] = useState(userData?.theme ?? "indigo");
   const [fullName, setFullName] = useState(user?.fullName || "");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -80,7 +80,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   useEffect(() => {
     if (!open || !userData) return;
     setMajor(userData.major ?? "other");
-    setNoteStyle(userData.noteStyle ?? "cornell");
+    setNoteStyle(userData.noteStyle ?? "standard");
     setTheme(userData.theme ?? "indigo");
     if (user?.fullName) setFullName(user.fullName);
     setDirty(false);
@@ -90,7 +90,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   useEffect(() => {
     if (!userData) return;
     const isMajorDirty = (userData.major ?? "other") !== major;
-    const isNoteStyleDirty = (userData.noteStyle ?? "cornell") !== noteStyle;
+    const isNoteStyleDirty = (userData.noteStyle ?? "standard") !== noteStyle;
     const isThemeDirty = (userData.theme ?? "indigo") !== theme;
     const isNameDirty = (user?.fullName ?? "") !== fullName;
     setDirty(isMajorDirty || isNameDirty || isNoteStyleDirty || isThemeDirty);
@@ -382,10 +382,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                           </SelectTrigger>
                           <SelectContent className="bg-[#18181b] border-white/10 text-white">
                             <SelectItem
-                              value="cornell"
+                              value="standard"
                               className="text-gray-300 focus:bg-white/10 focus:text-white"
                             >
-                              Cornell Method
+                              Standard
                             </SelectItem>
                             <SelectItem
                               value="outline"

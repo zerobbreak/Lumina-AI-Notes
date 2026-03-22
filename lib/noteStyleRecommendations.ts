@@ -4,8 +4,8 @@
  */
 
 export interface StyleRecommendation {
-  primary: "cornell" | "outline" | "mindmap";
-  secondary: "cornell" | "outline" | "mindmap";
+  primary: "standard" | "outline" | "mindmap";
+  secondary: "standard" | "outline" | "mindmap";
   reason: string;
 }
 
@@ -19,29 +19,29 @@ export interface MajorTheme {
 export const majorStyleRecommendations: Record<string, StyleRecommendation> = {
   cs: {
     primary: "outline",
-    secondary: "cornell",
+    secondary: "standard",
     reason:
       "Hierarchical bullet points work well for code concepts and algorithms",
   },
   engineering: {
-    primary: "cornell",
+    primary: "standard",
     secondary: "outline",
-    reason: "Cornell method helps separate formulas, definitions and examples",
+    reason: "Standard format helps organize formulas, definitions and examples",
   },
   medicine: {
-    primary: "cornell",
+    primary: "standard",
     secondary: "mindmap",
     reason: "Structured notes with cue columns aid medical terminology recall",
   },
   biology: {
     primary: "mindmap",
-    secondary: "cornell",
+    secondary: "standard",
     reason: "Visual connections help with complex biological systems",
   },
   law: {
-    primary: "cornell",
+    primary: "standard",
     secondary: "outline",
-    reason: "Case analysis benefits from the Cornell split-page format",
+    reason: "Case analysis benefits from the standard section-based format",
   },
   history: {
     primary: "outline",
@@ -50,12 +50,12 @@ export const majorStyleRecommendations: Record<string, StyleRecommendation> = {
   },
   business: {
     primary: "outline",
-    secondary: "cornell",
+    secondary: "standard",
     reason: "Bullet points work well for business frameworks and models",
   },
   other: {
     primary: "outline",
-    secondary: "cornell",
+    secondary: "standard",
     reason: "Versatile format for general studies",
   },
 };

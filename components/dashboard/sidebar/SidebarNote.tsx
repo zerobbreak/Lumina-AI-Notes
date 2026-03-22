@@ -20,6 +20,7 @@ interface SidebarNoteProps {
   };
   isActive?: boolean;
   isDraggable?: boolean;
+  isCompact?: boolean;
   onRename: () => void;
   onDelete: () => void;
   onArchive?: () => void;
@@ -30,6 +31,7 @@ function SidebarNoteComponent({
   note,
   isActive,
   isDraggable = true,
+  isCompact = false,
   onRename,
   onDelete,
   onArchive,
@@ -59,66 +61,69 @@ function SidebarNoteComponent({
   return (
     <div
       className={cn(
-        "relative group/note flex items-center",
+        "relative group/note flex items-center px-1",
         isDragging && "opacity-50",
+        isCompact && "px-0"
       )}
       draggable={isDraggable}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      {isDraggable && (
-        <div className="absolute left-0 opacity-0 group-hover/note:opacity-50 cursor-grab active:cursor-grabbing transition-opacity">
-          <GripVertical className="w-3 h-3 text-slate-400 dark:text-gray-500" />
-        </div>
-      )}
       <Button
         variant="ghost"
         className={cn(
-          "w-full justify-start h-9 px-2.5 pr-16 text-[13px] gap-3 transition-all",
-          isDraggable && "pl-5", // Extra padding for drag handle
+          "w-full justify-start h-8 px-2 text-[13px] gap-2.5 transition-all rounded-lg relative overflow-hidden group/btn",
           isActive
-            ? "bg-sidebar-accent text-sidebar-foreground font-medium"
-            : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent",
+            ? "bg-indigo-500/10 text-indigo-400 font-medium ring-1 ring-indigo-500/20"
+            : "text-muted-foreground hover:text-sidebar-foreground hover:bg-zinc-800/50",
+          isCompact && "w-10 h-10 justify-center px-0"
         )}
         onClick={handleClick}
+        title={isCompact ? note.title : undefined}
       >
+        {isDraggable && !isCompact && (
+          <div className="absolute left-0 opacity-0 group-hover/note:opacity-40 cursor-grab active:cursor-grabbing transition-opacity">
+            <GripVertical className="w-3 h-3" />
+          </div>
+        )}
         <FileText
           className={cn(
             "w-3.5 h-3.5 transition-colors shrink-0",
             isActive
-              ? "text-sidebar-foreground"
-              : "text-zinc-500 group-hover/note:text-zinc-400",
+              ? "text-indigo-400"
+              : "text-zinc-500 group-hover/btn:text-zinc-300",
           )}
         />
-        <span className="truncate">{note.title}</span>
-        {note.quickCaptureType === "voice" && (
-          <span className="ml-2 text-[9px] uppercase tracking-widest text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded border border-sidebar-border">
+        {!isCompact && <span className="truncate flex-1 text-left">{note.title}</span>}
+        {note.quickCaptureType === "voice" && !isCompact && (
+          <span className="text-[9px] font-bold uppercase tracking-tighter text-indigo-400/80 bg-indigo-500/10 px-1 py-0.5 rounded shrink-0">
             Voice
           </span>
         )}
       </Button>
-      <div className="absolute right-1 transition-all flex items-center gap-1">
-        {onExpand && (
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7 text-gray-500 hover:text-cyan-400 hover:bg-cyan-500/10"
-            onClick={(e) => {
-              e.stopPropagation();
-              onExpand();
-            }}
-            title="Expand"
-          >
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </Button>
-        )}
-        <ActionMenu
-          onRename={onRename}
-          onDelete={onDelete}
-          onArchive={onArchive}
-          isArchived={note.isArchived}
-        />
-      </div>
+      {!isCompact && (
+        <div className="absolute right-2 opacity-0 group-hover/note:opacity-100 transition-all flex items-center gap-0.5">
+          {onExpand && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6 text-muted-foreground hover:text-indigo-400 hover:bg-indigo-500/10 rounded-md"
+              onClick={(e) => {
+                e.stopPropagation();
+                onExpand();
+              }}
+            >
+              <ArrowUpRight className="w-3 h-3" />
+            </Button>
+          )}
+          <ActionMenu
+            onRename={onRename}
+            onDelete={onDelete}
+            onArchive={onArchive}
+            isArchived={note.isArchived}
+          />
+        </div>
+      )}
     </div>
   );
 }

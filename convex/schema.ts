@@ -17,7 +17,7 @@ export default defineSchema({
           id: v.string(),
           name: v.string(),
           code: v.string(),
-          defaultNoteStyle: v.optional(v.string()), // e.g. "cornell", "outline", "mindmap"
+          defaultNoteStyle: v.optional(v.string()), // e.g. "standard", "outline", "mindmap"
           templatePromptDisabled: v.optional(v.boolean()),
           modules: v.optional(
             v.array(
@@ -30,7 +30,7 @@ export default defineSchema({
         }),
       ),
     ),
-    noteStyle: v.optional(v.string()), // "cornell" | "outline" | "mindmap"
+    noteStyle: v.optional(v.string()), // "standard" | "outline" | "mindmap"
     theme: v.optional(v.string()), // UI accent color preference (e.g., "indigo", "amber")
     enabledBlocks: v.optional(v.array(v.string())),
     // Usage Tracking Fields
@@ -82,10 +82,6 @@ export default defineSchema({
     quickCaptureAudioUrl: v.optional(v.string()),
     quickCaptureStatus: v.optional(v.string()), // "draft" | "expanded"
     quickCaptureExpandedNoteId: v.optional(v.id("notes")),
-    // Cornell Notes specific fields
-    cornellCues: v.optional(v.string()),
-    cornellNotes: v.optional(v.string()),
-    cornellSummary: v.optional(v.string()),
     // Outline Mode specific fields
     outlineData: v.optional(v.string()), // JSON stringified tree structure
     outlineMetadata: v.optional(

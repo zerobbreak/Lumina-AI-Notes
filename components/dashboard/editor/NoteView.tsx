@@ -18,8 +18,6 @@ import {
   List,
   Image as ImageIcon,
   Loader2,
-  PanelLeft,
-  PanelRight,
   Download,
   Clock,
   Type,
@@ -29,7 +27,11 @@ import {
   Pin,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useEditor, EditorContent } from "@tiptap/react";
+import {
+  useEditor,
+  EditorContent,
+  type Editor as TiptapEditor,
+} from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { DiagramExtension } from "./extensions/DiagramExtension";
@@ -59,6 +61,8 @@ import { ImageExtension } from "./extensions/ImageExtension";
 import { GraphCalculatorExtension } from "./extensions/GraphCalculatorExtension";
 import { ChartExtension } from "./extensions/ChartExtension";
 import { MathExtensions } from "./extensions/MathExtension";
+import { SlashCommand, renderItems } from "./extensions/SlashCommand";
+import { SlashCommandLayer } from "./SlashCommandLayer";
 import { PresenceIndicator } from "@/components/dashboard/PresenceIndicator";
 import { CollaboratorsDialog } from "@/components/dashboard/dialogs/CollaboratorsDialog";
 import { TagPicker } from "@/components/dashboard/tags/TagPicker";
@@ -98,10 +102,6 @@ interface NoteViewProps {
 export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const router = useRouter();
   const {
-    toggleLeftSidebar,
-    toggleRightSidebar,
-    isLeftSidebarOpen,
-    isRightSidebarOpen,
     pendingNotes,
     clearPendingNotes,
     noteBootstrap,
@@ -126,11 +126,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   // Editor State
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [debouncedContent, setDebouncedContent] = useState<
-    | string
-    | { cornellCues: string; cornellNotes: string; cornellSummary: string }
-    | null
-  >(null);
+  const [debouncedContent, setDebouncedContent] = useState<string | null>(null);
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [isFlashcardsOpen, setIsFlashcardsOpen] = useState(false);
   const [isQuizOpen, setIsQuizOpen] = useState(false);
@@ -138,6 +134,10 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
   const [isCollaboratorsOpen, setIsCollaboratorsOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [slashUiTick, setSlashUiTick] = useState(0);
+  const bumpSlashUi = useCallback(() => {
+    setSlashUiTick((n) => n + 1);
+  }, []);
 
   const syntheticNote = useMemo((): Doc<"notes"> | null => {
     if (!userData || noteBootstrap?.noteId !== noteId) return null;
@@ -211,23 +211,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     if (noteQuery === undefined && noteBootstrap?.noteId !== noteId) return;
 
     const handler = setTimeout(() => {
-      // Check if this is Cornell data (object with cornellCues, cornellNotes, cornellSummary)
-      if (
-        typeof debouncedContent === "object" &&
-        "cornellCues" in debouncedContent
-      ) {
-        updateNote({
-          noteId,
-          cornellCues: debouncedContent.cornellCues,
-          cornellNotes: debouncedContent.cornellNotes,
-          cornellSummary: debouncedContent.cornellSummary,
-        }).then(() => {
-          setIsSaving(false);
-        });
-      } else if (
-        displayNote?.style === "outline" &&
-        typeof debouncedContent === "string"
-      ) {
+      if (displayNote?.style === "outline") {
         // Extract outline structure and metadata
         const structure = extractOutlineStructure(debouncedContent);
         const metadata = calculateOutlineMetadata(structure);
@@ -299,6 +283,11 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       StarterKit,
       Placeholder.configure({
         placeholder: "Start writing your notes...",
+      }),
+      SlashCommand.configure({
+        suggestion: {
+          render: () => renderItems(bumpSlashUi),
+        },
       }),
       DiagramExtension,
       ImageExtension,
@@ -417,64 +406,69 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     // Wait for the note content to be loaded first (important for new notes)
     if (loadedNoteId !== noteIdRef.current) return;
 
-    // If this is a Cornell note, update the Cornell fields directly
-    if (displayNote?.style === "cornell") {
-      const cornellCuesText = pendingNotes.cornellCues.join("\n\n");
-      const cornellNotesHtml = pendingNotes.cornellNotes
-        .map(
-          (note, i) =>
-            `<h4>${pendingNotes.cornellCues[i] || ""}</h4><p>${note}</p>`,
-        )
-        .join("");
-      const cornellSummaryText = pendingNotes.summary || "";
-
-      // Update the note with Cornell data
-      updateNote({
-        noteId,
-        cornellCues: cornellCuesText,
-        cornellNotes: cornellNotesHtml,
-        cornellSummary: cornellSummaryText,
-      }).then(() => {
-        clearPendingNotes();
-      });
-      return;
-    }
-
-    // For non-Cornell notes, build HTML content from structured notes
+    // Build HTML content from structured notes with sections
     if (!editor || editor.isDestroyed) return;
 
     let html = "";
 
     // Summary
     if (pendingNotes.summary) {
-      html += `<h2>📝 Summary</h2>`;
+      html += `<h2>Summary</h2>`;
       html += `<blockquote>${pendingNotes.summary}</blockquote>`;
     }
 
-    // Cornell Notes
-    if (pendingNotes.cornellCues.length > 0) {
-      html += `<h2>📚 Cornell Notes</h2>`;
-      pendingNotes.cornellCues.forEach((cue, i) => {
-        const note = pendingNotes.cornellNotes[i] || "";
-        html += `<h4>${cue}</h4>`;
-        html += `<blockquote>${note}</blockquote>`;
-        html += `<hr/>`;
+    // Sections (Notion-like format)
+    if (pendingNotes.sections && pendingNotes.sections.length > 0) {
+      pendingNotes.sections.forEach((section) => {
+        switch (section.type) {
+          case "heading":
+            const level = section.level || 2;
+            html += `<h${level}>${section.content}</h${level}>`;
+            break;
+          case "paragraph":
+            html += `<p>${section.content}</p>`;
+            break;
+          case "bullets":
+            html += `<ul>`;
+            section.content.split("\n").forEach((item) => {
+              const cleaned = item.replace(/^[•\u2022\-–]\s*/, "").trim();
+              if (cleaned) html += `<li>${cleaned}</li>`;
+            });
+            html += `</ul>`;
+            break;
+          case "numbered":
+            html += `<ol>`;
+            section.content.split("\n").forEach((item) => {
+              const cleaned = item.replace(/^\d+\.\s*/, "").trim();
+              if (cleaned) html += `<li>${cleaned}</li>`;
+            });
+            html += `</ol>`;
+            break;
+          case "quote":
+            html += `<blockquote>${section.content}</blockquote>`;
+            break;
+          case "divider":
+            html += `<hr/>`;
+            break;
+          default:
+            html += `<p>${section.content}</p>`;
+        }
       });
     }
 
     // Action Items
     if (pendingNotes.actionItems.length > 0) {
-      html += `<h2>✅ Action Items</h2>`;
+      html += `<h2>Action Items</h2>`;
       html += `<ul>`;
       pendingNotes.actionItems.forEach((item) => {
-        html += `<li>☐ ${item}</li>`;
+        html += `<li>${item}</li>`;
       });
       html += `</ul>`;
     }
 
     // Review Questions
     if (pendingNotes.reviewQuestions.length > 0) {
-      html += `<h2>❓ Review Questions</h2>`;
+      html += `<h2>Review Questions</h2>`;
       html += `<ul>`;
       pendingNotes.reviewQuestions.forEach((q) => {
         const cleaned = q.replace(/^[•\u2022\-–]\s+/, "");
@@ -489,14 +483,11 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       pendingNotes.diagramData.nodes &&
       pendingNotes.diagramData.nodes.length > 0
     ) {
-      // We inject the HTML that matches the DiagramExtension parseHTML rule
-      html += `<h2>🗺️ Mind Map</h2>`;
+      html += `<h2>Mind Map</h2>`;
       html += `<div data-type="diagram" data-nodes='${JSON.stringify(pendingNotes.diagramData.nodes)}' data-edges='${JSON.stringify(pendingNotes.diagramData.edges || [])}'></div>`;
     }
 
     // Insert at current cursor position (or end if no selection)
-    // Use setTimeout to avoid flushSync error during React render
-    // Delay ensures editor is fully initialized and React rendering cycle is complete
     const timeoutId = setTimeout(() => {
       scheduleEditorUpdate(() => {
         if (editor && !editor.isDestroyed && editor.view) {
@@ -563,9 +554,6 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const buildSnapshot = (): NoteContentSnapshot => ({
     style: (displayNote?.style as any) || "standard",
     content: displayNote?.content || "",
-    cornellCues: displayNote?.cornellCues || "",
-    cornellNotes: displayNote?.cornellNotes || "",
-    cornellSummary: displayNote?.cornellSummary || "",
     outlineData: displayNote?.outlineData || "",
   });
 
@@ -699,19 +687,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       {/* 1. Top Navigation / Breadcrumbs */}
       <div className="h-16 flex items-center px-4 lg:px-8 bg-background top-0 z-20 sticky justify-between">
         <div className="flex items-center gap-4">
-          {/* Left Sidebar Toggle */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleLeftSidebar}
-            className={`hidden md:flex ${!isLeftSidebarOpen ? "text-foreground bg-accent" : "text-muted-foreground"}`}
-            title="Toggle Sidebar"
-          >
-            <PanelLeft className="w-5 h-5" />
-          </Button>
-
-          <div className="h-4 w-px bg-border hidden md:block" />
-
+          {/* Left sidebar: single collapse control lives in Sidebar.tsx header (avoids duplicate with main chrome) */}
           <div className="flex items-center text-sm font-medium text-muted-foreground gap-2">
             <span
               onClick={onBack}
@@ -803,16 +779,6 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             isArchived={note.isArchived}
           />
 
-          {/* Right Sidebar Toggle */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleRightSidebar}
-            className={`hidden md:flex ${!isRightSidebarOpen ? "text-foreground bg-accent" : "text-muted-foreground"}`}
-            title="Toggle Assistant"
-          >
-            <PanelRight className="w-5 h-5" />
-          </Button>
         </div>
       </div>
 
@@ -931,19 +897,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
               }}
               className="pb-32"
             >
-              {note?.style === "cornell" ? (
-                <Editor
-                  styleType="cornell"
-                  cornellCues={note.cornellCues || ""}
-                  cornellNotes={note.cornellNotes || ""}
-                  cornellSummary={note.cornellSummary || ""}
-                  onChange={(content) => {
-                    setIsSaving(true);
-                    setDebouncedContent(content);
-                  }}
-                  isEditable={true}
-                />
-              ) : note?.style === "outline" ? (
+              {note?.style === "outline" ? (
                 <Editor
                   styleType="outline"
                   initialContent={note.content || ""}
@@ -958,7 +912,10 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
               ) : (
                 <>
                   {editor && <AIBubbleMenu editor={editor} />}
-                  <EditorContent editor={editor} />
+                  <div className="relative" data-slash-ui={slashUiTick}>
+                    {editor && <SlashCommandLayer editor={editor} />}
+                    <EditorContent editor={editor} />
+                  </div>
                 </>
               )}
             </DocumentDropZone>
@@ -969,11 +926,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
       {/* AI Assistant Bar */}
       <AskAI
-        context={
-          note.style === "cornell"
-            ? `Cues: ${note.cornellCues || ""}\n\nNotes: ${note.cornellNotes || ""}\n\nSummary: ${note.cornellSummary || ""}`
-            : note.content || ""
-        }
+        context={note.content || ""}
         contextType="note"
         contextTitle={note.title}
         onInsertToNote={handleInsertFromAI}
@@ -1066,9 +1019,6 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
               noteId,
               style: conversion.style,
               content: conversion.content ?? "",
-              cornellCues: conversion.cornellCues ?? "",
-              cornellNotes: conversion.cornellNotes ?? "",
-              cornellSummary: conversion.cornellSummary ?? "",
               outlineData: conversion.outlineData ?? "",
             });
             setIsTemplateModalOpen(false);
@@ -1080,9 +1030,6 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                     noteId,
                     style: previous.style,
                     content: previous.content ?? "",
-                    cornellCues: previous.cornellCues ?? "",
-                    cornellNotes: previous.cornellNotes ?? "",
-                    cornellSummary: previous.cornellSummary ?? "",
                     outlineData: previous.outlineData ?? "",
                   });
                 },

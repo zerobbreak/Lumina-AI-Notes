@@ -12,20 +12,60 @@
   scrollbar-width: none;
 }
 
-/* Notion-like block hover effect */
+/* Slash command palette — subtle scroll affordance */
+.slash-command-menu {
+  scroll-behavior: smooth;
+}
+
+/* Notion-like block affordance: light fill + left rail (less boxy than full wash) */
 .ProseMirror > * {
   position: relative;
-  transition: background-color 0.2s ease;
-  border-radius: 4px;
-  padding: 3px 6px;
-  margin-left: -6px;
-  margin-right: -6px;
+  transition:
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+  border-radius: 6px;
+  padding: 4px 8px 4px 10px;
+  margin-left: -10px;
+  margin-right: -8px;
   margin-top: 2px;
   margin-bottom: 2px;
 }
 
+/*
+ * Block hover rail MUST use ::after, not ::before.
+ * TipTap's empty-paragraph placeholder uses p.is-editor-empty:first-child::before;
+ * sharing ::before with the rail forced width: 3px onto the placeholder and stacked one char per line.
+ */
+.ProseMirror > *::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 2px;
+  background: transparent;
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+  pointer-events: none;
+}
+
 .ProseMirror > *:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: rgba(255, 255, 255, 0.035);
+}
+
+.ProseMirror > *:hover::after {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* While the slash menu is open: quieter block chrome so the palette reads clearly */
+[data-slash-menu-open="true"] .ProseMirror > *:hover {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+[data-slash-menu-open="true"] .ProseMirror > *:hover::after {
+  background: rgba(99, 102, 241, 0.35);
 }
 
 /* Floating Menu Styling */
@@ -191,26 +231,6 @@
   color: #93c5fd;
 }
 
-/* Cornell Notes Layout */
-.cornell-container {
-  max-height: 100%;
-}
-
-.cornell-container textarea {
-  font-family: inherit;
-  line-height: 1.6;
-}
-
-.cornell-container textarea:focus {
-  outline: none;
-}
-
-/* Ensure proper scrolling in Cornell sections */
-.cornell-container .ProseMirror {
-  min-height: 300px;
-  max-height: 100%;
-}
-
 /* Outline Mode Container */
 .outline-mode-container {
   padding: 1rem;
@@ -329,17 +349,84 @@
 }
 
 /* Collapsible content */
-.collapsed-content {
-  display: none;
+.is-collapsed .outline-node-content [data-tight="false"] > li > ul,
+.is-collapsed .outline-node-content [data-tight="false"] > li > ol,
+.is-collapsed .outline-node-content ul,
+.is-collapsed .outline-node-content ol,
+.is-collapsed .outline-node-content .outline-bullet-list,
+.is-collapsed .outline-node-content .outline-ordered-list,
+.is-collapsed .outline-node-content .outline-task-list {
+  display: none !important;
 }
 
-/* Outline list item wrapper */
+/* Notion-style collapsible list item */
 .outline-list-item-wrapper {
-  margin: 0.125rem 0;
+  margin: 1px 0;
+  transition: all 0.2s ease;
 }
 
 .outline-node-content {
   flex: 1;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #d1d5db;
+}
+
+.outline-node-content-container {
+  padding: 2px 0;
+}
+
+/* Indentation and nesting */
+.outline-list-item-wrapper .outline-list-item-wrapper {
+  margin-left: 24px;
+}
+
+/* Smooth transition for content */
+.collapsible-children-container {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Better hover state for the whole row */
+.group\/collapsible:hover {
+  cursor: pointer;
+}
+
+/* Notion-style Toggle List specific typography */
+.outline-node-content p {
+  margin: 0;
+  padding: 1px 0;
+}
+
+/* Nested list spacing adjustments */
+.outline-bullet-list, .outline-ordered-list, .outline-task-list {
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
+/* Ensure consistent indentation for nested items without toggles */
+.outline-list-item-wrapper:not(.has-children) .outline-node-content {
+  padding-left: 0;
+}
+
+/* Ensure the toggle button doesn't trigger editor focus/selection issues */
+.outline-list-item-wrapper button {
+  user-select: none;
+}
+
+/* Adjust bullet/number positioning to align with the new toggle */
+.outline-bullet-list > .outline-list-item::before,
+.outline-ordered-list > .outline-list-item::before {
+  left: 0.25rem;
+  top: 0.35rem;
+}
+
+/* Task list checkbox alignment */
+.outline-task-item {
+  padding: 1px 0;
+}
+
+.outline-task-item input[type="checkbox"] {
+  margin-top: 5px;
 }
 
 /* ===== Math Formula Styles ===== */
@@ -475,7 +562,6 @@
   /* Reset to light theme */
   body,
   .ProseMirror,
-  .cornell-container,
   .outline-mode-container {
     background: #ffffff !important;
     color: #000000 !important;
@@ -483,7 +569,6 @@
 
   /* Override dark theme text colors */
   .ProseMirror *,
-  .cornell-container *,
   .outline-mode-container * {
     color: #000000 !important;
     -webkit-print-color-adjust: exact;
@@ -521,50 +606,6 @@
   p {
     orphans: 3;
     widows: 3;
-  }
-
-  /* Cornell layout - convert to linear for print */
-  .cornell-container .grid {
-    display: block !important;
-  }
-
-  .cornell-container .grid > div {
-    border: none !important;
-    padding: 16px 0 !important;
-    margin-bottom: 16px !important;
-  }
-
-  .cornell-container .grid > div:first-child::before {
-    content: "💡 Cues & Questions";
-    display: block;
-    font-size: 14pt;
-    font-weight: bold;
-    color: #d97706 !important;
-    margin-bottom: 8px;
-    border-bottom: 2px solid #d97706;
-    padding-bottom: 4px;
-  }
-
-  .cornell-container .grid > div:last-child::before {
-    content: "📝 Notes";
-    display: block;
-    font-size: 14pt;
-    font-weight: bold;
-    color: #4f46e5 !important;
-    margin-bottom: 8px;
-    border-bottom: 2px solid #4f46e5;
-    padding-bottom: 4px;
-  }
-
-  .cornell-container > div:last-child::before {
-    content: "📋 Summary";
-    display: block;
-    font-size: 14pt;
-    font-weight: bold;
-    color: #059669 !important;
-    margin-bottom: 8px;
-    border-bottom: 2px solid #059669;
-    padding-bottom: 4px;
   }
 
   /* Task list checkboxes - render as symbols */

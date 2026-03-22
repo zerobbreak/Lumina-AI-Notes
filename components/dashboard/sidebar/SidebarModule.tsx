@@ -86,16 +86,16 @@ export function SidebarModule({
   };
 
   return (
-    <div className="relative group/module">
+    <div className="relative group/module px-1">
       <div className="flex items-center">
         <div
           className={cn(
-            "flex-1 flex items-center h-8 px-2 text-[12px] gap-2 transition-all cursor-pointer",
+            "flex-1 flex items-center h-7 px-2 text-[12px] gap-2 transition-all cursor-pointer rounded-md",
             isDragOver
-              ? "text-indigo-700 dark:text-indigo-200 bg-indigo-500/20 ring-1 ring-indigo-400/50"
+              ? "text-indigo-200 bg-indigo-500/20 ring-1 ring-indigo-500/30"
               : isExpanded
-                ? "text-indigo-600 dark:text-indigo-300 bg-indigo-500/5"
-                : "text-slate-600 dark:text-gray-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5",
+                ? "text-sidebar-foreground bg-zinc-800/30"
+                : "text-muted-foreground hover:text-sidebar-foreground hover:bg-zinc-800/20",
           )}
           onClick={() => {
             router.push(`/dashboard?contextId=${module.id}&contextType=module`);
@@ -106,7 +106,7 @@ export function SidebarModule({
         >
           {/* Toggle Button */}
           <div
-            className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-gray-500 cursor-pointer"
+            className="p-1 rounded-md hover:bg-zinc-700/50 text-zinc-500 hover:text-zinc-300 cursor-pointer transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               setIsExpanded(!isExpanded);
@@ -123,22 +123,22 @@ export function SidebarModule({
             className={cn(
               "w-3.5 h-3.5 shrink-0",
               isDragOver
-                ? "text-indigo-500 dark:text-indigo-300"
-                : "text-indigo-500 dark:text-indigo-500/50 group-hover/module:text-indigo-600 dark:group-hover/module:text-indigo-400",
+                ? "text-indigo-400"
+                : "text-indigo-500/50 group-hover/module:text-indigo-400 transition-colors",
             )}
           />
-          <span className="truncate flex-1">{module.title}</span>
+          <span className="truncate flex-1 tracking-tight">{module.title}</span>
 
           {/* Drop indicator */}
           {isDragOver && (
-            <span className="text-[9px] bg-indigo-500/30 px-1 py-0.5 rounded text-indigo-200">
+            <span className="text-[9px] bg-indigo-500/30 px-1 py-0.5 rounded text-indigo-200 animate-pulse">
               Drop
             </span>
           )}
         </div>
 
         {/* Action Menu */}
-        <div className="absolute right-1 opacity-0 group-hover/module:opacity-100 transition-opacity">
+        <div className="absolute right-2 opacity-0 group-hover/module:opacity-100 transition-opacity">
           <ActionMenu
             onRename={() => onRename(module.id, module.title, courseId)}
             onDelete={() => onDelete(module.id, courseId)}
@@ -147,7 +147,7 @@ export function SidebarModule({
       </div>
 
       {isExpanded && (
-        <div className="pl-4 ml-2 border-l border-slate-200 dark:border-white/5 space-y-0.5 mt-0.5">
+        <div className="pl-3 ml-3 border-l border-white/5 space-y-0.5 mt-0.5">
           {moduleNotes?.map((note) => (
             <SidebarNote
               key={note._id}

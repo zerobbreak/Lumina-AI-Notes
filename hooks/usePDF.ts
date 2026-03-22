@@ -56,62 +56,6 @@ function stripEmojisFromElement(element: HTMLElement): void {
 }
 
 /**
- * Convert Cornell 2-column layout to linear format for PDF export
- */
-function convertCornellToLinear(element: HTMLElement): HTMLElement {
-  const clone = element.cloneNode(true) as HTMLElement;
-
-  const cornellContainer = clone.querySelector(".cornell-container");
-  if (!cornellContainer) return clone;
-
-  const cuesTextarea = clone.querySelector(
-    'textarea[placeholder*="Key terms"]',
-  ) as HTMLTextAreaElement;
-  const notesSection = clone.querySelector(".ProseMirror");
-  const summaryTextarea = clone.querySelector(
-    'textarea[placeholder*="Summarize"]',
-  ) as HTMLTextAreaElement;
-
-  const linearContainer = document.createElement("div");
-  linearContainer.className = "cornell-linear-export";
-
-  // Cues section
-  if (cuesTextarea?.value) {
-    const cuesSection = document.createElement("div");
-    cuesSection.innerHTML = `
-      <h2>CUES & QUESTIONS</h2>
-      <p>${stripEmojis(cuesTextarea.value)}</p>
-    `;
-    linearContainer.appendChild(cuesSection);
-  }
-
-  // Notes section
-  if (notesSection) {
-    const notesWrapper = document.createElement("div");
-    const header = document.createElement("h2");
-    header.textContent = "NOTES";
-    notesWrapper.appendChild(header);
-    const notesClone = notesSection.cloneNode(true) as HTMLElement;
-    stripEmojisFromElement(notesClone);
-    notesWrapper.appendChild(notesClone);
-    linearContainer.appendChild(notesWrapper);
-  }
-
-  // Summary section
-  if (summaryTextarea?.value) {
-    const summarySection = document.createElement("div");
-    summarySection.innerHTML = `
-      <h2>SUMMARY</h2>
-      <p>${stripEmojis(summaryTextarea.value)}</p>
-    `;
-    linearContainer.appendChild(summarySection);
-  }
-
-  cornellContainer.replaceWith(linearContainer);
-  return clone;
-}
-
-/**
  * Convert outline task lists for PDF (replace checkboxes with symbols)
  */
 function convertOutlineForPDF(element: HTMLElement): HTMLElement {
@@ -134,13 +78,6 @@ function convertOutlineForPDF(element: HTMLElement): HTMLElement {
   });
 
   return clone;
-}
-
-/**
- * Check if content is Cornell format
- */
-function isCornellFormat(element: HTMLElement): boolean {
-  return element.querySelector(".cornell-container") !== null;
 }
 
 /**
@@ -174,10 +111,6 @@ export function usePDF() {
       onProgress?.(30);
 
       let printContent = element.cloneNode(true) as HTMLElement;
-
-      if (isCornellFormat(printContent)) {
-        printContent = convertCornellToLinear(printContent);
-      }
 
       if (isOutlineFormat(printContent)) {
         printContent = convertOutlineForPDF(printContent);
@@ -270,10 +203,6 @@ export function usePDF() {
       if (!element) throw new Error("Element not found");
 
       let clonedElement = element.cloneNode(true) as HTMLElement;
-
-      if (isCornellFormat(clonedElement)) {
-        clonedElement = convertCornellToLinear(clonedElement);
-      }
 
       if (isOutlineFormat(clonedElement)) {
         clonedElement = convertOutlineForPDF(clonedElement);

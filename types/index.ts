@@ -16,7 +16,7 @@ export type {
 } from "./core";
 
 // Editor types
-export type { CornellData, OutlineMetadata, NoteStyleType } from "./editor";
+export type { NoteSection, SectionsData, OutlineMetadata, NoteStyleType } from "./editor";
 
 // Diagram/MindMap types
 export type {

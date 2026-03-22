@@ -15,8 +15,9 @@ import { api } from "@/convex/_generated/api";
 import { useSearchParams } from "next/navigation";
 import { QuickCaptureFab } from "@/components/dashboard/quick-capture/QuickCaptureFab";
 import { Button } from "@/components/ui/button";
-import { PanelLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
+import { cn } from "@/lib/utils";
 
 function DashboardLayoutLoading() {
   return (
@@ -38,7 +39,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const userData = useQuery(api.users.getUser);
   const searchParams = useSearchParams();
   const hideQuickCapture = Boolean(searchParams.get("noteId"));
-  const { toggleLeftSidebar, isLeftSidebarOpen } = useDashboard();
+  const { toggleLeftSidebar, isLeftSidebarOpen, isRightSidebarOpen, toggleRightSidebar } = useDashboard();
+  const [isLeftHovered, setIsLeftHovered] = useState(false);
+  const [isRightHovered, setIsRightHovered] = useState(false);
 
   // Accept any pending email invites for the signed-in user.
   useEffect(() => {
@@ -68,8 +71,88 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         className="flex h-screen w-full bg-background overflow-hidden relative"
         data-theme={userData?.theme || "indigo"}
       >
+        {/* Left Sidebar Toggle Handle (Notion-style) */}
+        <div 
+          className={cn(
+            "fixed left-0 top-0 bottom-0 w-4 z-[60] group cursor-pointer transition-opacity duration-300",
+            isLeftSidebarOpen ? "opacity-0 pointer-events-none" : "opacity-100"
+          )}
+          onMouseEnter={() => setIsLeftHovered(true)}
+          onMouseLeave={() => setIsLeftHovered(false)}
+          onClick={toggleLeftSidebar}
+        >
+          <div className={cn(
+            "absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-24 rounded-full bg-muted-foreground/20 transition-all duration-300",
+            isLeftHovered && "bg-muted-foreground/40 w-2"
+          )} />
+          <div className={cn(
+            "absolute left-4 top-4 p-1.5 rounded-md bg-background border border-border shadow-sm opacity-0 transition-opacity duration-200",
+            isLeftHovered && "opacity-100"
+          )}>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </div>
+        </div>
+
         <Sidebar />
         <main className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden relative z-0">
+          {/* Left Sidebar Close Handle (when open) */}
+          <div 
+            className={cn(
+              "absolute left-0 top-0 bottom-0 w-1 z-50 group cursor-pointer transition-opacity duration-300",
+              !isLeftSidebarOpen ? "opacity-0 pointer-events-none" : "opacity-100"
+            )}
+            onMouseEnter={() => setIsLeftHovered(true)}
+            onMouseLeave={() => setIsLeftHovered(false)}
+            onClick={toggleLeftSidebar}
+          >
+            <div className={cn(
+              "absolute left-2 top-4 p-1.5 rounded-md bg-background border border-border shadow-sm opacity-0 transition-opacity duration-200",
+              isLeftHovered && "opacity-100"
+            )}>
+              <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </div>
+
+          {/* Right Sidebar Close Handle (when open) */}
+          <div 
+            className={cn(
+              "absolute right-0 top-0 bottom-0 w-1 z-50 group cursor-pointer transition-opacity duration-300",
+              !isRightSidebarOpen ? "opacity-0 pointer-events-none" : "opacity-100"
+            )}
+            onMouseEnter={() => setIsRightHovered(true)}
+            onMouseLeave={() => setIsRightHovered(false)}
+            onClick={toggleRightSidebar}
+          >
+            <div className={cn(
+              "absolute right-2 top-4 p-1.5 rounded-md bg-background border border-border shadow-sm opacity-0 transition-opacity duration-200",
+              isRightHovered && "opacity-100"
+            )}>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </div>
+
+          {/* Right Sidebar Open Handle (when closed) */}
+          <div 
+            className={cn(
+              "fixed right-0 top-0 bottom-0 w-4 z-[60] group cursor-pointer transition-opacity duration-300",
+              isRightSidebarOpen ? "opacity-0 pointer-events-none" : "opacity-100"
+            )}
+            onMouseEnter={() => setIsRightHovered(true)}
+            onMouseLeave={() => setIsRightHovered(false)}
+            onClick={toggleRightSidebar}
+          >
+            <div className={cn(
+              "absolute right-1 top-1/2 -translate-y-1/2 w-1.5 h-24 rounded-full bg-muted-foreground/20 transition-all duration-300",
+              isRightHovered && "bg-muted-foreground/40 w-2"
+            )} />
+            <div className={cn(
+              "absolute right-4 top-4 p-1.5 rounded-md bg-background border border-border shadow-sm opacity-0 transition-opacity duration-200",
+              isRightHovered && "opacity-100"
+            )}>
+              <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </div>
+
           {/* Mobile: opens navigation when note hub and other views have no header toggle */}
           <div className="flex md:hidden items-center h-11 shrink-0 px-2 border-b border-border bg-background/95 backdrop-blur-sm">
             <Button
@@ -84,7 +167,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               aria-label={isLeftSidebarOpen ? "Close navigation menu" : "Open navigation menu"}
               aria-expanded={isLeftSidebarOpen}
             >
-              <PanelLeft className="w-5 h-5" />
+              {isLeftSidebarOpen ? (
+                <ChevronLeft className="w-5 h-5" />
+              ) : (
+                <ChevronRight className="w-5 h-5" />
+              )}
             </Button>
           </div>
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col">

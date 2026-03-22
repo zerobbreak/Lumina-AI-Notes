@@ -17,35 +17,15 @@ import { BubbleMenu } from "@tiptap/extension-bubble-menu";
 import { FloatingMenu as FloatingMenuExtension } from "@tiptap/extension-floating-menu";
 import { FloatingMenu } from "@tiptap/react/menus";
 import { SlashCommand, renderItems } from "./extensions/SlashCommand";
-import { SlashCommandMenu } from "./SlashCommandMenu";
+import { SlashCommandLayer } from "./SlashCommandLayer";
 import { Plus, GripVertical } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ResourceMentionNode } from "./ResourceMentionNode";
 import { OutlineExtension } from "./extensions/OutlineExtension";
 import { DiagramExtension } from "./extensions/DiagramExtension";
 import { MathExtensions } from "./extensions/MathExtension";
-import { CornellData, OutlineMetadata, NoteStyleType } from "@/types";
+import { OutlineMetadata, NoteStyleType } from "@/types";
 import "./editor.css";
-
-function SlashCommandLayer({ editor }: { editor: TiptapEditor }) {
-  if (!editor.slashCommandProps) return null;
-  const sc = editor.slashCommandProps;
-  const parentEl = editor.view.dom.parentElement;
-  const parentRect = parentEl?.getBoundingClientRect();
-  const cr = sc.clientRect?.() ?? null;
-  const top = cr
-    ? cr.top -
-      (parentRect?.top ?? 0) +
-      (parentEl?.scrollTop ?? 0) +
-      24
-    : 0;
-  const left = cr ? cr.left - (parentRect?.left ?? 0) : 0;
-  return (
-    <div className="absolute z-50" style={{ top, left }}>
-      <SlashCommandMenu editor={editor} range={sc.range} />
-    </div>
-  );
-}
 
 const ResourceMention = Node.create({
   name: "resourceMention",
@@ -94,13 +74,9 @@ const ResourceMention = Node.create({
 interface EditorProps {
   initialContent?: string;
   isEditable?: boolean;
-  onChange?: (content: string | CornellData) => void;
+  onChange?: (content: string) => void;
   placeholder?: string;
   styleType?: NoteStyleType;
-  // Cornell-specific props
-  cornellCues?: string;
-  cornellNotes?: string;
-  cornellSummary?: string;
   // Outline-specific props
   outlineData?: string;
   outlineMetadata?: OutlineMetadata;
@@ -112,17 +88,9 @@ export default function Editor({
   onChange,
   placeholder = "Start writing...",
   styleType = "standard",
-  cornellCues: initialCornellCues,
-  cornellNotes: initialCornellNotes,
-  cornellSummary: initialCornellSummary,
   outlineData,
   outlineMetadata,
 }: EditorProps) {
-  // State for Cornell Notes sections
-  const [cornellCues, setCornellCues] = useState(initialCornellCues || "");
-  const [cornellSummary, setCornellSummary] = useState(
-    initialCornellSummary || "",
-  );
   const [slashUiTick, setSlashUiTick] = useState(0);
   const bumpSlashUi = useCallback(() => {
     setSlashUiTick((n) => n + 1);
@@ -194,8 +162,7 @@ export default function Editor({
   const editor = useEditor({
     immediatelyRender: false,
     extensions,
-    content:
-      styleType === "cornell" ? initialCornellNotes || "" : initialContent,
+    content: initialContent,
     editable: isEditable,
     editorProps: {
       attributes: {
@@ -238,65 +205,13 @@ export default function Editor({
       },
     },
     onUpdate: ({ editor }) => {
-      if (styleType === "cornell") {
-        // For Cornell notes, combine all sections
-        onChange?.({
-          cornellCues,
-          cornellNotes: editor.getHTML(),
-          cornellSummary,
-        });
-      } else {
-        onChange?.(editor.getHTML());
-      }
+      onChange?.(editor.getHTML());
     },
   });
 
-  // Update Cornell sections when props change (loading different note)
+  // Effect to update content if it changes externally
   useEffect(() => {
-    if (styleType === "cornell") {
-      setCornellCues(initialCornellCues || "");
-      setCornellSummary(initialCornellSummary || "");
-      if (editor && initialCornellNotes !== undefined) {
-        const currentContent = editor.getHTML();
-        if (currentContent !== initialCornellNotes) {
-          // Use queueMicrotask to schedule setContent outside of React's commit phase
-          // This avoids the flushSync error since TipTap internally uses flushSync
-          queueMicrotask(() => {
-            if (editor && !editor.isDestroyed) {
-              editor.commands.setContent(initialCornellNotes || "");
-            }
-          });
-        }
-      }
-    }
-  }, [
-    initialCornellCues,
-    initialCornellNotes,
-    initialCornellSummary,
-    styleType,
-    editor,
-  ]);
-
-  // Notify parent when Cornell cues or summary change
-  useEffect(() => {
-    if (styleType === "cornell" && editor) {
-      onChange?.({
-        cornellCues,
-        cornellNotes: editor.getHTML(),
-        cornellSummary,
-      });
-    }
-  }, [cornellCues, cornellSummary]);
-
-  // Effect to update content if it changes externally (for non-Cornell notes)
-  useEffect(() => {
-    if (
-      styleType !== "cornell" &&
-      editor &&
-      initialContent !== editor.getHTML()
-    ) {
-      // Use queueMicrotask to schedule content updates outside of React's commit phase
-      // This avoids the flushSync error since TipTap internally uses flushSync
+    if (editor && initialContent !== editor.getHTML()) {
       queueMicrotask(() => {
         if (editor && !editor.isDestroyed) {
           if (initialContent) {
@@ -307,76 +222,13 @@ export default function Editor({
         }
       });
     }
-  }, [initialContent, editor, styleType]);
+  }, [initialContent, editor]);
 
   if (!editor) {
     return null;
   }
 
   // Render based on styleType
-  if (styleType === "cornell") {
-    return (
-      <div className="cornell-container h-full flex flex-col">
-        {/* Main Grid */}
-        <div className="grid grid-cols-[300px_1fr] gap-6 flex-1 min-h-0">
-          {/* Left Column - Cues */}
-          <div className="border-r border-border p-6 bg-accent/30">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
-                <span className="text-lg">💡</span>
-              </div>
-              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                Cues & Questions
-              </h3>
-            </div>
-            <textarea
-              value={cornellCues}
-              onChange={(e) => setCornellCues(e.target.value)}
-              disabled={!isEditable}
-              className="w-full h-[calc(100%-3rem)] bg-transparent resize-none focus:outline-none text-foreground text-sm leading-relaxed placeholder:text-muted-foreground/50"
-              placeholder="• Key terms&#10;• Important concepts&#10;• Review questions&#10;• Main ideas"
-            />
-          </div>
-
-          {/* Right Column - Main Notes */}
-          <div className="p-6 flex flex-col min-h-0">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
-                <span className="text-lg">📝</span>
-              </div>
-              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                Notes
-              </h3>
-            </div>
-            <div className="flex-1 overflow-auto relative min-h-0">
-              <SlashCommandLayer editor={editor} />
-              <EditorContent editor={editor} />
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Row - Summary */}
-        <div className="border-t border-border p-6 bg-accent/30">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
-              <span className="text-lg">📋</span>
-            </div>
-            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-              Summary
-            </h3>
-          </div>
-          <textarea
-            value={cornellSummary}
-            onChange={(e) => setCornellSummary(e.target.value)}
-            disabled={!isEditable}
-            className="w-full bg-transparent resize-none focus:outline-none text-foreground text-sm h-24 leading-relaxed placeholder:text-muted-foreground/50"
-            placeholder="Summarize the main points in 2-3 sentences..."
-          />
-        </div>
-      </div>
-    );
-  }
-
   if (styleType === "outline") {
     return (
       <div className="outline-mode-container">

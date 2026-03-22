@@ -1,22 +1,16 @@
 import type { OutlineNode } from "@/lib/outlineUtils";
 
-export type NoteStyle = "standard" | "outline" | "cornell" | "mindmap";
+export type NoteStyle = "standard" | "outline" | "mindmap";
 
 export interface NoteContentSnapshot {
   style: NoteStyle;
   content?: string;
-  cornellCues?: string;
-  cornellNotes?: string;
-  cornellSummary?: string;
   outlineData?: string;
 }
 
 export interface ConversionResult {
   style: NoteStyle;
   content?: string;
-  cornellCues?: string;
-  cornellNotes?: string;
-  cornellSummary?: string;
   outlineData?: string;
 }
 
@@ -65,21 +59,6 @@ export function convertTemplate(
   }
 
   if (to === "outline") {
-    if (from.style === "cornell") {
-      const cues = (from.cornellCues || "").split("\n").filter(Boolean);
-      const notes = (from.cornellNotes || "")
-        .replace(/<[^>]*>/g, "\n")
-        .split("\n")
-        .filter(Boolean);
-      const merged = [...cues, ...notes];
-      const outlineData = JSON.stringify(outlineDataFromLines(merged));
-      return {
-        style: "outline",
-        content: `<ul>${outlineFromLines(merged)}</ul>`,
-        outlineData,
-      };
-    }
-
     if (from.style === "mindmap") {
       const nodes = extractMindmapNodes(from.content);
       const labels = nodes.map((n: any) => n?.data?.label || n?.label || "");
@@ -98,30 +77,6 @@ export function convertTemplate(
       style: "outline",
       content: `<ul>${outlineFromLines(lines)}</ul>`,
       outlineData,
-    };
-  }
-
-  if (to === "cornell") {
-    if (from.style === "outline") {
-      const plain = toPlainText(from.content);
-      const lines = plain.split("\n").map((l) => l.trim()).filter(Boolean);
-      const cues = lines.slice(0, Math.max(1, Math.floor(lines.length / 3)));
-      const notes = lines.slice(cues.length);
-      return {
-        style: "cornell",
-        cornellCues: cues.join("\n"),
-        cornellNotes: notes.map((n) => `<p>${n}</p>`).join(""),
-        cornellSummary: "",
-      };
-    }
-
-    const plain = toPlainText(from.content);
-    const cues = plain.split(".").map((l) => l.trim()).filter(Boolean);
-    return {
-      style: "cornell",
-      cornellCues: cues.slice(0, 3).join("\n"),
-      cornellNotes: cues.slice(3).map((n) => `<p>${n}</p>`).join(""),
-      cornellSummary: "",
     };
   }
 
@@ -147,6 +102,7 @@ export function convertTemplate(
     };
   }
 
+  // Standard style - just return the content as-is
   return {
     style: to,
     content: from.content,

@@ -19,15 +19,20 @@ export function AskAI({
   onInsertToNote,
 }: AskAIProps) {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const { isRightSidebarOpen } = useDashboard();
+  const { isRightSidebarOpen, rightSidebarState } = useDashboard();
+
+  const fabRightClass =
+    !isRightSidebarOpen
+      ? "right-6"
+      : rightSidebarState === "compact"
+        ? "right-[88px]"
+        : "right-[340px]";
 
   return (
     <>
       {/* Floating AI Widget Container */}
       <div
-        className={`fixed bottom-6 z-40 flex flex-col items-end gap-4 transition-all duration-300 ease-in-out ${
-          isRightSidebarOpen ? "right-[340px]" : "right-6"
-        }`}
+        className={`fixed bottom-6 z-40 flex flex-col items-end gap-4 transition-all duration-300 ease-in-out ${fabRightClass}`}
       >
         <AIAssistantPanel
           isOpen={isPanelOpen}

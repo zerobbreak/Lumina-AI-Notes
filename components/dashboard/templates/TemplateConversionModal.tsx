@@ -14,8 +14,8 @@ interface TemplateConversionModalProps {
 }
 
 const options: Array<{ id: NoteStyle; label: string; icon: React.ReactNode }> = [
+  { id: "standard", label: "Standard", icon: <FileText className="w-4 h-4" /> },
   { id: "outline", label: "Outline", icon: <List className="w-4 h-4" /> },
-  { id: "cornell", label: "Cornell", icon: <FileText className="w-4 h-4" /> },
   { id: "mindmap", label: "Mind Map", icon: <Share2 className="w-4 h-4" /> },
 ];
 
@@ -43,7 +43,7 @@ export function TemplateConversionModal({
   );
 
   const previewText = useMemo(() => {
-    const raw = conversion.content || conversion.cornellNotes || "";
+    const raw = conversion.content || "";
     if (typeof window === "undefined") return raw;
     const div = document.createElement("div");
     div.innerHTML = raw;

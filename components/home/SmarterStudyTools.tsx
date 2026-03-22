@@ -72,7 +72,7 @@ const features = [
     icon: Layout,
     title: "Structured Learning",
     description:
-      "Support for Cornell Notes, Outlines, and Mind Maps. Auto-organized by your semester, major, and courses.",
+      "Support for flexible note sections, Outlines, and Mind Maps. Auto-organized by your semester, major, and courses.",
     color: "from-indigo-500/20 to-violet-500/20",
     iconColor: "text-indigo-400",
     delay: 0.6,

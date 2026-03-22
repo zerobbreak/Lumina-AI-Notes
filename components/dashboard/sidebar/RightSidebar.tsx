@@ -33,6 +33,8 @@ import {
   History,
   Code2,
   Zap,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   Dialog,
@@ -182,7 +184,14 @@ export function RightSidebar() {
     activeContext,
     setActiveContext,
     isRightSidebarOpen,
+    rightSidebarState,
+    cycleRightSidebar,
+    setRightSidebarState,
   } = useDashboard();
+
+  const isRightCompact = rightSidebarState === "compact";
+  const isRightOpen = rightSidebarState === "open";
+  const isRightClosed = rightSidebarState === "closed";
   const generateFromPinnedAudio = useAction(api.notes.generateFromPinnedAudio);
 
   const { transcript, resetTranscript, browserSupportsSpeechRecognition } =
@@ -206,6 +215,13 @@ export function RightSidebar() {
     hasDraftTranscript,
     generatedNotes,
   ]);
+
+  // Full-width Studio when recording / upload / AI — compact strip is too small
+  useEffect(() => {
+    if (sidebarMode !== "idle" && rightSidebarState === "compact") {
+      setRightSidebarState("open");
+    }
+  }, [sidebarMode, rightSidebarState, setRightSidebarState]);
 
   // Validate active context file still exists
   const contextFile = useQuery(
@@ -608,8 +624,7 @@ export function RightSidebar() {
     // Wrap markdown in a StructuredNotes shape for compatibility
     const wrappedNotes: StructuredNotes = {
       summary: markdownContent,
-      cornellCues: [],
-      cornellNotes: [],
+      sections: [],
       actionItems: [],
       reviewQuestions: [],
     };
@@ -1123,45 +1138,21 @@ export function RightSidebar() {
   // Don't render until mounted (hydration fix)
   if (!isMounted) return null;
 
-  if (!isRightSidebarOpen) {
-    return null;
-  }
-
-  // Check browser support
-  if (!browserSupportsSpeechRecognition) {
-    return (
-      <div className="w-[320px] h-screen bg-black/20 backdrop-blur-xl border-l border-white/5 flex flex-col items-center justify-center text-white p-6 text-center gap-4">
-        <AlertCircle className="w-10 h-10 text-yellow-500" />
-        <p className="text-sm">
-          Speech recognition is not supported in this browser. Please use Google
-          Chrome for the best experience.
-        </p>
-      </div>
-    );
-  }
-
-  // Show denied state only if we know for sure permission was denied
-  if (permissionState === "denied") {
-    return (
-      <div className="w-[320px] h-screen bg-black/20 backdrop-blur-xl border-l border-white/5 flex flex-col items-center justify-center text-white p-6 text-center gap-4">
-        <Mic className="w-10 h-10 text-red-500" />
-        <p className="text-sm">
-          Microphone access was denied. Please allow microphone access in your
-          browser settings and reload the page.
-        </p>
-        <Button variant="outline" onClick={() => window.location.reload()}>
-          Reload Page
-        </Button>
-      </div>
-    );
-  }
-
   return (
+    <>
     <motion.div
-      initial={{ x: 320, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
+      initial={false}
+      animate={{
+        width: isRightOpen ? 320 : isRightCompact ? 72 : 0,
+        opacity: isRightClosed ? 0 : 1,
+        x: isRightClosed ? 320 : 0,
+      }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="w-[320px] h-screen bg-sidebar backdrop-blur-xl border-l border-sidebar-border flex flex-col shrink-0 z-50 transition-all duration-300 overflow-hidden"
+      className={cn(
+        "group/right-sidebar h-screen bg-sidebar backdrop-blur-xl border-l border-sidebar-border flex flex-col shrink-0 z-50 overflow-hidden",
+        "shadow-[inset_1px_0_0_0_rgba(255,255,255,0.04)]",
+        isRightClosed && "pointer-events-none border-transparent shadow-none",
+      )}
       onDrop={handleNativeDrop}
       onDragOver={handleNativeDragOver}
       onMouseUp={handleTextSelection}
@@ -1174,13 +1165,136 @@ export function RightSidebar() {
           : "rgba(255, 255, 255, 0.05)",
       }}
     >
-      <ScrollArea className="flex-1 min-h-0">
+      <div className="w-full h-full flex flex-col shrink-0 min-w-0">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="audio/*"
+          onChange={handleFileUpload}
+          className="hidden"
+          aria-hidden
+        />
+        <input
+          ref={textbookInputRef}
+          type="file"
+          accept=".pdf,.ppt,.pptx,.doc,.docx"
+          onChange={handleTextbookUpload}
+          className="hidden"
+          aria-hidden
+        />
+        <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-3 border-b border-white/5 bg-linear-to-b from-sidebar/90 to-sidebar/60 backdrop-blur-md">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent focus-visible:ring-1 focus-visible:ring-violet-500/40"
+              onClick={cycleRightSidebar}
+              aria-label={
+                isRightOpen
+                  ? "Narrow Lumina Studio"
+                  : isRightCompact
+                    ? "Hide Lumina Studio"
+                    : "Show Lumina Studio"
+              }
+              title={
+                isRightOpen
+                  ? "Narrow panel"
+                  : isRightCompact
+                    ? "Hide panel"
+                    : "Show panel"
+              }
+            >
+              {isRightCompact ? (
+                <ChevronLeft className="w-4 h-4" />
+              ) : (
+                <ChevronRight className="w-4 h-4" />
+              )}
+            </Button>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-linear-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/20 shrink-0 ring-1 ring-white/10">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+              {!isRightCompact && (
+                <div className="min-w-0 flex flex-col gap-0">
+                  <span className="font-bold text-sm tracking-tight text-sidebar-foreground truncate leading-tight">
+                    Lumina Studio
+                  </span>
+                  <span className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider">
+                    Capture &amp; transcribe
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        {isRightCompact ? (
+          <div className="flex-1 flex flex-col items-stretch gap-1.5 py-3 px-1.5 overflow-y-auto min-h-0">
+            <p className="text-[9px] font-semibold text-muted-foreground/45 uppercase tracking-widest text-center px-0.5 pb-1">
+              Quick
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-10 w-full rounded-xl border border-transparent text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent hover:border-white/10 transition-all duration-200 active:scale-[0.98] disabled:opacity-40"
+              title="Import audio"
+              disabled={isUploading || isTranscribing}
+              onClick={() =>
+                !isUploading &&
+                !isTranscribing &&
+                fileInputRef.current?.click()
+              }
+            >
+              <FileAudio className="w-5 h-5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-10 w-full rounded-xl border border-transparent text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent hover:border-white/10 transition-all duration-200 active:scale-[0.98] disabled:opacity-40"
+              title="Import file"
+              disabled={isUploadingTextbook}
+              onClick={() =>
+                !isUploadingTextbook && textbookInputRef.current?.click()
+              }
+            >
+              <BookOpen className="w-5 h-5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-10 w-full rounded-xl border border-transparent transition-all duration-200 active:scale-[0.98]",
+                isRecording
+                  ? "text-red-400 bg-red-500/10 border-red-500/20 hover:bg-red-500/15"
+                  : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent hover:border-white/10",
+              )}
+              title={isRecording ? "Pause recording" : "Start recording"}
+              onClick={() => void handleToggleRecording()}
+            >
+              <Mic className="w-5 h-5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-10 w-full rounded-xl border border-transparent text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent hover:border-white/10 transition-all duration-200 active:scale-[0.98]"
+              title="Upload & recording history"
+              onClick={() => setShowHistory((h) => !h)}
+            >
+              <History className="w-5 h-5" />
+            </Button>
+          </div>
+        ) : (
+        <ScrollArea className="flex-1 min-h-0">
         {/* Top: Upload & Recording */}
-        <div className="p-4 flex flex-col gap-3 relative overflow-hidden">
+        <div className="p-3 sm:p-4 flex flex-col gap-4 relative overflow-hidden">
           <ContextDeck />
 
           {/* Dynamic Mode Indicator Header */}
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between gap-2 min-h-[2.25rem]">
             <AnimatePresence mode="wait">
               <motion.div
                 key={sidebarMode}
@@ -1189,17 +1303,17 @@ export function RightSidebar() {
                 exit={{ opacity: 0, y: 10 }}
                 transition={{ duration: 0.2 }}
                 className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border",
+                  "flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border shadow-sm",
                   sidebarMode === "recording" &&
-                    "bg-red-500/10 text-red-400 border-red-500/20",
+                    "bg-red-500/10 text-red-400 border-red-500/25",
                   sidebarMode === "uploading" &&
-                    "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+                    "bg-cyan-500/10 text-cyan-400 border-cyan-500/25",
                   sidebarMode === "transcribing" &&
-                    "bg-amber-500/10 text-amber-400 border-amber-500/20",
+                    "bg-amber-500/10 text-amber-400 border-amber-500/25",
                   sidebarMode === "ready" &&
-                    "bg-green-500/10 text-green-400 border-green-500/20",
+                    "bg-green-500/10 text-green-400 border-green-500/25",
                   sidebarMode === "idle" &&
-                    "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-gray-400 border-slate-200 dark:border-white/10",
+                    "bg-sidebar-accent/80 text-muted-foreground border-sidebar-border",
                 )}
               >
                 {sidebarMode === "recording" && (
@@ -1232,7 +1346,7 @@ export function RightSidebar() {
                 {sidebarMode === "idle" && (
                   <>
                     <Radio className="w-3 h-3" />
-                    Lumina Studio
+                    Capture & import
                   </>
                 )}
               </motion.div>
@@ -1276,43 +1390,35 @@ export function RightSidebar() {
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="audio/*"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
+                <div className="grid grid-cols-2 gap-2.5 mb-2">
                   <button
+                    type="button"
                     onClick={() =>
                       !isUploading &&
                       !isTranscribing &&
                       fileInputRef.current?.click()
                     }
-                    className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border transition-all duration-200 bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/5 hover:bg-slate-200 dark:hover:bg-white/10 hover:border-slate-300 dark:hover:border-white/10"
+                    className="group/import flex flex-col items-center justify-center gap-2.5 p-3.5 rounded-2xl border border-white/8 bg-white/[0.03] transition-all duration-200 hover:bg-violet-500/10 hover:border-violet-500/25 hover:shadow-lg hover:shadow-violet-500/5 active:scale-[0.98]"
                   >
-                    <FileAudio className="w-5 h-5 text-slate-500 dark:text-gray-400" />
-                    <span className="text-[10px] font-medium text-slate-500 dark:text-gray-400">
+                    <div className="rounded-xl bg-violet-500/15 p-2.5 ring-1 ring-violet-500/20 group-hover/import:bg-violet-500/20 transition-colors">
+                      <FileAudio className="w-5 h-5 text-violet-300" />
+                    </div>
+                    <span className="text-[10px] font-semibold text-muted-foreground group-hover/import:text-sidebar-foreground transition-colors">
                       Import Audio
                     </span>
                   </button>
 
-                  <input
-                    ref={textbookInputRef}
-                    type="file"
-                    accept=".pdf,.ppt,.pptx,.doc,.docx"
-                    onChange={handleTextbookUpload}
-                    className="hidden"
-                  />
                   <button
+                    type="button"
                     onClick={() =>
                       !isUploadingTextbook && textbookInputRef.current?.click()
                     }
-                    className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border transition-all duration-200 bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/5 hover:bg-slate-200 dark:hover:bg-white/10 hover:border-slate-300 dark:hover:border-white/10"
+                    className="group/import flex flex-col items-center justify-center gap-2.5 p-3.5 rounded-2xl border border-white/8 bg-white/[0.03] transition-all duration-200 hover:bg-indigo-500/10 hover:border-indigo-500/25 hover:shadow-lg hover:shadow-indigo-500/5 active:scale-[0.98]"
                   >
-                    <BookOpen className="w-5 h-5 text-slate-500 dark:text-gray-400" />
-                    <span className="text-[10px] font-medium text-slate-500 dark:text-gray-400">
+                    <div className="rounded-xl bg-indigo-500/15 p-2.5 ring-1 ring-indigo-500/20 group-hover/import:bg-indigo-500/20 transition-colors">
+                      <BookOpen className="w-5 h-5 text-indigo-300" />
+                    </div>
+                    <span className="text-[10px] font-semibold text-muted-foreground group-hover/import:text-sidebar-foreground transition-colors">
                       Import File
                     </span>
                   </button>
@@ -1324,10 +1430,10 @@ export function RightSidebar() {
           {/* Recording Card - Mode Aware */}
           <div
             className={cn(
-              "rounded-3xl p-6 flex flex-col items-center gap-6 shadow-2xl shadow-black/50 relative overflow-hidden group transition-all duration-500",
+              "rounded-2xl p-5 sm:p-6 flex flex-col items-center gap-5 shadow-xl shadow-black/40 relative overflow-hidden group transition-all duration-500 border",
               sidebarMode === "ready"
-                ? "bg-linear-to-b from-green-900/20 to-slate-900 dark:to-black border border-green-500/20"
-                : "bg-slate-900 dark:bg-black border border-slate-700 dark:border-white/5",
+                ? "bg-linear-to-b from-green-900/25 to-sidebar border-green-500/25"
+                : "bg-zinc-900/80 dark:bg-black/60 border-white/10",
             )}
           >
             {/* Subtle Background Glow */}
@@ -1399,8 +1505,8 @@ export function RightSidebar() {
                         {recordingTitle || "Your AI-generated notes are ready"}
                       </p>
                       <p className="text-[10px] text-gray-500 mt-1">
-                        {generatedNotes.cornellNotes?.length || 0} key points
-                        extracted
+                        {generatedNotes.sections?.length || 0} sections
+                        generated
                       </p>
                     </div>
                   ) : showTranscriptPreview &&
@@ -1449,7 +1555,7 @@ export function RightSidebar() {
                     <span className="text-[9px] text-gray-600">
                       {useStreamingMode
                         ? "Animated markdown output"
-                        : "Cornell-style JSON output"}
+                        : "Section-based JSON output"}
                     </span>
                   </div>
 
@@ -1893,55 +1999,68 @@ export function RightSidebar() {
           </div>
         </div>
       </ScrollArea>
-
-      <Dialog open={isSaveModalOpen} onOpenChange={setIsSaveModalOpen}>
-        <DialogContent className="sm:max-w-md bg-zinc-900 border-white/10 text-white">
-          <DialogHeader>
-            <DialogTitle>Save Session</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="title" className="text-gray-400">
-                Title
-              </Label>
-              <Input
-                id="title"
-                value={recordingTitle}
-                onChange={(e) => setRecordingTitle(e.target.value)}
-                className="bg-black/20 border-white/10 text-white placeholder:text-gray-600 focus-visible:ring-indigo-500"
-                placeholder="Enter a title..."
-              />
-            </div>
-            <div className="flex justify-between text-sm text-gray-500 bg-white/5 p-3 rounded-lg">
-              <span>Duration</span>
-              <span className="font-mono text-white">
-                {formatTime(elapsedTime)}
-              </span>
-            </div>
-          </div>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="ghost"
-              onClick={() => setIsSaveModalOpen(false)}
-              className="text-gray-400 hover:text-white hover:bg-white/10"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirmSave}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white"
-            >
-              Save Recording
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <CodeExtractorDialog
-        isOpen={isCodeExtractorOpen}
-        onClose={() => setIsCodeExtractorOpen(false)}
-        selectedText={selectedText}
-        onExtract={handleExtractCode}
-      />
+        )}
+      </div>
     </motion.div>
+    {isRightClosed && (
+      <button
+        type="button"
+        onClick={() => setRightSidebarState("open")}
+        className="fixed right-4 top-4 z-[60] w-10 h-10 bg-zinc-900 border border-white/10 rounded-xl flex items-center justify-center text-muted-foreground hover:text-sidebar-foreground hover:bg-zinc-800 transition-all shadow-2xl group/reopen-right"
+        aria-label="Open Lumina Studio"
+        title="Open Lumina Studio"
+      >
+        <ChevronLeft className="w-5 h-5 group-hover/reopen-right:translate-x-0.5 transition-transform" />
+      </button>
+    )}
+    <Dialog open={isSaveModalOpen} onOpenChange={setIsSaveModalOpen}>
+      <DialogContent className="sm:max-w-md bg-zinc-900 border-white/10 text-white">
+        <DialogHeader>
+          <DialogTitle>Save Session</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="title" className="text-gray-400">
+              Title
+            </Label>
+            <Input
+              id="title"
+              value={recordingTitle}
+              onChange={(e) => setRecordingTitle(e.target.value)}
+              className="bg-black/20 border-white/10 text-white placeholder:text-gray-600 focus-visible:ring-indigo-500"
+              placeholder="Enter a title..."
+            />
+          </div>
+          <div className="flex justify-between text-sm text-gray-500 bg-white/5 p-3 rounded-lg">
+            <span>Duration</span>
+            <span className="font-mono text-white">
+              {formatTime(elapsedTime)}
+            </span>
+          </div>
+        </div>
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button
+            variant="ghost"
+            onClick={() => setIsSaveModalOpen(false)}
+            className="text-gray-400 hover:text-white hover:bg-white/10"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmSave}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white"
+          >
+            Save Recording
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    <CodeExtractorDialog
+      isOpen={isCodeExtractorOpen}
+      onClose={() => setIsCodeExtractorOpen(false)}
+      selectedText={selectedText}
+      onExtract={handleExtractCode}
+    />
+  </>
   );
 }

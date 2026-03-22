@@ -47,7 +47,7 @@ const CONCRETE_SIGNAL_RE =
   /\d|for example|e\.g\.|such as|because|therefore|used to|works by|defined as|means|specifically|in particular|according to|demonstrated by|calculated as|results in|consists of|involves/i;
 
 /**
- * Check whether a Cornell note entry lacks substantive depth.
+ * Check whether a note section lacks substantive depth.
  * Returns `true` if the note is too shallow by heuristic measures.
  */
 export const noteLacksDepth = (text: string): boolean => {

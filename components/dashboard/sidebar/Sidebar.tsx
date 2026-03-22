@@ -10,8 +10,10 @@ import {
   Archive,
   ClipboardList,
   Pin,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { useMutation, useQuery, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -41,6 +43,7 @@ import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 type RenameTarget = {
   id: string;
@@ -52,9 +55,13 @@ type RenameTarget = {
 export function Sidebar() {
   const { user } = useUser();
   const router = useRouter();
-  const { isLeftSidebarOpen, toggleLeftSidebar } = useDashboard();
+  const { leftSidebarState, setLeftSidebarState, cycleLeftSidebar } = useDashboard();
   const searchParams = useSearchParams();
   const { createNoteFlow } = useCreateNoteFlow();
+
+  const isCompact = leftSidebarState === "compact";
+  const isOpen = leftSidebarState === "open";
+  const isClosed = leftSidebarState === "closed";
 
   // Queries
   const userData = useQuery(api.users.getUser);
@@ -198,362 +205,385 @@ export function Sidebar() {
   };
 
   const sidebarInner = (
-    <div className="w-full h-full min-h-0 bg-sidebar flex flex-col group/sidebar overflow-hidden">
-      {/* Header */}
-      <div className="p-3 sm:p-4 space-y-3">
-        {/* Search */}
-        <Button
-          variant="ghost"
-          className="w-full justify-between bg-zinc-800/50 border border-sidebar-border text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent h-10 px-3 transition-all duration-200"
-          onClick={() => setIsSearchOpen(true)}
-        >
-          <span className="flex items-center gap-2.5 text-xs font-medium">
-            <Search className="w-3.5 h-3.5 opacity-70" />
-            <span className="opacity-80">Search notes...</span>
-          </span>
-          <span className="text-[10px] font-bold bg-zinc-800 px-1.5 py-0.5 rounded-[4px] border border-sidebar-border text-muted-foreground">
-            {formatShortcut("cmd+k")}
-          </span>
-        </Button>
-      </div>
-      <ScrollArea className="flex-1 px-3 py-3 min-w-0">
-        {/* FAVORITES */}
-        <div className="mb-6 min-w-0">
-          <div className="flex items-center justify-between px-2 mb-2 group min-w-0">
-            <h3 className="text-[10px] font-bold text-muted-foreground uppercase transition-colors group-hover:text-sidebar-foreground">
-              Favorites
-            </h3>
-          </div>
-          <div className="space-y-0.5">
-            {pinnedNotes?.map((note) => (
-              <SidebarNote
-                key={note._id}
-                note={note}
-                onRename={() => openRename(note._id, "note", note.title)}
-                onDelete={() => deleteNote({ noteId: note._id })}
-                onArchive={() => toggleArchiveNote({ noteId: note._id })}
-              />
-            ))}
-            {(!pinnedNotes || pinnedNotes.length === 0) && (
-              <EmptyState
-                icon={<Pin className="w-5 h-5 text-zinc-500" />}
-                title="No favorites"
-                description="Pin important notes to access them quickly"
-                className="py-6 px-2"
-              />
-            )}
-          </div>
-        </div>
-
-        {/* COURSES */}
-        <div className="mb-6 min-w-0">
-          <div className="flex items-center justify-between px-2 mb-2 group min-w-0">
-            <h3 className="text-[10px] font-bold text-muted-foreground uppercase transition-colors group-hover:text-sidebar-foreground">
-              Smart Folders
-            </h3>
+    <div className={cn(
+      "w-full h-full min-h-0 bg-sidebar flex flex-col group/sidebar overflow-hidden relative transition-all duration-300",
+      isCompact && "items-center"
+    )}>
+      {/* Header / Search */}
+      <div className={cn(
+        "p-4 flex flex-col gap-4 transition-all duration-300",
+        isCompact && "p-2 items-center"
+      )}>
+        <div className={cn(
+          "flex items-center justify-between transition-all gap-2",
+          isCompact && "flex-col gap-4"
+        )}>
+          <div className={cn("flex items-center gap-1.5 min-w-0 flex-1", isCompact && "flex-col px-0 w-full")}>
+            {/* Single collapse / expand control (Notion-style: one control, cycles open → compact → closed) */}
             <Button
+              type="button"
               variant="ghost"
               size="icon"
-              className="w-5 h-5 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent opacity-40 group-hover:opacity-100 transition-all rounded-md"
-              onClick={handleCreateCourse}
+              className={cn(
+                "shrink-0 h-8 w-8 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-lg",
+                isCompact && "w-10 h-10"
+              )}
+              onClick={cycleLeftSidebar}
+              aria-label={
+                isOpen
+                  ? "Narrow sidebar"
+                  : isCompact
+                    ? "Hide sidebar"
+                    : "Show sidebar"
+              }
+              title={
+                isOpen
+                  ? "Narrow sidebar"
+                  : isCompact
+                    ? "Hide sidebar"
+                    : "Show sidebar"
+              }
             >
-              <Plus className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-          <div className="space-y-1">
-            {userData?.courses?.map((course: Course) => (
-              <SidebarCourse
-                key={course.id}
-                course={course}
-                isExpanded={!!expandedCourses[course.id]}
-                onToggle={() => toggleCourse(course.id)}
-                onRename={(id, name) => openRename(id, "course", name)}
-                onDelete={(id) => deleteCourse({ courseId: id })}
-                onRenameModule={(id, name, parentId) =>
-                  openRename(id, "module", name, parentId)
-                }
-                onDeleteModule={(id, parentId) =>
-                  deleteModule({ courseId: parentId, moduleId: id })
-                }
-                onRenameNote={(id, title) => openRename(id, "note", title)}
-                onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
-                onArchiveNote={(id) =>
-                  toggleArchiveNote({ noteId: id as Id<"notes"> })
-                }
-              />
-            ))}
-            {(!userData?.courses || userData.courses.length === 0) && (
-              <EmptyState
-                icon={<FolderOpen className="w-5 h-5 text-zinc-500" />}
-                title="No Smart Folders yet"
-                description="Create a smart folder to organize your notes by course or topic"
-                action={{
-                  label: "Create Smart Folder",
-                  onClick: handleCreateCourse,
-                }}
-                className="py-6 px-2"
-              />
-            )}
-          </div>
-        </div>
-
-        {/* FILES */}
-        <div className="mb-6 min-w-0">
-          <div className="flex items-center justify-between px-2 mb-2 group min-w-0">
-            <h3 className="text-[10px] font-bold text-muted-foreground uppercase transition-colors group-hover:text-sidebar-foreground">
-              Resource Library
-            </h3>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="w-5 h-5 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent opacity-40 group-hover:opacity-100 transition-all rounded-md"
-              onClick={() => setIsUploadOpen(true)}
-              data-tour="upload-file"
-            >
-              <Upload className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-          <div className="space-y-0.5">
-            {recentFiles?.map((file) => (
-              <DraggableDocument
-                key={file._id}
-                documentId={file._id}
-                documentName={file.name}
-                processingStatus={file.processingStatus}
-                showDragIndicator={false}
-              >
-                <div className="relative group/file flex items-center">
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start h-9 px-2.5 pr-16 text-[13px] text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent gap-3 transition-all"
-                    title={file.errorMessage || undefined}
-                  >
-                    <File className="w-3.5 h-3.5 text-zinc-500 group-hover/file:text-zinc-400 transition-colors shrink-0" />
-                    <span className="truncate flex-1 text-left">
-                      {file.name}
-                    </span>
-                    <DocumentStatusBadge
-                      status={file.processingStatus}
-                      progressPercent={file.progressPercent}
-                      queuePosition={file.queuePosition}
-                    />
-                  </Button>
-                  {file.processingStatus === "error" && file.errorMessage && (
-                    <div className="absolute left-10 right-16 top-9 text-[10px] text-red-500/70 truncate">
-                      {file.errorMessage}
-                    </div>
-                  )}
-                  {(file.processingStatus === "processing" ||
-                    file.processingStatus === "pending") &&
-                    typeof file.progressPercent === "number" && (
-                      <div className="absolute left-10 right-16 bottom-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-zinc-600"
-                          style={{
-                            width: `${Math.min(100, Math.max(0, file.progressPercent))}%`,
-                          }}
-                        />
-                      </div>
-                    )}
-                  <div className="absolute right-1 transition-all">
-                    <ActionMenu
-                      onRename={() => openRename(file._id, "file", file.name)}
-                      onDelete={() => deleteFile({ fileId: file._id })}
-                      showRetry={file.processingStatus === "error"}
-                      onRetry={async () => {
-                        await retryProcessing({ fileId: file._id });
-                        await processDocument({ fileId: file._id });
-                      }}
-                    />
-                  </div>
-                </div>
-              </DraggableDocument>
-            ))}
-            {(!recentFiles || recentFiles.length === 0) && (
-              <EmptyState
-                icon={<File className="w-5 h-5 text-zinc-500" />}
-                title="No files yet"
-                description="Upload PDFs, documents, or audio files to enhance your notes"
-                action={{
-                  label: "Upload File",
-                  onClick: () => setIsUploadOpen(true),
-                }}
-                className="py-6 px-2"
-              />
-            )}
-          </div>
-        </div>
-
-        {/* NOTES */}
-        <div className="mb-6 min-w-0">
-          <div className="flex items-center justify-between px-2 mb-2 group min-w-0">
-            <h3 className="text-[10px] font-bold text-muted-foreground uppercase transition-colors group-hover:text-sidebar-foreground">
-              Quick Captures
-            </h3>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="w-5 h-5 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent opacity-70 group-hover:opacity-100 transition-all rounded-md"
-              onClick={handleCreateNote}
-              title="Create Quick Note"
-              data-tour="quick-note"
-            >
-              {isCreatingNote ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              {isCompact ? (
+                <ChevronRight className="w-4 h-4" />
               ) : (
-                <Plus className="w-3.5 h-3.5" />
+                <ChevronLeft className="w-4 h-4" />
               )}
             </Button>
+            <div className={cn("flex items-center gap-2 px-0.5 min-w-0", isCompact && "flex-col gap-2")}>
+              <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 shrink-0">
+                <Layers className="w-4.5 h-4.5 text-white" />
+              </div>
+              {!isCompact && (
+                <span className="font-bold text-sm tracking-tight text-sidebar-foreground animate-in fade-in duration-300 truncate">Lumina</span>
+              )}
+            </div>
           </div>
-          <div className="space-y-0.5">
-            {quickNotes
-              ?.filter((note) => note.quickCaptureStatus !== "expanded")
-              .map((note) => (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "w-8 h-8 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-lg shrink-0",
+              isCompact && "w-10 h-10 bg-zinc-800/30"
+            )}
+            onClick={handleCreateNote}
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+        </div>
+
+        {!isCompact ? (
+          <Button
+            variant="ghost"
+            className="w-full justify-between bg-zinc-800/30 border border-white/5 text-muted-foreground hover:text-sidebar-foreground hover:bg-zinc-800/60 h-9 px-3 transition-all duration-200 rounded-lg group/search"
+            onClick={() => setIsSearchOpen(true)}
+          >
+            <span className="flex items-center gap-2.5 text-[13px]">
+              <Search className="w-3.5 h-3.5 opacity-50 group-hover/search:opacity-100 transition-opacity" />
+              <span className="opacity-70 group-hover/search:opacity-100 transition-opacity">Search...</span>
+            </span>
+            <span className="text-[10px] font-medium bg-zinc-800/80 px-1.5 py-0.5 rounded border border-white/5 text-muted-foreground/60">
+              {formatShortcut("cmd+k")}
+            </span>
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="w-10 h-10 text-muted-foreground hover:text-sidebar-foreground hover:bg-zinc-800/60 rounded-lg bg-zinc-800/30"
+            onClick={() => setIsSearchOpen(true)}
+          >
+            <Search className="w-4 h-4" />
+          </Button>
+        )}
+      </div>
+
+      <ScrollArea className="flex-1 px-2 py-2 min-w-0">
+        <div className={cn("space-y-6", isCompact && "space-y-8 flex flex-col items-center")}>
+          {/* FAVORITES */}
+          <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
+            {!isCompact && (
+              <div className="flex items-center justify-between px-3 mb-1.5 group min-w-0">
+                <h3 className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider">
+                  Favorites
+                </h3>
+              </div>
+            )}
+            <div className={cn("space-y-0.5 w-full", isCompact && "space-y-4 flex flex-col items-center")}>
+              {pinnedNotes?.map((note) => (
                 <SidebarNote
                   key={note._id}
                   note={note}
+                  isCompact={isCompact}
                   onRename={() => openRename(note._id, "note", note.title)}
                   onDelete={() => deleteNote({ noteId: note._id })}
                   onArchive={() => toggleArchiveNote({ noteId: note._id })}
-                  onExpand={() => {
-                    setExpandTarget({
-                      id: note._id,
-                      title: note.title,
-                      content: note.content,
-                    });
-                    setExpandCourse("");
-                    setExpandModule("");
-                  }}
                 />
               ))}
-            {(!quickNotes || quickNotes.length === 0) && (
-              <EmptyState
-                icon={<FileText className="w-5 h-5 text-zinc-500" />}
-                title="No quick notes"
-                description="Create a quick note for ideas, reminders, or quick thoughts"
-                action={{
-                  label: "Create Note",
-                  onClick: handleCreateNote,
-                }}
-                className="py-6 px-2"
-              />
-            )}
+              {(!pinnedNotes || pinnedNotes.length === 0) && !isCompact && (
+                <div className="px-3 py-2 text-[12px] text-muted-foreground/40 italic">
+                  No favorites yet
+                </div>
+              )}
+              {(!pinnedNotes || pinnedNotes.length === 0) && isCompact && (
+                <Pin className="w-4 h-4 text-muted-foreground/20" />
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* FLASHCARDS */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between px-2 mb-2 group">
-            <h3 className="text-[10px] font-bold text-muted-foreground uppercase transition-colors group-hover:text-sidebar-foreground">
-              Study Tools
-            </h3>
+          {/* COURSES / SMART FOLDERS */}
+          <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
+            {!isCompact && (
+              <div className="flex items-center justify-between px-3 mb-1.5 group min-w-0">
+                <h3 className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider">
+                  Smart Folders
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="w-5 h-5 text-muted-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent opacity-0 group-hover:opacity-100 transition-all rounded-md"
+                  onClick={handleCreateCourse}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            )}
+            <div className={cn("space-y-1 w-full", isCompact && "space-y-4 flex flex-col items-center")}>
+              {userData?.courses?.map((course: Course) => (
+                <SidebarCourse
+                  key={course.id}
+                  course={course}
+                  isCompact={isCompact}
+                  isExpanded={!!expandedCourses[course.id]}
+                  onToggle={() => toggleCourse(course.id)}
+                  onRename={(id, name) => openRename(id, "course", name)}
+                  onDelete={(id) => deleteCourse({ courseId: id })}
+                  onRenameModule={(id, name, parentId) =>
+                    openRename(id, "module", name, parentId)
+                  }
+                  onDeleteModule={(id, parentId) =>
+                    deleteModule({ courseId: parentId, moduleId: id })
+                  }
+                  onRenameNote={(id, title) => openRename(id, "note", title)}
+                  onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
+                  onArchiveNote={(id) =>
+                    toggleArchiveNote({ noteId: id as Id<"notes"> })
+                  }
+                />
+              ))}
+              {isCompact && (!userData?.courses || userData.courses.length === 0) && (
+                <FolderOpen className="w-4 h-4 text-muted-foreground/20" />
+              )}
+            </div>
           </div>
-            <Button
-              variant="ghost"
-              className="w-full justify-start h-9 px-2.5 text-[13px] text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent gap-3 transition-all group"
-              onClick={() => router.push("/dashboard?view=flashcards")}
-              data-tour="flashcards"
-            >
-            <div className="p-0.5 rounded bg-zinc-800 group-hover:bg-zinc-700 transition-colors">
-              <Layers className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-300" />
+
+          {/* RESOURCE LIBRARY */}
+          <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
+            {!isCompact && (
+              <div className="flex items-center justify-between px-3 mb-1.5 group min-w-0">
+                <h3 className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider">
+                  Resources
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="w-5 h-5 text-muted-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent opacity-0 group-hover:opacity-100 transition-all rounded-md"
+                  onClick={() => setIsUploadOpen(true)}
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            )}
+            <div className={cn("space-y-0.5 w-full", isCompact && "space-y-4 flex flex-col items-center")}>
+              {recentFiles?.slice(0, 5).map((file) => (
+                <DraggableDocument
+                  key={file._id}
+                  documentId={file._id}
+                  documentName={file.name}
+                  processingStatus={file.processingStatus}
+                  showDragIndicator={false}
+                >
+                  <div className={cn("relative group/file flex items-center px-1", isCompact && "px-0")}>
+                    <Button
+                      variant="ghost"
+                      className={cn(
+                        "w-full justify-start h-8 px-2 text-[13px] text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent gap-2.5 transition-all rounded-lg",
+                        isCompact && "w-10 h-10 justify-center px-0"
+                      )}
+                      title={isCompact ? file.name : undefined}
+                    >
+                      <File className="w-3.5 h-3.5 text-zinc-500 group-hover/file:text-zinc-400 transition-colors shrink-0" />
+                      {!isCompact && <span className="truncate flex-1 text-left">{file.name}</span>}
+                    </Button>
+                    {!isCompact && (
+                      <div className="absolute right-2 opacity-0 group-hover/file:opacity-100 transition-opacity">
+                        <ActionMenu
+                          onRename={() => openRename(file._id, "file", file.name)}
+                          onDelete={() => deleteFile({ fileId: file._id })}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </DraggableDocument>
+              ))}
+              {isCompact && (!recentFiles || recentFiles.length === 0) && (
+                <File className="w-4 h-4 text-muted-foreground/20" />
+              )}
             </div>
-            <span>Flashcards</span>
-          </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start h-9 px-2.5 text-[13px] text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent gap-3 transition-all group mt-1"
-              onClick={() => router.push("/dashboard?view=quizzes")}
-            >
-            <div className="p-0.5 rounded bg-zinc-800 group-hover:bg-zinc-700 transition-colors">
-              <ClipboardList className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-300" />
+          </div>
+
+          {/* TOOLS */}
+          <div className={cn("min-w-0 w-full pt-2 border-t border-white/5", isCompact && "flex flex-col items-center pt-4")}>
+            <div className={cn("space-y-1 w-full", isCompact && "space-y-4 flex flex-col items-center")}>
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start h-9 px-3 text-[13px] text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent gap-3 rounded-lg group",
+                  isCompact && "w-10 h-10 justify-center px-0"
+                )}
+                onClick={() => router.push("/dashboard?view=flashcards")}
+                title={isCompact ? "Flashcards" : undefined}
+              >
+                <Layers className="w-4 h-4 text-zinc-500 group-hover:text-indigo-400 transition-colors" />
+                {!isCompact && <span>Flashcards</span>}
+              </Button>
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start h-9 px-3 text-[13px] text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent gap-3 rounded-lg group",
+                  isCompact && "w-10 h-10 justify-center px-0"
+                )}
+                onClick={() => router.push("/dashboard?view=quizzes")}
+                title={isCompact ? "Quizzes" : undefined}
+              >
+                <ClipboardList className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400 transition-colors" />
+                {!isCompact && <span>Quizzes</span>}
+              </Button>
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start h-9 px-3 text-[13px] text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent gap-3 rounded-lg group",
+                  isCompact && "w-10 h-10 justify-center px-0"
+                )}
+                onClick={() => router.push("/dashboard?view=archive")}
+                title={isCompact ? "Archive" : undefined}
+              >
+                <Archive className="w-4 h-4 text-zinc-500 group-hover:text-orange-400 transition-colors" />
+                {!isCompact && <span>Archive</span>}
+              </Button>
             </div>
-            <span>Quizzes</span>
-          </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start h-9 px-2.5 text-[13px] text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent gap-3 transition-all group mt-1"
-              onClick={() => router.push("/dashboard?view=archive")}
-            >
-            <div className="p-0.5 rounded bg-zinc-800 group-hover:bg-zinc-700 transition-colors">
-              <Archive className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-300" />
-            </div>
-            <span>Trash & Archive</span>
-          </Button>
+          </div>
         </div>
       </ScrollArea>
-      <div className="p-4 border-t border-sidebar-border bg-sidebar space-y-3">
-        {/* User Card */}
-        <div className="flex items-center gap-3 group cursor-pointer">
+
+      {/* Footer */}
+      <div className={cn(
+        "p-4 border-t border-white/5 bg-sidebar/50 backdrop-blur-sm space-y-4 transition-all duration-300",
+        isCompact && "p-2 items-center flex flex-col"
+      )}>
+        <div className={cn("flex items-center gap-3 group px-1", isCompact && "flex-col px-0")}>
           <div className="relative">
             {mounted ? (
               <UserButton
                 appearance={{
                   elements: {
-                    avatarBox: "w-9 h-9 rounded-xl ring-1 ring-sidebar-border",
+                    avatarBox: cn(
+                      "rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all",
+                      isCompact ? "w-10 h-10" : "w-8 h-8"
+                    ),
                   },
                 }}
               />
             ) : (
-              <div className="w-9 h-9 rounded-xl bg-zinc-800 animate-pulse" />
+              <div className={cn("rounded-lg bg-zinc-800 animate-pulse", isCompact ? "w-10 h-10" : "w-8 h-8")} />
             )}
-            {mounted && (
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-zinc-500 border-2 border-sidebar rounded-full"></div>
-            )}
+            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-sidebar rounded-full shadow-sm"></div>
           </div>
-          <div className="flex-1 overflow-hidden">
-            <p className="text-[13px] font-medium text-sidebar-foreground truncate">
-              {user?.fullName}
-            </p>
-            <p className="text-[11px] text-muted-foreground truncate">
-              Student Account
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setIsSettingsOpen(true);
-            }}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors opacity-0 group-hover:opacity-100"
-            aria-label="Open settings"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
+          {!isCompact && (
+            <div className="flex-1 overflow-hidden animate-in fade-in duration-300">
+              <p className="text-[13px] font-semibold text-sidebar-foreground truncate">
+                {user?.fullName || "Student"}
+              </p>
+              <p className="text-[11px] text-muted-foreground/60 truncate">
+                Pro Plan
+              </p>
+            </div>
+          )}
+          {!isCompact && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="w-8 h-8 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={() => setIsSettingsOpen(true)}
+            >
+              <Settings className="w-4 h-4" />
+            </Button>
+          )}
+          {isCompact && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="w-10 h-10 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-lg"
+              onClick={() => setIsSettingsOpen(true)}
+            >
+              <Settings className="w-4 h-4" />
+            </Button>
+          )}
         </div>
-
-        {/* Theme Toggle */}
-        <ThemeToggle />
+        {!isCompact && <ThemeToggle />}
       </div>
     </div>
-    );
+  );
 
   return (
     <>
       {/* Desktop / tablet: in-flow sidebar */}
       {!isNarrowViewport && (
         <div
-          className={`h-screen shrink-0 z-50 relative overflow-hidden border-sidebar-border transition-[width] duration-200 ease-out ${
-            isLeftSidebarOpen
-              ? "w-[280px] border-r"
-              : "w-0 border-transparent pointer-events-none"
-          }`}
+          className={cn(
+            "h-screen shrink-0 z-50 relative overflow-visible border-sidebar-border transition-all duration-300 ease-in-out",
+            isOpen ? "w-[280px] border-r opacity-100" : 
+            isCompact ? "w-[72px] border-r opacity-100" :
+            "w-0 border-transparent opacity-0 pointer-events-none"
+          )}
         >
-          {isLeftSidebarOpen ? sidebarInner : null}
+          {sidebarInner}
+          
+          {/* Re-open button when closed */}
+          {isClosed && (
+            <button
+              onClick={() => setLeftSidebarState("open")}
+              className="fixed left-4 top-4 w-10 h-10 bg-zinc-900 border border-white/10 rounded-xl flex items-center justify-center text-muted-foreground hover:text-sidebar-foreground hover:bg-zinc-800 transition-all z-[60] shadow-2xl group/reopen"
+            >
+              <ChevronLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
+            </button>
+          )}
         </div>
       )}
 
       {/* Mobile: overlay drawer (single mounted instance) */}
-      {isNarrowViewport && isLeftSidebarOpen ? (
+      {isNarrowViewport && !isClosed ? (
         <div className="fixed inset-0 z-100 flex">
           <button
             type="button"
             className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
             aria-label="Close sidebar"
-            onClick={toggleLeftSidebar}
+            onClick={() => setLeftSidebarState("closed")}
           />
-          <div className="relative h-full w-[min(280px,92vw)] max-w-[100vw] shadow-2xl border-r border-sidebar-border bg-sidebar">
+          <div className={cn(
+            "relative h-full shadow-2xl border-r border-sidebar-border bg-sidebar transition-all duration-300",
+            isOpen ? "w-[min(280px,92vw)]" : "w-[72px]"
+          )}>
             {sidebarInner}
           </div>
         </div>
+      ) : isNarrowViewport && isClosed ? (
+        <button
+          onClick={() => setLeftSidebarState("open")}
+          className="fixed left-4 bottom-4 w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-2xl z-[100] active:scale-95 transition-all"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
       ) : null}
 
       <UploadDialog

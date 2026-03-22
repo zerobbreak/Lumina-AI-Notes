@@ -405,10 +405,6 @@ export const updateNote = mutation({
     title: v.optional(v.string()),
     content: v.optional(v.string()),
     style: v.optional(v.string()),
-    // Cornell Notes specific fields
-    cornellCues: v.optional(v.string()),
-    cornellNotes: v.optional(v.string()),
-    cornellSummary: v.optional(v.string()),
     // Outline Mode specific fields
     outlineData: v.optional(v.string()),
     outlineMetadata: v.optional(
@@ -432,10 +428,6 @@ export const updateNote = mutation({
     if (args.title !== undefined) patch.title = args.title;
     if (args.content !== undefined) patch.content = args.content;
     if (args.style !== undefined) patch.style = args.style;
-    if (args.cornellCues !== undefined) patch.cornellCues = args.cornellCues;
-    if (args.cornellNotes !== undefined) patch.cornellNotes = args.cornellNotes;
-    if (args.cornellSummary !== undefined)
-      patch.cornellSummary = args.cornellSummary;
     if (args.outlineData !== undefined) patch.outlineData = args.outlineData;
     if (args.outlineMetadata !== undefined)
       patch.outlineMetadata = args.outlineMetadata;
@@ -563,7 +555,7 @@ ${text}`;
       enrichedTranscript: string,
     ) => {
       const draftText = JSON.stringify(draft);
-      const repairPrompt = `You are a quality assurance specialist improving generated Cornell lecture notes. The current notes are too shallow and lack substantive content.
+      const repairPrompt = `You are a quality assurance specialist improving generated lecture notes. The current notes are too shallow and lack substantive content.
 
 Original transcript:
 """
@@ -578,13 +570,16 @@ ${contextText}
 Current JSON (needs improvement):
 ${draftText}
 
-Your task: Rewrite ALL cornell notes to be substantially more detailed and informative.
+Your task: Rewrite ALL sections to be substantially more detailed and informative.
 
 Return JSON with EXACT keys:
 {
   "summary": "5-8 sentence comprehensive summary",
-  "cornellCues": ["Specific term/concept 1", ...],
-  "cornellNotes": ["Detailed 5-8 sentence explanation 1", ...],
+  "sections": [
+    {"id": "unique-id", "type": "heading", "content": "Section Title", "level": 2},
+    {"id": "unique-id", "type": "paragraph", "content": "Detailed explanation..."},
+    {"id": "unique-id", "type": "bullets", "content": "• Key point 1\\n• Key point 2\\n• Key point 3"}
+  ],
   "actionItems": ["..."],
   "reviewQuestions": ["..."],
   "diagramNodes": ["..."],
@@ -592,11 +587,11 @@ Return JSON with EXACT keys:
 }
 
 STRICT quality requirements:
-- 6-8 cue/note pairs
-- cornellNotes[i] must thoroughly explain cornellCues[i]
-- Each cornell note MUST be 5-8 sentences (80-120 words minimum)
-- Each note must follow: Definition → How it works → Specific example → Why it matters
-- Each note must include at least ONE concrete detail from transcript or pinned document
+- diagramNodes/diagramEdges: If present, index 0 is the root; edges must reference valid node indices only; keep labels concise for on-canvas display.
+- 6-10 content sections with clear headings
+- Each paragraph MUST be 5-8 sentences (80-120 words minimum)
+- Use bullet points for key ideas, important explanations, and lists
+- Each section must follow: Concept introduction → Explanation → Specific example → Significance
 - NEVER use generic filler phrases
 - Every sentence must add NEW information
 - Cross-reference pinned document content where relevant
@@ -668,18 +663,16 @@ CRITICAL CONTEXT: This transcript was captured via voice recording and may be fr
 - Infer and include underlying theory, definitions, and frameworks
 - Provide textbook-level depth for each concept mentioned
 
-Generate a JSON response with this EXACT structure:
+Generate a JSON response with this EXACT structure (Notion-like section-based format):
 {
   "summary": "A comprehensive 5-8 sentence summary that: 1) Opens with the EXACT main topic, 2) Explains WHY this topic matters, 3) Lists ALL key themes covered, 4) Highlights the most important findings/theories, 5) Concludes with key takeaways.",
-  "cornellCues": ["Precise Concept 1", "Precise Concept 2", "Precise Concept 3", "Precise Concept 4", "Precise Concept 5", "Precise Concept 6", "Precise Concept 7"],
-  "cornellNotes": [
-    "PARAGRAPH: Start with a precise DEFINITION. Explain the mechanism/process in 2-3 sentences. Provide a SPECIFIC example with concrete details (numbers, names, formulas). Explain significance and connections. (Minimum 5 sentences, ~80-120 words)",
-    "Each note follows the same structure: Definition → Mechanism → Specific Example → Significance. (Minimum 5 sentences, ~80-120 words)",
-    "Continue pattern. NO generic filler. Every sentence adds new information. (Minimum 5 sentences, ~80-120 words)",
-    "Include formulas, classifications, or frameworks from transcript/document. (Minimum 5 sentences, ~80-120 words)",
-    "Cover real-world applications, historical context, or comparisons. (Minimum 5 sentences, ~80-120 words)",
-    "Address nuances, exceptions, or common misconceptions. (Minimum 5 sentences, ~80-120 words)",
-    "Explain relationships between concepts and connections to broader field. (Minimum 5 sentences, ~80-120 words)"
+  "sections": [
+    {"id": "sec-1", "type": "heading", "content": "Main Concept 1 Title", "level": 2},
+    {"id": "sec-2", "type": "paragraph", "content": "Start with a precise DEFINITION. Explain the mechanism/process in 2-3 sentences. Provide a SPECIFIC example with concrete details (numbers, names, formulas). Explain significance and connections. (Minimum 5 sentences, ~80-120 words)"},
+    {"id": "sec-3", "type": "bullets", "content": "• Key insight from this section\\n• Critical detail with specific example\\n• Important takeaway or application"},
+    {"id": "sec-4", "type": "heading", "content": "Main Concept 2 Title", "level": 2},
+    {"id": "sec-5", "type": "paragraph", "content": "Continue the same pattern — thorough explanation. (Minimum 5 sentences, ~80-120 words)"},
+    {"id": "sec-6", "type": "bullets", "content": "• Key points for concept 2\\n• Important details and examples\\n• Practical applications"}
   ],
   "actionItems": ["Task 1", "Task 2"],
   "reviewQuestions": [
@@ -695,19 +688,23 @@ Generate a JSON response with this EXACT structure:
   "diagramEdges": ["0-1", "0-2", "0-3", "1-4", "1-5", "2-6", "3-7", "0-8"]
 }
 
+SECTION TYPES AVAILABLE:
+- "heading": Section titles with level 1, 2, or 3
+- "paragraph": Long-form text explanations
+- "bullets": Bullet point lists (use \\n to separate items, prefix each with •)
+- "numbered": Numbered lists
+- "quote": Important quotes or key statements
+- "divider": Visual separator
+
 MANDATORY QUALITY REQUIREMENTS:
-- cornellCues: Generate 6-8 specific academic terms or focused questions
-- cornellNotes: THIS IS THE MOST IMPORTANT PART. Each note MUST be:
-  * A SUBSTANTIAL paragraph of 5-8 sentences (80-120 words minimum)
-  * Structured as: Definition → Mechanism/Process → Specific Example → Significance
-  * Include at LEAST one concrete detail from the transcript or pinned document
-  * Written as if explaining to a student who wasn't in the lecture
-  * Free of generic filler phrases
-- cornellNotes[i] MUST directly explain cornellCues[i]
-- If pinned document provides additional depth, INCORPORATE it into relevant notes
+- sections: Generate 8-15 sections with a mix of headings, paragraphs, and bullet points
+- Each heading should be a specific academic term, concept name, or topic
+- Paragraphs MUST be 5-8 sentences (80-120 words minimum)
+- Include at LEAST one concrete detail from the transcript or pinned document per section
+- If pinned document provides additional depth, INCORPORATE it into relevant sections
 - reviewQuestions: Create 5-7 varied questions spanning Bloom's taxonomy
-- diagramNodes: Create 7-10 nodes showing concept hierarchy
-- diagramEdges: Connect nodes logically (format: "sourceIndex-targetIndex")
+- diagramNodes: 7-10 short labels (max ~80 characters each). Index 0 MUST be the single central topic (root) for the mind map.
+- diagramEdges: Use only "sourceIndex-targetIndex" with valid indices into diagramNodes. Build a tree or sparse DAG from the root: every node except index 0 must be reachable from node 0. No self-loops; avoid redundant duplicate connections between the same two nodes.
 - actionItems: Only include explicitly mentioned tasks (empty array if none)
 - Return ONLY valid JSON, no markdown code fences`;
 
@@ -740,30 +737,34 @@ MANDATORY QUALITY REQUIREMENTS:
       if (parsed) {
         let workingParsed: any = parsed;
 
-        let normalizedCues = Array.isArray(workingParsed.cornellCues)
-          ? workingParsed.cornellCues
-              .map((cue: unknown) => String(cue || "").trim())
-              .filter((cue: string) => cue.length > 0)
+        // Normalize sections array
+        let normalizedSections = Array.isArray(workingParsed.sections)
+          ? workingParsed.sections
+              .map((section: any, idx: number) => ({
+                id: section.id || `sec-${idx}`,
+                type: section.type || "paragraph",
+                content: String(section.content || "").trim(),
+                level: section.level,
+              }))
+              .filter((section: any) => section.content.length > 0)
           : [];
-        let normalizedNotes = Array.isArray(workingParsed.cornellNotes)
-          ? workingParsed.cornellNotes
-              .map((note: unknown) => String(note || "").trim())
-              .filter((note: string) => note.length > 0)
-          : [];
-        let pairCount = Math.min(normalizedCues.length, normalizedNotes.length);
 
-        // More aggressive quality check
-        const avgNoteWords =
-          normalizedNotes.length > 0
-            ? normalizedNotes.reduce(
-                (sum: number, note: string) => sum + wordCountFn(note),
-                0,
-              ) / normalizedNotes.length
+        // Quality check: repair if too few sections or sections lack depth
+        const paragraphSections = normalizedSections.filter(
+          (s: any) => s.type === "paragraph"
+        );
+        const avgParagraphWords =
+          paragraphSections.length > 0
+            ? paragraphSections.reduce(
+                (sum: number, s: any) => sum + wordCountFn(s.content),
+                0
+              ) / paragraphSections.length
             : 0;
         const needsRepair =
-          pairCount < 5 ||
-          avgNoteWords < 50 ||
-          normalizedNotes.some((note: string) => noteLacksDepth(note));
+          normalizedSections.length < 5 ||
+          avgParagraphWords < 50 ||
+          paragraphSections.some((s: any) => noteLacksDepth(s.content));
+
         if (needsRepair) {
           const repaired = await maybeRepairQuality(
             workingParsed,
@@ -771,17 +772,16 @@ MANDATORY QUALITY REQUIREMENTS:
           );
           if (repaired) {
             workingParsed = repaired;
-            normalizedCues = Array.isArray(workingParsed.cornellCues)
-              ? workingParsed.cornellCues
-                  .map((cue: unknown) => String(cue || "").trim())
-                  .filter((cue: string) => cue.length > 0)
+            normalizedSections = Array.isArray(workingParsed.sections)
+              ? workingParsed.sections
+                  .map((section: any, idx: number) => ({
+                    id: section.id || `sec-${idx}`,
+                    type: section.type || "paragraph",
+                    content: String(section.content || "").trim(),
+                    level: section.level,
+                  }))
+                  .filter((section: any) => section.content.length > 0)
               : [];
-            normalizedNotes = Array.isArray(workingParsed.cornellNotes)
-              ? workingParsed.cornellNotes
-                  .map((note: unknown) => String(note || "").trim())
-                  .filter((note: string) => note.length > 0)
-              : [];
-            pairCount = Math.min(normalizedCues.length, normalizedNotes.length);
           }
         }
 
@@ -812,8 +812,7 @@ MANDATORY QUALITY REQUIREMENTS:
 
         return {
           summary: workingParsed.summary || "",
-          cornellCues: normalizedCues.slice(0, pairCount),
-          cornellNotes: normalizedNotes.slice(0, pairCount),
+          sections: normalizedSections,
           actionItems: normalizedActionItems,
           reviewQuestions: normalizedReviewQuestions,
           diagramData,
@@ -823,8 +822,7 @@ MANDATORY QUALITY REQUIREMENTS:
       // Fallback: return empty structure
       return {
         summary: "Could not generate structured notes.",
-        cornellCues: [],
-        cornellNotes: [],
+        sections: [],
         actionItems: [],
         reviewQuestions: [],
         diagramData: undefined,
@@ -833,8 +831,7 @@ MANDATORY QUALITY REQUIREMENTS:
       console.error("generateFromPinnedAudio error:", error);
       return {
         summary: "Error generating structured notes.",
-        cornellCues: [],
-        cornellNotes: [],
+        sections: [],
         actionItems: [],
         reviewQuestions: [],
         diagramData: undefined,

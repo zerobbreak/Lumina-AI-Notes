@@ -21,8 +21,8 @@ import {
 } from "@/lib/noteStyleRecommendations";
 
 const TEMPLATE_LABEL: Record<string, string> = {
+  standard: "Standard",
   outline: "Outline",
-  cornell: "Cornell",
   mindmap: "Mind map",
 };
 

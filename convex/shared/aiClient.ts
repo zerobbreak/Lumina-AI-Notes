@@ -6,10 +6,17 @@ import { ENRICHMENT_WORD_THRESHOLD } from "./transcript";
 // Types for subscription tier checking
 export type SubscriptionTier = "free" | "scholar" | "institution";
 
+// Section type for flexible note structure
+export type NoteSectionDraft = {
+  id?: string;
+  type?: "heading" | "paragraph" | "bullets" | "numbered" | "quote" | "divider";
+  content?: string;
+  level?: number;
+};
+
 export type StructuredNotesDraft = {
   summary?: string;
-  cornellCues?: unknown[];
-  cornellNotes?: unknown[];
+  sections?: NoteSectionDraft[];
   actionItems?: unknown[];
   reviewQuestions?: unknown[];
   diagramNodes?: unknown[];
