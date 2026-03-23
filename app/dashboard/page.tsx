@@ -5,16 +5,16 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Sparkles } from "lucide-react";
-import { useEffect, Suspense } from "react";
+import { useEffect, Suspense, lazy } from "react";
 
-import NoteView from "@/components/dashboard/editor/NoteView";
-import FolderView from "@/components/dashboard/views/FolderView";
-import SmartFolderHub from "@/components/dashboard/views/SmartFolderHub";
-import { FlashcardsView } from "@/components/dashboard/flashcards/FlashcardsView";
-import { FlashcardStudy } from "@/components/dashboard/flashcards/FlashcardStudy";
-import { QuizzesView } from "@/components/dashboard/quizzes/QuizzesView";
-import { QuizTaking } from "@/components/dashboard/quizzes/QuizTaking";
-import ArchiveView from "@/components/dashboard/views/ArchiveView";
+const NoteView = lazy(() => import("@/components/dashboard/editor/NoteView"));
+const FolderView = lazy(() => import("@/components/dashboard/views/FolderView"));
+const SmartFolderHub = lazy(() => import("@/components/dashboard/views/SmartFolderHub"));
+const FlashcardsView = lazy(() => import("@/components/dashboard/flashcards/FlashcardsView").then(m => ({ default: m.FlashcardsView })));
+const FlashcardStudy = lazy(() => import("@/components/dashboard/flashcards/FlashcardStudy").then(m => ({ default: m.FlashcardStudy })));
+const QuizzesView = lazy(() => import("@/components/dashboard/quizzes/QuizzesView").then(m => ({ default: m.QuizzesView })));
+const QuizTaking = lazy(() => import("@/components/dashboard/quizzes/QuizTaking").then(m => ({ default: m.QuizTaking })));
+const ArchiveView = lazy(() => import("@/components/dashboard/views/ArchiveView"));
 
 function DashboardLoading() {
   return (
@@ -82,43 +82,70 @@ function DashboardContent() {
 
   // --- VIEW 1: NOTE EDITOR ---
   if (noteId) {
-    // NoteView handles its own loading states for the note data
     return (
-      <NoteView
-        noteId={noteId as Id<"notes">}
-        onBack={() => router.push("/dashboard")}
-      />
+      <Suspense fallback={<DashboardLoading />}>
+        <NoteView
+          noteId={noteId as Id<"notes">}
+          onBack={() => router.push("/dashboard")}
+        />
+      </Suspense>
     );
   }
 
   // --- VIEW 2: FLASHCARDS ---
   if (view === "flashcards") {
     if (deckId) {
-      return <FlashcardStudy deckId={deckId} />;
+      return (
+        <Suspense fallback={<DashboardLoading />}>
+          <FlashcardStudy deckId={deckId} />
+        </Suspense>
+      );
     }
-    return <FlashcardsView />;
+    return (
+      <Suspense fallback={<DashboardLoading />}>
+        <FlashcardsView />
+      </Suspense>
+    );
   }
 
   // --- VIEW 3: QUIZZES ---
   if (view === "quizzes") {
     if (deckId) {
-      return <QuizTaking deckId={deckId} />;
+      return (
+        <Suspense fallback={<DashboardLoading />}>
+          <QuizTaking deckId={deckId} />
+        </Suspense>
+      );
     }
-    return <QuizzesView />;
+    return (
+      <Suspense fallback={<DashboardLoading />}>
+        <QuizzesView />
+      </Suspense>
+    );
   }
 
   // --- VIEW 4: ARCHIVE ---
   if (view === "archive") {
-    return <ArchiveView />;
+    return (
+      <Suspense fallback={<DashboardLoading />}>
+        <ArchiveView />
+      </Suspense>
+    );
   }
 
   // --- VIEW 5: SMART FOLDER OVERVIEW ---
   if (contextId) {
     return (
-      <FolderView contextId={contextId} contextType={contextType || "course"} />
+      <Suspense fallback={<DashboardLoading />}>
+        <FolderView contextId={contextId} contextType={contextType || "course"} />
+      </Suspense>
     );
   }
 
   // --- VIEW 6: SMART FOLDER HUB (HOME) ---
-  return <SmartFolderHub />;
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <SmartFolderHub />
+    </Suspense>
+  );
 }

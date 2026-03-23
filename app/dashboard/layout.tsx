@@ -1,13 +1,11 @@
 "use client";
 
-import { Suspense, useState, useCallback, useEffect } from "react";
+import { Suspense, useState, useCallback, useEffect, lazy } from "react";
 import { Sidebar } from "@/components/dashboard/sidebar/Sidebar";
 import { RightSidebar } from "@/components/dashboard/sidebar/RightSidebar";
 import { DashboardProvider } from "@/components/dashboard/DashboardContext";
 import { DocumentProcessingIndicator } from "@/components/documents";
 import { DragOverlayWrapper } from "@/components/dashboard/DragOverlayWrapper";
-import { CommandPalette } from "@/components/dashboard/CommandPalette";
-import { KeyboardShortcutsDialog } from "@/components/dashboard/KeyboardShortcutsDialog";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { Sparkles } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
@@ -18,6 +16,9 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
 import { cn } from "@/lib/utils";
+
+const CommandPalette = lazy(() => import("@/components/dashboard/CommandPalette").then(m => ({ default: m.CommandPalette })));
+const KeyboardShortcutsDialog = lazy(() => import("@/components/dashboard/KeyboardShortcutsDialog").then(m => ({ default: m.KeyboardShortcutsDialog })));
 
 function DashboardLayoutLoading() {
   return (
@@ -185,17 +186,25 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         <DocumentProcessingIndicator />
       </div>
 
-      {/* Command Palette */}
-      <CommandPalette
-        open={isCommandPaletteOpen}
-        onOpenChange={setIsCommandPaletteOpen}
-      />
+      {/* Command Palette - lazy loaded */}
+      {isCommandPaletteOpen && (
+        <Suspense fallback={null}>
+          <CommandPalette
+            open={isCommandPaletteOpen}
+            onOpenChange={setIsCommandPaletteOpen}
+          />
+        </Suspense>
+      )}
 
-      {/* Keyboard Shortcuts Dialog */}
-      <KeyboardShortcutsDialog
-        open={isShortcutsOpen}
-        onOpenChange={setIsShortcutsOpen}
-      />
+      {/* Keyboard Shortcuts Dialog - lazy loaded */}
+      {isShortcutsOpen && (
+        <Suspense fallback={null}>
+          <KeyboardShortcutsDialog
+            open={isShortcutsOpen}
+            onOpenChange={setIsShortcutsOpen}
+          />
+        </Suspense>
+      )}
     </>
   );
 }

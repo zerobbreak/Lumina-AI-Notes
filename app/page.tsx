@@ -12,6 +12,8 @@ import { Play } from "lucide-react";
 import { FadeIn } from "@/components/animations/FadeIn";
 import { ComparisonBento } from "@/components/home/ComparisonBento";
 
+export const dynamic = "force-static";
+
 export default function Home() {
   return (
     <main className="dark min-h-screen bg-[#020817] selection:bg-cyan-500/30 overflow-x-hidden">

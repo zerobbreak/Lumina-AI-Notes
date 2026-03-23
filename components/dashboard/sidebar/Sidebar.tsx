@@ -331,6 +331,50 @@ export function Sidebar() {
             </div>
           </div>
 
+          {/* RECENT NOTES */}
+          <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
+            {!isCompact && (
+              <div className="flex items-center justify-between px-3 mb-1.5 group min-w-0">
+                <h3 className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider">
+                  Recent Notes
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="w-5 h-5 text-muted-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent opacity-0 group-hover:opacity-100 transition-all rounded-md"
+                  onClick={handleCreateNote}
+                  disabled={isCreatingNote}
+                >
+                  {isCreatingNote ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Plus className="w-3.5 h-3.5" />
+                  )}
+                </Button>
+              </div>
+            )}
+            <div className={cn("space-y-0.5 w-full", isCompact && "space-y-4 flex flex-col items-center")}>
+              {quickNotes?.map((note) => (
+                <SidebarNote
+                  key={note._id}
+                  note={note}
+                  isCompact={isCompact}
+                  onRename={() => openRename(note._id, "note", note.title)}
+                  onDelete={() => deleteNote({ noteId: note._id })}
+                  onArchive={() => toggleArchiveNote({ noteId: note._id })}
+                />
+              ))}
+              {(!quickNotes || quickNotes.length === 0) && !isCompact && (
+                <div className="px-3 py-2 text-[12px] text-muted-foreground/40 italic">
+                  No recent notes
+                </div>
+              )}
+              {(!quickNotes || quickNotes.length === 0) && isCompact && (
+                <FileText className="w-4 h-4 text-muted-foreground/20" />
+              )}
+            </div>
+          </div>
+
           {/* COURSES / SMART FOLDERS */}
           <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
             {!isCompact && (
