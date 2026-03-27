@@ -66,8 +66,7 @@ import { SlashCommandLayer } from "./SlashCommandLayer";
 import { PresenceIndicator } from "@/components/dashboard/PresenceIndicator";
 import { CollaboratorsDialog } from "@/components/dashboard/dialogs/CollaboratorsDialog";
 import { TagPicker } from "@/components/dashboard/tags/TagPicker";
-import { TemplateConversionModal } from "@/components/dashboard/templates/TemplateConversionModal";
-import type { NoteContentSnapshot } from "@/lib/templates/conversion";
+
 import { toast } from "sonner";
 import "./editor.css";
 
@@ -133,7 +132,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
   const [isCollaboratorsOpen, setIsCollaboratorsOpen] = useState(false);
-  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+
   const [slashUiTick, setSlashUiTick] = useState(0);
   const bumpSlashUi = useCallback(() => {
     setSlashUiTick((n) => n + 1);
@@ -551,11 +550,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     setIsExportOpen(true);
   };
 
-  const buildSnapshot = (): NoteContentSnapshot => ({
-    style: (displayNote?.style as any) || "standard",
-    content: displayNote?.content || "",
-    outlineData: displayNote?.outlineData || "",
-  });
+
 
   // Handle inserting AI-generated content into the note
   const handleInsertFromAI = useCallback(
@@ -761,14 +756,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             )}
           </Button>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsTemplateModalOpen(true)}
-            title="Change template"
-          >
-            <FileText className="w-5 h-5 text-muted-foreground hover:text-foreground" />
-          </Button>
+
 
           <ActionMenu
             onRename={() => setIsRenameOpen(true)}
@@ -1008,36 +996,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         noteId={noteId}
       />
 
-      {note && (
-        <TemplateConversionModal
-          open={isTemplateModalOpen}
-          onOpenChange={setIsTemplateModalOpen}
-          noteSnapshot={buildSnapshot()}
-          onConfirm={async (conversion) => {
-            const previous = buildSnapshot();
-            await updateNote({
-              noteId,
-              style: conversion.style,
-              content: conversion.content ?? "",
-              outlineData: conversion.outlineData ?? "",
-            });
-            setIsTemplateModalOpen(false);
-            toast.success("Template changed", {
-              action: {
-                label: "Undo",
-                onClick: async () => {
-                  await updateNote({
-                    noteId,
-                    style: previous.style,
-                    content: previous.content ?? "",
-                    outlineData: previous.outlineData ?? "",
-                  });
-                },
-              },
-            });
-          }}
-        />
-      )}
+
     </div>
   );
 }

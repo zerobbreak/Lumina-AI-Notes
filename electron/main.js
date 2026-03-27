@@ -1,7 +1,18 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 
 const isDev = process.env.NODE_ENV === 'development';
+const protocol = 'lumina-notes';
+
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient(protocol, process.execPath, [path.resolve(process.argv[1])]);
+  }
+} else {
+  app.setAsDefaultProtocolClient(protocol);
+}
+
+let mainWindow;
 
 function getStaticPath() {
   if (app.isPackaged) {
@@ -11,24 +22,59 @@ function getStaticPath() {
 }
 
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
     },
   });
 
   if (isDev) {
-    win.loadURL('http://localhost:3000');
-    win.webContents.openDevTools();
+    mainWindow.loadURL('http://localhost:3000');
+    mainWindow.webContents.openDevTools();
   } else {
-    win.loadFile(path.join(getStaticPath(), 'index.html'));
+    mainWindow.loadFile(path.join(getStaticPath(), 'index.html'));
   }
 }
 
-app.whenReady().then(createWindow);
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine) => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+    const url = commandLine.pop();
+    if (url && url.startsWith(`${protocol}://`)) {
+      handleAuthUrl(url);
+    }
+  });
+
+  app.whenReady().then(createWindow);
+}
+
+function handleAuthUrl(url) {
+  const parsedUrl = new URL(url);
+  if (parsedUrl.hostname === 'auth') {
+    const token = parsedUrl.searchParams.get('token');
+    if (token && mainWindow) {
+      mainWindow.webContents.send('auth-token', token);
+    }
+  }
+}
+
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  if (url.startsWith(`${protocol}://`)) {
+    handleAuthUrl(url);
+  }
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
@@ -36,4 +82,9 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
+});
+
+ipcMain.on('login-in-browser', () => {
+  const authUrl = isDev ? 'http://localhost:3000/electron-auth' : 'https://luminanotes.ai/electron-auth';
+  shell.openExternal(authUrl);
 });

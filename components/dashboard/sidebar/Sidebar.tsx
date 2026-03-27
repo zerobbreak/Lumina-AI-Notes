@@ -12,6 +12,8 @@ import {
   Pin,
   ChevronLeft,
   ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UserButton, useUser } from "@clerk/nextjs";
@@ -55,7 +57,7 @@ type RenameTarget = {
 export function Sidebar() {
   const { user } = useUser();
   const router = useRouter();
-  const { leftSidebarState, setLeftSidebarState, cycleLeftSidebar } = useDashboard();
+  const { leftSidebarState, setLeftSidebarState, toggleLeftSidebar } = useDashboard();
   const searchParams = useSearchParams();
   const { createNoteFlow } = useCreateNoteFlow();
 
@@ -228,27 +230,11 @@ export function Sidebar() {
                 "shrink-0 h-8 w-8 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-lg",
                 isCompact && "w-10 h-10"
               )}
-              onClick={cycleLeftSidebar}
-              aria-label={
-                isOpen
-                  ? "Narrow sidebar"
-                  : isCompact
-                    ? "Hide sidebar"
-                    : "Show sidebar"
-              }
-              title={
-                isOpen
-                  ? "Narrow sidebar"
-                  : isCompact
-                    ? "Hide sidebar"
-                    : "Show sidebar"
-              }
+              onClick={toggleLeftSidebar}
+              aria-label={isOpen ? "Hide sidebar" : "Show sidebar"}
+              title={isOpen ? "Hide sidebar" : "Show sidebar"}
             >
-              {isCompact ? (
-                <ChevronRight className="w-4 h-4" />
-              ) : (
-                <ChevronLeft className="w-4 h-4" />
-              )}
+              <PanelLeftClose className="w-4 h-4" />
             </Button>
             <div className={cn("flex items-center gap-2 px-0.5 min-w-0", isCompact && "flex-col gap-2")}>
               <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 shrink-0">
@@ -598,8 +584,10 @@ export function Sidebar() {
             <button
               onClick={() => setLeftSidebarState("open")}
               className="fixed left-4 top-4 w-10 h-10 bg-zinc-900 border border-white/10 rounded-xl flex items-center justify-center text-muted-foreground hover:text-sidebar-foreground hover:bg-zinc-800 transition-all z-[60] shadow-2xl group/reopen"
+              aria-label="Show sidebar"
+              title="Show sidebar"
             >
-              <ChevronLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
+              <PanelLeftOpen className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
             </button>
           )}
         </div>

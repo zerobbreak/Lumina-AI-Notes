@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Mic, Sparkles, LayoutDashboard } from "lucide-react";
+import { LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { LoginButton } from "@/components/auth/LoginButton";
 
 export function Navbar() {
   const router = useRouter();
@@ -13,57 +14,56 @@ export function Navbar() {
     router.prefetch("/dashboard");
   };
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#020817]/70 backdrop-blur-md supports-backdrop-filter:bg-[#020817]/30 transition-all duration-300">
+    <nav className="fixed top-0 left-0 right-0 z-50 transition-all duration-300" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(5,10,20,0.7)', backdropFilter: 'blur(20px)' }}>
       <div className="container mx-auto flex h-20 items-center justify-between px-4 md:px-6">
         <Link href="/" className="flex items-center gap-2">
-          {/* <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/20 text-cyan-400">
-            <Sparkles className="h-5 w-5" />
-          </div> */}
-          <span className="text-xl font-bold tracking-tight text-white">
-            <span className="text-cyan-400">Note</span>AI
+          <span className="text-xl font-bold tracking-tight text-white" style={{ fontFamily: 'var(--font-display)' }}>
+            <span style={{ color: 'var(--obs-amber)' }}>Note</span>AI
           </span>
         </Link>
 
         <div className="hidden items-center gap-10 md:flex">
           <Link
             href="#features"
-            className="text-sm font-medium text-gray-300 transition-colors hover:text-white"
+            className="text-sm font-medium transition-colors hover:text-white"
+            style={{ color: 'var(--obs-text-dim)', fontFamily: 'var(--font-body)' }}
           >
             Features
           </Link>
           <Link
-            href="#pricing"
-            className="text-sm font-medium text-gray-300 transition-colors hover:text-white"
+            href="#pipeline"
+            className="text-sm font-medium transition-colors hover:text-white"
+            style={{ color: 'var(--obs-text-dim)', fontFamily: 'var(--font-body)' }}
           >
-            Pricing
+            Pipeline
           </Link>
           <Link
-            href="#about"
-            className="text-sm font-medium text-gray-300 transition-colors hover:text-white"
+            href="#roadmap"
+            className="text-sm font-medium transition-colors hover:text-white"
+            style={{ color: 'var(--obs-text-dim)', fontFamily: 'var(--font-body)' }}
           >
-            About
+            Roadmap
           </Link>
         </div>
 
         <div className="flex items-center gap-6">
           {/* Show when user is NOT signed in */}
           <SignedOut>
-            <Link href="/sign-in">
-              <Button
-                variant="ghost"
-                className="hidden text-gray-300 hover:text-white sm:flex font-medium"
-              >
-                Log in
-              </Button>
-            </Link>
-            <Link href="/sign-up">
-              <Button
-                variant="default"
-                className="bg-cyan-400 hover:bg-cyan-500 text-black border-0 rounded-full px-6 font-semibold"
-              >
-                Sign Up
-              </Button>
-            </Link>
+            <LoginButton
+              variant="ghost"
+              className="hidden text-gray-300 hover:text-white sm:flex font-medium"
+              style={{ fontFamily: 'var(--font-body)' }}
+            >
+              Log in
+            </LoginButton>
+            <LoginButton
+              mode="signup"
+              variant="default"
+              className="border-0 rounded-full px-6 font-semibold text-black"
+              style={{ background: 'var(--obs-amber)', fontFamily: 'var(--font-display)' }}
+            >
+              Sign Up
+            </LoginButton>
           </SignedOut>
 
           {/* Show when user IS signed in */}
@@ -71,7 +71,8 @@ export function Navbar() {
             <Link href="/dashboard" prefetch={true} onMouseEnter={handleDashboardHover}>
               <Button
                 variant="default"
-                className="bg-cyan-600 hover:bg-cyan-700 text-white border-0 shadow-[0_0_20px_rgba(34,211,238,0.4)]"
+                className="text-black border-0"
+                style={{ background: 'var(--obs-amber)', boxShadow: '0 0 20px var(--obs-amber-glow)', fontFamily: 'var(--font-display)' }}
               >
                 <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
               </Button>

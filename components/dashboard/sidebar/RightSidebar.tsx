@@ -35,6 +35,8 @@ import {
   Zap,
   ChevronLeft,
   ChevronRight,
+  PanelRightClose,
+  PanelRightOpen,
 } from "lucide-react";
 import {
   Dialog,
@@ -185,7 +187,7 @@ export function RightSidebar() {
     setActiveContext,
     isRightSidebarOpen,
     rightSidebarState,
-    cycleRightSidebar,
+    toggleRightSidebar,
     setRightSidebarState,
   } = useDashboard();
 
@@ -1189,27 +1191,11 @@ export function RightSidebar() {
               variant="ghost"
               size="icon"
               className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent focus-visible:ring-1 focus-visible:ring-violet-500/40"
-              onClick={cycleRightSidebar}
-              aria-label={
-                isRightOpen
-                  ? "Narrow Lumina Studio"
-                  : isRightCompact
-                    ? "Hide Lumina Studio"
-                    : "Show Lumina Studio"
-              }
-              title={
-                isRightOpen
-                  ? "Narrow panel"
-                  : isRightCompact
-                    ? "Hide panel"
-                    : "Show panel"
-              }
+              onClick={toggleRightSidebar}
+              aria-label={isRightOpen ? "Hide Lumina Studio" : "Show Lumina Studio"}
+              title={isRightOpen ? "Hide Lumina Studio" : "Show Lumina Studio"}
             >
-              {isRightCompact ? (
-                <ChevronLeft className="w-4 h-4" />
-              ) : (
-                <ChevronRight className="w-4 h-4" />
-              )}
+              <PanelRightClose className="w-4 h-4" />
             </Button>
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-linear-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/20 shrink-0 ring-1 ring-white/10">
@@ -2010,7 +1996,7 @@ export function RightSidebar() {
         aria-label="Open Lumina Studio"
         title="Open Lumina Studio"
       >
-        <ChevronLeft className="w-5 h-5 group-hover/reopen-right:translate-x-0.5 transition-transform" />
+        <PanelRightOpen className="w-5 h-5 group-hover/reopen-right:-translate-x-0.5 transition-transform" />
       </button>
     )}
     <Dialog open={isSaveModalOpen} onOpenChange={setIsSaveModalOpen}>
