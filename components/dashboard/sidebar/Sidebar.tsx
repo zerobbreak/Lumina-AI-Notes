@@ -8,16 +8,15 @@ import {
   Upload,
   Loader2,
   Archive,
+  Calendar,
   ClipboardList,
   Pin,
-  ChevronLeft,
-  ChevronRight,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UserButton, useUser } from "@clerk/nextjs";
-import { useMutation, useQuery, useAction } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -30,17 +29,16 @@ import { UploadDialog } from "@/components/dashboard/dialogs/UploadDialog";
 import { SettingsDialog } from "@/components/dashboard/dialogs/SettingsDialog";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { useDashboard } from "@/hooks/useDashboard";
-import { DraggableDocument, DocumentStatusBadge } from "@/components/documents";
+import { DraggableDocument } from "@/components/documents";
 import { SidebarCourse } from "./SidebarCourse";
 import { SidebarNote } from "./SidebarNote";
-import { ActionMenu } from "@/components/shared/ActionMenu"; // Still needed for Files
-import { File, FolderOpen, FileText } from "lucide-react"; // Still needed for Files
+import { ActionMenu } from "@/components/shared/ActionMenu";
+import { File, FolderOpen, FileText } from "lucide-react";
 import {
   useKeyboardShortcut,
   formatShortcut,
 } from "@/hooks/useKeyboardShortcut";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { ThemeToggle } from "@/components/shared/ThemeToggle"; // Import ThemeToggle
+import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -51,13 +49,14 @@ type RenameTarget = {
   id: string;
   type: "note" | "course" | "module" | "file";
   name: string;
-  parentId?: string; // For modules (courseId)
+  parentId?: string;
 };
 
 export function Sidebar() {
   const { user } = useUser();
   const router = useRouter();
-  const { leftSidebarState, setLeftSidebarState, toggleLeftSidebar } = useDashboard();
+  const { leftSidebarState, setLeftSidebarState, toggleLeftSidebar } =
+    useDashboard();
   const searchParams = useSearchParams();
   const { createNoteFlow } = useCreateNoteFlow();
 
@@ -65,13 +64,11 @@ export function Sidebar() {
   const isOpen = leftSidebarState === "open";
   const isClosed = leftSidebarState === "closed";
 
-  // Queries
   const userData = useQuery(api.users.getUser);
   const quickNotes = useQuery(api.notes.getQuickNotes);
   const recentFiles = useQuery(api.files.getFiles);
-  const pinnedNotes = useQuery(api.notes.getPinnedNotes); // Add query
+  const pinnedNotes = useQuery(api.notes.getPinnedNotes);
 
-  // Mutations
   const deleteNote = useMutation(api.notes.deleteNote);
   const renameNote = useMutation(api.notes.renameNote);
   const toggleArchiveNote = useMutation(api.notes.toggleArchiveNote);
@@ -86,13 +83,8 @@ export function Sidebar() {
 
   const deleteFile = useMutation(api.files.deleteFile);
   const renameFile = useMutation(api.files.renameFile);
-  const retryProcessing = useMutation(api.files.retryProcessing);
-  const processDocument = useAction(api.ai.processDocument);
 
-  // Local State
-  const [expandedCourses, setExpandedCourses] = useState<
-    Record<string, boolean>
-  >({});
+  const [expandedCourses, setExpandedCourses] = useState<Record<string, boolean>>({});
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -107,12 +99,10 @@ export function Sidebar() {
   const [expandCourse, setExpandCourse] = useState<string>("");
   const [expandModule, setExpandModule] = useState<string>("");
 
-  // Hydration protection
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Mobile vs desktop: only mount one sidebar panel so state stays single-instance
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
@@ -122,13 +112,23 @@ export function Sidebar() {
     return () => mq.removeEventListener("change", update);
   }, []);
 
+  const calendarView = searchParams.get("view") === "calendar";
+  useEffect(() => {
+    if (!calendarView) return;
+    if (isNarrowViewport) setLeftSidebarState("closed");
+    else setLeftSidebarState("compact");
+  }, [calendarView, isNarrowViewport, setLeftSidebarState]);
+
+  const openCalendar = useCallback(() => {
+    if (isNarrowViewport) setLeftSidebarState("closed");
+    else setLeftSidebarState("compact");
+    router.push("/dashboard?view=calendar");
+  }, [isNarrowViewport, router, setLeftSidebarState]);
+
   const toggleCourse = (courseId: string) => {
     setExpandedCourses((prev) => ({ ...prev, [courseId]: !prev[courseId] }));
   };
 
-  // --- Handlers ---
-
-  // Rename Confirm Logic
   const handleRenameConfirm = async (newValue: string) => {
     if (!renameTarget) return;
     const { id, type, parentId } = renameTarget;
@@ -158,7 +158,6 @@ export function Sidebar() {
     parentId?: string,
   ) => setRenameTarget({ id, type, name, parentId });
 
-  // Notes
   const handleCreateNote = useCallback(async () => {
     try {
       setIsCreatingNote(true);
@@ -178,7 +177,6 @@ export function Sidebar() {
     }
   }, [createNoteFlow, userData?.major, router]);
 
-  // Keyboard shortcuts
   useKeyboardShortcut(
     "cmd+k",
     useCallback(() => {
@@ -197,7 +195,6 @@ export function Sidebar() {
 
   useKeyboardShortcut("cmd+n", handleCreateNote, { preventDefault: true });
 
-  // Courses
   const handleCreateCourse = async () => {
     try {
       await createCourse({ name: "New Course", code: "CSE 101" });
@@ -208,40 +205,41 @@ export function Sidebar() {
 
   const sidebarInner = (
     <div className={cn(
-      "w-full h-full min-h-0 bg-sidebar flex flex-col group/sidebar overflow-hidden relative transition-all duration-300",
+      "w-full h-full min-h-0 bg-sidebar flex flex-col overflow-hidden relative transition-all duration-200",
       isCompact && "items-center"
     )}>
-      {/* Header / Search */}
+      {/* ── Header ── */}
       <div className={cn(
-        "p-4 flex flex-col gap-4 transition-all duration-300",
+        "pt-3 pb-2 px-3 flex flex-col gap-2.5",
         isCompact && "p-2 items-center"
       )}>
         <div className={cn(
-          "flex items-center justify-between transition-all gap-2",
-          isCompact && "flex-col gap-4"
+          "flex items-center justify-between",
+          isCompact && "flex-col gap-3"
         )}>
-          <div className={cn("flex items-center gap-1.5 min-w-0 flex-1", isCompact && "flex-col px-0 w-full")}>
-            {/* Single collapse / expand control (Notion-style: one control, cycles open → compact → closed) */}
+          <div className={cn("flex items-center gap-2 min-w-0 flex-1", isCompact && "flex-col w-full")}>
             <Button
               type="button"
               variant="ghost"
               size="icon"
               className={cn(
-                "shrink-0 h-8 w-8 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-lg",
-                isCompact && "w-10 h-10"
+                "shrink-0 h-7 w-7 text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md transition-colors",
+                isCompact && "w-9 h-9"
               )}
               onClick={toggleLeftSidebar}
               aria-label={isOpen ? "Hide sidebar" : "Show sidebar"}
               title={isOpen ? "Hide sidebar" : "Show sidebar"}
             >
-              <PanelLeftClose className="w-4 h-4" />
+              <PanelLeftClose className="w-[15px] h-[15px]" />
             </Button>
-            <div className={cn("flex items-center gap-2 px-0.5 min-w-0", isCompact && "flex-col gap-2")}>
-              <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 shrink-0">
-                <Layers className="w-4.5 h-4.5 text-white" />
+            <div className={cn("flex items-center gap-2 min-w-0", isCompact && "flex-col gap-1.5")}>
+              <div className="w-[22px] h-[22px] rounded-[5px] bg-linear-to-br from-primary/90 to-primary/60 flex items-center justify-center shrink-0">
+                <Layers className="w-3 h-3 text-primary-foreground" />
               </div>
               {!isCompact && (
-                <span className="font-bold text-sm tracking-tight text-sidebar-foreground animate-in fade-in duration-300 truncate">Lumina</span>
+                <span className="font-semibold text-[13px] tracking-tight text-sidebar-foreground truncate">
+                  Lumina
+                </span>
               )}
             </div>
           </div>
@@ -249,53 +247,56 @@ export function Sidebar() {
             variant="ghost"
             size="icon"
             className={cn(
-              "w-8 h-8 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-lg shrink-0",
-              isCompact && "w-10 h-10 bg-zinc-800/30"
+              "w-7 h-7 text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md transition-colors shrink-0",
+              isCompact && "w-9 h-9"
             )}
             onClick={handleCreateNote}
+            title="New page"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-[15px] h-[15px]" />
           </Button>
         </div>
 
+        {/* Search */}
         {!isCompact ? (
-          <Button
-            variant="ghost"
-            className="w-full justify-between bg-zinc-800/30 border border-white/5 text-muted-foreground hover:text-sidebar-foreground hover:bg-zinc-800/60 h-9 px-3 transition-all duration-200 rounded-lg group/search"
+          <button
+            className="w-full flex items-center justify-between h-[30px] px-2.5 text-muted-foreground/50 hover:bg-sidebar-accent/40 rounded-md transition-colors group/search"
             onClick={() => setIsSearchOpen(true)}
           >
-            <span className="flex items-center gap-2.5 text-[13px]">
-              <Search className="w-3.5 h-3.5 opacity-50 group-hover/search:opacity-100 transition-opacity" />
-              <span className="opacity-70 group-hover/search:opacity-100 transition-opacity">Search...</span>
+            <span className="flex items-center gap-2 text-[13px]">
+              <Search className="w-[14px] h-[14px]" />
+              <span>Search</span>
             </span>
-            <span className="text-[10px] font-medium bg-zinc-800/80 px-1.5 py-0.5 rounded border border-white/5 text-muted-foreground/60">
+            <span className="text-[11px] text-muted-foreground/30 group-hover/search:text-muted-foreground/50 transition-colors">
               {formatShortcut("cmd+k")}
             </span>
-          </Button>
+          </button>
         ) : (
           <Button
             variant="ghost"
             size="icon"
-            className="w-10 h-10 text-muted-foreground hover:text-sidebar-foreground hover:bg-zinc-800/60 rounded-lg bg-zinc-800/30"
+            className="w-9 h-9 text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md"
             onClick={() => setIsSearchOpen(true)}
           >
-            <Search className="w-4 h-4" />
+            <Search className="w-[15px] h-[15px]" />
           </Button>
         )}
       </div>
 
-      <ScrollArea className="flex-1 px-2 py-2 min-w-0">
-        <div className={cn("space-y-6", isCompact && "space-y-8 flex flex-col items-center")}>
-          {/* FAVORITES */}
+      {/* ── Scrollable content ── */}
+      <ScrollArea className="flex-1 px-1.5 pb-2 min-w-0">
+        <div className={cn("space-y-5 py-1", isCompact && "space-y-6 flex flex-col items-center")}>
+
+          {/* Favorites */}
           <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
             {!isCompact && (
-              <div className="flex items-center justify-between px-3 mb-1.5 group min-w-0">
-                <h3 className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider">
+              <div className="flex items-center justify-between px-2 mb-0.5 group min-w-0">
+                <h3 className="text-[11px] font-medium text-muted-foreground/40 select-none">
                   Favorites
                 </h3>
               </div>
             )}
-            <div className={cn("space-y-0.5 w-full", isCompact && "space-y-4 flex flex-col items-center")}>
+            <div className={cn("space-y-px w-full", isCompact && "space-y-3 flex flex-col items-center")}>
               {pinnedNotes?.map((note) => (
                 <SidebarNote
                   key={note._id}
@@ -307,7 +308,7 @@ export function Sidebar() {
                 />
               ))}
               {(!pinnedNotes || pinnedNotes.length === 0) && !isCompact && (
-                <div className="px-3 py-2 text-[12px] text-muted-foreground/40 italic">
+                <div className="px-2 py-1.5 text-[12px] text-muted-foreground/30">
                   No favorites yet
                 </div>
               )}
@@ -317,29 +318,29 @@ export function Sidebar() {
             </div>
           </div>
 
-          {/* RECENT NOTES */}
+          {/* Recent Notes */}
           <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
             {!isCompact && (
-              <div className="flex items-center justify-between px-3 mb-1.5 group min-w-0">
-                <h3 className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider">
-                  Recent Notes
+              <div className="flex items-center justify-between px-2 mb-0.5 group min-w-0">
+                <h3 className="text-[11px] font-medium text-muted-foreground/40 select-none">
+                  Recent
                 </h3>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="w-5 h-5 text-muted-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent opacity-0 group-hover:opacity-100 transition-all rounded-md"
+                  className="w-5 h-5 text-muted-foreground/30 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 opacity-0 group-hover:opacity-100 transition-all rounded-sm"
                   onClick={handleCreateNote}
                   disabled={isCreatingNote}
                 >
                   {isCreatingNote ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <Loader2 className="w-3 h-3 animate-spin" />
                   ) : (
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-3 h-3" />
                   )}
                 </Button>
               </div>
             )}
-            <div className={cn("space-y-0.5 w-full", isCompact && "space-y-4 flex flex-col items-center")}>
+            <div className={cn("space-y-px w-full", isCompact && "space-y-3 flex flex-col items-center")}>
               {quickNotes?.map((note) => (
                 <SidebarNote
                   key={note._id}
@@ -351,7 +352,7 @@ export function Sidebar() {
                 />
               ))}
               {(!quickNotes || quickNotes.length === 0) && !isCompact && (
-                <div className="px-3 py-2 text-[12px] text-muted-foreground/40 italic">
+                <div className="px-2 py-1.5 text-[12px] text-muted-foreground/30">
                   No recent notes
                 </div>
               )}
@@ -361,24 +362,24 @@ export function Sidebar() {
             </div>
           </div>
 
-          {/* COURSES / SMART FOLDERS */}
+          {/* Smart Folders / Courses */}
           <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
             {!isCompact && (
-              <div className="flex items-center justify-between px-3 mb-1.5 group min-w-0">
-                <h3 className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider">
-                  Smart Folders
+              <div className="flex items-center justify-between px-2 mb-0.5 group min-w-0">
+                <h3 className="text-[11px] font-medium text-muted-foreground/40 select-none">
+                  Courses
                 </h3>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="w-5 h-5 text-muted-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent opacity-0 group-hover:opacity-100 transition-all rounded-md"
+                  className="w-5 h-5 text-muted-foreground/30 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 opacity-0 group-hover:opacity-100 transition-all rounded-sm"
                   onClick={handleCreateCourse}
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <Plus className="w-3 h-3" />
                 </Button>
               </div>
             )}
-            <div className={cn("space-y-1 w-full", isCompact && "space-y-4 flex flex-col items-center")}>
+            <div className={cn("space-y-px w-full", isCompact && "space-y-3 flex flex-col items-center")}>
               {userData?.courses?.map((course: Course) => (
                 <SidebarCourse
                   key={course.id}
@@ -407,24 +408,24 @@ export function Sidebar() {
             </div>
           </div>
 
-          {/* RESOURCE LIBRARY */}
+          {/* Resources */}
           <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
             {!isCompact && (
-              <div className="flex items-center justify-between px-3 mb-1.5 group min-w-0">
-                <h3 className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider">
+              <div className="flex items-center justify-between px-2 mb-0.5 group min-w-0">
+                <h3 className="text-[11px] font-medium text-muted-foreground/40 select-none">
                   Resources
                 </h3>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="w-5 h-5 text-muted-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent opacity-0 group-hover:opacity-100 transition-all rounded-md"
+                  className="w-5 h-5 text-muted-foreground/30 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 opacity-0 group-hover:opacity-100 transition-all rounded-sm"
                   onClick={() => setIsUploadOpen(true)}
                 >
-                  <Upload className="w-3.5 h-3.5" />
+                  <Upload className="w-3 h-3" />
                 </Button>
               </div>
             )}
-            <div className={cn("space-y-0.5 w-full", isCompact && "space-y-4 flex flex-col items-center")}>
+            <div className={cn("space-y-px w-full", isCompact && "space-y-3 flex flex-col items-center")}>
               {recentFiles?.slice(0, 5).map((file) => (
                 <DraggableDocument
                   key={file._id}
@@ -433,20 +434,19 @@ export function Sidebar() {
                   processingStatus={file.processingStatus}
                   showDragIndicator={false}
                 >
-                  <div className={cn("relative group/file flex items-center px-1", isCompact && "px-0")}>
-                    <Button
-                      variant="ghost"
+                  <div className={cn("relative group/file flex items-center", isCompact && "px-0")}>
+                    <button
                       className={cn(
-                        "w-full justify-start h-8 px-2 text-[13px] text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent gap-2.5 transition-all rounded-lg",
-                        isCompact && "w-10 h-10 justify-center px-0"
+                        "w-full flex items-center h-[30px] px-2 text-[13px] text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2 transition-colors rounded-md",
+                        isCompact && "w-9 h-9 justify-center px-0"
                       )}
                       title={isCompact ? file.name : undefined}
                     >
-                      <File className="w-3.5 h-3.5 text-zinc-500 group-hover/file:text-zinc-400 transition-colors shrink-0" />
+                      <File className="w-[14px] h-[14px] text-muted-foreground/40 shrink-0" />
                       {!isCompact && <span className="truncate flex-1 text-left">{file.name}</span>}
-                    </Button>
+                    </button>
                     {!isCompact && (
-                      <div className="absolute right-2 opacity-0 group-hover/file:opacity-100 transition-opacity">
+                      <div className="absolute right-1 opacity-0 group-hover/file:opacity-100 transition-opacity">
                         <ActionMenu
                           onRename={() => openRename(file._id, "file", file.name)}
                           onDelete={() => deleteFile({ fileId: file._id })}
@@ -462,79 +462,100 @@ export function Sidebar() {
             </div>
           </div>
 
-          {/* TOOLS */}
-          <div className={cn("min-w-0 w-full pt-2 border-t border-white/5", isCompact && "flex flex-col items-center pt-4")}>
-            <div className={cn("space-y-1 w-full", isCompact && "space-y-4 flex flex-col items-center")}>
-              <Button
-                variant="ghost"
+          {/* Tools */}
+          <div className={cn(
+            "min-w-0 w-full pt-3 border-t border-sidebar-border/50",
+            isCompact && "flex flex-col items-center pt-4"
+          )}>
+            {!isCompact && (
+              <div className="px-2 mb-0.5">
+                <h3 className="text-[11px] font-medium text-muted-foreground/40 select-none">
+                  Tools
+                </h3>
+              </div>
+            )}
+            <div className={cn("space-y-px w-full", isCompact && "space-y-3 flex flex-col items-center")}>
+              <button
+                type="button"
                 className={cn(
-                  "w-full justify-start h-9 px-3 text-[13px] text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent gap-3 rounded-lg group",
-                  isCompact && "w-10 h-10 justify-center px-0"
+                  "w-full flex items-center h-[30px] px-2 text-[13px] text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool",
+                  isCompact && "w-9 h-9 justify-center px-0",
+                  calendarView && "bg-sidebar-accent/50 text-sidebar-foreground",
+                )}
+                onClick={openCalendar}
+                title={isCompact ? "Calendar" : undefined}
+              >
+                <Calendar className="w-[14px] h-[14px] text-muted-foreground/40 group-hover/tool:text-sidebar-foreground transition-colors" />
+                {!isCompact && <span>Calendar</span>}
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "w-full flex items-center h-[30px] px-2 text-[13px] text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool",
+                  isCompact && "w-9 h-9 justify-center px-0",
                 )}
                 onClick={() => router.push("/dashboard?view=flashcards")}
                 title={isCompact ? "Flashcards" : undefined}
               >
-                <Layers className="w-4 h-4 text-zinc-500 group-hover:text-indigo-400 transition-colors" />
+                <Layers className="w-[14px] h-[14px] text-muted-foreground/40 group-hover/tool:text-sidebar-foreground transition-colors" />
                 {!isCompact && <span>Flashcards</span>}
-              </Button>
-              <Button
-                variant="ghost"
+              </button>
+              <button
                 className={cn(
-                  "w-full justify-start h-9 px-3 text-[13px] text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent gap-3 rounded-lg group",
-                  isCompact && "w-10 h-10 justify-center px-0"
+                  "w-full flex items-center h-[30px] px-2 text-[13px] text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool",
+                  isCompact && "w-9 h-9 justify-center px-0"
                 )}
                 onClick={() => router.push("/dashboard?view=quizzes")}
                 title={isCompact ? "Quizzes" : undefined}
               >
-                <ClipboardList className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400 transition-colors" />
+                <ClipboardList className="w-[14px] h-[14px] text-muted-foreground/40 group-hover/tool:text-sidebar-foreground transition-colors" />
                 {!isCompact && <span>Quizzes</span>}
-              </Button>
-              <Button
-                variant="ghost"
+              </button>
+              <button
                 className={cn(
-                  "w-full justify-start h-9 px-3 text-[13px] text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent gap-3 rounded-lg group",
-                  isCompact && "w-10 h-10 justify-center px-0"
+                  "w-full flex items-center h-[30px] px-2 text-[13px] text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool",
+                  isCompact && "w-9 h-9 justify-center px-0"
                 )}
                 onClick={() => router.push("/dashboard?view=archive")}
                 title={isCompact ? "Archive" : undefined}
               >
-                <Archive className="w-4 h-4 text-zinc-500 group-hover:text-orange-400 transition-colors" />
+                <Archive className="w-[14px] h-[14px] text-muted-foreground/40 group-hover/tool:text-sidebar-foreground transition-colors" />
                 {!isCompact && <span>Archive</span>}
-              </Button>
+              </button>
             </div>
           </div>
         </div>
       </ScrollArea>
 
-      {/* Footer */}
+      {/* ── Footer ── */}
       <div className={cn(
-        "p-4 border-t border-white/5 bg-sidebar/50 backdrop-blur-sm space-y-4 transition-all duration-300",
+        "px-3 py-3 border-t border-sidebar-border/50 transition-all duration-200",
         isCompact && "p-2 items-center flex flex-col"
       )}>
-        <div className={cn("flex items-center gap-3 group px-1", isCompact && "flex-col px-0")}>
-          <div className="relative">
+        <div className={cn("flex items-center gap-2.5 group/footer", isCompact && "flex-col gap-2")}>
+          <div className="relative shrink-0">
             {mounted ? (
               <UserButton
                 appearance={{
                   elements: {
                     avatarBox: cn(
-                      "rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all",
-                      isCompact ? "w-10 h-10" : "w-8 h-8"
+                      "rounded-md ring-1 ring-sidebar-border hover:ring-sidebar-foreground/20 transition-all",
+                      isCompact ? "w-9 h-9" : "w-7 h-7"
                     ),
                   },
                 }}
               />
             ) : (
-              <div className={cn("rounded-lg bg-zinc-800 animate-pulse", isCompact ? "w-10 h-10" : "w-8 h-8")} />
+              <div className={cn("rounded-md bg-sidebar-accent animate-pulse", isCompact ? "w-9 h-9" : "w-7 h-7")} />
             )}
-            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-sidebar rounded-full shadow-sm"></div>
+            <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 border-[1.5px] border-sidebar rounded-full" />
           </div>
           {!isCompact && (
-            <div className="flex-1 overflow-hidden animate-in fade-in duration-300">
-              <p className="text-[13px] font-semibold text-sidebar-foreground truncate">
+            <div className="flex-1 overflow-hidden min-w-0">
+              <p className="text-[13px] font-medium text-sidebar-foreground truncate leading-tight">
                 {user?.fullName || "Student"}
               </p>
-              <p className="text-[11px] text-muted-foreground/60 truncate">
+              <p className="text-[11px] text-muted-foreground/40 truncate leading-tight">
                 Pro Plan
               </p>
             </div>
@@ -543,68 +564,67 @@ export function Sidebar() {
             <Button
               variant="ghost"
               size="icon"
-              className="w-8 h-8 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+              className="w-7 h-7 text-muted-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md opacity-0 group-hover/footer:opacity-100 transition-all"
               onClick={() => setIsSettingsOpen(true)}
             >
-              <Settings className="w-4 h-4" />
+              <Settings className="w-[14px] h-[14px]" />
             </Button>
           )}
           {isCompact && (
             <Button
               variant="ghost"
               size="icon"
-              className="w-10 h-10 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-lg"
+              className="w-9 h-9 text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md"
               onClick={() => setIsSettingsOpen(true)}
             >
-              <Settings className="w-4 h-4" />
+              <Settings className="w-[15px] h-[15px]" />
             </Button>
           )}
         </div>
-        {!isCompact && <ThemeToggle />}
+        {!isCompact && <div className="mt-2.5"><ThemeToggle /></div>}
       </div>
     </div>
   );
 
   return (
     <>
-      {/* Desktop / tablet: in-flow sidebar */}
+      {/* Desktop / tablet */}
       {!isNarrowViewport && (
         <div
           className={cn(
-            "h-screen shrink-0 z-50 relative overflow-visible border-sidebar-border transition-all duration-300 ease-in-out",
-            isOpen ? "w-[280px] border-r opacity-100" : 
-            isCompact ? "w-[72px] border-r opacity-100" :
+            "h-screen shrink-0 z-50 relative overflow-visible border-sidebar-border transition-all duration-200 ease-out",
+            isOpen ? "w-[260px] border-r opacity-100" :
+            isCompact ? "w-[60px] border-r opacity-100" :
             "w-0 border-transparent opacity-0 pointer-events-none"
           )}
         >
           {sidebarInner}
-          
-          {/* Re-open button when closed */}
+
           {isClosed && (
             <button
               onClick={() => setLeftSidebarState("open")}
-              className="fixed left-4 top-4 w-10 h-10 bg-zinc-900 border border-white/10 rounded-xl flex items-center justify-center text-muted-foreground hover:text-sidebar-foreground hover:bg-zinc-800 transition-all z-[60] shadow-2xl group/reopen"
+              className="fixed left-3 top-3 w-8 h-8 bg-sidebar border border-sidebar-border rounded-md flex items-center justify-center text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all z-60"
               aria-label="Show sidebar"
               title="Show sidebar"
             >
-              <PanelLeftOpen className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+              <PanelLeftOpen className="w-4 h-4" />
             </button>
           )}
         </div>
       )}
 
-      {/* Mobile: overlay drawer (single mounted instance) */}
+      {/* Mobile overlay */}
       {isNarrowViewport && !isClosed ? (
         <div className="fixed inset-0 z-100 flex">
           <button
             type="button"
-            className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
+            className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
             aria-label="Close sidebar"
             onClick={() => setLeftSidebarState("closed")}
           />
           <div className={cn(
-            "relative h-full shadow-2xl border-r border-sidebar-border bg-sidebar transition-all duration-300",
-            isOpen ? "w-[min(280px,92vw)]" : "w-[72px]"
+            "relative h-full shadow-xl border-r border-sidebar-border bg-sidebar transition-all duration-200",
+            isOpen ? "w-[min(260px,90vw)]" : "w-[60px]"
           )}>
             {sidebarInner}
           </div>
@@ -612,9 +632,9 @@ export function Sidebar() {
       ) : isNarrowViewport && isClosed ? (
         <button
           onClick={() => setLeftSidebarState("open")}
-          className="fixed left-4 bottom-4 w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-2xl z-[100] active:scale-95 transition-all"
+          className="fixed left-3 bottom-3 w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-primary-foreground shadow-lg z-100 active:scale-95 transition-transform"
         >
-          <Plus className="w-6 h-6" />
+          <Plus className="w-5 h-5" />
         </button>
       ) : null}
 

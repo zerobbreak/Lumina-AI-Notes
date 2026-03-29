@@ -12,29 +12,21 @@ import { toast } from "sonner";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Mic,
-  Clock,
-  Pause,
   Play,
   RotateCcw,
   Save,
-  AlertCircle,
   Sparkles,
   Loader2,
-  Upload,
   ChevronDown,
   Trash2,
   FileAudio,
   FileText,
   Radio,
-  Volume2,
   PenLine,
   BookOpen,
-  RefreshCw,
   History,
   Code2,
   Zap,
-  ChevronLeft,
-  ChevronRight,
   PanelRightClose,
   PanelRightOpen,
 } from "lucide-react";
@@ -111,10 +103,10 @@ export function RightSidebar() {
   const [sessionTranscript, setSessionTranscript] = useState<EnhancedChunk[]>(
     [],
   );
-  const [permissionState, setPermissionState] = useState<
+  const [, setPermissionState] = useState<
     "prompt" | "granted" | "denied" | "unknown"
   >("unknown");
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [, setIsAnalyzing] = useState(false);
 
   // Save Modal State
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -179,13 +171,13 @@ export function RightSidebar() {
   const files = useQuery(api.files.getFiles);
   const userData = useQuery(api.users.getUser);
   const { createNoteFlow } = useCreateNoteFlow();
+  const updateNote = useMutation(api.notes.updateNote);
 
   // Get dashboard context for pending notes and active context
   const {
     setPendingNotes,
     activeContext,
     setActiveContext,
-    isRightSidebarOpen,
     rightSidebarState,
     toggleRightSidebar,
     setRightSidebarState,
@@ -196,8 +188,7 @@ export function RightSidebar() {
   const isRightClosed = rightSidebarState === "closed";
   const generateFromPinnedAudio = useAction(api.notes.generateFromPinnedAudio);
 
-  const { transcript, resetTranscript, browserSupportsSpeechRecognition } =
-    useSpeechRecognition();
+  const { transcript, resetTranscript } = useSpeechRecognition();
 
   const hasDraftTranscript =
     sessionTranscript.length > 0 || transcript.trim().length > 0;
@@ -264,22 +255,22 @@ export function RightSidebar() {
   };
 
   // Format seconds to HH:MM:SS (moved up for hoisting)
-  const formatTime = (seconds: number) => {
+  const formatTime = useCallback((seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
     return `${h.toString().padStart(2, "0")}:${m
       .toString()
       .padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  };
+  }, []);
 
-  const clearRecordingDraft = () => {
+  const clearRecordingDraft = useCallback(() => {
     try {
       localStorage.removeItem(RECORDING_DRAFT_STORAGE_KEY);
     } catch (error) {
       console.warn("[recording-draft] failed to clear local draft:", error);
     }
-  };
+  }, []);
 
   const buildFinalChunks = useMemo(() => {
     const chunks = [...sessionTranscript];
@@ -408,7 +399,7 @@ export function RightSidebar() {
 
     const timeoutId = setTimeout(async () => {
       try {
-        const recordingId = await upsertRecordingDraft({
+        await upsertRecordingDraft({
           sessionId: liveSessionIdRef.current,
           title:
             recordingTitle ||
@@ -639,6 +630,7 @@ export function RightSidebar() {
         const result = await createNoteFlow({
           title,
           major: userData?.major || "general",
+          ...(selectedSession ? { sourceRecordingId: selectedSession } : {}),
         });
         if (!result?.noteId) return;
         setPendingNotes(wrappedNotes);
@@ -650,6 +642,12 @@ export function RightSidebar() {
         toast.error("Failed to create note. Please try again.");
       }
     } else {
+      if (selectedSession) {
+        updateNote({
+          noteId: currentNoteId as Id<"notes">,
+          sourceRecordingId: selectedSession,
+        }).catch(() => {});
+      }
       setPendingNotes(wrappedNotes);
       streamingNotes.reset();
       toast.success("Content ready to insert");
@@ -670,6 +668,7 @@ export function RightSidebar() {
         const result = await createNoteFlow({
           title,
           major: userData?.major || "general",
+          ...(selectedSession ? { sourceRecordingId: selectedSession } : {}),
         });
         if (!result?.noteId) return;
 
@@ -684,6 +683,12 @@ export function RightSidebar() {
       }
     } else if (generatedNotes) {
       // Note is already open - just set pending notes
+      if (selectedSession && currentNoteId) {
+        updateNote({
+          noteId: currentNoteId as Id<"notes">,
+          sourceRecordingId: selectedSession,
+        }).catch(() => {});
+      }
       setPendingNotes(generatedNotes);
       setGeneratedNotes(null);
       toast.success("Content ready to insert");
@@ -1151,21 +1156,13 @@ export function RightSidebar() {
       }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
       className={cn(
-        "group/right-sidebar h-screen bg-sidebar backdrop-blur-xl border-l border-sidebar-border flex flex-col shrink-0 z-50 overflow-hidden",
-        "shadow-[inset_1px_0_0_0_rgba(255,255,255,0.04)]",
-        isRightClosed && "pointer-events-none border-transparent shadow-none",
+        "group/right-sidebar h-screen bg-sidebar border-l border-sidebar-border flex flex-col shrink-0 z-50 overflow-hidden",
+        isRightClosed && "pointer-events-none border-transparent",
+        activeContext && "border-l-primary/30",
       )}
       onDrop={handleNativeDrop}
       onDragOver={handleNativeDragOver}
       onMouseUp={handleTextSelection}
-      style={{
-        boxShadow: activeContext
-          ? "inset 0 0 40px rgba(59, 130, 246, 0.1)"
-          : "none",
-        borderColor: activeContext
-          ? "rgba(59, 130, 246, 0.3)"
-          : "rgba(255, 255, 255, 0.05)",
-      }}
     >
       <div className="w-full h-full flex flex-col shrink-0 min-w-0">
         <input
@@ -1184,13 +1181,13 @@ export function RightSidebar() {
           className="hidden"
           aria-hidden
         />
-        <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-3 border-b border-white/5 bg-linear-to-b from-sidebar/90 to-sidebar/60 backdrop-blur-md">
+        <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-3 border-b border-sidebar-border">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent focus-visible:ring-1 focus-visible:ring-violet-500/40"
+              className="h-8 w-8 shrink-0 rounded-md text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
               onClick={toggleRightSidebar}
               aria-label={isRightOpen ? "Hide Lumina Studio" : "Show Lumina Studio"}
               title={isRightOpen ? "Hide Lumina Studio" : "Show Lumina Studio"}
@@ -1198,16 +1195,16 @@ export function RightSidebar() {
               <PanelRightClose className="w-4 h-4" />
             </Button>
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-linear-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/20 shrink-0 ring-1 ring-white/10">
-                <Sparkles className="w-4 h-4 text-white" />
+              <div className="w-7 h-7 rounded-md bg-sidebar-accent flex items-center justify-center shrink-0">
+                <Sparkles className="w-3.5 h-3.5 text-muted-foreground" />
               </div>
               {!isRightCompact && (
                 <div className="min-w-0 flex flex-col gap-0">
-                  <span className="font-bold text-sm tracking-tight text-sidebar-foreground truncate leading-tight">
-                    Lumina Studio
+                  <span className="font-medium text-sm text-sidebar-foreground truncate leading-tight">
+                    Studio
                   </span>
-                  <span className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider">
-                    Capture &amp; transcribe
+                  <span className="text-[10px] text-muted-foreground">
+                    Capture & transcribe
                   </span>
                 </div>
               )}
@@ -1215,15 +1212,15 @@ export function RightSidebar() {
           </div>
         </div>
         {isRightCompact ? (
-          <div className="flex-1 flex flex-col items-stretch gap-1.5 py-3 px-1.5 overflow-y-auto min-h-0">
-            <p className="text-[9px] font-semibold text-muted-foreground/45 uppercase tracking-widest text-center px-0.5 pb-1">
+          <div className="flex-1 flex flex-col items-stretch gap-1 py-3 px-1.5 overflow-y-auto min-h-0">
+            <p className="text-[9px] text-muted-foreground text-center px-0.5 pb-1.5">
               Quick
             </p>
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="h-10 w-full rounded-xl border border-transparent text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent hover:border-white/10 transition-all duration-200 active:scale-[0.98] disabled:opacity-40"
+              className="h-9 w-full rounded-md text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors disabled:opacity-40"
               title="Import audio"
               disabled={isUploading || isTranscribing}
               onClick={() =>
@@ -1232,118 +1229,102 @@ export function RightSidebar() {
                 fileInputRef.current?.click()
               }
             >
-              <FileAudio className="w-5 h-5" />
+              <FileAudio className="w-4 h-4" />
             </Button>
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="h-10 w-full rounded-xl border border-transparent text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent hover:border-white/10 transition-all duration-200 active:scale-[0.98] disabled:opacity-40"
+              className="h-9 w-full rounded-md text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors disabled:opacity-40"
               title="Import file"
               disabled={isUploadingTextbook}
               onClick={() =>
                 !isUploadingTextbook && textbookInputRef.current?.click()
               }
             >
-              <BookOpen className="w-5 h-5" />
+              <BookOpen className="w-4 h-4" />
             </Button>
             <Button
               type="button"
               variant="ghost"
               size="icon"
               className={cn(
-                "h-10 w-full rounded-xl border border-transparent transition-all duration-200 active:scale-[0.98]",
+                "h-9 w-full rounded-md transition-colors",
                 isRecording
-                  ? "text-red-400 bg-red-500/10 border-red-500/20 hover:bg-red-500/15"
-                  : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent hover:border-white/10",
+                  ? "text-red-500 bg-red-500/10 hover:bg-red-500/15"
+                  : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
               )}
               title={isRecording ? "Pause recording" : "Start recording"}
               onClick={() => void handleToggleRecording()}
             >
-              <Mic className="w-5 h-5" />
+              <Mic className="w-4 h-4" />
             </Button>
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="h-10 w-full rounded-xl border border-transparent text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent hover:border-white/10 transition-all duration-200 active:scale-[0.98]"
+              className="h-9 w-full rounded-md text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors"
               title="Upload & recording history"
               onClick={() => setShowHistory((h) => !h)}
             >
-              <History className="w-5 h-5" />
+              <History className="w-4 h-4" />
             </Button>
           </div>
         ) : (
         <ScrollArea className="flex-1 min-h-0">
         {/* Top: Upload & Recording */}
-        <div className="p-3 sm:p-4 flex flex-col gap-4 relative overflow-hidden">
+        <div className="p-4 flex flex-col gap-3 relative overflow-hidden">
           <ContextDeck />
 
           {/* Dynamic Mode Indicator Header */}
-          <div className="flex items-center justify-between gap-2 min-h-[2.25rem]">
+          <div className="flex items-center justify-between gap-2 min-h-8">
             <AnimatePresence mode="wait">
               <motion.div
                 key={sidebarMode}
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 10 }}
-                transition={{ duration: 0.2 }}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border shadow-sm",
-                  sidebarMode === "recording" &&
-                    "bg-red-500/10 text-red-400 border-red-500/25",
-                  sidebarMode === "uploading" &&
-                    "bg-cyan-500/10 text-cyan-400 border-cyan-500/25",
-                  sidebarMode === "transcribing" &&
-                    "bg-amber-500/10 text-amber-400 border-amber-500/25",
-                  sidebarMode === "ready" &&
-                    "bg-green-500/10 text-green-400 border-green-500/25",
-                  sidebarMode === "idle" &&
-                    "bg-sidebar-accent/80 text-muted-foreground border-sidebar-border",
-                )}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="flex items-center gap-2 text-sm text-muted-foreground"
               >
                 {sidebarMode === "recording" && (
                   <>
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-                    </span>
-                    Recording • {formatTime(elapsedTime)}
+                    <span className="w-2 h-2 rounded-full bg-red-500" />
+                    <span className="font-medium text-foreground">{formatTime(elapsedTime)}</span>
                   </>
                 )}
                 {sidebarMode === "uploading" && (
                   <>
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    Uploading... {uploadProgress}%
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Uploading {uploadProgress}%</span>
                   </>
                 )}
                 {sidebarMode === "transcribing" && (
                   <>
-                    <Sparkles className="w-3 h-3 animate-pulse" />
-                    Processing with AI...
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Processing...</span>
                   </>
                 )}
                 {sidebarMode === "ready" && (
                   <>
-                    <Sparkles className="w-3 h-3" />
-                    Content Ready
+                    <span className="w-2 h-2 rounded-full bg-green-500" />
+                    <span>Ready</span>
                   </>
                 )}
                 {sidebarMode === "idle" && (
                   <>
-                    <Radio className="w-3 h-3" />
-                    Capture & import
+                    <Radio className="w-3.5 h-3.5" />
+                    <span>Capture</span>
                   </>
                 )}
               </motion.div>
             </AnimatePresence>
 
-            {/* Reset button only for recording mode (ready mode has its own reset button) */}
             {sidebarMode === "recording" && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-xs text-slate-500 dark:text-gray-500 hover:text-slate-700 dark:hover:text-white"
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
                 onClick={() => handleReset(false)}
               >
                 <RotateCcw className="w-3 h-3 mr-1" />
@@ -1352,19 +1333,17 @@ export function RightSidebar() {
             )}
           </div>
 
-          {/* Animated gradient border based on mode */}
-          <div
-            className={cn(
-              "absolute top-0 left-0 w-full h-1 transition-all duration-500",
-              sidebarMode === "recording"
-                ? "bg-linear-to-r from-red-500 via-orange-500 to-red-500 bg-size-[200%_100%] animate-gradient-x opacity-100"
-                : sidebarMode === "uploading" || sidebarMode === "transcribing"
-                  ? "bg-linear-to-r from-cyan-500 via-indigo-500 to-purple-500 animate-pulse opacity-100"
-                  : sidebarMode === "ready"
-                    ? "bg-linear-to-r from-green-500 via-emerald-500 to-green-500 opacity-100"
-                    : "bg-linear-to-r from-cyan-500 via-indigo-500 to-purple-500 opacity-30",
-            )}
-          />
+          {/* Subtle top indicator based on mode */}
+          {sidebarMode !== "idle" && (
+            <div
+              className={cn(
+                "absolute top-0 left-0 w-full h-0.5 transition-colors duration-300",
+                sidebarMode === "recording" && "bg-red-500",
+                (sidebarMode === "uploading" || sidebarMode === "transcribing") && "bg-muted-foreground",
+                sidebarMode === "ready" && "bg-green-500",
+              )}
+            />
+          )}
 
           {/* Quick Import Actions - Only show in idle mode */}
           <AnimatePresence>
@@ -1373,10 +1352,10 @@ export function RightSidebar() {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.15 }}
                 className="overflow-hidden"
               >
-                <div className="grid grid-cols-2 gap-2.5 mb-2">
+                <div className="grid grid-cols-2 gap-2 mb-2">
                   <button
                     type="button"
                     onClick={() =>
@@ -1384,12 +1363,12 @@ export function RightSidebar() {
                       !isTranscribing &&
                       fileInputRef.current?.click()
                     }
-                    className="group/import flex flex-col items-center justify-center gap-2.5 p-3.5 rounded-2xl border border-white/8 bg-white/[0.03] transition-all duration-200 hover:bg-violet-500/10 hover:border-violet-500/25 hover:shadow-lg hover:shadow-violet-500/5 active:scale-[0.98]"
+                    className="group/import flex flex-col items-center justify-center gap-2 p-3 rounded-lg border border-sidebar-border bg-background hover:bg-sidebar-accent transition-colors"
                   >
-                    <div className="rounded-xl bg-violet-500/15 p-2.5 ring-1 ring-violet-500/20 group-hover/import:bg-violet-500/20 transition-colors">
-                      <FileAudio className="w-5 h-5 text-violet-300" />
+                    <div className="rounded-md bg-sidebar-accent p-2 group-hover/import:bg-background transition-colors">
+                      <FileAudio className="w-4 h-4 text-muted-foreground group-hover/import:text-foreground transition-colors" />
                     </div>
-                    <span className="text-[10px] font-semibold text-muted-foreground group-hover/import:text-sidebar-foreground transition-colors">
+                    <span className="text-[10px] font-medium text-muted-foreground group-hover/import:text-foreground transition-colors">
                       Import Audio
                     </span>
                   </button>
@@ -1399,12 +1378,12 @@ export function RightSidebar() {
                     onClick={() =>
                       !isUploadingTextbook && textbookInputRef.current?.click()
                     }
-                    className="group/import flex flex-col items-center justify-center gap-2.5 p-3.5 rounded-2xl border border-white/8 bg-white/[0.03] transition-all duration-200 hover:bg-indigo-500/10 hover:border-indigo-500/25 hover:shadow-lg hover:shadow-indigo-500/5 active:scale-[0.98]"
+                    className="group/import flex flex-col items-center justify-center gap-2 p-3 rounded-lg border border-sidebar-border bg-background hover:bg-sidebar-accent transition-colors"
                   >
-                    <div className="rounded-xl bg-indigo-500/15 p-2.5 ring-1 ring-indigo-500/20 group-hover/import:bg-indigo-500/20 transition-colors">
-                      <BookOpen className="w-5 h-5 text-indigo-300" />
+                    <div className="rounded-md bg-sidebar-accent p-2 group-hover/import:bg-background transition-colors">
+                      <BookOpen className="w-4 h-4 text-muted-foreground group-hover/import:text-foreground transition-colors" />
                     </div>
-                    <span className="text-[10px] font-semibold text-muted-foreground group-hover/import:text-sidebar-foreground transition-colors">
+                    <span className="text-[10px] font-medium text-muted-foreground group-hover/import:text-foreground transition-colors">
                       Import File
                     </span>
                   </button>
@@ -1416,23 +1395,10 @@ export function RightSidebar() {
           {/* Recording Card - Mode Aware */}
           <div
             className={cn(
-              "rounded-2xl p-5 sm:p-6 flex flex-col items-center gap-5 shadow-xl shadow-black/40 relative overflow-hidden group transition-all duration-500 border",
-              sidebarMode === "ready"
-                ? "bg-linear-to-b from-green-900/25 to-sidebar border-green-500/25"
-                : "bg-zinc-900/80 dark:bg-black/60 border-white/10",
+              "rounded-lg p-4 flex flex-col items-center gap-4 relative overflow-hidden transition-colors duration-200 border",
+              "bg-sidebar-accent/50 border-sidebar-border",
             )}
           >
-            {/* Subtle Background Glow */}
-            <div
-              className={cn(
-                "absolute inset-0 bg-linear-to-b opacity-20 pointer-events-none transition-opacity duration-500",
-                sidebarMode === "recording"
-                  ? "from-red-500/30 via-transparent to-transparent"
-                  : sidebarMode === "ready"
-                    ? "from-green-500/20 via-transparent to-transparent"
-                    : "from-blue-500/10 via-transparent to-transparent",
-              )}
-            />
 
             {/* Mode-specific content */}
             <AnimatePresence mode="wait">
@@ -1440,10 +1406,10 @@ export function RightSidebar() {
               {sidebarMode === "ready" && (
                 <motion.div
                   key="ready-mode"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="w-full flex flex-col gap-4 relative z-10"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="w-full flex flex-col gap-3"
                 >
                   {/* Code Block Panel */}
                   {codeBlocks.length > 0 && (
@@ -1460,7 +1426,7 @@ export function RightSidebar() {
                       size="sm"
                       variant="ghost"
                       onClick={() => setIsCodeExtractorOpen(true)}
-                      className="w-full h-8 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs border border-emerald-500/20"
+                      className="w-full h-8 text-xs text-muted-foreground hover:text-foreground hover:bg-sidebar-accent border border-sidebar-border"
                     >
                       <Code2 className="w-3.5 h-3.5 mr-1.5" />
                       Extract Selection as Code Block
@@ -1480,34 +1446,33 @@ export function RightSidebar() {
 
                   {/* Show Generated Notes Preview if notes are ready (structured mode) */}
                   {generatedNotes && streamingNotes.state.phase === "idle" ? (
-                    <div className="bg-green-500/10 rounded-xl p-3 border border-green-500/20">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Sparkles className="w-3.5 h-3.5 text-green-400" />
-                        <span className="text-[10px] font-semibold text-green-400 uppercase tracking-wider">
-                          Notes Generated ✓
+                    <div className="rounded-md p-3 border border-sidebar-border bg-background">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                        <span className="text-xs font-medium text-foreground">
+                          Notes ready
                         </span>
                       </div>
-                      <p className="text-xs text-gray-300 line-clamp-2">
-                        {recordingTitle || "Your AI-generated notes are ready"}
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {recordingTitle || "AI-generated notes are ready"}
                       </p>
-                      <p className="text-[10px] text-gray-500 mt-1">
+                      <p className="text-[10px] text-muted-foreground/70 mt-1">
                         {generatedNotes.sections?.length || 0} sections
-                        generated
                       </p>
                     </div>
                   ) : showTranscriptPreview &&
                     sessionTranscript.length > 0 &&
                     streamingNotes.state.phase === "idle" ? (
                     /* Transcript Preview */
-                    <div className="bg-black/30 rounded-xl p-3 border border-white/5">
-                      <div className="flex items-center justify-between mb-2">
+                    <div className="rounded-md p-3 border border-sidebar-border bg-background">
+                      <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
-                          <FileText className="w-3.5 h-3.5 text-green-400" />
-                          <span className="text-[10px] font-semibold text-green-400 uppercase tracking-wider">
-                            Transcript Ready
+                          <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span className="text-xs font-medium text-foreground">
+                            Transcript ready
                           </span>
                         </div>
-                        <span className="text-[10px] text-gray-500">
+                        <span className="text-[10px] text-muted-foreground">
                           {sessionTranscript.reduce(
                             (acc, chunk) => acc + chunk.text.split(" ").length,
                             0,
@@ -1515,7 +1480,7 @@ export function RightSidebar() {
                           words
                         </span>
                       </div>
-                      <p className="text-xs text-gray-300 line-clamp-3">
+                      <p className="text-xs text-muted-foreground line-clamp-3">
                         {sessionTranscript[0]?.text?.slice(0, 200) ||
                           "No transcript available"}
                         {(sessionTranscript[0]?.text?.length || 0) > 200 &&
@@ -1529,30 +1494,25 @@ export function RightSidebar() {
                     <button
                       onClick={() => setUseStreamingMode(!useStreamingMode)}
                       className={cn(
-                        "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium border transition-all",
+                        "flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium transition-colors",
                         useStreamingMode
-                          ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
-                          : "bg-white/5 text-gray-500 border-white/10",
+                          ? "bg-sidebar-accent text-foreground"
+                          : "text-muted-foreground hover:text-foreground",
                       )}
                     >
                       <Zap className="w-3 h-3" />
                       {useStreamingMode ? "Streaming" : "Structured"}
                     </button>
-                    <span className="text-[9px] text-gray-600">
+                    <span className="text-[10px] text-muted-foreground">
                       {useStreamingMode
-                        ? "Animated markdown output"
-                        : "Section-based JSON output"}
+                        ? "Animated output"
+                        : "Section-based"}
                     </span>
                   </div>
 
-                  {/* Generate Notes Button - Prominent */}
+                  {/* Generate Notes Button - Clean primary action */}
                   <Button
-                    className={cn(
-                      "w-full h-14 text-white font-semibold shadow-lg",
-                      generatedNotes
-                        ? "bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-indigo-500/20"
-                        : "bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 shadow-green-500/20",
-                    )}
+                    className="w-full h-10 font-medium"
                     onClick={
                       generatedNotes
                         ? handleInsertNotes
@@ -1567,17 +1527,17 @@ export function RightSidebar() {
                     {isGeneratingNotes || streamingNotes.state.isStreaming ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Generating Notes...
+                        Generating...
                       </>
                     ) : generatedNotes ? (
                       <>
                         <PenLine className="w-4 h-4 mr-2" />
-                        Insert Notes to Editor
+                        Insert Notes
                       </>
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4 mr-2" />
-                        Generate AI Notes
+                        Generate Notes
                       </>
                     )}
                   </Button>
@@ -1587,27 +1547,30 @@ export function RightSidebar() {
                     {!generatedNotes && (
                       <Button
                         variant="ghost"
-                        className="flex-1 h-9 bg-white/5 hover:bg-white/10 text-xs font-medium text-gray-300 border border-white/5"
+                        size="sm"
+                        className="flex-1 h-8 text-xs text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
                         onClick={handleToggleRecording}
                       >
-                        <Play className="w-3 h-3 mr-2" />
+                        <Play className="w-3 h-3 mr-1.5" />
                         Resume
                       </Button>
                     )}
                     <Button
                       variant="ghost"
-                      className="flex-1 h-9 bg-white/5 hover:bg-white/10 text-xs font-medium text-gray-300 border border-white/5"
+                      size="sm"
+                      className="flex-1 h-8 text-xs text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
                       onClick={handleSaveClick}
                     >
-                      <Save className="w-3 h-3 mr-2" />
+                      <Save className="w-3 h-3 mr-1.5" />
                       Save
                     </Button>
                     <Button
                       variant="ghost"
-                      className="flex-1 h-9 bg-white/5 hover:bg-white/10 text-xs font-medium text-gray-400 border border-white/5"
+                      size="sm"
+                      className="flex-1 h-8 text-xs text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
                       onClick={() => handleReset(false)}
                     >
-                      <RotateCcw className="w-3 h-3 mr-2" />
+                      <RotateCcw className="w-3 h-3 mr-1.5" />
                       Reset
                     </Button>
                   </div>
@@ -1621,31 +1584,26 @@ export function RightSidebar() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="w-full flex flex-col items-center gap-6"
+                  className="w-full flex flex-col items-center gap-4"
                 >
                   {/* Header Status */}
-                  <div className="w-full flex items-center justify-between relative z-10">
+                  <div className="w-full flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div
                         className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300",
+                          "w-9 h-9 rounded-md flex items-center justify-center transition-colors",
                           isRecording
-                            ? "bg-red-500/20 text-red-500"
-                            : "bg-white/5 text-gray-400",
+                            ? "bg-red-500/10 text-red-500"
+                            : "bg-sidebar-accent text-muted-foreground",
                         )}
                       >
-                        <Mic className="w-5 h-5 fill-current" />
+                        <Mic className="w-4 h-4" />
                       </div>
                       <div className="flex flex-col">
-                        <span
-                          className={cn(
-                            "text-[10px] font-bold tracking-wider uppercase",
-                            isRecording ? "text-red-500" : "text-gray-500",
-                          )}
-                        >
+                        <span className="text-xs text-muted-foreground">
                           {isRecording ? "Recording" : "Ready"}
                         </span>
-                        <span className="font-mono text-sm font-medium text-white tabular-nums">
+                        <span className="font-mono text-sm font-medium text-foreground tabular-nums">
                           {formatTime(elapsedTime)}
                         </span>
                       </div>
@@ -1655,56 +1613,55 @@ export function RightSidebar() {
                     {(elapsedTime > 0 || sessionTranscript.length > 0) && (
                       <button
                         onClick={() => handleReset(true)}
-                        className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                        className="w-7 h-7 rounded-md hover:bg-sidebar-accent flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>
 
-                  {/* Waveform Visualizer - Clean & Minimal */}
-                  <div className="w-full h-16 flex items-center justify-center gap-1 relative z-10 my-2">
-                    {Array.from({ length: 20 }).map((_, i) => (
+                  {/* Minimal Waveform Visualizer */}
+                  <div className="w-full h-10 flex items-center justify-center gap-0.5 my-1">
+                    {Array.from({ length: 16 }).map((_, i) => (
                       <motion.div
                         key={i}
                         animate={
                           isRecording
                             ? {
-                                height: [10, 10 + Math.random() * 40, 10],
-                                opacity: [0.3, 1, 0.3],
+                                height: [4, 4 + Math.random() * 20, 4],
+                                opacity: [0.4, 0.8, 0.4],
                               }
-                            : { height: 6, opacity: 0.2 }
+                            : { height: 4, opacity: 0.2 }
                         }
                         transition={{
-                          duration: 0.4,
+                          duration: 0.5,
                           repeat: Infinity,
                           repeatType: "reverse",
-                          delay: i * 0.05,
+                          delay: i * 0.04,
                         }}
                         className={cn(
-                          "w-1.5 rounded-full",
-                          isRecording ? "bg-red-500" : "bg-gray-600",
+                          "w-1 rounded-full",
+                          isRecording ? "bg-red-400" : "bg-muted-foreground/30",
                         )}
                       />
                     ))}
                   </div>
 
                   {/* Main Action Button */}
-                  <button
+                  <Button
                     onClick={handleToggleRecording}
+                    variant={isRecording ? "outline" : "default"}
                     className={cn(
-                      "w-full py-4 rounded-2xl font-semibold text-sm tracking-wide transition-all duration-300 transform active:scale-[0.98] relative z-10 shadow-lg",
-                      isRecording
-                        ? "bg-white text-black hover:bg-gray-100"
-                        : "bg-[#6366f1] text-white hover:bg-[#5558dd] shadow-indigo-500/25",
+                      "w-full h-10 font-medium transition-colors",
+                      isRecording && "border-red-500/30 text-red-500 hover:bg-red-500/10 hover:text-red-500",
                     )}
                   >
                     {isRecording
-                      ? "Pause Recording"
+                      ? "Pause"
                       : hasDraftTranscript
-                        ? "Resume Recording"
+                        ? "Resume"
                         : "Start Recording"}
-                  </button>
+                  </Button>
                 </motion.div>
               )}
 
@@ -1713,30 +1670,30 @@ export function RightSidebar() {
                 sidebarMode === "transcribing") && (
                 <motion.div
                   key="uploading-mode"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className="w-full flex flex-col items-center gap-4 py-4 relative z-10"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="w-full flex flex-col items-center gap-3 py-3"
                 >
-                  <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-cyan-500/20 to-indigo-500/20 flex items-center justify-center">
-                    <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+                  <div className="w-12 h-12 rounded-md bg-sidebar-accent flex items-center justify-center">
+                    <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-semibold text-white mb-1">
+                    <p className="text-sm font-medium text-foreground">
                       {sidebarMode === "uploading"
-                        ? "Uploading Audio..."
-                        : "Processing with AI..."}
+                        ? "Uploading..."
+                        : "Processing..."}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {sidebarMode === "uploading"
                         ? `${uploadProgress}% complete`
-                        : "Transcribing your audio..."}
+                        : "Transcribing audio"}
                     </p>
                   </div>
                   {sidebarMode === "uploading" && (
-                    <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                    <div className="w-full h-1 bg-sidebar-accent rounded-full overflow-hidden">
                       <motion.div
-                        className="h-full bg-linear-to-r from-cyan-500 to-indigo-500"
+                        className="h-full bg-primary"
                         initial={{ width: 0 }}
                         animate={{ width: `${uploadProgress}%` }}
                         transition={{ duration: 0.3 }}
@@ -1749,20 +1706,20 @@ export function RightSidebar() {
           </div>
 
           {/* Upload & Recording History */}
-          <div className="pt-1">
+          <div className="pt-2">
             <button
-              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-all duration-200"
+              className="w-full flex items-center justify-between px-2 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors"
               onClick={() => setShowHistory(!showHistory)}
             >
-              <span className="flex items-center gap-2.5 text-xs font-semibold uppercase tracking-wider">
-                <RefreshCw className="w-4 h-4" />
-                Upload & Recording History
+              <span className="flex items-center gap-2 text-xs font-medium">
+                <History className="w-3.5 h-3.5" />
+                History
                 {(pastRecordings?.filter(
                   (r) => r.transcript && r.transcript.trim().length > 0,
                 )?.length ?? 0) +
                   (files?.length ?? 0) >
                   0 && (
-                  <span className="px-1.5 py-0.5 rounded-md bg-slate-200 dark:bg-white/10 text-[10px] font-bold">
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-sidebar-accent text-muted-foreground">
                     {(pastRecordings?.filter(
                       (r) => r.transcript && r.transcript.trim().length > 0,
                     )?.length ?? 0) + (files?.length ?? 0)}
@@ -1771,9 +1728,9 @@ export function RightSidebar() {
               </span>
               <motion.div
                 animate={{ rotate: showHistory ? 180 : 0 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.15 }}
               >
-                <ChevronDown className="w-4 h-4" />
+                <ChevronDown className="w-3.5 h-3.5" />
               </motion.div>
             </button>
 
@@ -1783,7 +1740,7 @@ export function RightSidebar() {
                 (r) => !r.transcript || r.transcript.trim().length === 0,
               ).length > 0 && (
                 <button
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 mt-1 rounded-lg text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-500/10 hover:bg-amber-200 dark:hover:bg-amber-500/20 border border-amber-200 dark:border-amber-500/20 text-xs font-medium transition-all"
+                  className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 mt-1 rounded-md text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/15 text-xs transition-colors"
                   onClick={async () => {
                     try {
                       const result = await cleanupOrphanedRecordings();
@@ -1803,7 +1760,7 @@ export function RightSidebar() {
                       (r) => !r.transcript || r.transcript.trim().length === 0,
                     ).length
                   }{" "}
-                  failed upload(s)
+                  failed
                 </button>
               )}
 
@@ -1823,7 +1780,6 @@ export function RightSidebar() {
 
                       {[
                         ...(pastRecordings ?? [])
-                          // Filter out recordings without valid transcripts (empty or just "")
                           .filter(
                             (r) =>
                               r.transcript && r.transcript.trim().length > 0,
@@ -1833,8 +1789,8 @@ export function RightSidebar() {
                             id: r._id,
                             title: r.title,
                             subtitle: r.duration
-                              ? `Audio - ${Math.floor(r.duration / 60)}:${String(Math.floor(r.duration % 60)).padStart(2, "0")}`
-                              : "Audio Recording",
+                              ? `${Math.floor(r.duration / 60)}:${String(Math.floor(r.duration % 60)).padStart(2, "0")}`
+                              : "Audio",
                             createdAt: r.createdAt,
                             status:
                               selectedSession === r._id
@@ -1861,13 +1817,13 @@ export function RightSidebar() {
                         .map((item) => (
                           <motion.div
                             key={item.type + item.id}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
                             className={cn(
-                              "group relative flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200",
+                              "group relative flex items-center gap-2.5 px-2 py-2 rounded-md cursor-pointer transition-colors",
                               item.status === "Active"
-                                ? "bg-linear-to-r from-cyan-500/15 to-transparent border border-cyan-500/30"
-                                : "hover:bg-slate-100 dark:hover:bg-white/5 border border-transparent",
+                                ? "bg-sidebar-accent"
+                                : "hover:bg-sidebar-accent",
                             )}
                             onClick={() => {
                               if (item.type === "recording") {
@@ -1886,55 +1842,42 @@ export function RightSidebar() {
                           >
                             <div
                               className={cn(
-                                "h-10 w-10 shrink-0 rounded-lg flex items-center justify-center transition-all duration-200",
+                                "h-7 w-7 shrink-0 rounded-md flex items-center justify-center transition-colors",
                                 item.status === "Active"
-                                  ? "bg-cyan-500/20 text-cyan-400"
-                                  : "bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-gray-500 group-hover:text-slate-700 dark:group-hover:text-gray-300 group-hover:bg-slate-200 dark:group-hover:bg-white/10",
+                                  ? "bg-primary/10 text-primary"
+                                  : "bg-sidebar-accent text-muted-foreground group-hover:text-foreground",
                               )}
                             >
                               {item.type === "recording" ? (
-                                item.status === "Active" ? (
-                                  <Volume2 className="w-5 h-5" />
-                                ) : (
-                                  <FileAudio className="w-5 h-5" />
-                                )
+                                <FileAudio className="w-3.5 h-3.5" />
                               ) : (
-                                <FileText className="w-5 h-5" />
+                                <FileText className="w-3.5 h-3.5" />
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p
                                 className={cn(
-                                  "text-sm font-medium truncate transition-colors",
+                                  "text-xs font-medium truncate transition-colors",
                                   item.status === "Active"
-                                    ? "text-cyan-700 dark:text-cyan-100"
-                                    : "text-slate-700 dark:text-gray-300 group-hover:text-slate-900 dark:group-hover:text-white",
+                                    ? "text-foreground"
+                                    : "text-muted-foreground group-hover:text-foreground",
                                 )}
                               >
                                 {item.title}
                               </p>
                               {item.subtitle && (
-                                <p className="text-[10px] text-slate-500 dark:text-gray-500 truncate">
+                                <p className="text-[10px] text-muted-foreground/70 truncate">
                                   {item.subtitle}
                                 </p>
                               )}
                             </div>
-                            <span
-                              className={cn(
-                                "text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0",
-                                item.status === "Active"
-                                  ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30"
-                                  : item.status === "Processing"
-                                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                                    : "text-gray-500",
-                              )}
-                            >
-                              {item.status}
-                            </span>
+                            {item.status === "Processing" && (
+                              <Loader2 className="w-3 h-3 animate-spin text-muted-foreground shrink-0" />
+                            )}
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="h-8 w-8 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all rounded-lg shrink-0"
+                              className="h-6 w-6 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all rounded-md shrink-0"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (item.type === "recording") {
@@ -1954,7 +1897,7 @@ export function RightSidebar() {
                                 }
                               }}
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3 h-3" />
                             </Button>
                           </motion.div>
                         ))}
@@ -1963,18 +1906,11 @@ export function RightSidebar() {
                         0 &&
                         !isUploading &&
                         !isTranscribing && (
-                          <div className="flex flex-col items-center justify-center py-8 text-slate-500 dark:text-gray-600 gap-3">
-                            <div className="w-14 h-14 rounded-xl bg-slate-100 dark:bg-white/5 flex items-center justify-center">
-                              <History className="w-7 h-7 opacity-30" />
-                            </div>
-                            <div className="text-center">
-                              <p className="text-xs font-medium text-slate-500 dark:text-gray-500">
-                                No uploads or recordings yet
-                              </p>
-                              <p className="text-[10px] text-slate-400 dark:text-gray-600 mt-0.5">
-                                Your history will appear here
-                              </p>
-                            </div>
+                          <div className="flex flex-col items-center justify-center py-6 text-muted-foreground gap-2">
+                            <History className="w-5 h-5 opacity-40" />
+                            <p className="text-xs">
+                              No history yet
+                            </p>
                           </div>
                         )}
                     </div>
@@ -1992,34 +1928,33 @@ export function RightSidebar() {
       <button
         type="button"
         onClick={() => setRightSidebarState("open")}
-        className="fixed right-4 top-4 z-[60] w-10 h-10 bg-zinc-900 border border-white/10 rounded-xl flex items-center justify-center text-muted-foreground hover:text-sidebar-foreground hover:bg-zinc-800 transition-all shadow-2xl group/reopen-right"
-        aria-label="Open Lumina Studio"
-        title="Open Lumina Studio"
+        className="fixed right-4 top-4 z-60 w-9 h-9 bg-background border border-sidebar-border rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors"
+        aria-label="Open Studio"
+        title="Open Studio"
       >
-        <PanelRightOpen className="w-5 h-5 group-hover/reopen-right:-translate-x-0.5 transition-transform" />
+        <PanelRightOpen className="w-4 h-4" />
       </button>
     )}
     <Dialog open={isSaveModalOpen} onOpenChange={setIsSaveModalOpen}>
-      <DialogContent className="sm:max-w-md bg-zinc-900 border-white/10 text-white">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Save Session</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="title" className="text-gray-400">
+            <Label htmlFor="title" className="text-muted-foreground">
               Title
             </Label>
             <Input
               id="title"
               value={recordingTitle}
               onChange={(e) => setRecordingTitle(e.target.value)}
-              className="bg-black/20 border-white/10 text-white placeholder:text-gray-600 focus-visible:ring-indigo-500"
               placeholder="Enter a title..."
             />
           </div>
-          <div className="flex justify-between text-sm text-gray-500 bg-white/5 p-3 rounded-lg">
+          <div className="flex justify-between text-sm text-muted-foreground bg-sidebar-accent p-3 rounded-md">
             <span>Duration</span>
-            <span className="font-mono text-white">
+            <span className="font-mono text-foreground">
               {formatTime(elapsedTime)}
             </span>
           </div>
@@ -2028,15 +1963,11 @@ export function RightSidebar() {
           <Button
             variant="ghost"
             onClick={() => setIsSaveModalOpen(false)}
-            className="text-gray-400 hover:text-white hover:bg-white/10"
           >
             Cancel
           </Button>
-          <Button
-            onClick={handleConfirmSave}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white"
-          >
-            Save Recording
+          <Button onClick={handleConfirmSave}>
+            Save
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Folder, ChevronRight, ChevronDown, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Folder, ChevronRight, ChevronDown } from "lucide-react";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
@@ -14,7 +13,7 @@ import { toast } from "sonner";
 
 interface SidebarModuleProps {
   module: {
-    id: string; // This is a string UUID from the schema, not a Convex ID
+    id: string;
     title: string;
   };
   courseId: string;
@@ -38,14 +37,12 @@ export function SidebarModule({
   const [isExpanded, setIsExpanded] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
-  // Fetch notes for this module
   const moduleNotes = useQuery(api.notes.getNotesByContext, {
     moduleId: module.id,
   });
 
   const moveNoteToFolder = useMutation(api.notes.moveNoteToFolder);
 
-  // Drop zone handlers
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -76,7 +73,6 @@ export function SidebarModule({
           moduleId: module.id,
         });
         toast.success(`Moved "${noteTitle}" to ${module.title}`);
-        // Auto-expand the module to show the new note
         setIsExpanded(true);
       } catch (error) {
         console.error("Failed to move note:", error);
@@ -86,16 +82,14 @@ export function SidebarModule({
   };
 
   return (
-    <div className="relative group/module px-1">
+    <div className="relative group/module">
       <div className="flex items-center">
         <div
           className={cn(
-            "flex-1 flex items-center h-7 px-2 text-[12px] gap-2 transition-all cursor-pointer rounded-md",
+            "flex-1 flex items-center h-[28px] px-2 text-[12px] gap-1.5 transition-colors cursor-pointer rounded-md",
             isDragOver
-              ? "text-indigo-200 bg-indigo-500/20 ring-1 ring-indigo-500/30"
-              : isExpanded
-                ? "text-sidebar-foreground bg-zinc-800/30"
-                : "text-muted-foreground hover:text-sidebar-foreground hover:bg-zinc-800/20",
+              ? "text-primary bg-primary/10 ring-1 ring-primary/20"
+              : "text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/40",
           )}
           onClick={() => {
             router.push(`/dashboard?contextId=${module.id}&contextType=module`);
@@ -104,41 +98,38 @@ export function SidebarModule({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          {/* Toggle Button */}
           <div
-            className="p-1 rounded-md hover:bg-zinc-700/50 text-zinc-500 hover:text-zinc-300 cursor-pointer transition-colors"
+            className="p-0.5 rounded-sm text-muted-foreground/35 hover:text-muted-foreground/60 cursor-pointer transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               setIsExpanded(!isExpanded);
             }}
           >
             {isExpanded ? (
-              <ChevronDown className="w-3 h-3" />
+              <ChevronDown className="w-2.5 h-2.5" />
             ) : (
-              <ChevronRight className="w-3 h-3" />
+              <ChevronRight className="w-2.5 h-2.5" />
             )}
           </div>
 
           <Folder
             className={cn(
-              "w-3.5 h-3.5 shrink-0",
+              "w-3.5 h-3.5 shrink-0 transition-colors",
               isDragOver
-                ? "text-indigo-400"
-                : "text-indigo-500/50 group-hover/module:text-indigo-400 transition-colors",
+                ? "text-primary/70"
+                : "text-muted-foreground/30",
             )}
           />
-          <span className="truncate flex-1 tracking-tight">{module.title}</span>
+          <span className="truncate flex-1">{module.title}</span>
 
-          {/* Drop indicator */}
           {isDragOver && (
-            <span className="text-[9px] bg-indigo-500/30 px-1 py-0.5 rounded text-indigo-200 animate-pulse">
+            <span className="text-[9px] bg-primary/10 px-1 py-0.5 rounded text-primary/70 animate-pulse">
               Drop
             </span>
           )}
         </div>
 
-        {/* Action Menu */}
-        <div className="absolute right-2 opacity-0 group-hover/module:opacity-100 transition-opacity">
+        <div className="absolute right-1 opacity-0 group-hover/module:opacity-100 transition-opacity">
           <ActionMenu
             onRename={() => onRename(module.id, module.title, courseId)}
             onDelete={() => onDelete(module.id, courseId)}
@@ -147,7 +138,7 @@ export function SidebarModule({
       </div>
 
       {isExpanded && (
-        <div className="pl-3 ml-3 border-l border-white/5 space-y-0.5 mt-0.5">
+        <div className="ml-[14px] pl-2.5 border-l border-sidebar-border/30 space-y-px mt-px">
           {moduleNotes?.map((note) => (
             <SidebarNote
               key={note._id}

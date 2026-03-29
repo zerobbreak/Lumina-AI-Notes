@@ -15,6 +15,7 @@ const FlashcardStudy = lazy(() => import("@/components/dashboard/flashcards/Flas
 const QuizzesView = lazy(() => import("@/components/dashboard/quizzes/QuizzesView").then(m => ({ default: m.QuizzesView })));
 const QuizTaking = lazy(() => import("@/components/dashboard/quizzes/QuizTaking").then(m => ({ default: m.QuizTaking })));
 const ArchiveView = lazy(() => import("@/components/dashboard/views/ArchiveView"));
+const CalendarView = lazy(() => import("@/components/dashboard/views/CalendarView"));
 
 function DashboardLoading() {
   return (
@@ -129,6 +130,15 @@ function DashboardContent() {
     return (
       <Suspense fallback={<DashboardLoading />}>
         <ArchiveView />
+      </Suspense>
+    );
+  }
+
+  // --- VIEW 4b: CALENDAR ---
+  if (view === "calendar") {
+    return (
+      <Suspense fallback={<DashboardLoading />}>
+        <CalendarView />
       </Suspense>
     );
   }

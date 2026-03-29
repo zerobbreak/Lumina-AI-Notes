@@ -91,8 +91,11 @@ export default defineSchema({
         collapsedNodes: v.array(v.string()), // IDs of collapsed nodes
       }),
     ),
+    // When notes are generated from a saved recording session
+    sourceRecordingId: v.optional(v.id("recordings")),
   })
     .index("by_userId", ["userId"])
+    .index("by_userId_and_createdAt", ["userId", "createdAt"])
     .index("by_userId_and_pinned", ["userId", "isPinned"])
     .index("by_userId_and_archived", ["userId", "isArchived"])
     .index("by_userId_and_noteType", ["userId", "noteType"])

@@ -12,6 +12,7 @@ interface CreateNoteInput {
   courseId?: string;
   moduleId?: string;
   noteType?: string;
+  sourceRecordingId?: Id<"recordings">;
 }
 
 export function useCreateNoteFlow(): {
@@ -32,6 +33,7 @@ export function useCreateNoteFlow(): {
         moduleId: input.moduleId,
         noteType: input.noteType,
         style: "standard",
+        sourceRecordingId: input.sourceRecordingId,
       });
       setNoteBootstrap({
         noteId,

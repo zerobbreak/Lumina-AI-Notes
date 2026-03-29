@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Menu } = require('electron');
 const path = require('path');
 
 const isDev = process.env.NODE_ENV === 'development';
@@ -56,7 +56,11 @@ if (!gotTheLock) {
     }
   });
 
-  app.whenReady().then(createWindow);
+  app.whenReady().then(() => {
+    // Hide default File/Edit/View… bar — web UI carries the product chrome.
+    Menu.setApplicationMenu(null);
+    createWindow();
+  });
 }
 
 function handleAuthUrl(url) {

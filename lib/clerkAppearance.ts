@@ -1,6 +1,5 @@
-import { SignUp } from "@clerk/nextjs";
-
-const clerkAppearance = {
+/** Shared Clerk UI styling for sign-in and desktop browser auth callback. */
+export const clerkAuthAppearance = {
   elements: {
     rootBox: "mx-auto w-full max-w-[420px]",
     card: "!bg-[rgba(11,17,32,0.85)] !backdrop-blur-xl !border !border-white/[0.06] !shadow-[0_8px_32px_rgba(0,0,0,0.4)] !rounded-2xl",
@@ -31,16 +30,7 @@ const clerkAppearance = {
     cardBox: "!shadow-none",
   },
   layout: {
-    socialButtonsPlacement: "top" as const,
+    socialButtonsPlacement: "top",
     showOptionalFields: false,
   },
-};
-
-export default function Page() {
-  return (
-    <SignUp
-      forceRedirectUrl="/onboarding"
-      appearance={clerkAppearance}
-    />
-  );
-}
+} as const;

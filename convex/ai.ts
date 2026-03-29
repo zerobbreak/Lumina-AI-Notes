@@ -1034,7 +1034,9 @@ export const generateEmbedding = action({
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
+    const model = genAI.getGenerativeModel({
+      model: "text-embedding-004",
+    });
 
     // Strip HTML tags and limit text length
     const plainText = args.text
@@ -1080,7 +1082,7 @@ export const semanticSearch = action({
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const embeddingModel = genAI.getGenerativeModel({
-      model: "embedding-001",
+      model: "text-embedding-004",
     });
 
     // Generate query embedding
@@ -2074,7 +2076,7 @@ Return ONLY valid JSON, no markdown code fences or explanation.`,
 
       // Generate embedding using existing genAI instance
       const embeddingModel = genAI.getGenerativeModel({
-        model: "embedding-001",
+        model: "text-embedding-004",
       });
 
       // Combine summary and beginning of text for embedding
@@ -2155,7 +2157,7 @@ export const unifiedSemanticSearch = action({
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const embeddingModel = genAI.getGenerativeModel({
-      model: "embedding-001",
+      model: "text-embedding-004",
     });
 
     // Generate query embedding

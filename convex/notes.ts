@@ -122,6 +122,7 @@ export const createNote = mutation({
     quickCaptureAudioUrl: v.optional(v.string()),
     quickCaptureStatus: v.optional(v.string()),
     quickCaptureExpandedNoteId: v.optional(v.id("notes")),
+    sourceRecordingId: v.optional(v.id("recordings")),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -151,6 +152,7 @@ export const createNote = mutation({
       quickCaptureAudioUrl: args.quickCaptureAudioUrl,
       quickCaptureStatus: args.quickCaptureStatus,
       quickCaptureExpandedNoteId: args.quickCaptureExpandedNoteId,
+      sourceRecordingId: args.sourceRecordingId,
     });
 
     return noteId;
@@ -420,6 +422,7 @@ export const updateNote = mutation({
     quickCaptureAudioUrl: v.optional(v.string()),
     quickCaptureStatus: v.optional(v.string()),
     quickCaptureExpandedNoteId: v.optional(v.id("notes")),
+    sourceRecordingId: v.optional(v.id("recordings")),
   },
   handler: async (ctx, args) => {
     await requireNoteEdit(ctx, args.noteId);
@@ -441,6 +444,8 @@ export const updateNote = mutation({
       patch.quickCaptureStatus = args.quickCaptureStatus;
     if (args.quickCaptureExpandedNoteId !== undefined)
       patch.quickCaptureExpandedNoteId = args.quickCaptureExpandedNoteId;
+    if (args.sourceRecordingId !== undefined)
+      patch.sourceRecordingId = args.sourceRecordingId;
 
     await ctx.db.patch(args.noteId, patch);
   },

@@ -13,6 +13,7 @@ import type * as aiEditor from "../aiEditor.js";
 import type * as aiNotes from "../aiNotes.js";
 import type * as aiTranscription from "../aiTranscription.js";
 import type * as analytics from "../analytics.js";
+import type * as calendar from "../calendar.js";
 import type * as collaboration from "../collaboration.js";
 import type * as crons from "../crons.js";
 import type * as encoding from "../encoding.js";
@@ -42,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   aiNotes: typeof aiNotes;
   aiTranscription: typeof aiTranscription;
   analytics: typeof analytics;
+  calendar: typeof calendar;
   collaboration: typeof collaboration;
   crons: typeof crons;
   encoding: typeof encoding;
