@@ -158,16 +158,33 @@ export function Sidebar() {
     parentId?: string,
   ) => setRenameTarget({ id, type, name, parentId });
 
+  const currentNoteId = searchParams.get("noteId");
+  const openNote = useQuery(
+    api.notes.getNote,
+    currentNoteId ? { noteId: currentNoteId as Id<"notes"> } : "skip",
+  );
+
   const handleCreateNote = useCallback(async () => {
+    if (currentNoteId && openNote === undefined) return;
     try {
       setIsCreatingNote(true);
       const result = await createNoteFlow({
         title: "Untitled Note",
         major: userData?.major || "general",
+        ...(openNote
+          ? {
+              parentNoteId: openNote._id,
+              courseId: openNote.courseId,
+              moduleId: openNote.moduleId,
+              noteType: "page",
+            }
+          : {}),
       });
       if (result?.noteId) {
         router.push(`/dashboard?noteId=${result.noteId}`);
-        toast.success("New note created");
+        toast.success(
+          openNote ? "Sub-page created" : "New note created",
+        );
       }
     } catch (e) {
       console.error(e);
@@ -175,7 +192,13 @@ export function Sidebar() {
     } finally {
       setIsCreatingNote(false);
     }
-  }, [createNoteFlow, userData?.major, router]);
+  }, [
+    createNoteFlow,
+    userData?.major,
+    router,
+    currentNoteId,
+    openNote,
+  ]);
 
   useKeyboardShortcut(
     "cmd+k",

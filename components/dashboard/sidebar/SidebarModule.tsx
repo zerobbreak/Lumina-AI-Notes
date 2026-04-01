@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Folder, ChevronRight, ChevronDown } from "lucide-react";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { useRouter } from "next/navigation";
@@ -40,6 +40,11 @@ export function SidebarModule({
   const moduleNotes = useQuery(api.notes.getNotesByContext, {
     moduleId: module.id,
   });
+
+  const rootModuleNotes = useMemo(
+    () => moduleNotes?.filter((n) => !n.parentNoteId),
+    [moduleNotes],
+  );
 
   const moveNoteToFolder = useMutation(api.notes.moveNoteToFolder);
 
@@ -139,7 +144,7 @@ export function SidebarModule({
 
       {isExpanded && (
         <div className="ml-[14px] pl-2.5 border-l border-sidebar-border/30 space-y-px mt-px">
-          {moduleNotes?.map((note) => (
+          {rootModuleNotes?.map((note) => (
             <SidebarNote
               key={note._id}
               note={note}

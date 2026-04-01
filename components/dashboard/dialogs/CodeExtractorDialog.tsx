@@ -13,7 +13,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Code2 } from "lucide-react";
-import { CODE_LANGUAGES, type CodeLanguage } from "@/types/streaming";
+import {
+  CODE_LANGUAGES,
+  CODE_LANGUAGE_LABELS,
+  type CodeLanguage,
+} from "@/types/streaming";
 
 interface CodeExtractorDialogProps {
   isOpen: boolean;
@@ -21,31 +25,6 @@ interface CodeExtractorDialogProps {
   selectedText: string;
   onExtract: (language: CodeLanguage, label?: string) => void;
 }
-
-/** Human-readable labels for code languages */
-const LANGUAGE_LABELS: Record<CodeLanguage, string> = {
-  javascript: "JavaScript",
-  typescript: "TypeScript",
-  python: "Python",
-  java: "Java",
-  c: "C",
-  cpp: "C++",
-  csharp: "C#",
-  go: "Go",
-  rust: "Rust",
-  sql: "SQL",
-  html: "HTML",
-  css: "CSS",
-  bash: "Bash / Shell",
-  ruby: "Ruby",
-  php: "PHP",
-  swift: "Swift",
-  kotlin: "Kotlin",
-  r: "R",
-  matlab: "MATLAB",
-  pseudocode: "Pseudocode",
-  other: "Other",
-};
 
 export function CodeExtractorDialog({
   isOpen,
@@ -106,7 +85,7 @@ export function CodeExtractorDialog({
             >
               {CODE_LANGUAGES.map((lang) => (
                 <option key={lang} value={lang}>
-                  {LANGUAGE_LABELS[lang]}
+                  {CODE_LANGUAGE_LABELS[lang]}
                 </option>
               ))}
             </select>

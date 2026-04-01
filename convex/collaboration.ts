@@ -101,7 +101,9 @@ export const inviteToNote = mutation({
 export const acceptPendingInvites = mutation({
   args: {},
   handler: async (ctx) => {
-    const identity = await requireIdentity(ctx);
+    // Do not throw when auth is not ready yet (e.g. first paint before Clerk/Convex token sync).
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return { accepted: 0 };
     const email = normalizeEmail(identity.email || "");
     if (!email) return { accepted: 0 };
 

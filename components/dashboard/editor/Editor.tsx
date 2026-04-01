@@ -9,6 +9,8 @@ import {
 } from "@tiptap/react";
 import { Node, mergeAttributes } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
+import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
+import { editorLowlight } from "@/lib/editorLowlight";
 import Placeholder from "@tiptap/extension-placeholder";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
@@ -18,6 +20,7 @@ import { FloatingMenu as FloatingMenuExtension } from "@tiptap/extension-floatin
 import { FloatingMenu } from "@tiptap/react/menus";
 import { SlashCommand, renderItems } from "./extensions/SlashCommand";
 import { SlashCommandLayer } from "./SlashCommandLayer";
+import { CodeBlockLanguageBubbleMenu } from "./CodeBlockLanguageBubbleMenu";
 import { Plus, GripVertical } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ResourceMentionNode } from "./ResourceMentionNode";
@@ -98,6 +101,7 @@ export default function Editor({
   // Build extensions based on style type
   const extensions: AnyExtension[] = [
     StarterKit.configure({
+      codeBlock: false,
       ...(styleType === "outline"
         ? {
             bulletList: {
@@ -121,6 +125,13 @@ export default function Editor({
             },
           }
         : {}),
+    }),
+    CodeBlockLowlight.configure({
+      lowlight: editorLowlight,
+      defaultLanguage: "javascript",
+      HTMLAttributes: {
+        class: "lumina-code-block",
+      },
     }),
     Placeholder.configure({
       placeholder,
@@ -234,6 +245,7 @@ export default function Editor({
       <div className="outline-mode-container">
         {/* Editor */}
         <div className="outline-editor-content relative">
+          <CodeBlockLanguageBubbleMenu editor={editor} />
           <SlashCommandLayer editor={editor} />
           <EditorContent editor={editor} />
         </div>
@@ -244,6 +256,7 @@ export default function Editor({
   // Default Standard
   return (
     <div className="relative group/editor" data-slash-ui={slashUiTick}>
+      {editor && <CodeBlockLanguageBubbleMenu editor={editor} />}
       {editor && (
         <FloatingMenu
           editor={editor}

@@ -70,7 +70,7 @@ export default defineSchema({
     isArchived: v.optional(v.boolean()),
     isShared: v.optional(v.boolean()),
     createdAt: v.number(),
-    // Vector embedding for semantic search (768 dimensions for text-embedding-004)
+    // Vector embedding for semantic search (768 dimensions for gemini-embedding-001)
     embedding: v.optional(v.array(v.float64())),
     // Linked source documents for citations
     linkedDocumentIds: v.optional(v.array(v.id("files"))),
@@ -105,7 +105,7 @@ export default defineSchema({
     .index("by_parentNoteId", ["parentNoteId"])
     .vectorIndex("by_embedding", {
       vectorField: "embedding",
-      dimensions: 768, // text-embedding-004 uses 768 dimensions
+      dimensions: 768, // gemini-embedding-001 with outputDimensionality 768
       filterFields: ["userId"],
     })
     .searchIndex("search_title", {
@@ -257,7 +257,7 @@ export default defineSchema({
     embedding: v.array(v.float64()),
   }).vectorIndex("by_embedding", {
     vectorField: "embedding",
-    dimensions: 768, // Match your Gemini embedding size
+    dimensions: 768, // gemini-embedding-001 @ 768
     filterFields: ["storageId", "courseId"], // <--- CRITICAL ADDITION
   }),
 

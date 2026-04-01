@@ -6,12 +6,20 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Code2, ChevronDown, ChevronUp, Copy, Trash2, Tag } from "lucide-react";
 import { toast } from "sonner";
-import type { CodeBlock } from "@/types/streaming";
+import {
+  CODE_LANGUAGES,
+  CODE_LANGUAGE_LABELS,
+  type CodeBlock,
+  type CodeLanguage,
+} from "@/types/streaming";
+import { HighlightedCodeBlock } from "./HighlightedCodeBlock";
 
 interface CodeBlockPanelProps {
   codeBlocks: CodeBlock[];
   onRemove: (id: string) => void;
   onClear: () => void;
+  /** Update language for highlighting and AI context */
+  onLanguageChange: (id: string, language: CodeLanguage) => void;
 }
 
 const PREVIEW_LEN = 120;
@@ -20,6 +28,7 @@ export function CodeBlockPanel({
   codeBlocks,
   onRemove,
   onClear,
+  onLanguageChange,
 }: CodeBlockPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [expandedBlockIds, setExpandedBlockIds] = useState<Set<string>>(
@@ -108,11 +117,29 @@ export function CodeBlockPanel({
                     className="rounded-md bg-[#0d1117] border border-white/10 overflow-hidden"
                   >
                     {/* Block header */}
-                    <div className="flex items-center justify-between px-2 py-1.5 border-b border-white/10">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded shrink-0">
-                          {block.language}
-                        </span>
+                    <div className="flex items-center justify-between gap-2 px-2 py-1.5 border-b border-white/10">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <label className="sr-only" htmlFor={`code-lang-${block.id}`}>
+                          Language
+                        </label>
+                        <select
+                          id={`code-lang-${block.id}`}
+                          value={block.language}
+                          onChange={(e) =>
+                            onLanguageChange(
+                              block.id,
+                              e.target.value as CodeLanguage,
+                            )
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-7 max-w-[11rem] shrink-0 rounded border border-white/15 bg-black/60 py-0.5 pl-1.5 pr-6 text-[10px] font-medium text-emerald-300 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+                        >
+                          {CODE_LANGUAGES.map((lang) => (
+                            <option key={lang} value={lang}>
+                              {CODE_LANGUAGE_LABELS[lang]}
+                            </option>
+                          ))}
+                        </select>
                         {block.label && (
                           <span className="text-[10px] text-gray-500 flex items-center gap-0.5 truncate">
                             <Tag className="w-2.5 h-2.5 shrink-0" />
@@ -148,21 +175,26 @@ export function CodeBlockPanel({
                         </button>
                       </div>
                     </div>
-                    {/* Full code block body (Notion-like); collapsed shows a short preview */}
-                    <pre
-                      className={`p-3 text-[11px] text-gray-200 font-mono leading-relaxed overflow-x-auto whitespace-pre border-t border-white/5 ${
+                    {/* Full code block with Prism highlighting; collapsed clips height */}
+                    <div
+                      className={`border-t border-white/5 ${
                         expandedBlockIds.has(block.id)
                           ? "max-h-[min(360px,70vh)] overflow-y-auto"
-                          : "max-h-[72px] overflow-hidden"
+                          : ""
                       }`}
                     >
-                      <code className="block w-full min-w-0">
-                        {expandedBlockIds.has(block.id) ||
-                        block.content.length <= PREVIEW_LEN
-                          ? block.content
-                          : block.content.slice(0, PREVIEW_LEN) + "…"}
-                      </code>
-                    </pre>
+                      <HighlightedCodeBlock
+                        code={block.content}
+                        language={block.language}
+                        maxHeightPx={
+                          expandedBlockIds.has(block.id) ||
+                          block.content.length <= PREVIEW_LEN
+                            ? undefined
+                            : 72
+                        }
+                        showLineNumbers={expandedBlockIds.has(block.id)}
+                      />
+                    </div>
                   </motion.div>
                 ))}
               </div>

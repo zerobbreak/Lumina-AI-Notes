@@ -11,6 +11,7 @@ interface CreateNoteInput {
   major?: string;
   courseId?: string;
   moduleId?: string;
+  parentNoteId?: Id<"notes">;
   noteType?: string;
   sourceRecordingId?: Id<"recordings">;
 }
@@ -31,6 +32,7 @@ export function useCreateNoteFlow(): {
         major: input.major || userData?.major || "general",
         courseId: input.courseId,
         moduleId: input.moduleId,
+        parentNoteId: input.parentNoteId,
         noteType: input.noteType,
         style: "standard",
         sourceRecordingId: input.sourceRecordingId,
@@ -40,6 +42,7 @@ export function useCreateNoteFlow(): {
         title: input.title,
         courseId: input.courseId,
         moduleId: input.moduleId,
+        parentNoteId: input.parentNoteId,
         style: "standard",
       });
       return { noteId, style: "standard" as const };

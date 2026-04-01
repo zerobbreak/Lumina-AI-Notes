@@ -4,7 +4,8 @@ import { action } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, TaskType } from "@google/generative-ai";
+import { embedTextForVectorSearch } from "./geminiEmbedding";
 import {
   TranscriptChunkInput,
   normalizeTranscriptForPrompt,
@@ -1106,9 +1107,6 @@ export const generateEmbedding = action({
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: "text-embedding-004",
-    });
 
     // Strip HTML tags and limit text length
     const plainText = args.text
@@ -1122,8 +1120,11 @@ export const generateEmbedding = action({
     }
 
     try {
-      const result = await model.embedContent(plainText);
-      return result.embedding.values;
+      return await embedTextForVectorSearch(
+        genAI,
+        plainText,
+        TaskType.RETRIEVAL_DOCUMENT,
+      );
     } catch (error) {
       console.error("generateEmbedding error:", error);
       return null;
@@ -1153,13 +1154,15 @@ export const semanticSearch = action({
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const embeddingModel = genAI.getGenerativeModel({
-      model: "text-embedding-004",
-    });
 
-    // Generate query embedding
-    const queryResult = await embeddingModel.embedContent(args.query);
-    const queryEmbedding = queryResult.embedding.values;
+    const queryEmbedding = await embedTextForVectorSearch(
+      genAI,
+      args.query,
+      TaskType.RETRIEVAL_QUERY,
+    );
+    if (!queryEmbedding) {
+      return { answer: "", sources: [] };
+    }
 
     // Search using vector index
     const limit = args.limit || 5;
@@ -2146,16 +2149,16 @@ Return ONLY valid JSON, no markdown code fences or explanation.`,
         throw new Error("No text could be extracted from PDF");
       }
 
-      // Generate embedding using existing genAI instance
-      const embeddingModel = genAI.getGenerativeModel({
-        model: "text-embedding-004",
-      });
-
       // Combine summary and beginning of text for embedding
       const textForEmbedding = `${summary}\n\n${extractedText.substring(0, 5000)}`;
-      const embeddingResult =
-        await embeddingModel.embedContent(textForEmbedding);
-      const embedding = embeddingResult.embedding.values;
+      const embedding = await embedTextForVectorSearch(
+        genAI,
+        textForEmbedding,
+        TaskType.RETRIEVAL_DOCUMENT,
+      );
+      if (!embedding) {
+        throw new Error("Failed to generate document embedding");
+      }
 
       await ctx.runMutation(internal.files.updateProcessingStatus, {
         fileId: args.fileId,
@@ -2228,13 +2231,19 @@ export const unifiedSemanticSearch = action({
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const embeddingModel = genAI.getGenerativeModel({
-      model: "text-embedding-004",
-    });
 
-    // Generate query embedding
-    const queryResult = await embeddingModel.embedContent(args.query);
-    const queryEmbedding = queryResult.embedding.values;
+    const queryEmbedding = await embedTextForVectorSearch(
+      genAI,
+      args.query,
+      TaskType.RETRIEVAL_QUERY,
+    );
+    if (!queryEmbedding) {
+      return {
+        answer:
+          "I couldn't process your search query. Try rephrasing with more specific terms.",
+        sources: [],
+      };
+    }
 
     const limit = args.limit || 5;
 

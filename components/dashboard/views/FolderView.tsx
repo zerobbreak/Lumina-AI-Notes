@@ -182,34 +182,29 @@ export default function FolderView({
   const currentCourse = getCurrentCourse();
 
   return (
-    <div className="h-full flex flex-col relative bg-[#0A0A0A]">
-      {/* Header Banner */}
+    <div className="h-full flex flex-col relative bg-sidebar text-sidebar-foreground">
+      {/* Header — flat chrome to match left/right sidebars (bg-sidebar) */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6 }}
-        className="relative h-64 flex flex-col justify-end px-12 pb-10 border-b border-white/5 overflow-hidden"
+        className="relative h-64 flex flex-col justify-end px-12 pb-10 border-b border-sidebar-border overflow-hidden bg-sidebar"
       >
-        {/* Background Art */}
-        <div className="absolute inset-0 bg-linear-to-r from-indigo-900/30 via-purple-900/20 to-black/0 backdrop-blur-3xl" />
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay" />
-        <div className="absolute bottom-0 left-0 w-full h-48 bg-linear-to-t from-[#050505] to-transparent" />
-
         <div className="relative z-10">
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.4 }}
-            className="flex items-center gap-3 text-sm text-gray-400 mb-6"
+            className="flex items-center gap-3 text-sm text-muted-foreground mb-6"
           >
             <span
-              className="hover:text-cyan-400 cursor-pointer transition-colors"
+              className="hover:text-sidebar-primary cursor-pointer transition-colors"
               onClick={() => router.push("/dashboard")}
             >
               Smart Folders
             </span>
-            <ChevronRight className="w-4 h-4 text-gray-600" />
-            <span className="text-white font-medium bg-white/5 px-3 py-1 rounded-full border border-white/10 backdrop-blur-md">
+            <ChevronRight className="w-4 h-4 text-muted-foreground/60" />
+            <span className="font-medium text-sidebar-foreground bg-sidebar-accent px-3 py-1 rounded-full border border-sidebar-border">
               {getContextName()}
             </span>
           </motion.div>
@@ -220,11 +215,11 @@ export default function FolderView({
             className="flex items-center justify-between"
           >
             <div className="flex items-center gap-6">
-              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-md shadow-2xl">
+              <div className="w-16 h-16 rounded-2xl bg-sidebar-accent border border-sidebar-border flex items-center justify-center shadow-sm">
                 {contextType === "course" ? (
-                  <BookOpen className="w-8 h-8 text-cyan-400" />
+                  <BookOpen className="w-8 h-8 text-sidebar-primary" />
                 ) : (
-                  <Folder className="w-8 h-8 text-cyan-400" />
+                  <Folder className="w-8 h-8 text-sidebar-primary" />
                 )}
               </div>
               {contextType === "module" && currentModuleData ? (
@@ -237,11 +232,11 @@ export default function FolderView({
                       title: newTitle,
                     });
                   }}
-                  className="text-5xl font-bold text-white tracking-tight hover:bg-white/5 rounded px-2 -ml-2 transition-colors cursor-text"
+                  className="text-5xl font-bold text-sidebar-foreground tracking-tight hover:bg-sidebar-accent/50 rounded px-2 -ml-2 transition-colors cursor-text"
                   placeholder="Untitled Module"
                 />
               ) : (
-                <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight line-clamp-2 leading-tight max-w-4xl">
+                <h1 className="text-3xl md:text-4xl font-bold text-sidebar-foreground tracking-tight line-clamp-2 leading-tight max-w-4xl">
                   {getContextName()}
                 </h1>
               )}
@@ -250,20 +245,20 @@ export default function FolderView({
         </div>
       </motion.div>
 
-      <ScrollArea className="flex-1 bg-[#050505]">
+      <ScrollArea className="flex-1 bg-sidebar">
         <div className="max-w-[1600px] mx-auto py-12 px-12 space-y-12">
           {/* MODULES SECTION (Only for Course context) */}
           {contextType === "course" && currentCourse && (
             <section>
               <div className="flex items-center justify-between mb-6 px-1">
-                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                  <Folder className="w-4 h-4 text-purple-500" />
+                <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                  <Folder className="w-4 h-4 text-sidebar-primary" />
                   Modules ({currentCourse.modules?.length || 0})
                 </h2>
                 <Button
                   size="sm"
                   variant="outline"
-                  className="rounded-full bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:text-purple-400 hover:border-purple-500/30 transition-all duration-300"
+                  className="rounded-full bg-sidebar-accent border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent/80 hover:text-sidebar-foreground hover:border-sidebar-border transition-all duration-300"
                   onClick={handleAddModule}
                 >
                   <Plus className="w-3.5 h-3.5 mr-2" />
@@ -287,13 +282,13 @@ export default function FolderView({
                       )
                     }
                     whileHover={{ scale: 1.02 }}
-                    className="group relative flex items-center gap-4 p-4 rounded-2xl border border-white/5 bg-[#121212]/80 backdrop-blur-sm cursor-pointer transition-all duration-300 hover:border-purple-500/30 hover:shadow-[0_0_20px_rgba(168,85,247,0.15)] hover:bg-[#18181B]"
+                    className="group relative flex items-center gap-4 p-4 rounded-2xl border border-sidebar-border bg-sidebar-accent/60 backdrop-blur-sm cursor-pointer transition-all duration-300 hover:bg-sidebar-accent hover:border-sidebar-border"
                   >
-                    <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
-                      <Folder className="w-6 h-6 text-purple-400" />
+                    <div className="w-12 h-12 rounded-xl bg-sidebar-accent flex items-center justify-center group-hover:bg-sidebar-accent/80 transition-colors">
+                      <Folder className="w-6 h-6 text-sidebar-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white truncate group-hover:text-purple-200 transition-colors">
+                      <p className="text-sm font-semibold text-sidebar-foreground truncate group-hover:text-sidebar-foreground transition-colors">
                         {mod.title}
                       </p>
                     </div>
@@ -324,7 +319,7 @@ export default function FolderView({
                   currentCourse.modules.length === 0) && (
                   <div className="col-span-full">
                     <EmptyState
-                      icon={<Folder className="w-8 h-8 text-purple-400" />}
+                      icon={<Folder className="w-8 h-8 text-sidebar-primary" />}
                       title="No modules yet"
                       description="Create modules to organize your notes into topics or chapters"
                       action={{
@@ -338,20 +333,20 @@ export default function FolderView({
             </section>
           )}
 
-          {contextType === "course" && <Separator className="bg-white/5" />}
+          {contextType === "course" && <Separator className="bg-sidebar-border" />}
 
           {/* NOTES SECTION */}
           <section>
             <div className="flex items-center justify-between mb-6 px-1">
-              <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                <FileText className="w-4 h-4 text-cyan-500" />
+              <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                <FileText className="w-4 h-4 text-sidebar-primary" />
                 Notes
               </h2>
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
                   variant="outline"
-                  className="rounded-full bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:text-cyan-400 hover:border-cyan-500/30 transition-all duration-300"
+                  className="rounded-full bg-sidebar-accent border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent/80 hover:text-sidebar-foreground hover:border-sidebar-border transition-all duration-300"
                   onClick={handleCreateNoteInContext}
                 >
                   <Plus className="w-3.5 h-3.5 mr-2" />
@@ -372,12 +367,12 @@ export default function FolderView({
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleCreateNoteInContext}
-                className="rounded-xl border border-dashed border-white/10 hover:border-cyan-500/30 hover:bg-cyan-500/5 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-3 p-8 min-h-[180px]"
+                className="rounded-xl border border-dashed border-sidebar-border hover:border-sidebar-primary/40 hover:bg-sidebar-accent/40 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-3 p-8 min-h-[180px]"
               >
-                <div className="w-16 h-16 rounded-full bg-cyan-500/10 flex items-center justify-center">
-                  <Plus className="w-8 h-8 text-cyan-400" />
+                <div className="w-16 h-16 rounded-full bg-sidebar-accent flex items-center justify-center">
+                  <Plus className="w-8 h-8 text-sidebar-primary" />
                 </div>
-                <span className="text-sm font-medium text-cyan-400">
+                <span className="text-sm font-medium text-sidebar-primary">
                   Create New Note
                 </span>
               </motion.div>
@@ -398,12 +393,12 @@ export default function FolderView({
                       router.push(`/dashboard?noteId=${n._id}`);
                     }}
                     whileHover={{ scale: 1.02 }}
-                    className="group relative rounded-xl border border-white/10 bg-[#121212] hover:bg-[#18181B] hover:border-white/20 cursor-pointer transition-all duration-300 p-5"
+                    className="group relative rounded-xl border border-sidebar-border bg-sidebar-accent/70 hover:bg-sidebar-accent hover:border-sidebar-border cursor-pointer transition-all duration-300 p-5"
                   >
                     {/* Icon in top-left and menu in top-right */}
                     <div className="flex items-start justify-between mb-4">
-                      <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center">
-                        <FileText className="w-5 h-5 text-cyan-400" />
+                      <div className="w-10 h-10 rounded-lg bg-sidebar-accent flex items-center justify-center">
+                        <FileText className="w-5 h-5 text-sidebar-primary" />
                       </div>
 
                       <div
@@ -431,13 +426,13 @@ export default function FolderView({
                     </div>
 
                     {/* Title */}
-                    <h3 className="font-bold text-lg text-white mb-3 line-clamp-2 group-hover:text-cyan-200 transition-colors">
+                    <h3 className="font-bold text-lg text-sidebar-foreground mb-3 line-clamp-2 transition-colors">
                       {n.title}
                     </h3>
 
                     {/* Identifier badge */}
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-cyan-400 bg-cyan-950/40 px-2 py-1 rounded border border-cyan-500/20">
+                      <span className="text-xs font-mono text-sidebar-primary bg-sidebar-accent px-2 py-1 rounded border border-sidebar-border">
                         {n.style?.toUpperCase() || "NOTE"}
                       </span>
                       {n.isPinned && <Pin className="w-3 h-3 text-amber-400" />}
@@ -448,7 +443,7 @@ export default function FolderView({
               {(!contextNotes || contextNotes.length === 0) && (
                 <div className="col-span-full">
                   <EmptyState
-                    icon={<FileText className="w-8 h-8 text-cyan-400" />}
+                    icon={<FileText className="w-8 h-8 text-sidebar-primary" />}
                     title="No notes yet"
                     description="Create your first note to start organizing your thoughts and ideas"
                     action={{
@@ -461,12 +456,12 @@ export default function FolderView({
             </motion.div>
           </section>
 
-          <Separator className="bg-white/5" />
+          <Separator className="bg-sidebar-border" />
 
           {/* FILES SECTION */}
           <section>
-            <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2 mb-6 px-1">
-              <File className="w-4 h-4 text-indigo-500" />
+            <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2 mb-6 px-1">
+              <File className="w-4 h-4 text-sidebar-primary" />
               Files & Resources
             </h2>
 
@@ -489,15 +484,15 @@ export default function FolderView({
                     href={f.url ?? undefined}
                     target="_blank"
                     rel="noreferrer"
-                    className="group flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-[#121212]/80 backdrop-blur-sm hover:bg-[#18181B] hover:border-indigo-500/30 hover:shadow-[0_0_20px_rgba(99,102,241,0.15)] transition-all duration-300"
+                    className="group flex items-center gap-4 p-4 rounded-xl border border-sidebar-border bg-sidebar-accent/60 backdrop-blur-sm hover:bg-sidebar-accent hover:border-sidebar-border transition-all duration-300"
                     title={f.errorMessage || undefined}
                   >
-                    <div className="w-12 h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
-                      <File className="w-6 h-6 text-indigo-400" />
+                    <div className="w-12 h-12 rounded-lg bg-sidebar-accent flex items-center justify-center group-hover:bg-sidebar-accent/80 transition-colors">
+                      <File className="w-6 h-6 text-sidebar-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold text-white truncate group-hover:text-indigo-200 transition-colors">
+                        <p className="text-sm font-bold text-sidebar-foreground truncate transition-colors">
                           {f.name}
                         </p>
                         <DocumentStatusBadge
@@ -506,7 +501,7 @@ export default function FolderView({
                           queuePosition={f.queuePosition}
                         />
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         {f.processingStatus === "done"
                           ? "Drag to generate notes"
                           : new Date(f.createdAt).toLocaleDateString()}
@@ -519,9 +514,9 @@ export default function FolderView({
                       {(f.processingStatus === "processing" ||
                         f.processingStatus === "pending") &&
                         typeof f.progressPercent === "number" && (
-                          <div className="mt-2 h-1 bg-white/10 rounded-full overflow-hidden">
+                          <div className="mt-2 h-1 bg-sidebar-border rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-linear-to-r from-indigo-500 to-cyan-500"
+                              className="h-full bg-sidebar-primary"
                               style={{
                                 width: `${Math.min(100, Math.max(0, f.progressPercent))}%`,
                               }}
@@ -557,7 +552,7 @@ export default function FolderView({
 
               {(!contextFiles || contextFiles.length === 0) && (
                 <EmptyState
-                  icon={<File className="w-8 h-8 text-indigo-400" />}
+                  icon={<File className="w-8 h-8 text-sidebar-primary" />}
                   title="No files yet"
                   description="Upload files to enhance your notes with additional resources"
                   className="py-8"

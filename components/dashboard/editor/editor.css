@@ -226,16 +226,22 @@
   width: 30%;
 }
 
-/* Notion-like fenced code: full-width block; inner <code> is not an inline pill */
+/*
+ * Code blocks: match note surface (theme --background / --border) so they feel part of the page.
+ * Lowlight (highlight.js) adds .hljs-* spans — colors below.
+ */
+.ProseMirror pre.lumina-code-block,
 .ProseMirror pre {
-  background-color: #0d1117;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 0.5rem;
-  padding: 0.875rem 1rem;
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.625rem;
+  box-shadow: 0 1px 2px hsl(var(--foreground) / 0.04);
+  padding: 1.15rem 1.25rem;
   margin-bottom: 1em;
+  margin-top: 0.25em;
   overflow-x: auto;
   font-size: 0.8125rem;
-  line-height: 1.55;
+  line-height: 1.6;
   color: #e5e7eb;
 }
 
@@ -246,7 +252,7 @@
   margin: 0;
   background: transparent;
   border-radius: 0;
-  color: inherit;
+  color: #e5e7eb;
   font-family:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
     monospace;
@@ -254,6 +260,61 @@
   line-height: inherit;
   white-space: pre;
   overflow-x: auto;
+}
+
+/* highlight.js / lowlight — cyan keywords, grey comments, readable defaults */
+.ProseMirror .hljs-keyword,
+.ProseMirror .hljs-selector-tag,
+.ProseMirror .hljs-meta .hljs-keyword {
+  color: #7dd3fc;
+}
+
+.ProseMirror .hljs-built_in,
+.ProseMirror .hljs-section,
+.ProseMirror .hljs-selector-class {
+  color: #5eead4;
+}
+
+.ProseMirror .hljs-string,
+.ProseMirror .hljs-attr,
+.ProseMirror .hljs-template-tag {
+  color: #86efac;
+}
+
+.ProseMirror .hljs-comment {
+  color: #6b7280;
+  font-style: italic;
+}
+
+.ProseMirror .hljs-title,
+.ProseMirror .hljs-name {
+  color: #93c5fd;
+}
+
+.ProseMirror .hljs-number,
+.ProseMirror .hljs-literal {
+  color: #fcd34d;
+}
+
+.ProseMirror .hljs-function .hljs-keyword,
+.ProseMirror .hljs-subst {
+  color: #d1d5db;
+}
+
+.ProseMirror .hljs-variable,
+.ProseMirror .hljs-template-variable,
+.ProseMirror .hljs-params {
+  color: #e5e7eb;
+}
+
+.ProseMirror .hljs-regexp,
+.ProseMirror .hljs-link {
+  color: #fbb6ce;
+}
+
+.ProseMirror .hljs-doctag,
+.ProseMirror .hljs-strong {
+  font-weight: 600;
 }
 
 /* Inline code (backticks) — distinct from fenced blocks */

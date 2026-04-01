@@ -25,6 +25,7 @@ import {
   BarChart3,
   Sigma,
   Pin,
+  Plus,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -34,6 +35,8 @@ import {
 } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
+import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
+import { editorLowlight } from "@/lib/editorLowlight";
 import { DiagramExtension } from "./extensions/DiagramExtension";
 import Editor from "./Editor";
 import { Button } from "@/components/ui/button";
@@ -46,6 +49,7 @@ import { AskAI } from "@/components/dashboard/ai/AskAI";
 import { useDashboard } from "@/hooks/useDashboard";
 import { usePDF } from "@/hooks/usePDF";
 import { AIBubbleMenu } from "./AIBubbleMenu";
+import { CodeBlockLanguageBubbleMenu } from "./CodeBlockLanguageBubbleMenu";
 import { DocumentDropZone } from "@/components/documents";
 import { marked } from "marked";
 import {
@@ -66,6 +70,7 @@ import { SlashCommandLayer } from "./SlashCommandLayer";
 import { PresenceIndicator } from "@/components/dashboard/PresenceIndicator";
 import { CollaboratorsDialog } from "@/components/dashboard/dialogs/CollaboratorsDialog";
 import { TagPicker } from "@/components/dashboard/tags/TagPicker";
+import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
 
 import { toast } from "sonner";
 import "./editor.css";
@@ -87,8 +92,9 @@ function buildBootstrapDoc(
     style: b.style ?? "standard",
     courseId: b.courseId,
     moduleId: b.moduleId,
+    parentNoteId: b.parentNoteId,
     createdAt: Date.now(),
-    noteType: "quick",
+    noteType: b.parentNoteId || b.courseId || b.moduleId ? "page" : "quick",
   } as Doc<"notes">;
 }
 
@@ -102,6 +108,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const router = useRouter();
   const {
     pendingNotes,
+    pendingNotesTargetNoteId,
     clearPendingNotes,
     noteBootstrap,
     setNoteBootstrap,
@@ -110,7 +117,13 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
   // Fetch data
   const noteQuery = useQuery(api.notes.getNote, { noteId });
+  const parentNote = useQuery(
+    api.notes.getNote,
+    noteQuery?.parentNoteId ? { noteId: noteQuery.parentNoteId } : "skip",
+  );
+  const childNotes = useQuery(api.notes.getChildNotes, { parentNoteId: noteId });
   const userData = useQuery(api.users.getUser);
+  const { createNoteFlow } = useCreateNoteFlow();
   const updateNote = useMutation(api.notes.updateNote);
   const deleteNote = useMutation(api.notes.deleteNote);
   const toggleArchiveNote = useMutation(api.notes.toggleArchiveNote);
@@ -148,6 +161,19 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     if (noteQuery !== undefined) return noteQuery;
     return syntheticNote ?? undefined;
   }, [noteQuery, syntheticNote]);
+
+  // Deleted note or lost access: leave editor (presence leave would fail without server fix too).
+  useEffect(() => {
+    if (userData === undefined || userData === null) return;
+    if (noteQuery === undefined) return;
+    if (noteQuery !== null) return;
+    if (syntheticNote) return;
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      onBack();
+    }
+  }, [userData, noteQuery, syntheticNote, router, onBack]);
 
   // Parse context (Course / Module)
   const courseName = useMemo(() => {
@@ -279,7 +305,14 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     editable: true,
     immediatelyRender: false,
     extensions: [
-      StarterKit,
+      StarterKit.configure({ codeBlock: false }),
+      CodeBlockLowlight.configure({
+        lowlight: editorLowlight,
+        defaultLanguage: "javascript",
+        HTMLAttributes: {
+          class: "lumina-code-block",
+        },
+      }),
       Placeholder.configure({
         placeholder: "Start writing your notes...",
       }),
@@ -410,6 +443,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   // Wait for note to be loaded (loadedNoteId === noteId) to avoid conflicts
   useEffect(() => {
     if (!pendingNotes) return;
+    if (pendingNotesTargetNoteId !== noteId) return;
     // Wait for the note content to be loaded first (important for new notes)
     if (loadedNoteId !== noteIdRef.current) return;
 
@@ -525,6 +559,8 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     };
   }, [
     pendingNotes,
+    pendingNotesTargetNoteId,
+    noteId,
     editor,
     clearPendingNotes,
     loadedNoteId,
@@ -541,12 +577,14 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     // Store context before deletion for smart navigation
     const courseId = displayNote?.courseId;
     const moduleId = displayNote?.moduleId;
+    const parentId = displayNote?.parentNoteId;
 
     try {
       await deleteNote({ noteId });
 
-      // Navigate based on original context
-      if (moduleId) {
+      if (parentId) {
+        router.push(`/dashboard?noteId=${parentId}`);
+      } else if (moduleId) {
         router.push(`/dashboard?contextId=${moduleId}&contextType=module`);
       } else if (courseId) {
         router.push(`/dashboard?contextId=${courseId}&contextType=course`);
@@ -566,6 +604,33 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const handleRenameConfirm = async (newTitle: string) => {
     await renameNote({ noteId, title: newTitle });
   };
+
+  const handleCreateSubPage = useCallback(async () => {
+    if (!displayNote) return;
+    try {
+      const result = await createNoteFlow({
+        title: "Untitled Note",
+        major: userData?.major || "general",
+        parentNoteId: noteId,
+        courseId: displayNote.courseId,
+        moduleId: displayNote.moduleId,
+        noteType: "page",
+      });
+      if (result?.noteId) {
+        router.push(`/dashboard?noteId=${result.noteId}`);
+        toast.success("Sub-page created");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to create sub-page");
+    }
+  }, [
+    createNoteFlow,
+    userData?.major,
+    noteId,
+    displayNote,
+    router,
+  ]);
 
   const handleExportPDF = () => {
     setIsExportOpen(true);
@@ -716,6 +781,22 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             >
               {courseName}
             </span>
+            {parentNote && (
+              <>
+                <ChevronRight className="w-4 h-4 text-zinc-700 shrink-0" />
+                <span
+                  onClick={() =>
+                    router.push(`/dashboard?noteId=${parentNote._id}`)
+                  }
+                  className="hover:text-foreground cursor-pointer transition-colors truncate max-w-[min(40vw,200px)]"
+                  title={parentNote.title}
+                >
+                  {parentNote.title.length > 24
+                    ? `${parentNote.title.slice(0, 24)}…`
+                    : parentNote.title}
+                </span>
+              </>
+            )}
             <ChevronRight className="w-4 h-4 text-zinc-700" />
             <span className="text-foreground">
               {note.title.length > 20
@@ -853,6 +934,41 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
               </div>
             </div>
 
+            <div className="mt-4 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Sub-pages
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={handleCreateSubPage}
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  New sub-page
+                </Button>
+              </div>
+              {childNotes && childNotes.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {childNotes.map((c) => (
+                    <li key={c._id}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push(`/dashboard?noteId=${c._id}`)
+                        }
+                        className="text-left text-sm text-primary hover:underline w-full truncate"
+                      >
+                        {c.title || "Untitled"}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
             {/* Metadata */}
             <div className="flex flex-wrap items-center gap-x-6 gap-y-1 mt-3 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
@@ -905,6 +1021,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                 />
               ) : (
                 <>
+                  {editor && <CodeBlockLanguageBubbleMenu editor={editor} />}
                   {editor && <AIBubbleMenu editor={editor} />}
                   <div className="relative" data-slash-ui={slashUiTick}>
                     {editor && <SlashCommandLayer editor={editor} />}

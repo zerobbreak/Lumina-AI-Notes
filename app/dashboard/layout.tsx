@@ -8,7 +8,7 @@ import { DocumentProcessingIndicator } from "@/components/documents";
 import { DragOverlayWrapper } from "@/components/dashboard/DragOverlayWrapper";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { Sparkles } from "lucide-react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useSearchParams } from "next/navigation";
 import { QuickCaptureFab } from "@/components/dashboard/quick-capture/QuickCaptureFab";
@@ -37,6 +37,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const acceptPendingInvites = useMutation(
     api.collaboration.acceptPendingInvites,
   );
+  const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
   const userData = useQuery(api.users.getUser);
   const searchParams = useSearchParams();
   const hideQuickCapture = Boolean(searchParams.get("noteId"));
@@ -44,10 +45,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [isLeftHovered, setIsLeftHovered] = useState(false);
   const [isRightHovered, setIsRightHovered] = useState(false);
 
-  // Accept any pending email invites for the signed-in user.
+  // Accept any pending email invites for the signed-in user (after Convex auth is ready).
   useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
     acceptPendingInvites().catch(() => {});
-  }, [acceptPendingInvites]);
+  }, [acceptPendingInvites, authLoading, isAuthenticated]);
 
   // Global keyboard shortcuts
   useKeyboardShortcut(

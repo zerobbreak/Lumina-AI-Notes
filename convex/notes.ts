@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query, action } from "./_generated/server";
 import { api } from "./_generated/api";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, TaskType } from "@google/generative-ai";
+import { embedTextForVectorSearch } from "./geminiEmbedding";
 import {
   normalizeTranscriptForPrompt,
   ENRICHMENT_WORD_THRESHOLD,
@@ -136,17 +137,39 @@ export const createNote = mutation({
       throw new Error("Called createNote without authentication present");
     }
 
-    // Determine noteType: if courseId or moduleId is provided, it's a "page", otherwise "quick"
+    let courseId = args.courseId;
+    let moduleId = args.moduleId;
+
+    if (args.parentNoteId) {
+      const parent = await ctx.db.get(args.parentNoteId);
+      if (!parent) throw new Error("Parent note not found");
+      const parentRole = await getNoteRole(
+        ctx,
+        args.parentNoteId,
+        identity.tokenIdentifier,
+      );
+      if (
+        !parentRole ||
+        (parentRole !== "owner" && parentRole !== "editor")
+      ) {
+        throw new Error("Forbidden");
+      }
+      if (courseId === undefined) courseId = parent.courseId;
+      if (moduleId === undefined) moduleId = parent.moduleId;
+    }
+
+    // Page: folder context, nested page under a parent, or explicit noteType
     const noteType =
-      args.noteType || (args.courseId || args.moduleId ? "page" : "quick");
+      args.noteType ||
+      (courseId || moduleId || args.parentNoteId ? "page" : "quick");
 
     const noteId = await ctx.db.insert("notes", {
       userId: identity.tokenIdentifier,
       title: args.title,
       noteType,
       major: args.major,
-      courseId: args.courseId,
-      moduleId: args.moduleId,
+      courseId,
+      moduleId,
       parentNoteId: args.parentNoteId,
       style: args.style || "standard",
       content: args.content ?? "",
@@ -226,6 +249,7 @@ export const getQuickNotes = query({
       .filter((q) =>
         q.and(
           q.neq(q.field("isArchived"), true),
+          q.eq(q.field("parentNoteId"), undefined),
           // Quick notes: noteType is "quick" OR (noteType is undefined AND no courseId/moduleId)
           q.or(
             q.eq(q.field("noteType"), "quick"),
@@ -254,10 +278,11 @@ export const getQuickNotes = query({
       if (!n) continue;
       if (n.isArchived) continue;
       const isQuick =
-        n.noteType === "quick" ||
-        (n.noteType === undefined &&
-          n.courseId === undefined &&
-          n.moduleId === undefined);
+        !n.parentNoteId &&
+        (n.noteType === "quick" ||
+          (n.noteType === undefined &&
+            n.courseId === undefined &&
+            n.moduleId === undefined));
       if (isQuick) sharedNotes.push(n);
     }
 
@@ -344,7 +369,7 @@ export const getNotesByContext = query({
       const accessible = [];
       for (const n of notes) {
         const role = await getNoteRole(ctx, n._id, identity.tokenIdentifier);
-        if (role) accessible.push(n);
+        if (role && !n.parentNoteId) accessible.push(n);
       }
       return accessible;
     }
@@ -357,12 +382,43 @@ export const getNotesByContext = query({
       const accessible = [];
       for (const n of notes) {
         const role = await getNoteRole(ctx, n._id, identity.tokenIdentifier);
-        if (role) accessible.push(n);
+        if (role && !n.parentNoteId) accessible.push(n);
       }
       return accessible;
     }
 
     return [];
+  },
+});
+
+/** Direct child pages of a note (nested notes). */
+export const getChildNotes = query({
+  args: { parentNoteId: v.id("notes") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const parentRole = await getNoteRole(
+      ctx,
+      args.parentNoteId,
+      identity.tokenIdentifier,
+    );
+    if (!parentRole) return [];
+
+    const children = await ctx.db
+      .query("notes")
+      .withIndex("by_parentNoteId", (q) =>
+        q.eq("parentNoteId", args.parentNoteId),
+      )
+      .collect();
+
+    const accessible: typeof children = [];
+    for (const n of children) {
+      const role = await getNoteRole(ctx, n._id, identity.tokenIdentifier);
+      if (role) accessible.push(n);
+    }
+
+    return accessible.sort((a, b) => b.createdAt - a.createdAt);
   },
 });
 
@@ -598,9 +654,6 @@ export const generateFromPinnedAudio = action({
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    const embeddingModel = genAI.getGenerativeModel({
-      model: "text-embedding-004",
-    });
 
     const normalizedTranscript = normalizeTranscriptForPrompt(args.transcript);
     const referenceUrlsBlock = await fetchReferenceUrlsForPrompt(
@@ -674,24 +727,28 @@ STRICT quality requirements:
       return tryParseJson(fixedRepairText);
     };
 
-    // 1. Embed the transcript
-    const embeddingResult =
-      await embeddingModel.embedContent(normalizedTranscript);
-    const transcriptEmbedding = embeddingResult.embedding.values;
+    // 1. Embed the transcript (query-style retrieval against indexed documents)
+    const transcriptEmbedding = await embedTextForVectorSearch(
+      genAI,
+      normalizedTranscript,
+      TaskType.RETRIEVAL_QUERY,
+    );
 
     // 2. Search the pinned file (or all documents if no pin)
     let relevantDocs: Array<{ _id: any; _score: number }> = [];
-    if (args.pinnedFileId) {
-      relevantDocs = await ctx.vectorSearch("documents", "by_embedding", {
-        vector: transcriptEmbedding,
-        filter: (q: any) => q.eq("storageId", args.pinnedFileId),
-        limit: 5,
-      });
-    } else {
-      relevantDocs = await ctx.vectorSearch("documents", "by_embedding", {
-        vector: transcriptEmbedding,
-        limit: 5,
-      });
+    if (transcriptEmbedding) {
+      if (args.pinnedFileId) {
+        relevantDocs = await ctx.vectorSearch("documents", "by_embedding", {
+          vector: transcriptEmbedding,
+          filter: (q: any) => q.eq("storageId", args.pinnedFileId),
+          limit: 5,
+        });
+      } else {
+        relevantDocs = await ctx.vectorSearch("documents", "by_embedding", {
+          vector: transcriptEmbedding,
+          limit: 5,
+        });
+      }
     }
 
     // 3. Fetch the actual document texts
@@ -947,6 +1004,7 @@ export const moveNoteToFolder = mutation({
       noteType: "page",
       courseId: args.courseId,
       moduleId: args.moduleId,
+      parentNoteId: undefined,
     });
 
     return args.noteId;
@@ -969,6 +1027,7 @@ export const unassignNoteFromFolder = mutation({
       noteType: "quick",
       courseId: undefined,
       moduleId: undefined,
+      parentNoteId: undefined,
     });
 
     return args.noteId;

@@ -124,7 +124,8 @@ function SidebarCourseComponent({
   }, [onDelete, course.id]);
 
   const rootCourseNotes = useMemo(
-    () => courseNotes?.filter((note) => !note.moduleId),
+    () =>
+      courseNotes?.filter((note) => !note.moduleId && !note.parentNoteId),
     [courseNotes],
   );
 

@@ -789,7 +789,7 @@ export function RightSidebar() {
           ...(selectedSession ? { sourceRecordingId: selectedSession } : {}),
         });
         if (!result?.noteId) return;
-        setPendingNotes(wrappedNotes);
+        setPendingNotes(wrappedNotes, result.noteId);
         streamingNotes.reset();
         router.push(`/dashboard?noteId=${result.noteId}`);
         toast.success("Created new note with generated content");
@@ -804,7 +804,7 @@ export function RightSidebar() {
           sourceRecordingId: selectedSession,
         }).catch(() => {});
       }
-      setPendingNotes(wrappedNotes);
+      setPendingNotes(wrappedNotes, currentNoteId as Id<"notes">);
       streamingNotes.reset();
       toast.success("Content ready to insert");
     }
@@ -829,7 +829,7 @@ export function RightSidebar() {
         if (!result?.noteId) return;
 
         // Set pending notes and navigate to the new note
-        setPendingNotes(generatedNotes);
+        setPendingNotes(generatedNotes, result.noteId);
         setGeneratedNotes(null);
         router.push(`/dashboard?noteId=${result.noteId}`);
         toast.success("Created new note with generated content");
@@ -845,7 +845,7 @@ export function RightSidebar() {
           sourceRecordingId: selectedSession,
         }).catch(() => {});
       }
-      setPendingNotes(generatedNotes);
+      setPendingNotes(generatedNotes, currentNoteId as Id<"notes">);
       setGeneratedNotes(null);
       toast.success("Content ready to insert");
     }
@@ -884,6 +884,15 @@ export function RightSidebar() {
   const handleClearCodeBlocks = useCallback(() => {
     setCodeBlocks([]);
   }, []);
+
+  const handleCodeBlockLanguageChange = useCallback(
+    (id: string, language: CodeLanguage) => {
+      setCodeBlocks((prev) =>
+        prev.map((b) => (b.id === id ? { ...b, language } : b)),
+      );
+    },
+    [],
+  );
 
   // Timer Ref
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -1582,6 +1591,7 @@ export function RightSidebar() {
                       codeBlocks={codeBlocks}
                       onRemove={handleRemoveCodeBlock}
                       onClear={handleClearCodeBlocks}
+                      onLanguageChange={handleCodeBlockLanguageChange}
                     />
                   )}
 
