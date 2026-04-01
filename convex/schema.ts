@@ -96,6 +96,7 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_userId_and_createdAt", ["userId", "createdAt"])
+    .index("by_userId_sourceRecordingId", ["userId", "sourceRecordingId"])
     .index("by_userId_and_pinned", ["userId", "isPinned"])
     .index("by_userId_and_archived", ["userId", "isArchived"])
     .index("by_userId_and_noteType", ["userId", "noteType"])

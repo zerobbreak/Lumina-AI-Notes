@@ -64,7 +64,10 @@ export function StreamingNotesDisplay({
                 prose-strong:text-white prose-em:text-gray-300
                 prose-li:text-gray-300 prose-p:text-gray-300
                 prose-code:text-emerald-400 prose-code:bg-emerald-900/30 prose-code:px-1 prose-code:rounded
-                prose-pre:bg-[#0d1117] prose-pre:border prose-pre:border-white/10
+                prose-pre:my-4 prose-pre:rounded-lg prose-pre:border prose-pre:border-white/10
+                prose-pre:bg-[#0d1117] prose-pre:p-4 prose-pre:overflow-x-auto
+                prose-pre:code:bg-transparent prose-pre:code:p-0 prose-pre:code:rounded-none
+                prose-pre:code:text-gray-200 prose-pre:code:font-normal prose-pre:code:shadow-none
                 prose-blockquote:border-cyan-500/50 prose-blockquote:text-gray-400"
               dangerouslySetInnerHTML={{ __html: htmlContent }}
             />

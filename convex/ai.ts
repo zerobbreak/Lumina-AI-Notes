@@ -18,6 +18,10 @@ import {
 } from "./shared/noteQuality";
 import { buildDiagramData } from "./shared/diagram";
 import { arrayBufferToBase64 } from "./encoding";
+import {
+  fetchReferenceUrlsForPrompt,
+  normalizeReferenceUrlList,
+} from "./shared/urlContent";
 
 // Types for subscription tier checking
 type SubscriptionTier = "free" | "scholar" | "institution";
@@ -65,6 +69,9 @@ const getGeminiModel = (config?: { responseMimeType: string }) => {
     generationConfig: config,
   });
 };
+
+/** Cap inline “previous notes” passed to Gemini (per request). */
+const MAX_PREVIOUS_NOTES_CHARS = 100_000;
 
 /**
  * Enrich a sparse or fragmented transcript by using AI to reconstruct
@@ -202,10 +209,16 @@ export const generateNotesStreamingText = action({
     transcript: v.string(),
     title: v.optional(v.string()),
     codeBlocks: v.optional(v.string()),
+    previousNotesContent: v.optional(v.string()),
+    /** Public http(s) pages to fetch and use as extra context (max 5). */
+    referenceUrls: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const model = getGeminiModel();
     const normalizedTranscript = normalizeTranscriptForPrompt(args.transcript);
+    const referenceUrlsBlock = await fetchReferenceUrlsForPrompt(
+      normalizeReferenceUrlList(args.referenceUrls),
+    );
 
     // Build enriched transcript with code blocks if provided
     let enrichedTranscript = normalizedTranscript;
@@ -240,12 +253,34 @@ export const generateNotesStreamingText = action({
       ? `\n6. **Code Examples** - Explain each extracted code block: what it does, key patterns used, and how it connects to the lecture concepts. Use proper markdown code fences.`
       : "";
 
+    const prevStream = args.previousNotesContent?.trim();
+    const revisionStream = prevStream
+      ? `
+
+REVISION MODE: The student already has notes from this session. Use the transcript as the source of truth. Improve the previous notes: add missing ideas from the transcript, correct errors, deepen thin sections, and reorganize if needed. Output a **full** polished markdown document (not a changelog).
+
+Previous notes:
+"""
+${prevStream.slice(0, MAX_PREVIOUS_NOTES_CHARS)}
+"""
+`
+      : "";
+
+    const linkContextStream = referenceUrlsBlock.trim()
+      ? `
+
+=== Reference web pages (supplementary — enrich definitions and examples; the transcript remains primary) ===
+${referenceUrlsBlock}
+`
+      : "";
+
     const prompt = `You are an expert academic note-taker. Convert the following lecture/recording transcript into well-structured, comprehensive study notes.${titleContext}
 
 Transcript:
 """
 ${enrichedTranscript}
 """
+${linkContextStream}${revisionStream}
 
 Create detailed study notes with the following sections:
 1. **Summary** - A concise overview (3-4 sentences capturing the key message)
@@ -258,8 +293,10 @@ Requirements:
 - Use clear markdown formatting with headers, bullet points, and bold/italic emphasis
 - Be thorough — expand on concepts, don't just list keywords
 - Include specific examples, numbers, and quotes from the transcript when available
+- When reference web pages are provided above, weave in accurate details from them where they align with the lecture; do not invent facts not supported by the transcript or references
 - Make notes self-contained: a student should understand the material from these notes alone
 - Use LaTeX notation ($$...$$) for any mathematical formulas mentioned
+- For any multi-line code, pseudocode, or file excerpts, use fenced markdown blocks (\`\`\`language ... \`\`\`) so they render as full code blocks, not inline backticks
 
 Format the output as clean, well-organized markdown suitable for studying.`;
 
@@ -527,10 +564,17 @@ export const generateStructuredNotes = action({
     transcript: v.string(), // JSON stringified array of {text, timestamp}
     title: v.optional(v.string()),
     style: v.optional(v.string()), // "outline" | "standard"
+    /** When set, revise and improve these notes using the transcript as source of truth */
+    previousNotesContent: v.optional(v.string()),
+    /** Public http(s) pages to fetch and use as extra context (max 5). */
+    referenceUrls: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const model = getGeminiModel({ responseMimeType: "application/json" });
     const normalizedTranscript = normalizeTranscriptForPrompt(args.transcript);
+    const referenceUrlsBlock = await fetchReferenceUrlsForPrompt(
+      normalizeReferenceUrlList(args.referenceUrls),
+    );
 
     const fixJson = async (text: string) => {
       const fixPrompt = `Fix the following JSON. Return ONLY valid JSON with the same structure and content, no markdown.
@@ -543,12 +587,16 @@ ${text}`;
 
     const maybeRepairQuality = async (draft: unknown) => {
       const draftText = JSON.stringify(draft);
+      const webRef =
+        referenceUrlsBlock.trim().length > 0
+          ? `\n\nSupplementary web pages (use for depth where relevant):\n${referenceUrlsBlock}\n`
+          : "";
       const repairPrompt = `You are a quality assurance specialist improving generated lecture notes. The current notes are too shallow and lack substantive content.
 
 Original transcript:
 """
 ${enrichedTranscript}
-"""
+"""${webRef}
 
 Current JSON (needs improvement):
 ${draftText}
@@ -578,6 +626,7 @@ STRICT quality requirements:
 - NEVER use generic filler phrases like "this is important", "key concept", "students should understand"
 - Every sentence must add NEW information — no repetition or padding
 - Use your expertise to add academic depth where the transcript was brief
+- When supplementary web pages are supplied, incorporate accurate details from them where they support the lecture; do not fabricate unsupported claims
 - Return ONLY valid JSON`;
 
       const repairedResult = await model.generateContent(repairPrompt);
@@ -596,6 +645,29 @@ STRICT quality requirements:
       args.title,
     );
 
+    const previousTrimmed = args.previousNotesContent?.trim();
+    const revisionBlock = previousTrimmed
+      ? `
+
+REVISION MODE — The student already has study notes from this same recording session. The transcript is the source of truth.
+
+Previous notes (starting point — keep accurate structure and phrasing where still correct; expand thin sections; fix contradictions; reorganize if it helps clarity):
+"""
+${previousTrimmed.slice(0, MAX_PREVIOUS_NOTES_CHARS)}
+"""
+
+Produce a **complete** replacement in the required JSON format. Do not mention "previous notes" or this instruction in the output — only polished final study material.
+`
+      : "";
+
+    const linkContextBlock = referenceUrlsBlock.trim()
+      ? `
+
+=== Reference web pages (supplementary — enrich definitions and examples; the transcript remains primary) ===
+${referenceUrlsBlock}
+`
+      : "";
+
     let prompt = `You are a world-class academic note-taker and subject matter expert with deep knowledge across all university-level disciplines. You have years of experience transforming lecture recordings into comprehensive, exam-ready study materials that students rely on as their PRIMARY study resource.
 
 Your goal: Create notes so thorough and detailed that a student who MISSED the lecture could study ONLY from your notes and still perform excellently on an exam.
@@ -604,7 +676,7 @@ Transcript:
 """
 ${enrichedTranscript}
 """
-
+${linkContextBlock}${revisionBlock}
 ${args.title ? `Lecture Title/Topic: "${args.title}"` : ""}
 
 CRITICAL CONTEXT: This transcript was captured via voice recording and may be fragmented or incomplete. You MUST use your subject matter expertise to:

@@ -13,6 +13,12 @@ import {
   noteLacksDepth,
 } from "./shared/noteQuality";
 import { buildDiagramData } from "./shared/diagram";
+import {
+  fetchReferenceUrlsForPrompt,
+  normalizeReferenceUrlList,
+} from "./shared/urlContent";
+
+const MAX_PREVIOUS_NOTES_CHARS = 100_000;
 
 type NoteRole = "owner" | "editor" | "viewer";
 
@@ -156,6 +162,52 @@ export const createNote = mutation({
     });
 
     return noteId;
+  },
+});
+
+/** Latest saved note content for a recording (for “improve existing notes” regeneration). */
+export const getPriorNoteContentForRecording = query({
+  args: { recordingId: v.id("recordings") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const recording = await ctx.db.get(args.recordingId);
+    if (!recording || recording.userId !== identity.tokenIdentifier) {
+      return null;
+    }
+
+    const matches = await ctx.db
+      .query("notes")
+      .withIndex("by_userId_sourceRecordingId", (q) =>
+        q
+          .eq("userId", identity.tokenIdentifier)
+          .eq("sourceRecordingId", args.recordingId),
+      )
+      .collect();
+
+    if (matches.length === 0) return null;
+
+    matches.sort((a, b) => b.createdAt - a.createdAt);
+
+    const MAX_CHARS = 120_000;
+    for (const note of matches) {
+      const chunks: string[] = [];
+      if (note.content?.trim()) chunks.push(note.content.trim());
+      if (note.outlineData?.trim()) {
+        chunks.push(`[Outline structure]\n${note.outlineData.trim()}`);
+      }
+      const raw = chunks.join("\n\n");
+      if (raw.length === 0) continue;
+
+      return {
+        noteTitle: note.title,
+        content: raw.slice(0, MAX_CHARS),
+        truncated: raw.length > MAX_CHARS,
+      };
+    }
+
+    return null;
   },
 });
 
@@ -533,7 +585,13 @@ export const getDocumentsByIds = query({
  * Uses vector search to find relevant chunks from the pinned document
  */
 export const generateFromPinnedAudio = action({
-  args: { transcript: v.string(), pinnedFileId: v.optional(v.string()) },
+  args: {
+    transcript: v.string(),
+    pinnedFileId: v.optional(v.string()),
+    previousNotesContent: v.optional(v.string()),
+    /** Public http(s) pages to fetch and use as extra context (max 5). */
+    referenceUrls: v.optional(v.array(v.string())),
+  },
   handler: async (ctx, args) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("GEMINI_API_KEY not set");
@@ -545,6 +603,9 @@ export const generateFromPinnedAudio = action({
     });
 
     const normalizedTranscript = normalizeTranscriptForPrompt(args.transcript);
+    const referenceUrlsBlock = await fetchReferenceUrlsForPrompt(
+      normalizeReferenceUrlList(args.referenceUrls),
+    );
 
     const fixJson = async (text: string) => {
       const fixPrompt = `Fix the following JSON. Return ONLY valid JSON with the same structure and content, no markdown.
@@ -571,6 +632,7 @@ Pinned document context (use for additional depth):
 """
 ${contextText}
 """
+${referenceUrlsBlock.trim() ? `\n\nSupplementary web pages:\n${referenceUrlsBlock}\n` : ""}
 
 Current JSON (needs improvement):
 ${draftText}
@@ -600,6 +662,7 @@ STRICT quality requirements:
 - NEVER use generic filler phrases
 - Every sentence must add NEW information
 - Cross-reference pinned document content where relevant
+- When supplementary web pages are supplied, use them for accurate extra detail; do not invent unsupported facts
 - Return ONLY valid JSON`;
 
       const repairedResult = await model.generateContent(repairPrompt);
@@ -653,14 +716,34 @@ STRICT quality requirements:
       ? `\n\nRelevant Context from Pinned Document:\n"""\n${contextText}\n"""\n\nIMPORTANT: Cross-reference the transcript with this pinned document. Use specific information, definitions, formulas, and examples from the document to enrich your notes. Cite document content when it adds depth to concepts mentioned in the lecture.`
       : "";
 
+    const prevPinned = args.previousNotesContent?.trim();
+    const revisionPinned = prevPinned
+      ? `
+
+REVISION MODE — The student already has notes from this session. The transcript and pinned document are the source of truth. Improve the previous notes: merge in missing transcript and document-backed detail, fix errors, deepen thin sections.
+
+Previous notes:
+"""
+${prevPinned.slice(0, MAX_PREVIOUS_NOTES_CHARS)}
+"""
+
+Output a **complete** replacement JSON in the required schema. Do not reference these instructions in the output.
+`
+      : "";
+
+    const webLinkSection = referenceUrlsBlock.trim()
+      ? `\n\n=== Reference web pages (supplementary — use with transcript and pinned document) ===\n${referenceUrlsBlock}\n`
+      : "";
+
     const prompt = `You are a world-class academic note-taker and subject matter expert. You create comprehensive, exam-ready study materials that students rely on as their PRIMARY study resource.
 
-Your goal: Create notes so thorough and detailed that a student who MISSED the lecture could study ONLY from your notes and still perform excellently on an exam.${contextSection}
+Your goal: Create notes so thorough and detailed that a student who MISSED the lecture could study ONLY from your notes and still perform excellently on an exam.${contextSection}${webLinkSection}
 
 Transcript:
 """
 ${enrichedTranscript}
 """
+${revisionPinned}
 
 CRITICAL CONTEXT: This transcript was captured via voice recording and may be fragmented or incomplete. You MUST:
 - Reconstruct incomplete explanations into full, coherent concepts

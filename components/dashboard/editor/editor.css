@@ -59,6 +59,19 @@
   background: rgba(255, 255, 255, 0.14);
 }
 
+/*
+ * While the editor is focused (typing / caret inside), block hover is still active
+ * because the mouse stays over the paragraph — that reads as a gray slab on the
+ * canvas. Clear hover chrome so the note area matches the page background.
+ */
+.ProseMirror:focus-within > *:hover {
+  background-color: transparent;
+}
+
+.ProseMirror:focus-within > *:hover::after {
+  opacity: 0;
+}
+
 /* While the slash menu is open: quieter block chrome so the palette reads clearly */
 [data-slash-menu-open="true"] .ProseMirror > *:hover {
   background-color: rgba(255, 255, 255, 0.02);
@@ -66,6 +79,14 @@
 
 [data-slash-menu-open="true"] .ProseMirror > *:hover::after {
   background: rgba(99, 102, 241, 0.35);
+}
+
+[data-slash-menu-open="true"] .ProseMirror:focus-within > *:hover {
+  background-color: transparent;
+}
+
+[data-slash-menu-open="true"] .ProseMirror:focus-within > *:hover::after {
+  opacity: 0;
 }
 
 /* Floating Menu Styling */
@@ -205,17 +226,42 @@
   width: 30%;
 }
 
+/* Notion-like fenced code: full-width block; inner <code> is not an inline pill */
 .ProseMirror pre {
-  background-color: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: #0d1117;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 0.5rem;
-  padding: 1rem;
+  padding: 0.875rem 1rem;
   margin-bottom: 1em;
+  overflow-x: auto;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: #e5e7eb;
+}
+
+.ProseMirror pre code {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border-radius: 0;
+  color: inherit;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+  font-size: inherit;
+  line-height: inherit;
+  white-space: pre;
   overflow-x: auto;
 }
 
-.ProseMirror code {
+/* Inline code (backticks) — distinct from fenced blocks */
+.ProseMirror :not(pre) code {
   color: #a5f3fc;
+  background-color: rgba(0, 0, 0, 0.35);
+  padding: 0.125em 0.4em;
+  border-radius: 0.25rem;
   font-family:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
     monospace;

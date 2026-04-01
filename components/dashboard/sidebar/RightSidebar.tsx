@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+  useId,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import SpeechRecognition, {
   useSpeechRecognition,
@@ -29,6 +36,7 @@ import {
   Zap,
   PanelRightClose,
   PanelRightOpen,
+  Link2,
 } from "lucide-react";
 import {
   Dialog,
@@ -40,6 +48,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useDashboard } from "@/hooks/useDashboard";
@@ -73,6 +82,8 @@ type RecordingDraft = {
 };
 
 const RECORDING_DRAFT_STORAGE_KEY = "lumina:right-sidebar:recording-draft:v1";
+
+const WAVEFORM_BARS = 16;
 
 // Sidebar modes for dynamic UI adaptation
 type SidebarMode =
@@ -135,12 +146,90 @@ export function RightSidebar() {
   const [showHistory, setShowHistory] = useState(true);
   const [selectedSession, setSelectedSession] =
     useState<Id<"recordings"> | null>(null);
+  const [improveFromPriorNotes, setImproveFromPriorNotes] = useState(true);
+  const improvePriorNotesId = useId();
   const [usedContextName, setUsedContextName] = useState<string | null>(null);
+  /** Public http(s) URLs — fetched server-side and passed into note generation */
+  const [referenceUrlInput, setReferenceUrlInput] = useState("");
+  const [referenceUrls, setReferenceUrls] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textbookInputRef = useRef<HTMLInputElement>(null);
   const showTranscriptPreview = false;
   const restoredDraftRef = useRef(false);
   const liveSessionIdRef = useRef<string>(crypto.randomUUID());
+
+  /** Real-time mic levels for the recording waveform (Web Speech API has no audio API). */
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const micAudioContextRef = useRef<AudioContext | null>(null);
+  const micAnalyserRef = useRef<AnalyserNode | null>(null);
+  const micRafRef = useRef<number | null>(null);
+  const [waveformLevels, setWaveformLevels] = useState<number[]>(() =>
+    Array(WAVEFORM_BARS).fill(0),
+  );
+
+  const stopMicMonitor = useCallback(() => {
+    if (micRafRef.current != null) {
+      cancelAnimationFrame(micRafRef.current);
+      micRafRef.current = null;
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((t) => t.stop());
+      micStreamRef.current = null;
+    }
+    if (micAudioContextRef.current) {
+      void micAudioContextRef.current.close();
+      micAudioContextRef.current = null;
+    }
+    micAnalyserRef.current = null;
+    setWaveformLevels(Array(WAVEFORM_BARS).fill(0));
+  }, []);
+
+  const startMicMonitor = useCallback(async () => {
+    stopMicMonitor();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStreamRef.current = stream;
+      const ctx = new AudioContext();
+      micAudioContextRef.current = ctx;
+      await ctx.resume();
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.72;
+      analyser.minDecibels = -85;
+      analyser.maxDecibels = -22;
+      source.connect(analyser);
+      micAnalyserRef.current = analyser;
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      let frameCount = 0;
+
+      const tick = () => {
+        const a = micAnalyserRef.current;
+        if (!a) return;
+        a.getByteFrequencyData(dataArray);
+        const step = Math.max(1, Math.floor(bufferLength / WAVEFORM_BARS));
+        const next: number[] = [];
+        for (let i = 0; i < WAVEFORM_BARS; i++) {
+          let sum = 0;
+          const start = i * step;
+          const end = Math.min(start + step, bufferLength);
+          for (let j = start; j < end; j++) sum += dataArray[j] ?? 0;
+          const denom = Math.max(1, end - start) * 255;
+          const avg = sum / denom;
+          next.push(Math.min(1, Math.pow(avg * 2.8, 0.62)));
+        }
+        frameCount += 1;
+        if (frameCount % 2 === 0) {
+          setWaveformLevels(next);
+        }
+        micRafRef.current = requestAnimationFrame(tick);
+      };
+      micRafRef.current = requestAnimationFrame(tick);
+    } catch (e) {
+      console.warn("[RightSidebar] Mic level monitor failed:", e);
+    }
+  }, [stopMicMonitor]);
 
   // Router and Search Params
   const router = useRouter();
@@ -224,6 +313,30 @@ export function RightSidebar() {
       : "skip",
   ); // New Phase 2 Action
 
+  const priorNoteForSession = useQuery(
+    api.notes.getPriorNoteContentForRecording,
+    selectedSession ? { recordingId: selectedSession } : "skip",
+  );
+
+  useEffect(() => {
+    setImproveFromPriorNotes(true);
+  }, [selectedSession]);
+
+  const previousNotesForGeneration = useMemo(() => {
+    if (
+      !selectedSession ||
+      !priorNoteForSession?.content ||
+      !improveFromPriorNotes
+    ) {
+      return undefined;
+    }
+    return priorNoteForSession.content;
+  }, [
+    selectedSession,
+    priorNoteForSession?.content,
+    improveFromPriorNotes,
+  ]);
+
   // Phase 4: Magnetic Drop Zone Logic
   // Note: useDropzone is primarily for file drops. For sidebar drag integration, we use native handlers.
   useDropzone({
@@ -287,8 +400,37 @@ export function RightSidebar() {
     return chunks;
   }, [sessionTranscript, transcript, elapsedTime, formatTime]);
 
+  const addReferenceUrlsFromInput = useCallback(() => {
+    const raw = referenceUrlInput.trim();
+    if (!raw) return;
+    const tokens = raw.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
+    setReferenceUrls((prev) => {
+      const next = [...prev];
+      for (const tok of tokens) {
+        if (next.length >= 5) {
+          toast.message("Up to 5 reference links", {
+            description: "Remove one to add another.",
+          });
+          break;
+        }
+        try {
+          const href = /^https?:\/\//i.test(tok) ? tok : `https://${tok}`;
+          const u = new URL(href);
+          if (u.protocol !== "http:" && u.protocol !== "https:") continue;
+          if (!next.includes(u.href)) next.push(u.href);
+        } catch {
+          toast.error("Invalid URL", { description: tok });
+        }
+      }
+      return next;
+    });
+    setReferenceUrlInput("");
+  }, [referenceUrlInput]);
+
   // Reset handler (moved up for hoisting)
   const handleReset = (showToast = false) => {
+    SpeechRecognition.stopListening();
+    stopMicMonitor();
     setIsRecording(false);
     setElapsedTime(0);
     resetTranscript();
@@ -297,6 +439,8 @@ export function RightSidebar() {
     setSelectedSession(null);
     setActiveContext(null);
     setUsedContextName(null);
+    setReferenceUrlInput("");
+    setReferenceUrls([]);
     liveSessionIdRef.current = crypto.randomUUID();
     clearRecordingDraft();
     if (showToast) {
@@ -436,6 +580,7 @@ export function RightSidebar() {
     // 2. Pause recording if active
     if (isRecording) {
       SpeechRecognition.stopListening();
+      stopMicMonitor();
       setIsRecording(false);
     }
 
@@ -477,6 +622,7 @@ export function RightSidebar() {
     // Stop recording if still active
     if (isRecording) {
       SpeechRecognition.stopListening();
+      stopMicMonitor();
       setIsRecording(false);
     }
 
@@ -538,6 +684,9 @@ export function RightSidebar() {
         const notes = await generateFromPinnedAudio({
           transcript: JSON.stringify(buildFinalChunks),
           pinnedFileId: activeContext.id,
+          previousNotesContent: previousNotesForGeneration,
+          referenceUrls:
+            referenceUrls.length > 0 ? referenceUrls : undefined,
         });
         setGeneratedNotes(notes);
         setUsedContextName(activeContext.name);
@@ -546,6 +695,9 @@ export function RightSidebar() {
         const notes = await generateStructuredNotes({
           transcript: JSON.stringify(buildFinalChunks),
           title: recordingTitle || "Recording",
+          previousNotesContent: previousNotesForGeneration,
+          referenceUrls:
+            referenceUrls.length > 0 ? referenceUrls : undefined,
         });
         setGeneratedNotes(notes);
         setUsedContextName(null);
@@ -576,6 +728,7 @@ export function RightSidebar() {
   const handleGenerateStreamingNotes = async () => {
     if (isRecording) {
       SpeechRecognition.stopListening();
+      stopMicMonitor();
       setIsRecording(false);
     }
 
@@ -608,6 +761,9 @@ export function RightSidebar() {
       transcript: JSON.stringify(buildFinalChunks),
       title: recordingTitle || undefined,
       codeBlocks: codeBlocks.length > 0 ? codeBlocks : undefined,
+      previousNotesContent: previousNotesForGeneration,
+      referenceUrls:
+        referenceUrls.length > 0 ? referenceUrls : undefined,
     });
   };
 
@@ -770,6 +926,12 @@ export function RightSidebar() {
     };
   }, [isRecording]);
 
+  useEffect(() => {
+    return () => {
+      stopMicMonitor();
+    };
+  }, [stopMicMonitor]);
+
   // Clear context if file no longer exists
   useEffect(() => {
     if (
@@ -793,8 +955,10 @@ export function RightSidebar() {
           continuous: true,
           language: "en-US",
         });
+        void startMicMonitor();
       } catch (error) {
         console.error("Failed to start speech recognition:", error);
+        stopMicMonitor();
         setIsRecording(false);
         alert(
           "Failed to start speech recognition. Please check microphone permissions.",
@@ -803,6 +967,7 @@ export function RightSidebar() {
     } else {
       // Pausing - save and analyze current transcript chunk
       SpeechRecognition.stopListening();
+      stopMicMonitor();
       const currentText = transcript.trim();
       if (currentText) {
         const timestamp = formatTime(elapsedTime);
@@ -1420,6 +1585,72 @@ export function RightSidebar() {
                     />
                   )}
 
+                  {/* Optional web URLs — fetched server-side and merged into the AI prompt */}
+                  <div className="w-full rounded-md border border-sidebar-border bg-background/70 px-2.5 py-2 space-y-2">
+                    <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
+                      <Link2 className="w-3 h-3 shrink-0" />
+                      Reference links
+                    </div>
+                    <p className="text-[10px] text-muted-foreground/90 leading-snug">
+                      Add public pages (syllabus, docs, articles). We fetch the
+                      text and use it alongside your transcript when generating
+                      notes. Up to 5 links.
+                    </p>
+                    <div className="flex gap-1.5">
+                      <Input
+                        value={referenceUrlInput}
+                        onChange={(e) => setReferenceUrlInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addReferenceUrlsFromInput();
+                          }
+                        }}
+                        placeholder="https://…"
+                        className="h-8 text-xs"
+                      />
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-8 shrink-0 px-2.5 text-xs"
+                        onClick={addReferenceUrlsFromInput}
+                        disabled={referenceUrls.length >= 5}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                    {referenceUrls.length > 0 ? (
+                      <ul className="flex flex-col gap-1 max-h-28 overflow-y-auto">
+                        {referenceUrls.map((u) => (
+                          <li
+                            key={u}
+                            className="flex items-start gap-1.5 rounded border border-border/50 bg-muted/20 px-1.5 py-1"
+                          >
+                            <span
+                              className="flex-1 min-w-0 text-[10px] text-muted-foreground break-all"
+                              title={u}
+                            >
+                              {u}
+                            </span>
+                            <button
+                              type="button"
+                              className="shrink-0 p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                              onClick={() =>
+                                setReferenceUrls((prev) =>
+                                  prev.filter((x) => x !== u),
+                                )
+                              }
+                              aria-label="Remove link"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+
                   {/* Extract Code Button — shown when text is selected */}
                   {selectedText && (
                     <Button
@@ -1510,6 +1741,37 @@ export function RightSidebar() {
                     </span>
                   </div>
 
+                  {priorNoteForSession &&
+                    selectedSession &&
+                    !generatedNotes && (
+                      <div className="w-full flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 px-2.5 py-2">
+                        <Checkbox
+                          id={improvePriorNotesId}
+                          checked={improveFromPriorNotes}
+                          onCheckedChange={(checked) =>
+                            setImproveFromPriorNotes(checked === true)
+                          }
+                          className="mt-0.5"
+                        />
+                        <Label
+                          htmlFor={improvePriorNotesId}
+                          className="text-[10px] leading-snug text-muted-foreground font-normal cursor-pointer"
+                        >
+                          Improve existing note &quot;
+                          {priorNoteForSession.noteTitle.length > 44
+                            ? `${priorNoteForSession.noteTitle.slice(0, 44)}…`
+                            : priorNoteForSession.noteTitle}
+                          &quot; using this transcript
+                          {priorNoteForSession.truncated ? (
+                            <span className="mt-1 block text-amber-700/90 dark:text-amber-400/90">
+                              Part of a very long note was trimmed for the AI
+                              context limit.
+                            </span>
+                          ) : null}
+                        </Label>
+                      </div>
+                    )}
+
                   {/* Generate Notes Button - Clean primary action */}
                   <Button
                     className="w-full h-10 font-medium"
@@ -1526,8 +1788,30 @@ export function RightSidebar() {
                   >
                     {isGeneratingNotes || streamingNotes.state.isStreaming ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Generating...
+                        <Loader2 className="w-4 h-4 mr-2 shrink-0 animate-spin" />
+                        <AnimatePresence mode="wait" initial={false}>
+                          <motion.span
+                            key={
+                              useStreamingMode &&
+                              streamingNotes.state.phase === "animating"
+                                ? "formatting"
+                                : "generating"
+                            }
+                            initial={{ opacity: 0, y: 4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            transition={{
+                              duration: 0.22,
+                              ease: [0.22, 1, 0.36, 1],
+                            }}
+                            className="inline-block"
+                          >
+                            {useStreamingMode &&
+                            streamingNotes.state.phase === "animating"
+                              ? "Formatting..."
+                              : "Generating..."}
+                          </motion.span>
+                        </AnimatePresence>
                       </>
                     ) : generatedNotes ? (
                       <>
@@ -1620,29 +1904,23 @@ export function RightSidebar() {
                     )}
                   </div>
 
-                  {/* Minimal Waveform Visualizer */}
-                  <div className="w-full h-10 flex items-center justify-center gap-0.5 my-1">
-                    {Array.from({ length: 16 }).map((_, i) => (
-                      <motion.div
+                  {/* Mic-level waveform (AnalyserNode); not random — reflects live input */}
+                  <div className="w-full h-10 flex items-end justify-center gap-0.5 my-1">
+                    {waveformLevels.map((level, i) => (
+                      <div
                         key={i}
-                        animate={
-                          isRecording
-                            ? {
-                                height: [4, 4 + Math.random() * 20, 4],
-                                opacity: [0.4, 0.8, 0.4],
-                              }
-                            : { height: 4, opacity: 0.2 }
-                        }
-                        transition={{
-                          duration: 0.5,
-                          repeat: Infinity,
-                          repeatType: "reverse",
-                          delay: i * 0.04,
-                        }}
                         className={cn(
-                          "w-1 rounded-full",
+                          "w-1 rounded-full transition-[height,opacity] duration-75 ease-out",
                           isRecording ? "bg-red-400" : "bg-muted-foreground/30",
                         )}
+                        style={{
+                          height: isRecording
+                            ? `${4 + level * 28}px`
+                            : 4,
+                          opacity: isRecording
+                            ? 0.35 + level * 0.6
+                            : 0.2,
+                        }}
                       />
                     ))}
                   </div>

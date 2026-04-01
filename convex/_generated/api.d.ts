@@ -28,6 +28,7 @@ import type * as shared_aiClient from "../shared/aiClient.js";
 import type * as shared_diagram from "../shared/diagram.js";
 import type * as shared_noteQuality from "../shared/noteQuality.js";
 import type * as shared_transcript from "../shared/transcript.js";
+import type * as shared_urlContent from "../shared/urlContent.js";
 import type * as tags from "../tags.js";
 import type * as users from "../users.js";
 
@@ -58,6 +59,7 @@ declare const fullApi: ApiFromModules<{
   "shared/diagram": typeof shared_diagram;
   "shared/noteQuality": typeof shared_noteQuality;
   "shared/transcript": typeof shared_transcript;
+  "shared/urlContent": typeof shared_urlContent;
   tags: typeof tags;
   users: typeof users;
 }>;

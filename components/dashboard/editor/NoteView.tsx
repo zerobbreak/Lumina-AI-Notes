@@ -349,6 +349,14 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     return content;
   };
 
+  /** Convert AI/transcript markdown to HTML for TipTap insertContent (same as DocumentDropZone). */
+  const markdownToHtml = useCallback(async (md: string): Promise<string> => {
+    const trimmed = md.trim();
+    if (!trimmed) return "";
+    const result = await marked.parse(trimmed);
+    return typeof result === "string" ? result : String(result);
+  }, []);
+
   // Sync content when note loads OR when noteId changes (switching between notes)
   useEffect(() => {
     const loadContent = async () => {
@@ -408,107 +416,120 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     // Build HTML content from structured notes with sections
     if (!editor || editor.isDestroyed) return;
 
-    let html = "";
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-    // Summary
-    if (pendingNotes.summary) {
-      html += `<h2>Summary</h2>`;
-      html += `<blockquote>${pendingNotes.summary}</blockquote>`;
-    }
+    const run = async () => {
+      let html = "";
 
-    // Sections (Notion-like format)
-    if (pendingNotes.sections && pendingNotes.sections.length > 0) {
-      pendingNotes.sections.forEach((section) => {
-        switch (section.type) {
-          case "heading":
-            const level = section.level || 2;
-            html += `<h${level}>${section.content}</h${level}>`;
-            break;
-          case "paragraph":
-            html += `<p>${section.content}</p>`;
-            break;
-          case "bullets":
-            html += `<ul>`;
-            section.content.split("\n").forEach((item) => {
-              const cleaned = item.replace(/^[•\u2022\-–]\s*/, "").trim();
-              if (cleaned) html += `<li>${cleaned}</li>`;
-            });
-            html += `</ul>`;
-            break;
-          case "numbered":
-            html += `<ol>`;
-            section.content.split("\n").forEach((item) => {
-              const cleaned = item.replace(/^\d+\.\s*/, "").trim();
-              if (cleaned) html += `<li>${cleaned}</li>`;
-            });
-            html += `</ol>`;
-            break;
-          case "quote":
-            html += `<blockquote>${section.content}</blockquote>`;
-            break;
-          case "divider":
-            html += `<hr/>`;
-            break;
-          default:
-            html += `<p>${section.content}</p>`;
-        }
-      });
-    }
+      // Summary: backend streaming returns markdown; must parse to HTML — raw markdown
+      // inside <blockquote> was shown as literal # and ** (TipTap does not parse MD in HTML text nodes).
+      if (pendingNotes.summary) {
+        html += `<h2>Summary</h2>`;
+        html += await markdownToHtml(pendingNotes.summary);
+      }
 
-    // Action Items
-    if (pendingNotes.actionItems.length > 0) {
-      html += `<h2>Action Items</h2>`;
-      html += `<ul>`;
-      pendingNotes.actionItems.forEach((item) => {
-        html += `<li>${item}</li>`;
-      });
-      html += `</ul>`;
-    }
-
-    // Review Questions
-    if (pendingNotes.reviewQuestions.length > 0) {
-      html += `<h2>Review Questions</h2>`;
-      html += `<ul>`;
-      pendingNotes.reviewQuestions.forEach((q) => {
-        const cleaned = q.replace(/^[•\u2022\-–]\s+/, "");
-        html += `<li>${cleaned}</li>`;
-      });
-      html += `</ul>`;
-    }
-
-    // Interactive Mind Map (ReactFlow)
-    if (
-      pendingNotes.diagramData &&
-      pendingNotes.diagramData.nodes &&
-      pendingNotes.diagramData.nodes.length > 0
-    ) {
-      html += `<h2>Mind Map</h2>`;
-      html += `<div data-type="diagram" data-nodes='${JSON.stringify(pendingNotes.diagramData.nodes)}' data-edges='${JSON.stringify(pendingNotes.diagramData.edges || [])}'></div>`;
-    }
-
-    // Insert at current cursor position (or end if no selection)
-    const timeoutId = setTimeout(() => {
-      scheduleEditorUpdate(() => {
-        if (editor && !editor.isDestroyed && editor.view) {
-          try {
-            editor.chain().focus().insertContent(html).run();
-            clearPendingNotes();
-          } catch (error) {
-            console.error("Failed to insert pending notes:", error);
-            clearPendingNotes();
+      // Sections (Notion-like format)
+      if (pendingNotes.sections && pendingNotes.sections.length > 0) {
+        for (const section of pendingNotes.sections) {
+          switch (section.type) {
+            case "heading": {
+              const level = section.level || 2;
+              html += `<h${level}>${section.content}</h${level}>`;
+              break;
+            }
+            case "paragraph":
+              html += `<p>${section.content}</p>`;
+              break;
+            case "bullets":
+              html += `<ul>`;
+              section.content.split("\n").forEach((item) => {
+                const cleaned = item.replace(/^[•\u2022\-–]\s*/, "").trim();
+                if (cleaned) html += `<li>${cleaned}</li>`;
+              });
+              html += `</ul>`;
+              break;
+            case "numbered":
+              html += `<ol>`;
+              section.content.split("\n").forEach((item) => {
+                const cleaned = item.replace(/^\d+\.\s*/, "").trim();
+                if (cleaned) html += `<li>${cleaned}</li>`;
+              });
+              html += `</ol>`;
+              break;
+            case "quote":
+              html += await markdownToHtml(section.content);
+              break;
+            case "divider":
+              html += `<hr/>`;
+              break;
+            default:
+              html += `<p>${section.content}</p>`;
           }
         }
-      });
-    }, 200);
+      }
 
-    return () => clearTimeout(timeoutId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      // Action Items
+      if (pendingNotes.actionItems.length > 0) {
+        html += `<h2>Action Items</h2>`;
+        html += `<ul>`;
+        pendingNotes.actionItems.forEach((item) => {
+          html += `<li>${item}</li>`;
+        });
+        html += `</ul>`;
+      }
+
+      // Review Questions
+      if (pendingNotes.reviewQuestions.length > 0) {
+        html += `<h2>Review Questions</h2>`;
+        html += `<ul>`;
+        pendingNotes.reviewQuestions.forEach((q) => {
+          const cleaned = q.replace(/^[•\u2022\-–]\s+/, "");
+          html += `<li>${cleaned}</li>`;
+        });
+        html += `</ul>`;
+      }
+
+      // Interactive Mind Map (ReactFlow)
+      if (
+        pendingNotes.diagramData &&
+        pendingNotes.diagramData.nodes &&
+        pendingNotes.diagramData.nodes.length > 0
+      ) {
+        html += `<h2>Mind Map</h2>`;
+        html += `<div data-type="diagram" data-nodes='${JSON.stringify(pendingNotes.diagramData.nodes)}' data-edges='${JSON.stringify(pendingNotes.diagramData.edges || [])}'></div>`;
+      }
+
+      if (cancelled) return;
+
+      timeoutId = setTimeout(() => {
+        scheduleEditorUpdate(() => {
+          if (editor && !editor.isDestroyed && editor.view) {
+            try {
+              editor.chain().focus().insertContent(html).run();
+              clearPendingNotes();
+            } catch (error) {
+              console.error("Failed to insert pending notes:", error);
+              clearPendingNotes();
+            }
+          }
+        });
+      }, 200);
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    };
   }, [
     pendingNotes,
     editor,
     clearPendingNotes,
     loadedNoteId,
     scheduleEditorUpdate,
+    markdownToHtml,
   ]);
 
   // --- Handlers ---
@@ -552,39 +573,24 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
 
 
-  // Handle inserting AI-generated content into the note
+  // Handle inserting AI-generated content into the note (full markdown: fenced code blocks, lists, etc.)
   const handleInsertFromAI = useCallback(
     (content: string) => {
       if (!editor || editor.isDestroyed) return;
 
-      // Convert markdown to HTML for the editor
-      // Simple conversion for common markdown patterns
-      let htmlContent = content
-        .replace(/^### (.*$)/gim, "<h3>$1</h3>")
-        .replace(/^## (.*$)/gim, "<h2>$1</h2>")
-        .replace(/^# (.*$)/gim, "<h1>$1</h1>")
-        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-        .replace(/\*(.*?)\*/g, "<em>$1</em>")
-        .replace(/^\- (.*$)/gim, "<li>$1</li>")
-        .replace(/^\* (.*$)/gim, "<li>$1</li>")
-        .replace(/\n/g, "<br>");
-
-      // Wrap consecutive <li> elements in <ul>
-      htmlContent = htmlContent.replace(/(<li>.*?<\/li>(<br>)?)+/g, (match) => {
-        const items = match.replace(/<br>/g, "");
-        return `<ul>${items}</ul>`;
-      });
-
-      // Insert at the end of the document with a separator
-      editor
-        .chain()
-        .focus("end")
-        .insertContent("<hr><p></p>")
-        .insertContent(htmlContent)
-        .insertContent("<p></p>")
-        .run();
+      void (async () => {
+        const htmlContent = await markdownToHtml(content);
+        if (!editor || editor.isDestroyed) return;
+        editor
+          .chain()
+          .focus("end")
+          .insertContent("<hr><p></p>")
+          .insertContent(htmlContent)
+          .insertContent("<p></p>")
+          .run();
+      })();
     },
-    [editor],
+    [editor, markdownToHtml],
   );
 
   // --- Deleting State ---
