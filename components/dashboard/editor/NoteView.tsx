@@ -358,6 +358,13 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     });
   }, []);
 
+  /** Recording flow: user chose Insert Notes and we are opening the note / injecting AI content */
+  const isAwaitingRecordingNotes = Boolean(
+    pendingNotes && pendingNotesTargetNoteId === noteId,
+  );
+  const recordingNotesOverlayLabel =
+    loadedNoteId === noteId ? "Adding your notes…" : "Opening your note…";
+
   // Helper function to detect if content is markdown and convert to HTML
   const convertMarkdownIfNeeded = async (content: string): Promise<string> => {
     if (!content) return "";
@@ -679,7 +686,15 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
   if (!userData || displayNote === undefined) {
     return (
-      <div className="h-full flex flex-col bg-[#0A0A0A]">
+      <div className="h-full flex flex-col bg-[#0A0A0A] relative">
+        {isAwaitingRecordingNotes && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-[#0A0A0A]/85 backdrop-blur-sm">
+            <Loader2 className="w-10 h-10 animate-spin text-primary" />
+            <p className="text-sm font-medium text-foreground">
+              {recordingNotesOverlayLabel}
+            </p>
+          </div>
+        )}
         {/* Skeleton Navigation */}
         <div className="h-16 flex items-center px-8 border-b border-white/5">
           <Skeleton className="h-4 w-24 mr-2" />
@@ -750,6 +765,18 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
   return (
     <div className="h-full flex flex-col bg-background relative animate-in fade-in duration-500">
+      {isAwaitingRecordingNotes && (
+        <div
+          className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-background/80 backdrop-blur-sm"
+          aria-busy="true"
+          aria-live="polite"
+        >
+          <Loader2 className="w-10 h-10 animate-spin text-primary" />
+          <p className="text-sm font-medium text-foreground">
+            {recordingNotesOverlayLabel}
+          </p>
+        </div>
+      )}
       {/* 1. Top Navigation / Breadcrumbs */}
       <div className="h-16 flex items-center px-4 lg:px-8 bg-background top-0 z-20 sticky justify-between">
         <div className="flex items-center gap-4">

@@ -121,6 +121,10 @@ export function RightSidebar() {
 
   // Save Modal State
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isSavingSession, setIsSavingSession] = useState(false);
+  /** True while creating a note and navigating after Insert Notes (from recording flow). */
+  const [isOpeningNoteFromRecording, setIsOpeningNoteFromRecording] =
+    useState(false);
   const [recordingTitle, setRecordingTitle] = useState("");
 
   // AI Generate Notes State
@@ -595,12 +599,13 @@ export function RightSidebar() {
   };
 
   const handleConfirmSave = async () => {
-    try {
-      if (buildFinalChunks.length === 0) {
-        toast.warning("Cannot save empty recording");
-        return;
-      }
+    if (buildFinalChunks.length === 0) {
+      toast.warning("Cannot save empty recording");
+      return;
+    }
 
+    setIsSavingSession(true);
+    try {
       await upsertRecordingDraft({
         sessionId: liveSessionIdRef.current,
         title: recordingTitle || `Untitled Session`,
@@ -615,6 +620,8 @@ export function RightSidebar() {
       toast.error("Failed to save session", {
         description: "Please check your connection and try again.",
       });
+    } finally {
+      setIsSavingSession(false);
     }
   };
 
@@ -779,6 +786,7 @@ export function RightSidebar() {
     };
 
     if (!currentNoteId) {
+      setIsOpeningNoteFromRecording(true);
       try {
         const title = recordingTitle
           ? `Notes from ${recordingTitle}`
@@ -796,6 +804,8 @@ export function RightSidebar() {
       } catch (error) {
         console.error("Failed to create note:", error);
         toast.error("Failed to create note. Please try again.");
+      } finally {
+        setIsOpeningNoteFromRecording(false);
       }
     } else {
       if (selectedSession) {
@@ -815,6 +825,7 @@ export function RightSidebar() {
 
     if (!currentNoteId && generatedNotes) {
       // No note is open - create a new one
+      setIsOpeningNoteFromRecording(true);
       try {
         const title =
           recordingTitle || usedContextName
@@ -836,6 +847,8 @@ export function RightSidebar() {
       } catch (error) {
         console.error("Failed to create note:", error);
         toast.error("Failed to create note. Please try again.");
+      } finally {
+        setIsOpeningNoteFromRecording(false);
       }
     } else if (generatedNotes) {
       // Note is already open - just set pending notes
@@ -1793,10 +1806,17 @@ export function RightSidebar() {
                           : handleGenerateNotes
                     }
                     disabled={
-                      isGeneratingNotes || streamingNotes.state.isStreaming
+                      isGeneratingNotes ||
+                      streamingNotes.state.isStreaming ||
+                      isOpeningNoteFromRecording
                     }
                   >
-                    {isGeneratingNotes || streamingNotes.state.isStreaming ? (
+                    {isOpeningNoteFromRecording ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 shrink-0 animate-spin" />
+                        Opening note…
+                      </>
+                    ) : isGeneratingNotes || streamingNotes.state.isStreaming ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 shrink-0 animate-spin" />
                         <AnimatePresence mode="wait" initial={false}>
@@ -2223,7 +2243,13 @@ export function RightSidebar() {
         <PanelRightOpen className="w-4 h-4" />
       </button>
     )}
-    <Dialog open={isSaveModalOpen} onOpenChange={setIsSaveModalOpen}>
+    <Dialog
+      open={isSaveModalOpen}
+      onOpenChange={(open) => {
+        setIsSaveModalOpen(open);
+        if (!open) setIsSavingSession(false);
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Save Session</DialogTitle>
@@ -2238,6 +2264,7 @@ export function RightSidebar() {
               value={recordingTitle}
               onChange={(e) => setRecordingTitle(e.target.value)}
               placeholder="Enter a title..."
+              disabled={isSavingSession}
             />
           </div>
           <div className="flex justify-between text-sm text-muted-foreground bg-sidebar-accent p-3 rounded-md">
@@ -2251,11 +2278,19 @@ export function RightSidebar() {
           <Button
             variant="ghost"
             onClick={() => setIsSaveModalOpen(false)}
+            disabled={isSavingSession}
           >
             Cancel
           </Button>
-          <Button onClick={handleConfirmSave}>
-            Save
+          <Button onClick={handleConfirmSave} disabled={isSavingSession}>
+            {isSavingSession ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              "Save"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
