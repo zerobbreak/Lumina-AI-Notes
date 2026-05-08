@@ -95,6 +95,45 @@ function wordCount(text: string) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
+function shouldAutoTitle(title: unknown) {
+  if (typeof title !== "string") return true;
+  const t = title.trim().toLowerCase();
+  return t === "" || t === "new chat" || t.startsWith("new chat");
+}
+
+async function maybeGenerateSessionTitle(args: {
+  mode: ChatMode;
+  question: string;
+  contextNotes: ContextNote[];
+}) {
+  const q = args.question.trim();
+  if (q.length < 8) return null;
+  const noteTitles = args.contextNotes
+    .slice(0, 6)
+    .map((n, i) => `[#${i + 1}] ${n.title}`)
+    .join(" | ");
+
+  const prompt = `Create a short chat title (3–7 words) based on the student's question and the note titles.
+Rules:
+- No quotes, no punctuation at the end.
+- Prefer a topic phrase, not a full sentence.
+- If the mode is QUIZ, include the word "Quiz".
+- Max 42 characters.
+
+Mode: ${args.mode.toUpperCase()}
+Question: ${q}
+Notes: ${noteTitles || "None"}
+
+Return ONLY the title.`;
+
+  const model = getGeminiModel();
+  const result = await model.generateContent(prompt);
+  const title = result.response.text().trim().replace(/^["']|["']$/g, "");
+  const cleaned = title.replace(/\s+/g, " ").trim();
+  if (!cleaned) return null;
+  return cleaned.length > 42 ? cleaned.slice(0, 42).trim() : cleaned;
+}
+
 export const generateAssistantReply: ReturnType<typeof action> = action({
   args: {
     sessionId: v.id("chatSessions"),
@@ -125,6 +164,25 @@ export const generateAssistantReply: ReturnType<typeof action> = action({
     const contextNotes = await ctx.runQuery(api.chats.getContextNotes, {
       noteIds,
     });
+
+    // Auto-title the chat once, based on the first real question.
+    if (shouldAutoTitle(session.title)) {
+      try {
+        const generated = await maybeGenerateSessionTitle({
+          mode,
+          question: args.question,
+          contextNotes,
+        });
+        if (generated) {
+          await ctx.runMutation(api.chats.updateSessionTitle, {
+            sessionId: args.sessionId,
+            title: generated,
+          });
+        }
+      } catch {
+        // Non-critical: title generation shouldn't block answering.
+      }
+    }
 
     const notesWordCount = contextNotes.reduce(
       (sum: number, n: ContextNote) => sum + wordCount(n.content || ""),
