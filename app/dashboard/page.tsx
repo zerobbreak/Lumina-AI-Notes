@@ -16,6 +16,7 @@ const QuizzesView = lazy(() => import("@/components/dashboard/quizzes/QuizzesVie
 const QuizTaking = lazy(() => import("@/components/dashboard/quizzes/QuizTaking").then(m => ({ default: m.QuizTaking })));
 const ArchiveView = lazy(() => import("@/components/dashboard/views/ArchiveView"));
 const CalendarView = lazy(() => import("@/components/dashboard/views/CalendarView"));
+const NoteStudioView = lazy(() => import("@/components/dashboard/views/NoteStudioView"));
 
 function DashboardLoading() {
   return (
@@ -139,6 +140,15 @@ function DashboardContent() {
     return (
       <Suspense fallback={<DashboardLoading />}>
         <CalendarView />
+      </Suspense>
+    );
+  }
+
+  // --- VIEW 4c: NOTE STUDIO ---
+  if (view === "studio") {
+    return (
+      <Suspense fallback={<DashboardLoading />}>
+        <NoteStudioView />
       </Suspense>
     );
   }

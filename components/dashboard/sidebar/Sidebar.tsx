@@ -33,7 +33,7 @@ import { DraggableDocument } from "@/components/documents";
 import { SidebarCourse } from "./SidebarCourse";
 import { SidebarNote } from "./SidebarNote";
 import { ActionMenu } from "@/components/shared/ActionMenu";
-import { File, FolderOpen, FileText } from "lucide-react";
+import { File, FolderOpen, FileText, PenLine } from "lucide-react";
 import {
   useKeyboardShortcut,
   formatShortcut,
@@ -382,6 +382,32 @@ export function Sidebar() {
               {(!quickNotes || quickNotes.length === 0) && isCompact && (
                 <FileText className="w-4 h-4 text-muted-foreground/20" />
               )}
+            </div>
+          </div>
+
+          {/* Note Studio */}
+          <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
+            {!isCompact && (
+              <div className="flex items-center justify-between px-2 mb-0.5 group min-w-0">
+                <h3 className="text-[11px] font-medium text-muted-foreground/40 select-none">
+                  Note Studio
+                </h3>
+              </div>
+            )}
+            <div className={cn("space-y-px w-full", isCompact && "space-y-3 flex flex-col items-center")}>
+              <button
+                type="button"
+                className={cn(
+                  "w-full flex items-center h-[30px] px-2 text-[13px] text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool",
+                  isCompact && "w-9 h-9 justify-center px-0",
+                  searchParams.get("view") === "studio" && "bg-sidebar-accent/50 text-sidebar-foreground",
+                )}
+                onClick={() => router.push("/dashboard?view=studio")}
+                title={isCompact ? "Note Studio" : undefined}
+              >
+                <PenLine className="w-[14px] h-[14px] text-muted-foreground/40 group-hover/tool:text-sidebar-foreground transition-colors" />
+                {!isCompact && <span>Workspace</span>}
+              </button>
             </div>
           </div>
 
