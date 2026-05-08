@@ -1113,11 +1113,13 @@ export function RightSidebar() {
 
       // Step 3: Save recording record
       const title = file.name.replace(/\.[^/.]+$/, "") || "Uploaded Recording";
+      const sessionId = crypto.randomUUID();
       const recordingId = await saveUploadedRecording({
         title,
         storageId,
         duration,
         tzOffsetMinutes: new Date().getTimezoneOffset(),
+        sessionId,
       });
       if (process.env.NODE_ENV === "development") console.log(
         `[upload] Recording saved: id=${recordingId}, durationSec=${duration}`,

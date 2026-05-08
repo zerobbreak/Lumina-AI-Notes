@@ -306,4 +306,32 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_userId_name", ["userId", "name"]),
+
+  chatSessions: defineTable({
+    userId: v.string(),
+    title: v.string(),
+    pinnedNoteIds: v.optional(v.array(v.id("notes"))),
+    mode: v.optional(
+      v.union(
+        v.literal("explain"),
+        v.literal("synthesize"),
+        v.literal("compare"),
+        v.literal("apply"),
+        v.literal("quiz"),
+        v.literal("fill_gaps"),
+      ),
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_userId", ["userId"]),
+
+  chatMessages: defineTable({
+    sessionId: v.id("chatSessions"),
+    role: v.string(), // "user" | "assistant"
+    content: v.string(),
+    contextNoteIds: v.optional(v.array(v.id("notes"))),
+    createdAt: v.number(),
+  })
+    .index("by_sessionId", ["sessionId"])
+    .index("by_sessionId_createdAt", ["sessionId", "createdAt"]),
 });
