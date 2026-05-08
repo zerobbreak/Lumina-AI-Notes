@@ -18,7 +18,7 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
         try {
           // In a real scenario, we might need more logic here 
           // to handle the session setting via Clerk
-          console.log("Received auth token from Electron:", token);
+          if (process.env.NODE_ENV === "development") console.log("Received auth token from Electron:", token);
           // For now, we'll assume the app reloads or handles the token
           // If using Clerk's __clerk_db_jwt, we can potentially set it in cookies or storage
           window.location.reload();

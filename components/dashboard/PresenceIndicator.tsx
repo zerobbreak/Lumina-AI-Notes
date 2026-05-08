@@ -12,6 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Users } from "lucide-react";
+import Image from "next/image";
 
 interface PresenceIndicatorProps {
   noteId: Id<"notes">;
@@ -98,9 +99,11 @@ export function PresenceIndicator({
                     style={{ zIndex: displayedViewers.length - index }}
                   >
                     {viewer.userImage ? (
-                      <img
+                      <Image
                         src={viewer.userImage}
                         alt={viewer.userName}
+                        width={24}
+                        height={24}
                         className="w-6 h-6 rounded-full border-2 border-[#0a0a12] object-cover"
                       />
                     ) : (
@@ -153,9 +156,11 @@ export function PresenceIndicator({
                   className="flex items-center gap-2 text-sm"
                 >
                   {viewer.userImage ? (
-                    <img
+                    <Image
                       src={viewer.userImage}
                       alt={viewer.userName}
+                      width={20}
+                      height={20}
                       className="w-5 h-5 rounded-full object-cover"
                     />
                   ) : (

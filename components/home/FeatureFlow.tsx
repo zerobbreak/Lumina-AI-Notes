@@ -1,53 +1,53 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Mic, FileText, Sparkles, Brain, Search, Share2, Layers, GraduationCap } from "lucide-react";
+import { Mic, Search, Network, BrainCircuit, Sparkles, Fingerprint } from "lucide-react";
 
 const features = [
   {
-    title: "AI Note Generation",
-    description: "Drop a lecture, PDF, or raw audio. Gemini-2.5 Flash extracts and structures your notes in seconds — Cornell, outline, or mind map.",
-    icon: Sparkles,
+    title: "Vocal Extraction",
+    description: "Raw audio streams converted into structured semantic data in real-time.",
+    icon: Mic,
     accent: "var(--obs-amber)",
-    span: "col-span-2 row-span-2",
+    span: "col-span-1 md:col-span-2 row-span-2",
     size: "large",
   },
   {
-    title: "Smart Flashcards",
-    description: "Auto-generated flashcards from your notes. Spaced repetition that adapts to how you learn.",
-    icon: Layers,
+    title: "Neural Tagging",
+    description: "Concepts are automatically identified and mapped.",
+    icon: BrainCircuit,
     accent: "var(--obs-teal)",
     span: "col-span-1 row-span-1",
     size: "small",
   },
   {
-    title: "Adaptive Quizzes",
-    description: "AI-crafted questions targeting your weak areas. Performance tracking over time.",
-    icon: GraduationCap,
-    accent: "#a78bfa",
+    title: "Context Links",
+    description: "Ideas organically connect forming a knowledge graph.",
+    icon: Network,
+    accent: "#818cf8",
     span: "col-span-1 row-span-1",
     size: "small",
   },
   {
-    title: "Semantic Search",
-    description: "Forgot where you mentioned 'Quantum Entanglement'? Just ask. Lumina understands context, not just keywords.",
+    title: "Semantic Recall",
+    description: "Search by meaning, not just keywords. The AI understands intent.",
     icon: Search,
     accent: "var(--obs-amber)",
-    span: "col-span-2 row-span-1",
+    span: "col-span-1 md:col-span-2 row-span-1",
     size: "wide",
   },
   {
-    title: "Real-time Collaboration",
-    description: "Study together. Live cursors, shared notes, and presence indicators make group work seamless.",
-    icon: Share2,
+    title: "Thought Synthesis",
+    description: "AI generates new insights from fragmented notes.",
+    icon: Sparkles,
     accent: "var(--obs-teal)",
     span: "col-span-1 row-span-1",
     size: "small",
   },
   {
-    title: "PDF & Audio Intake",
-    description: "Upload PDFs or record lectures directly. Lumina transcribes, extracts, and maps it all.",
-    icon: Mic,
+    title: "Identity Protection",
+    description: "Encrypted memory distinct to your cognitive footprint.",
+    icon: Fingerprint,
     accent: "#f59e0b",
     span: "col-span-1 row-span-1",
     size: "small",
@@ -56,105 +56,108 @@ const features = [
 
 export function FeatureFlow() {
   return (
-    <section id="features" className="relative py-28 overflow-hidden" style={{ background: 'var(--obs-bg)' }}>
-      <div className="container mx-auto px-6">
-        <div className="max-w-3xl mb-16">
-          <motion.p
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
+    <section id="features" className="relative py-32 overflow-hidden" style={{ background: 'transparent' }}>
+      
+      {/* Flowing background paths */}
+      <div className="absolute inset-0 z-0 pointer-events-none opacity-20">
+        <svg className="absolute w-full h-full" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 0 200 Q 300 400 600 200 T 1200 400" fill="none" stroke="var(--obs-teal)" strokeWidth="1" opacity="0.3" />
+          <path d="M 0 300 Q 400 100 800 400 T 1600 200" fill="none" stroke="var(--obs-amber)" strokeWidth="1" opacity="0.3" />
+        </svg>
+      </div>
+
+      <div className="container mx-auto px-6 relative z-10">
+        <div className="max-w-3xl mb-20">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            className="text-xs uppercase tracking-[0.25em] font-semibold mb-4"
-            style={{ color: 'var(--obs-amber)', fontFamily: 'var(--font-display)' }}
+            className="inline-flex items-center gap-3 mb-6"
           >
-            What You Can Do
-          </motion.p>
+            <div className="h-px w-8 bg-gradient-to-r from-teal-500 to-transparent" />
+            <p className="text-[10px] uppercase tracking-[0.3em] font-bold text-teal-400">
+              Intelligence in Motion
+            </p>
+          </motion.div>
           <motion.h2 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-4xl md:text-6xl font-extrabold text-white tracking-[-0.03em] mb-6"
+            className="text-4xl md:text-6xl font-extrabold text-white tracking-[-0.04em] mb-6 leading-tight"
             style={{ fontFamily: 'var(--font-display)' }}
           >
-            Built for How
+            Built for how you
             <br />
-            <span className="observatory-text">You Actually Study</span>
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-amber-400 to-teal-400">actually think.</span>
           </motion.h2>
-          <p className="text-lg leading-relaxed" style={{ color: 'var(--obs-text-dim)', fontFamily: 'var(--font-body)' }}>
-            Six integrated capabilities. One intelligent system. No more juggling apps.
+          <p className="text-xl leading-relaxed text-gray-400 font-light" style={{ fontFamily: 'var(--font-body)' }}>
+            Information flows continuously, organically structured by AI to match your cognitive patterns.
           </p>
         </div>
 
         {/* Bento Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 auto-rows-[180px]">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5 auto-rows-[200px]">
           {features.map((feature, idx) => (
             <motion.div
               key={feature.title}
-              initial={{ opacity: 0, y: 25 }}
+              initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-60px" }}
-              transition={{ duration: 0.6, delay: idx * 0.08 }}
-              className={`${feature.span} group relative overflow-hidden rounded-2xl cursor-default transition-all duration-500`}
-              style={{ 
-                background: 'var(--obs-surface)',
-                border: '1px solid rgba(255,255,255,0.05)',
-              }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.8, delay: idx * 0.1, ease: [0.16, 1, 0.3, 1] }}
+              className={`${feature.span} group relative overflow-hidden rounded-3xl cursor-default bg-black/40 backdrop-blur-xl border border-white/5 transition-all duration-700 hover:bg-white/[0.02]`}
             >
-              {/* Hover glow */}
+              {/* Internal glow layer */}
               <div 
-                className="absolute -inset-1 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-2xl pointer-events-none"
-                style={{ background: feature.accent, opacity: 0 }}
-              />
-              <div 
-                className="absolute -inset-1 rounded-2xl opacity-0 group-hover:opacity-[0.08] transition-opacity duration-700 blur-2xl pointer-events-none"
-                style={{ background: feature.accent }}
+                className="absolute -inset-10 opacity-0 group-hover:opacity-[0.15] transition-opacity duration-1000 blur-3xl pointer-events-none mix-blend-screen"
+                style={{ background: `radial-gradient(circle at center, ${feature.accent}, transparent 70%)` }}
               />
 
-              <div className="relative h-full p-6 md:p-8 flex flex-col justify-between z-10">
+              <div className="relative h-full p-8 flex flex-col justify-between z-10">
                 <div>
                   <div 
-                    className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-transform duration-500 group-hover:scale-110"
-                    style={{ background: `${feature.accent}15`, border: `1px solid ${feature.accent}25` }}
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6 transition-all duration-700 group-hover:scale-110 group-hover:rotate-3 shadow-lg"
+                    style={{ background: `linear-gradient(135deg, ${feature.accent}20, transparent)`, border: `1px solid ${feature.accent}30` }}
                   >
-                    <feature.icon className="h-5 w-5" style={{ color: feature.accent }} />
+                    <feature.icon className="h-6 w-6" style={{ color: feature.accent }} />
                   </div>
                   <h3 
-                    className="text-lg font-bold text-white tracking-tight mb-2"
+                    className="text-xl font-bold text-white tracking-tight mb-3"
                     style={{ fontFamily: 'var(--font-display)' }}
                   >
                     {feature.title}
                   </h3>
-                  <p className="text-sm leading-relaxed" style={{ color: 'var(--obs-text-dim)', fontFamily: 'var(--font-body)' }}>
+                  <p className="text-sm leading-relaxed text-gray-400 font-light">
                     {feature.description}
                   </p>
                 </div>
 
-                {/* Feature-specific micro visual */}
+                {/* Animated visual elements */}
                 {feature.size === "large" && (
-                  <div className="mt-4 flex items-center gap-3">
-                    {["Cornell", "Outline", "Mind Map"].map((style) => (
-                      <span 
-                        key={style}
-                        className="text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-md font-semibold"
-                        style={{ background: `${feature.accent}12`, color: feature.accent, border: `1px solid ${feature.accent}20` }}
-                      >
-                        {style}
-                      </span>
-                    ))}
+                  <div className="mt-6 flex items-center gap-2 overflow-hidden h-6 opacity-60">
+                    <motion.div animate={{ x: [-100, 300] }} transition={{ repeat: Infinity, duration: 3, ease: "linear" }} className="w-10 h-px bg-amber-400 shadow-[0_0_10px_#d4a853]" />
+                    <motion.div animate={{ x: [-100, 300] }} transition={{ repeat: Infinity, duration: 2.5, ease: "linear", delay: 0.5 }} className="w-6 h-px bg-amber-400 shadow-[0_0_10px_#d4a853]" />
                   </div>
                 )}
 
                 {feature.size === "wide" && (
-                  <div className="mt-3 flex items-center gap-2">
-                    <div className="flex-1 h-8 rounded-lg flex items-center px-3 gap-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <Search className="h-3 w-3" style={{ color: 'var(--obs-text-dim)' }} />
-                      <span className="text-xs" style={{ color: 'var(--obs-text-dim)' }}>Search across all notes...</span>
+                  <div className="mt-4 flex items-center gap-3">
+                    <div className="flex-1 h-10 rounded-xl flex items-center px-4 gap-3 bg-white/5 border border-white/5 shadow-inner">
+                      <Search className="h-4 w-4 text-amber-500/50" />
+                      <span className="text-xs text-gray-500 font-mono tracking-wider">Search connections...</span>
+                      <motion.div animate={{ opacity: [1, 0] }} transition={{ repeat: Infinity, duration: 0.8 }} className="w-1.5 h-3 bg-amber-500/80 ml-auto" />
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Border hover effect */}
-              <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" style={{ border: `1px solid ${feature.accent}30` }} />
+              {/* Border sweep effect */}
+              <div className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none overflow-hidden">
+                <div className="absolute top-0 left-0 w-[200%] h-[200%] -translate-x-1/2 -translate-y-1/2 bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(255,255,255,0.2)_360deg)] animate-[spin_4s_linear_infinite]" />
+              </div>
+              <div className="absolute inset-[1px] bg-black/60 rounded-3xl z-0 group-hover:bg-black/40 transition-colors duration-700" />
+              
+              {/* Bring content above the sweep mask */}
+              <div className="absolute inset-0 z-10 pointer-events-none" />
             </motion.div>
           ))}
         </div>

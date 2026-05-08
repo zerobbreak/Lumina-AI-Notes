@@ -255,8 +255,8 @@ export const saveUploadedRecording = mutation({
       createdAt: Date.now(),
     });
 
-    console.log(`[saveUploadedRecording] Created recording: ${recordingId}`);
-    console.log(
+    if (process.env.NODE_ENV === "development") console.log(`[saveUploadedRecording] Created recording: ${recordingId}`);
+    if (process.env.NODE_ENV === "development") console.log(
       `[saveUploadedRecording] With userId: ${identity.tokenIdentifier}`,
     );
 
@@ -280,23 +280,23 @@ export const updateRecordingTranscript = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
 
-    console.log(
+    if (process.env.NODE_ENV === "development") console.log(
       `[updateRecordingTranscript] Looking for recording: ${args.recordingId}`,
     );
-    console.log(
+    if (process.env.NODE_ENV === "development") console.log(
       `[updateRecordingTranscript] Current user tokenIdentifier: ${identity.tokenIdentifier}`,
     );
 
     const recording = await ctx.db.get(args.recordingId);
-    console.log(
+    if (process.env.NODE_ENV === "development") console.log(
       `[updateRecordingTranscript] Recording found:`,
       recording ? "yes" : "no",
     );
     if (recording) {
-      console.log(
+      if (process.env.NODE_ENV === "development") console.log(
         `[updateRecordingTranscript] Recording userId: ${recording.userId}`,
       );
-      console.log(
+      if (process.env.NODE_ENV === "development") console.log(
         `[updateRecordingTranscript] Match: ${recording.userId === identity.tokenIdentifier}`,
       );
     }

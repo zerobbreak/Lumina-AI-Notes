@@ -13,14 +13,27 @@ export const dynamic = "force-static";
 
 export default function Home() {
   return (
-    <main className="dark min-h-screen text-white selection:bg-amber-500/30 overflow-x-hidden selection:text-white font-body" style={{ background: 'var(--obs-bg, #050a14)', fontFamily: "var(--font-body, 'DM Sans', sans-serif)" }}>
+    <main className="dark min-h-screen text-white selection:bg-amber-500/30 overflow-x-hidden selection:text-white font-body" style={{ background: '#02050a', fontFamily: "var(--font-body, 'DM Sans', sans-serif)" }}>
       <Navbar />
 
-      {/* Persistent Background Depth */}
+      {/* Persistent Background Depth - Ambient Intelligence */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] rounded-full blur-[120px] opacity-20 animate-pulse-slow will-change-transform" style={{ background: 'var(--obs-amber, #d4a853)' }} />
-        <div className="absolute bottom-[5%] right-[-5%] w-[40%] h-[40%] rounded-full blur-[120px] opacity-15 animate-pulse-slow will-change-transform" style={{ background: 'var(--obs-teal, #2dd4bf)' }} />
-        <div className="noise-overlay absolute inset-0 opacity-[0.02] translate-z-0" />
+        {/* Core lighting */}
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full blur-[160px] opacity-[0.15] animate-pulse-slow mix-blend-screen" style={{ background: 'var(--obs-amber)', willChange: 'transform, opacity' }} />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full blur-[150px] opacity-[0.12] animate-pulse-slow mix-blend-screen" style={{ animationDelay: '2s', background: 'var(--obs-teal)', willChange: 'transform, opacity' }} />
+        
+        {/* Grid/Neural paths */}
+        <div className="absolute inset-0 opacity-[0.12]" 
+             style={{ 
+               backgroundImage: `linear-gradient(to right, rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+               backgroundSize: '4rem 4rem',
+               maskImage: 'radial-gradient(ellipse 60% 60% at 50% 50%, #000 40%, transparent 100%)',
+               WebkitMaskImage: 'radial-gradient(ellipse 60% 60% at 50% 50%, #000 40%, transparent 100%)'
+             }} 
+        />
+        
+        {/* Grain overlay */}
+        <div className="noise-overlay absolute inset-0 opacity-[0.04] mix-blend-overlay" style={{ transform: 'translateZ(0)' }} />
       </div>
 
       <div className="relative z-10">

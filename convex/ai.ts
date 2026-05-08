@@ -1294,7 +1294,7 @@ export const transcribeAudio = action({
   },
   handler: async (ctx, args) => {
     const startMs = Date.now();
-    console.log(
+    if (process.env.NODE_ENV === "development") console.log(
       `[transcribeAudio] Start: storageId=${args.storageId}, mimeType=${args.mimeType}`,
     );
     const apiKey = process.env.GEMINI_API_KEY;
@@ -1313,7 +1313,7 @@ export const transcribeAudio = action({
       const fetchStartMs = Date.now();
       // Fetch the audio file from Convex storage
       const audioBlob = await ctx.storage.get(args.storageId);
-      console.log(
+      if (process.env.NODE_ENV === "development") console.log(
         `[transcribeAudio] Storage fetch time: ${Date.now() - fetchStartMs}ms`,
       );
       if (!audioBlob) {
@@ -1340,7 +1340,7 @@ export const transcribeAudio = action({
         };
       }
 
-      console.log(
+      if (process.env.NODE_ENV === "development") console.log(
         `[transcribeAudio] Processing audio: ${(audioBlob.size / 1024).toFixed(1)}KB, mimeType: ${args.mimeType}`,
       );
 
@@ -1349,7 +1349,7 @@ export const transcribeAudio = action({
       const encodeStartMs = Date.now();
       const arrayBuffer = await audioBlob.arrayBuffer();
       const audioBase64 = arrayBufferToBase64(arrayBuffer);
-      console.log(
+      if (process.env.NODE_ENV === "development") console.log(
         `[transcribeAudio] Base64 encode time: ${Date.now() - encodeStartMs}ms, base64Bytes=${audioBase64.length}`,
       );
 
@@ -1373,7 +1373,7 @@ export const transcribeAudio = action({
       };
 
       const generateTranscription = async (modelName: string) => {
-        console.log(
+        if (process.env.NODE_ENV === "development") console.log(
           `[transcribeAudio] Attempting transcription with model: ${modelName}`,
         );
         const model = genAI.getGenerativeModel({ model: modelName });
@@ -1397,7 +1397,7 @@ Focus on accuracy above all else.`,
           ]),
           90000, // 90 seconds
         );
-        console.log(
+        if (process.env.NODE_ENV === "development") console.log(
           `[transcribeAudio] AI call time: ${Date.now() - apiStartMs}ms`,
         );
         return result.response.text().trim();
@@ -1410,7 +1410,7 @@ Focus on accuracy above all else.`,
       // Retry with exponential backoff for transient errors
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          console.log(
+          if (process.env.NODE_ENV === "development") console.log(
             `[transcribeAudio] Attempt ${attempt}/${maxRetries} with gemini-2.5-flash`,
           );
           responseText = await generateTranscription("gemini-2.5-flash");
@@ -1426,7 +1426,7 @@ Focus on accuracy above all else.`,
           if (attempt < maxRetries) {
             // Exponential backoff: 1s, 2s, 4s
             const delay = Math.pow(2, attempt - 1) * 1000;
-            console.log(`[transcribeAudio] Waiting ${delay}ms before retry...`);
+            if (process.env.NODE_ENV === "development") console.log(`[transcribeAudio] Waiting ${delay}ms before retry...`);
             await new Promise((resolve) => setTimeout(resolve, delay));
           }
         }
@@ -1437,10 +1437,10 @@ Focus on accuracy above all else.`,
         throw lastError;
       }
 
-      console.log(
+      if (process.env.NODE_ENV === "development") console.log(
         `[transcribeAudio] Success! Got ${responseText.length} characters of transcription`,
       );
-      console.log(
+      if (process.env.NODE_ENV === "development") console.log(
         `[transcribeAudio] Total action time: ${Date.now() - startMs}ms`,
       );
 
@@ -1449,7 +1449,7 @@ Focus on accuracy above all else.`,
       let structureResult: LectureStructureResult = { segments: [] };
 
       try {
-        console.log("[transcribeAudio] Transcript obtained, now cleaning...");
+        if (process.env.NODE_ENV === "development") console.log("[transcribeAudio] Transcript obtained, now cleaning...");
         const cleanupResult = await ctx.runAction(
           api.ai.cleanLectureTranscript,
           {
@@ -1461,7 +1461,7 @@ Focus on accuracy above all else.`,
           cleanupResult.cleanedTranscript || cleanedTranscript;
         cleanupMetadata = cleanupResult.metadata || cleanupMetadata;
 
-        console.log(
+        if (process.env.NODE_ENV === "development") console.log(
           `[transcribeAudio] Cleaned transcript: removed ${cleanupMetadata.fillerWordsRemoved} filler words, marked ${cleanupMetadata.repetitionsMarked} repetitions, converted ${cleanupMetadata.mathExpressionsConverted} math expressions`,
         );
 
@@ -1476,7 +1476,7 @@ Focus on accuracy above all else.`,
             ? detectedStructure
             : structureResult;
 
-        console.log(
+        if (process.env.NODE_ENV === "development") console.log(
           `[transcribeAudio] Detected ${structureResult.segments?.length || 0} lecture segments`,
         );
       } catch (cleanupError) {

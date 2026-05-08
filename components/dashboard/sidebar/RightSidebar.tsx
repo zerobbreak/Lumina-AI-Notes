@@ -1043,7 +1043,7 @@ export function RightSidebar() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    console.log(
+    if (process.env.NODE_ENV === "development") console.log(
       `[upload] Start: name=${file.name}, sizeMB=${(file.size / 1024 / 1024).toFixed(2)}, type=${file.type || "unknown"}`,
     );
 
@@ -1106,7 +1106,7 @@ export function RightSidebar() {
       }
 
       const { storageId } = await uploadResponse.json();
-      console.log(
+      if (process.env.NODE_ENV === "development") console.log(
         `[upload] Storage upload complete in ${Date.now() - uploadStartMs}ms, storageId=${storageId}`,
       );
       setUploadProgress(50);
@@ -1119,7 +1119,7 @@ export function RightSidebar() {
         duration,
         tzOffsetMinutes: new Date().getTimezoneOffset(),
       });
-      console.log(
+      if (process.env.NODE_ENV === "development") console.log(
         `[upload] Recording saved: id=${recordingId}, durationSec=${duration}`,
       );
       setUploadProgress(60);
@@ -1137,7 +1137,7 @@ export function RightSidebar() {
           mimeType,
           courseContext: userData?.major || undefined,
         });
-        console.log(
+        if (process.env.NODE_ENV === "development") console.log(
           `[upload] Transcription call returned in ${Date.now() - transcribeStartMs}ms, success=${transcriptionResult.success}`,
         );
 
