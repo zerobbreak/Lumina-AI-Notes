@@ -163,6 +163,7 @@ export const createNote = mutation({
       args.noteType ||
       (courseId || moduleId || args.parentNoteId ? "page" : "quick");
 
+    const now = Date.now();
     const noteId = await ctx.db.insert("notes", {
       userId: identity.tokenIdentifier,
       title: args.title,
@@ -176,7 +177,8 @@ export const createNote = mutation({
       isPinned: false,
       tagIds: args.tagIds || [],
       wordCount: args.wordCount || 0,
-      createdAt: Date.now(),
+      createdAt: now,
+      lastAccessedAt: now,
       quickCaptureType: args.quickCaptureType,
       quickCaptureAudioUrl: args.quickCaptureAudioUrl,
       quickCaptureStatus: args.quickCaptureStatus,
@@ -536,6 +538,7 @@ export const updateNote = mutation({
     await requireNoteEdit(ctx, args.noteId);
 
     const patch: any = {};
+    const now = Date.now();
     if (args.title !== undefined) patch.title = args.title;
     if (args.content !== undefined) patch.content = args.content;
     if (args.style !== undefined) patch.style = args.style;
@@ -555,7 +558,20 @@ export const updateNote = mutation({
     if (args.sourceRecordingId !== undefined)
       patch.sourceRecordingId = args.sourceRecordingId;
 
+    // Treat edits as "usage" for stale cleanup.
+    patch.lastAccessedAt = now;
     await ctx.db.patch(args.noteId, patch);
+  },
+});
+
+/**
+ * Mark a note as opened/viewed (client should call when opening a note).
+ */
+export const touchNote = mutation({
+  args: { noteId: v.id("notes") },
+  handler: async (ctx, args) => {
+    await requireNoteAccess(ctx, args.noteId);
+    await ctx.db.patch(args.noteId, { lastAccessedAt: Date.now() });
   },
 });
 

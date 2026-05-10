@@ -11,7 +11,6 @@ import {
   Calendar,
   ClipboardList,
   Pin,
-  PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -55,7 +54,7 @@ type RenameTarget = {
 export function Sidebar() {
   const { user } = useUser();
   const router = useRouter();
-  const { leftSidebarState, setLeftSidebarState, toggleLeftSidebar } =
+  const { leftSidebarState, setLeftSidebarState } =
     useDashboard();
   const searchParams = useSearchParams();
   const { createNoteFlow } = useCreateNoteFlow();
@@ -241,20 +240,6 @@ export function Sidebar() {
           isCompact && "flex-col gap-3"
         )}>
           <div className={cn("flex items-center gap-2 min-w-0 flex-1", isCompact && "flex-col w-full")}>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "shrink-0 h-7 w-7 text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md transition-colors",
-                isCompact && "w-9 h-9"
-              )}
-              onClick={toggleLeftSidebar}
-              aria-label={isOpen ? "Hide sidebar" : "Show sidebar"}
-              title={isOpen ? "Hide sidebar" : "Show sidebar"}
-            >
-              <PanelLeftClose className="w-[15px] h-[15px]" />
-            </Button>
             <div className={cn("flex items-center gap-2 min-w-0", isCompact && "flex-col gap-1.5")}>
               <div className="w-[22px] h-[22px] rounded-[5px] bg-linear-to-br from-primary/90 to-primary/60 flex items-center justify-center shrink-0">
                 <Layers className="w-3 h-3 text-primary-foreground" />
@@ -270,7 +255,7 @@ export function Sidebar() {
             variant="ghost"
             size="icon"
             className={cn(
-              "w-7 h-7 text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md transition-colors shrink-0",
+              "w-7 h-7 text-muted-foreground/75 dark:text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md transition-colors shrink-0 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
               isCompact && "w-9 h-9"
             )}
             onClick={handleCreateNote}
@@ -283,14 +268,15 @@ export function Sidebar() {
         {/* Search */}
         {!isCompact ? (
           <button
-            className="w-full flex items-center justify-between h-[30px] px-2.5 text-muted-foreground/50 hover:bg-sidebar-accent/40 rounded-md transition-colors group/search"
+            type="button"
+            className="w-full flex items-center justify-between h-[30px] px-2.5 text-sidebar-foreground/88 dark:text-muted-foreground/55 hover:bg-sidebar-accent/40 rounded-md transition-colors group/search focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
             onClick={() => setIsSearchOpen(true)}
           >
-            <span className="flex items-center gap-2 text-[13px]">
+            <span className="flex items-center gap-2 text-[13px] font-medium">
               <Search className="w-[14px] h-[14px]" />
               <span>Search</span>
             </span>
-            <span className="text-[11px] text-muted-foreground/30 group-hover/search:text-muted-foreground/50 transition-colors">
+            <span className="text-[11px] text-muted-foreground/70 dark:text-muted-foreground/40 group-hover/search:text-muted-foreground dark:group-hover/search:text-muted-foreground/65 transition-colors">
               {formatShortcut("cmd+k")}
             </span>
           </button>
@@ -298,7 +284,7 @@ export function Sidebar() {
           <Button
             variant="ghost"
             size="icon"
-            className="w-9 h-9 text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md"
+            className="w-9 h-9 text-muted-foreground/75 dark:text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
             onClick={() => setIsSearchOpen(true)}
           >
             <Search className="w-[15px] h-[15px]" />
@@ -314,7 +300,7 @@ export function Sidebar() {
           <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
             {!isCompact && (
               <div className="flex items-center justify-between px-2 mb-0.5 group min-w-0">
-                <h3 className="text-[11px] font-medium text-muted-foreground/40 select-none">
+                <h3 className="text-[11px] font-medium text-muted-foreground dark:text-muted-foreground/55 select-none">
                   Favorites
                 </h3>
               </div>
@@ -331,12 +317,12 @@ export function Sidebar() {
                 />
               ))}
               {(!pinnedNotes || pinnedNotes.length === 0) && !isCompact && (
-                <div className="px-2 py-1.5 text-[12px] text-muted-foreground/30">
+                <div className="px-2 py-1.5 text-[12px] text-muted-foreground/85 dark:text-muted-foreground/45">
                   No favorites yet
                 </div>
               )}
               {(!pinnedNotes || pinnedNotes.length === 0) && isCompact && (
-                <Pin className="w-4 h-4 text-muted-foreground/20" />
+                <Pin className="w-4 h-4 text-muted-foreground/60 dark:text-muted-foreground/25" />
               )}
             </div>
           </div>
@@ -345,13 +331,13 @@ export function Sidebar() {
           <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
             {!isCompact && (
               <div className="flex items-center justify-between px-2 mb-0.5 group min-w-0">
-                <h3 className="text-[11px] font-medium text-muted-foreground/40 select-none">
+                <h3 className="text-[11px] font-medium text-muted-foreground dark:text-muted-foreground/55 select-none">
                   Recent
                 </h3>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="w-5 h-5 text-muted-foreground/30 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 opacity-0 group-hover:opacity-100 transition-all rounded-sm"
+                  className="w-5 h-5 text-muted-foreground/60 dark:text-muted-foreground/35 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 opacity-0 group-hover:opacity-100 transition-all rounded-sm focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
                   onClick={handleCreateNote}
                   disabled={isCreatingNote}
                 >
@@ -375,12 +361,12 @@ export function Sidebar() {
                 />
               ))}
               {(!quickNotes || quickNotes.length === 0) && !isCompact && (
-                <div className="px-2 py-1.5 text-[12px] text-muted-foreground/30">
+                <div className="px-2 py-1.5 text-[12px] text-muted-foreground/85 dark:text-muted-foreground/45">
                   No recent notes
                 </div>
               )}
               {(!quickNotes || quickNotes.length === 0) && isCompact && (
-                <FileText className="w-4 h-4 text-muted-foreground/20" />
+                <FileText className="w-4 h-4 text-muted-foreground/60 dark:text-muted-foreground/25" />
               )}
             </div>
           </div>
@@ -389,7 +375,7 @@ export function Sidebar() {
           <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
             {!isCompact && (
               <div className="flex items-center justify-between px-2 mb-0.5 group min-w-0">
-                <h3 className="text-[11px] font-medium text-muted-foreground/40 select-none">
+                <h3 className="text-[11px] font-medium text-muted-foreground dark:text-muted-foreground/55 select-none">
                   Note Studio
                 </h3>
               </div>
@@ -398,14 +384,14 @@ export function Sidebar() {
               <button
                 type="button"
                 className={cn(
-                  "w-full flex items-center h-[30px] px-2 text-[13px] text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool",
+                  "w-full flex items-center h-[30px] px-2 text-[13px] text-sidebar-foreground/92 dark:text-muted-foreground/72 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
                   isCompact && "w-9 h-9 justify-center px-0",
-                  searchParams.get("view") === "studio" && "bg-sidebar-accent/50 text-sidebar-foreground",
+                  searchParams.get("view") === "studio" && "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-sm ring-1 ring-sidebar-border/40 dark:bg-sidebar-accent/55 dark:text-sidebar-accent-foreground",
                 )}
                 onClick={() => router.push("/dashboard?view=studio")}
                 title={isCompact ? "Note Studio" : undefined}
               >
-                <PenLine className="w-[14px] h-[14px] text-muted-foreground/40 group-hover/tool:text-sidebar-foreground transition-colors" />
+                <PenLine className="w-[14px] h-[14px] shrink-0 text-current opacity-80 group-hover/tool:opacity-100 transition-opacity" />
                 {!isCompact && <span>Workspace</span>}
               </button>
             </div>
@@ -415,13 +401,13 @@ export function Sidebar() {
           <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
             {!isCompact && (
               <div className="flex items-center justify-between px-2 mb-0.5 group min-w-0">
-                <h3 className="text-[11px] font-medium text-muted-foreground/40 select-none">
+                <h3 className="text-[11px] font-medium text-muted-foreground dark:text-muted-foreground/55 select-none">
                   Courses
                 </h3>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="w-5 h-5 text-muted-foreground/30 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 opacity-0 group-hover:opacity-100 transition-all rounded-sm"
+                  className="w-5 h-5 text-muted-foreground/60 dark:text-muted-foreground/35 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 opacity-0 group-hover:opacity-100 transition-all rounded-sm focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
                   onClick={handleCreateCourse}
                 >
                   <Plus className="w-3 h-3" />
@@ -452,7 +438,7 @@ export function Sidebar() {
                 />
               ))}
               {isCompact && (!userData?.courses || userData.courses.length === 0) && (
-                <FolderOpen className="w-4 h-4 text-muted-foreground/20" />
+                <FolderOpen className="w-4 h-4 text-muted-foreground/60 dark:text-muted-foreground/25" />
               )}
             </div>
           </div>
@@ -461,13 +447,13 @@ export function Sidebar() {
           <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
             {!isCompact && (
               <div className="flex items-center justify-between px-2 mb-0.5 group min-w-0">
-                <h3 className="text-[11px] font-medium text-muted-foreground/40 select-none">
+                <h3 className="text-[11px] font-medium text-muted-foreground dark:text-muted-foreground/55 select-none">
                   Resources
                 </h3>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="w-5 h-5 text-muted-foreground/30 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 opacity-0 group-hover:opacity-100 transition-all rounded-sm"
+                  className="w-5 h-5 text-muted-foreground/60 dark:text-muted-foreground/35 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 opacity-0 group-hover:opacity-100 transition-all rounded-sm focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
                   onClick={() => setIsUploadOpen(true)}
                 >
                   <Upload className="w-3 h-3" />
@@ -485,13 +471,14 @@ export function Sidebar() {
                 >
                   <div className={cn("relative group/file flex items-center", isCompact && "px-0")}>
                     <button
+                      type="button"
                       className={cn(
-                        "w-full flex items-center h-[30px] px-2 text-[13px] text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2 transition-colors rounded-md",
+                        "w-full flex items-center h-[30px] px-2 text-[13px] text-sidebar-foreground/92 dark:text-muted-foreground/72 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2 transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
                         isCompact && "w-9 h-9 justify-center px-0"
                       )}
                       title={isCompact ? file.name : undefined}
                     >
-                      <File className="w-[14px] h-[14px] text-muted-foreground/40 shrink-0" />
+                      <File className="w-[14px] h-[14px] shrink-0 text-current opacity-75" />
                       {!isCompact && <span className="truncate flex-1 text-left">{file.name}</span>}
                     </button>
                     {!isCompact && (
@@ -506,7 +493,7 @@ export function Sidebar() {
                 </DraggableDocument>
               ))}
               {isCompact && (!recentFiles || recentFiles.length === 0) && (
-                <File className="w-4 h-4 text-muted-foreground/20" />
+                <File className="w-4 h-4 text-muted-foreground/60 dark:text-muted-foreground/25" />
               )}
             </div>
           </div>
@@ -518,7 +505,7 @@ export function Sidebar() {
           )}>
             {!isCompact && (
               <div className="px-2 mb-0.5">
-                <h3 className="text-[11px] font-medium text-muted-foreground/40 select-none">
+                <h3 className="text-[11px] font-medium text-muted-foreground dark:text-muted-foreground/55 select-none">
                   Tools
                 </h3>
               </div>
@@ -527,48 +514,50 @@ export function Sidebar() {
               <button
                 type="button"
                 className={cn(
-                  "w-full flex items-center h-[30px] px-2 text-[13px] text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool",
+                  "w-full flex items-center h-[30px] px-2 text-[13px] text-sidebar-foreground/92 dark:text-muted-foreground/72 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
                   isCompact && "w-9 h-9 justify-center px-0",
-                  calendarView && "bg-sidebar-accent/50 text-sidebar-foreground",
+                  calendarView && "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-sm ring-1 ring-sidebar-border/40 dark:bg-sidebar-accent/55",
                 )}
                 onClick={openCalendar}
                 title={isCompact ? "Calendar" : undefined}
               >
-                <Calendar className="w-[14px] h-[14px] text-muted-foreground/40 group-hover/tool:text-sidebar-foreground transition-colors" />
+                <Calendar className="w-[14px] h-[14px] shrink-0 text-current opacity-80 group-hover/tool:opacity-100 transition-opacity" />
                 {!isCompact && <span>Calendar</span>}
               </button>
               <button
                 type="button"
                 className={cn(
-                  "w-full flex items-center h-[30px] px-2 text-[13px] text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool",
+                  "w-full flex items-center h-[30px] px-2 text-[13px] text-sidebar-foreground/92 dark:text-muted-foreground/72 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
                   isCompact && "w-9 h-9 justify-center px-0",
                 )}
                 onClick={() => router.push("/dashboard?view=flashcards")}
                 title={isCompact ? "Flashcards" : undefined}
               >
-                <Layers className="w-[14px] h-[14px] text-muted-foreground/40 group-hover/tool:text-sidebar-foreground transition-colors" />
+                <Layers className="w-[14px] h-[14px] shrink-0 text-current opacity-80 group-hover/tool:opacity-100 transition-opacity" />
                 {!isCompact && <span>Flashcards</span>}
               </button>
               <button
+                type="button"
                 className={cn(
-                  "w-full flex items-center h-[30px] px-2 text-[13px] text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool",
+                  "w-full flex items-center h-[30px] px-2 text-[13px] text-sidebar-foreground/92 dark:text-muted-foreground/72 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
                   isCompact && "w-9 h-9 justify-center px-0"
                 )}
                 onClick={() => router.push("/dashboard?view=quizzes")}
                 title={isCompact ? "Quizzes" : undefined}
               >
-                <ClipboardList className="w-[14px] h-[14px] text-muted-foreground/40 group-hover/tool:text-sidebar-foreground transition-colors" />
+                <ClipboardList className="w-[14px] h-[14px] shrink-0 text-current opacity-80 group-hover/tool:opacity-100 transition-opacity" />
                 {!isCompact && <span>Quizzes</span>}
               </button>
               <button
+                type="button"
                 className={cn(
-                  "w-full flex items-center h-[30px] px-2 text-[13px] text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool",
+                  "w-full flex items-center h-[30px] px-2 text-[13px] text-sidebar-foreground/92 dark:text-muted-foreground/72 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
                   isCompact && "w-9 h-9 justify-center px-0"
                 )}
                 onClick={() => router.push("/dashboard?view=archive")}
                 title={isCompact ? "Archive" : undefined}
               >
-                <Archive className="w-[14px] h-[14px] text-muted-foreground/40 group-hover/tool:text-sidebar-foreground transition-colors" />
+                <Archive className="w-[14px] h-[14px] shrink-0 text-current opacity-80 group-hover/tool:opacity-100 transition-opacity" />
                 {!isCompact && <span>Archive</span>}
               </button>
             </div>
@@ -604,7 +593,7 @@ export function Sidebar() {
               <p className="text-[13px] font-medium text-sidebar-foreground truncate leading-tight">
                 {user?.fullName || "Student"}
               </p>
-              <p className="text-[11px] text-muted-foreground/40 truncate leading-tight">
+              <p className="text-[11px] text-muted-foreground dark:text-muted-foreground/60 truncate leading-tight">
                 Pro Plan
               </p>
             </div>
@@ -613,7 +602,7 @@ export function Sidebar() {
             <Button
               variant="ghost"
               size="icon"
-              className="w-7 h-7 text-muted-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md opacity-0 group-hover/footer:opacity-100 transition-all"
+              className="w-7 h-7 text-muted-foreground/70 dark:text-muted-foreground/45 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md opacity-0 group-hover/footer:opacity-100 transition-all focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
               onClick={() => setIsSettingsOpen(true)}
             >
               <Settings className="w-[14px] h-[14px]" />
@@ -623,7 +612,7 @@ export function Sidebar() {
             <Button
               variant="ghost"
               size="icon"
-              className="w-9 h-9 text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md"
+              className="w-9 h-9 text-muted-foreground/75 dark:text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
               onClick={() => setIsSettingsOpen(true)}
             >
               <Settings className="w-[15px] h-[15px]" />
@@ -651,8 +640,9 @@ export function Sidebar() {
 
           {isClosed && (
             <button
+              type="button"
               onClick={() => setLeftSidebarState("open")}
-              className="fixed left-3 top-3 w-8 h-8 bg-sidebar border border-sidebar-border rounded-md flex items-center justify-center text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all z-60"
+              className="fixed left-3 top-3 w-8 h-8 bg-sidebar border border-sidebar-border rounded-md flex items-center justify-center text-muted-foreground/75 dark:text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all z-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
               aria-label="Show sidebar"
               title="Show sidebar"
             >
@@ -680,8 +670,10 @@ export function Sidebar() {
         </div>
       ) : isNarrowViewport && isClosed ? (
         <button
+          type="button"
           onClick={() => setLeftSidebarState("open")}
-          className="fixed left-3 bottom-3 w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-primary-foreground shadow-lg z-100 active:scale-95 transition-transform"
+          aria-label="Open sidebar"
+          className="fixed left-3 bottom-3 w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-primary-foreground shadow-lg z-100 active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <Plus className="w-5 h-5" />
         </button>

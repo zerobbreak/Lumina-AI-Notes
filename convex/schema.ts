@@ -70,6 +70,8 @@ export default defineSchema({
     isArchived: v.optional(v.boolean()),
     isShared: v.optional(v.boolean()),
     createdAt: v.number(),
+    /** Updated when the note is opened/edited; used for stale cleanup. */
+    lastAccessedAt: v.optional(v.number()),
     // Vector embedding for semantic search (768 dimensions for gemini-embedding-001)
     embedding: v.optional(v.array(v.float64())),
     // Linked source documents for citations
@@ -96,6 +98,7 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_userId_and_createdAt", ["userId", "createdAt"])
+    .index("by_userId_and_lastAccessedAt", ["userId", "lastAccessedAt"])
     .index("by_userId_sourceRecordingId", ["userId", "sourceRecordingId"])
     .index("by_userId_and_pinned", ["userId", "isPinned"])
     .index("by_userId_and_archived", ["userId", "isArchived"])
@@ -121,6 +124,8 @@ export default defineSchema({
     storageId: v.optional(v.string()),
     courseId: v.optional(v.string()),
     createdAt: v.number(),
+    /** Updated when the file is opened/used; used for stale cleanup. */
+    lastAccessedAt: v.optional(v.number()),
     // Document processing fields
     extractedText: v.optional(v.string()),
     summary: v.optional(v.string()),
@@ -134,6 +139,8 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_userId_courseId", ["userId", "courseId"])
+    .index("by_userId_createdAt", ["userId", "createdAt"])
+    .index("by_userId_lastAccessedAt", ["userId", "lastAccessedAt"])
     .index("by_processingStatus", ["processingStatus"])
     .searchIndex("search_name", {
       searchField: "name",
@@ -334,4 +341,47 @@ export default defineSchema({
   })
     .index("by_sessionId", ["sessionId"])
     .index("by_sessionId_createdAt", ["sessionId", "createdAt"]),
+
+  deadlines: defineTable({
+    userId: v.string(),
+    title: v.string(),
+    dueAt: v.number(), // ms timestamp
+    kind: v.union(
+      v.literal("assignment"),
+      v.literal("exam"),
+      v.literal("event"),
+      v.literal("task"),
+    ),
+    courseId: v.optional(v.string()),
+    moduleId: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_userId_dueAt", ["userId", "dueAt"])
+    .index("by_userId_completedAt", ["userId", "completedAt"]),
+
+  deadlineReminders: defineTable({
+    userId: v.string(),
+    deadlineId: v.id("deadlines"),
+    remindAt: v.number(), // ms timestamp
+    createdAt: v.number(),
+    sentAt: v.optional(v.number()),
+  })
+    .index("by_userId_remindAt", ["userId", "remindAt"])
+    .index("by_remindAt", ["remindAt"])
+    .index("by_deadlineId", ["deadlineId"]),
+
+  notifications: defineTable({
+    userId: v.string(),
+    type: v.union(v.literal("deadline_reminder")),
+    title: v.string(),
+    body: v.optional(v.string()),
+    href: v.optional(v.string()),
+    createdAt: v.number(),
+    readAt: v.optional(v.number()),
+  })
+    .index("by_userId_createdAt", ["userId", "createdAt"])
+    .index("by_userId_readAt", ["userId", "readAt"]),
 });

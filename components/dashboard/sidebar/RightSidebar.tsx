@@ -34,8 +34,6 @@ import {
   History,
   Code2,
   Zap,
-  PanelRightClose,
-  PanelRightOpen,
   Link2,
 } from "lucide-react";
 import {
@@ -272,7 +270,6 @@ export function RightSidebar() {
     activeContext,
     setActiveContext,
     rightSidebarState,
-    toggleRightSidebar,
     setRightSidebarState,
   } = useDashboard();
 
@@ -1372,17 +1369,6 @@ export function RightSidebar() {
         />
         <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-3 border-b border-sidebar-border">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 shrink-0 rounded-md text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-              onClick={toggleRightSidebar}
-              aria-label={isRightOpen ? "Hide Lumina Studio" : "Show Lumina Studio"}
-              title={isRightOpen ? "Hide Lumina Studio" : "Show Lumina Studio"}
-            >
-              <PanelRightClose className="w-4 h-4" />
-            </Button>
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-7 h-7 rounded-md bg-sidebar-accent flex items-center justify-center shrink-0">
                 <Sparkles className="w-3.5 h-3.5 text-muted-foreground" />
@@ -2234,17 +2220,6 @@ export function RightSidebar() {
         )}
       </div>
     </motion.div>
-    {isRightClosed && (
-      <button
-        type="button"
-        onClick={() => setRightSidebarState("open")}
-        className="fixed right-4 top-4 z-60 w-9 h-9 bg-background border border-sidebar-border rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors"
-        aria-label="Open Studio"
-        title="Open Studio"
-      >
-        <PanelRightOpen className="w-4 h-4" />
-      </button>
-    )}
     <Dialog
       open={isSaveModalOpen}
       onOpenChange={(open) => {

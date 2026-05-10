@@ -1,13 +1,12 @@
 "use client";
 
 import { useMemo, useState, useCallback } from "react";
+import type { ComponentProps } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { useRouter } from "next/navigation";
 import {
-  ChevronLeft,
-  ChevronRight,
   Calendar as CalendarIcon,
   Mic,
   FileText,
@@ -17,7 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
+import { Calendar, CalendarDayButton } from "@/components/ui/calendar";
 import type { Course } from "@/types";
 
 function localDayKey(ts: number): string {
@@ -25,6 +24,13 @@ function localDayKey(ts: number): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function dateToDayKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
 
@@ -40,21 +46,54 @@ function formatDuration(sec: number | undefined): string {
   return `${m}m ${s}s`;
 }
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
 function daysInMonth(y: number, m: number): number {
   return new Date(y, m + 1, 0).getDate();
+}
+
+type ActivityByDayMap = Map<
+  string,
+  { recordings: Doc<"recordings">[]; notes: Doc<"notes">[] }
+>;
+
+function ActivityCalendarDayButton({
+  byDay,
+  ...props
+}: ComponentProps<typeof CalendarDayButton> & { byDay: ActivityByDayMap }) {
+  const key = dateToDayKey(props.day.date);
+  const bundle = byDay.get(key);
+  const recN = bundle?.recordings.length ?? 0;
+  const noteN = bundle?.notes.length ?? 0;
+  const total = recN + noteN;
+
+  return (
+    <CalendarDayButton {...props}>
+      {props.children}
+      {total > 0 ? (
+        <span className="flex shrink-0 justify-center gap-0.5" aria-hidden>
+          {recN > 0 && (
+            <span
+              className="inline-block size-1.5 rounded-full bg-violet-500"
+              title="Sessions"
+            />
+          )}
+          {noteN > 0 && (
+            <span
+              className="inline-block size-1.5 rounded-full bg-emerald-500"
+              title="Notes"
+            />
+          )}
+        </span>
+      ) : (
+        <span className="pointer-events-none h-1.5 shrink-0" aria-hidden />
+      )}
+    </CalendarDayButton>
+  );
 }
 
 export default function CalendarView() {
   const router = useRouter();
   const userData = useQuery(api.users.getUser);
   const gamification = useQuery(api.users.getUserGamificationStats);
-
-  const [todayParts] = useState(() => {
-    const n = new Date();
-    return { y: n.getFullYear(), m: n.getMonth(), d: n.getDate() };
-  });
 
   const [cal, setCal] = useState(() => {
     const n = new Date();
@@ -70,8 +109,6 @@ export default function CalendarView() {
     daysInMonth(cursor.y, cursor.m),
   );
   const selectedKey = `${cursor.y}-${String(cursor.m + 1).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
-
-  const todayKey = `${todayParts.y}-${String(todayParts.m + 1).padStart(2, "0")}-${String(todayParts.d).padStart(2, "0")}`;
 
   const range = useMemo(() => {
     const startMs = new Date(cursor.y, cursor.m, 1, 0, 0, 0, 0).getTime();
@@ -104,64 +141,52 @@ export default function CalendarView() {
     return map;
   }, [activity]);
 
-  const monthLabel = new Date(cursor.y, cursor.m, 1).toLocaleString(undefined, {
-    month: "long",
-    year: "numeric",
-  });
+  const displayMonthStart = useMemo(
+    () => new Date(cursor.y, cursor.m, 1),
+    [cursor.y, cursor.m],
+  );
 
-  const gridDays = useMemo(() => {
-    const first = new Date(cursor.y, cursor.m, 1);
-    const startPad = first.getDay();
-    const dim = new Date(cursor.y, cursor.m + 1, 0).getDate();
-    const cells: { day: number | null; key: string | null }[] = [];
-    for (let i = 0; i < startPad; i++) {
-      cells.push({ day: null, key: null });
-    }
-    for (let d = 1; d <= dim; d++) {
-      const key = `${cursor.y}-${String(cursor.m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      cells.push({ day: d, key });
-    }
-    while (cells.length % 7 !== 0) {
-      cells.push({ day: null, key: null });
-    }
-    return cells;
-  }, [cursor.y, cursor.m]);
+  const selectedDate = useMemo(
+    () => new Date(cursor.y, cursor.m, safeDay),
+    [cursor.y, cursor.m, safeDay],
+  );
 
-  const goPrev = useCallback(() => {
-    setCal((s) => {
-      const c = s.cursor;
-      const next =
-        c.m === 0 ? { y: c.y - 1, m: 11 } : { y: c.y, m: c.m - 1 };
-      const t = new Date();
-      const inMonth =
-        t.getFullYear() === next.y && t.getMonth() === next.m;
-      const dim = daysInMonth(next.y, next.m);
-      const day = inMonth ? Math.min(t.getDate(), dim) : 1;
-      return { cursor: next, selectedDay: day };
-    });
+  const navigateToMonthContaining = useCallback((d: Date) => {
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    const today = new Date();
+    const inMonth =
+      today.getFullYear() === y && today.getMonth() === m;
+    const dim = daysInMonth(y, m);
+    const day = inMonth ? Math.min(today.getDate(), dim) : 1;
+    setCal({ cursor: { y, m }, selectedDay: day });
   }, []);
 
-  const goNext = useCallback(() => {
-    setCal((s) => {
-      const c = s.cursor;
-      const next =
-        c.m === 11 ? { y: c.y + 1, m: 0 } : { y: c.y, m: c.m + 1 };
-      const t = new Date();
-      const inMonth =
-        t.getFullYear() === next.y && t.getMonth() === next.m;
-      const dim = daysInMonth(next.y, next.m);
-      const day = inMonth ? Math.min(t.getDate(), dim) : 1;
-      return { cursor: next, selectedDay: day };
-    });
-  }, []);
+  const handleMonthChange = useCallback(
+    (d: Date) => {
+      navigateToMonthContaining(new Date(d.getFullYear(), d.getMonth(), 1));
+    },
+    [navigateToMonthContaining],
+  );
+
+  const handleSelect = useCallback(
+    (date: Date | undefined) => {
+      if (!date) return;
+      setCal({
+        cursor: {
+          y: date.getFullYear(),
+          m: date.getMonth(),
+        },
+        selectedDay: date.getDate(),
+      });
+    },
+    [],
+  );
 
   const goToday = useCallback(() => {
     const t = new Date();
-    setCal({
-      cursor: { y: t.getFullYear(), m: t.getMonth() },
-      selectedDay: t.getDate(),
-    });
-  }, []);
+    navigateToMonthContaining(new Date(t.getFullYear(), t.getMonth(), t.getDate()));
+  }, [navigateToMonthContaining]);
 
   const selectedBundle = byDay.get(selectedKey);
 
@@ -173,14 +198,6 @@ export default function CalendarView() {
     },
     [userData],
   );
-
-  if (activity === undefined) {
-    return (
-      <div className="flex-1 h-full flex items-center justify-center bg-background text-muted-foreground">
-        <Loader2 className="w-6 h-6 animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div className="flex-1 h-full flex flex-col overflow-hidden bg-background min-h-0">
@@ -221,69 +238,40 @@ export default function CalendarView() {
 
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
         <div className="lg:w-[min(100%,520px)] shrink-0 border-b lg:border-b-0 lg:border-r border-border p-4 md:p-6 flex flex-col min-h-0">
-          <div className="flex items-center justify-between gap-2 mb-4">
-            <Button variant="outline" size="icon" onClick={goPrev} aria-label="Previous month">
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <div className="font-semibold text-foreground capitalize">{monthLabel}</div>
-            <Button variant="outline" size="icon" onClick={goNext} aria-label="Next month">
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-          <Button variant="secondary" size="sm" className="mb-4 self-start" onClick={goToday}>
+          <Button variant="secondary" size="sm" className="mb-3 self-start" onClick={goToday}>
             Today
           </Button>
 
-          <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-muted-foreground mb-2">
-            {WEEKDAYS.map((w) => (
-              <div key={w} className="py-1 font-medium">
-                {w}
-              </div>
-            ))}
-          </div>
+          {activity === undefined ? (
+            <div
+              className="mb-3 flex items-center gap-2 text-xs text-muted-foreground"
+              role="status"
+              aria-live="polite"
+            >
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+              Loading activity…
+            </div>
+          ) : null}
 
-          <div className="grid grid-cols-7 gap-1">
-            {gridDays.map((cell, idx) => {
-              if (cell.day === null || !cell.key) {
-                return <div key={`pad-${idx}`} className="aspect-square min-h-[36px]" />;
-              }
-              const bundle = byDay.get(cell.key);
-              const recN = bundle?.recordings.length ?? 0;
-              const noteN = bundle?.notes.length ?? 0;
-              const total = recN + noteN;
-              const isToday = cell.key === todayKey;
-              const isSelected = cell.key === selectedKey;
-
-              return (
-                <button
-                  key={cell.key}
-                  type="button"
-                  onClick={() =>
-                    setCal((s) => ({ ...s, selectedDay: cell.day! }))
-                  }
-                  className={cn(
-                    "aspect-square min-h-[36px] rounded-lg text-sm font-medium transition-colors flex flex-col items-center justify-center gap-0.5",
-                    "hover:bg-accent",
-                    isToday && "ring-2 ring-primary/50",
-                    isSelected && "bg-accent text-accent-foreground",
-                    !isSelected && !isToday && "text-foreground",
-                  )}
-                >
-                  <span>{cell.day}</span>
-                  {total > 0 && (
-                    <span className="flex gap-0.5">
-                      {recN > 0 && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-violet-500" title="Recordings" />
-                      )}
-                      {noteN > 0 && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Notes" />
-                      )}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          <Calendar
+            mode="single"
+            month={displayMonthStart}
+            onMonthChange={handleMonthChange}
+            selected={selectedDate}
+            onSelect={handleSelect}
+            weekStartsOn={0}
+            showOutsideDays
+            className="w-full rounded-xl border border-border bg-card/30 p-2 [--cell-size:2.5rem] md:[--cell-size:2.75rem]"
+            classNames={{
+              root: "w-full min-w-0",
+              month: "w-full min-w-0 flex-1",
+            }}
+            components={{
+              DayButton: (props) => (
+                <ActivityCalendarDayButton {...props} byDay={byDay} />
+              ),
+            }}
+          />
 
           <div className="mt-4 flex items-center gap-4 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1.5">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, lazy, Suspense } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -16,10 +16,8 @@ import {
   Gavel,
   Landmark,
   Layout,
-  FileText,
   Clock,
   ArrowRight,
-  File as FileIcon,
   Layers,
   Loader2,
 } from "lucide-react";
@@ -29,23 +27,15 @@ import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { motion } from "framer-motion";
+import type { Doc } from "@/convex/_generated/dataModel";
+import { NotesRail } from "@/components/dashboard/home/NotesRail";
+import { StudyNextActions } from "@/components/dashboard/home/StudyNextActions";
+import { ProductivityPanel } from "@/components/dashboard/home/ProductivityPanel";
+import { AcademicPipeline } from "@/components/dashboard/home/AcademicPipeline";
 
 const TourOverlay = lazy(() => import("@/components/dashboard/TourOverlay").then(m => ({ default: m.TourOverlay })));
 import type { TourStep } from "@/components/dashboard/TourOverlay";
 const AnalyticsCharts = lazy(() => import("./AnalyticsCharts"));
-
-// Helper to get a nice gradient based on course code or name
-const getGradient = (code: string) => {
-  const gradients = [
-    "from-indigo-500/20 via-purple-500/20 to-pink-500/20",
-    "from-cyan-500/20 via-teal-500/20 to-emerald-500/20",
-    "from-amber-500/20 via-orange-500/20 to-red-500/20",
-    "from-fuchsia-500/20 via-pink-500/20 to-rose-500/20",
-    "from-blue-500/20 via-indigo-500/20 to-violet-500/20",
-  ];
-  const index = code.length % gradients.length;
-  return gradients[index];
-};
 
 const getIcon = (code: string) => {
   const c = code.toLowerCase();
@@ -93,10 +83,62 @@ export default function SmartFolderHub() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const updateTourProgress = useMutation(api.users.updateTourProgress);
-  const [showTour, setShowTour] = useState(false);
+
+  const tourParam = searchParams.get("tour");
+  /** Hide overlay immediately on dismiss; cleared when URL requests tour again. */
+  const [suppressTourOverlay, setSuppressTourOverlay] = useState(false);
+  useEffect(() => {
+    // Reset suppression only when a new tour is requested.
+    // Deferring avoids the "sync setState in effect" eslint rule in this repo.
+    if (tourParam === "1") {
+      const id = window.setTimeout(() => setSuppressTourOverlay(false), 0);
+      return () => window.clearTimeout(id);
+    }
+  }, [tourParam]);
+
+  const labelLookup = useMemo(() => {
+    const courses = (userData?.courses ?? []) as Course[];
+    const courseMap = new Map<
+      string,
+      { code?: string; name: string; modules?: Array<{ id: string; title: string }> }
+    >();
+    courses.forEach((c) => {
+      courseMap.set(c.id, { code: c.code, name: c.name, modules: c.modules });
+    });
+    return ({
+      courseId,
+      moduleId,
+    }: {
+      courseId?: string;
+      moduleId?: string;
+    }) => {
+      if (!courseId) return {};
+      const course = courseMap.get(courseId);
+      if (!course) return {};
+      const moduleEntry = moduleId
+        ? course.modules?.find((m) => m.id === moduleId)
+        : undefined;
+      return {
+        courseLabel: course.code ? `${course.code}` : course.name,
+        moduleLabel: moduleEntry?.title,
+      };
+    };
+  }, [userData?.courses]);
+
+  const wantsTourOverlay =
+    !!userData &&
+    tourParam === "1" &&
+    userData.tourCompleted !== true;
+  const showTour = wantsTourOverlay && !suppressTourOverlay;
 
   // Analytics lazy-loading — only subscribe when user expands the section
   const [showAnalytics, setShowAnalytics] = useState(false);
+  // Notes: only fetch pinned when user requests tab
+  const [wantsPinnedNotes, setWantsPinnedNotes] = useState(false);
+  const pinnedNotes = useQuery(
+    api.notes.getPinnedNotes,
+    wantsPinnedNotes ? {} : "skip",
+  );
 
   // Rename State
   const [renameTarget, setRenameTarget] = useState<{
@@ -113,18 +155,6 @@ export default function SmartFolderHub() {
     await renameCourse({ courseId: renameTarget.id, name: newName });
     setRenameTarget(null);
   };
-
-  if (!userData) return null;
-
-  // Calculate statistics
-  const dueTodayCount = todayQueue?.cardIds?.length ?? 0;
-
-  useEffect(() => {
-    if (!userData) return;
-    const shouldShow =
-      searchParams.get("tour") === "1" && userData.tourCompleted !== true;
-    setShowTour(shouldShow);
-  }, [searchParams, userData]);
 
   const tourSteps = useMemo<TourStep[]>(
     () => [
@@ -164,8 +194,13 @@ export default function SmartFolderHub() {
     [],
   );
 
+  if (!userData) return null;
+
+  // Calculate statistics
+  const dueTodayCount = todayQueue?.cardIds?.length ?? 0;
+
   const closeTour = async (completed: boolean) => {
-    setShowTour(false);
+    setSuppressTourOverlay(true);
     await updateTourProgress({ completed: completed ? true : false, step: 0 });
     router.replace("/dashboard");
   };
@@ -182,20 +217,24 @@ export default function SmartFolderHub() {
           />
         </Suspense>
       )}
-      <div className="p-8 max-w-[1600px] mx-auto space-y-12">
+      <div className="p-6 lg:p-8 max-w-[1600px] mx-auto space-y-10">
         {/* Hero Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
-          className="relative rounded-3xl p-8 overflow-hidden"
+          className="relative rounded-3xl p-7 lg:p-8 overflow-hidden"
           data-tour="dashboard-overview"
         >
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl dark:bg-cyan-500/12" />
+            <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-indigo-500/10 blur-3xl dark:bg-indigo-500/12" />
+          </div>
           <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="space-y-2">
-              <h1 className="text-5xl font-bold text-foreground tracking-tight">
+              <h1 className="text-4xl lg:text-5xl font-bold text-foreground tracking-tight">
                 Welcome back,{" "}
-                <span className="text-transparent bg-clip-text bg-linear-to-r from-cyan-400 to-blue-500">
+                <span className="text-transparent bg-clip-text bg-linear-to-r from-cyan-700 to-blue-700 dark:from-cyan-400 dark:to-blue-500">
                   {userData.name?.split(" ")[0] || "Student"}
                 </span>
               </h1>
@@ -204,34 +243,34 @@ export default function SmartFolderHub() {
                 start something new.
               </p>
             </div>
-            <div className="flex gap-4">
-              <div className="rounded-2xl border border-white/10 bg-black/40 backdrop-blur-md px-5 py-4 min-w-[200px]">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-400">
-                  <Layers className="w-4 h-4" />
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="rounded-2xl border border-border bg-card text-card-foreground px-5 py-4 min-w-[200px] shadow-sm ring-1 ring-black/5 dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:ring-0 dark:backdrop-blur-md">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-700 dark:text-amber-400">
+                  <Layers className="w-4 h-4 shrink-0" aria-hidden />
                   Cards Due Today
                 </div>
-                <div className="mt-2 text-3xl font-bold text-white">
+                <div className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
                   {dueTodayCount}
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => router.push("/dashboard?view=flashcards")}
-                  className="mt-3 text-xs text-gray-400 hover:text-white hover:bg-white/5"
+                  className="mt-3 -ml-2 h-8 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent dark:hover:bg-white/5"
                 >
                   Start reviewing
-                  <ArrowRight className="w-3 h-3 ml-1" />
+                  <ArrowRight className="w-3 h-3 ml-1" aria-hidden />
                 </Button>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-black/40 backdrop-blur-md px-5 py-4 min-w-[200px]">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-cyan-400">
-                  <Clock className="w-4 h-4" />
+              <div className="rounded-2xl border border-border bg-card text-card-foreground px-5 py-4 min-w-[200px] shadow-sm ring-1 ring-black/5 dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:ring-0 dark:backdrop-blur-md">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-cyan-700 dark:text-cyan-400">
+                  <Clock className="w-4 h-4 shrink-0" aria-hidden />
                   Study Streak
                 </div>
-                <div className="mt-2 text-3xl font-bold text-white">
+                <div className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
                   {gamification?.currentStreak ?? 0}
                 </div>
-                <div className="mt-1 text-[10px] text-gray-500">
+                <div className="mt-1 text-xs text-muted-foreground">
                   Longest: {gamification?.longestStreak ?? 0} days
                 </div>
               </div>
@@ -239,61 +278,66 @@ export default function SmartFolderHub() {
           </div>
         </motion.div>
 
-        {/* Analytics Section — lazy-loaded to save DB reads */}
+        {/* Workspace (stacked sections) */}
         <div className="space-y-6">
-          <div className="flex items-center justify-between mb-2 px-1">
-            <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-emerald-500" />
-              Study Analytics
-            </h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowAnalytics((prev) => !prev)}
-              className="text-xs text-gray-400 hover:text-white hover:bg-white/5"
+          <NotesRail
+            recentNotes={recentNotes as Doc<"notes">[] | undefined}
+            pinnedNotes={pinnedNotes as Doc<"notes">[] | undefined}
+            onRequestPinned={() => setWantsPinnedNotes(true)}
+            onOpenNote={(id) => router.push(`/dashboard?noteId=${id}`)}
+            lookupLabels={labelLookup}
+          />
+
+          <StudyNextActions
+            dueTodayCount={dueTodayCount}
+            streakDays={gamification?.currentStreak ?? 0}
+            recentNote={recentNotes?.[0] as Doc<"notes"> | undefined}
+            onStartFlashcards={() => router.push("/dashboard?view=flashcards")}
+            onOpenRecentNote={(id) => router.push(`/dashboard?noteId=${id}`)}
+          />
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            <ProductivityPanel
+              showAnalytics={showAnalytics}
+              onToggle={() => setShowAnalytics((prev) => !prev)}
+              headlineMetric={{
+                value: `${gamification?.currentStreak ?? 0}d`,
+                label: "Study streak",
+              }}
             >
-              {showAnalytics ? "Hide" : "Show"}
-              <ArrowRight
-                className={`w-3 h-3 ml-1 transition-transform ${showAnalytics ? "rotate-90" : ""}`}
-              />
-            </Button>
+              <Suspense
+                fallback={
+                  <div className="rounded-2xl border border-border bg-card p-6 text-center shadow-sm dark:border-white/10 dark:bg-black/40">
+                    <Loader2
+                      className="w-6 h-6 animate-spin mx-auto text-muted-foreground"
+                      aria-hidden
+                    />
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Loading analytics...
+                    </p>
+                  </div>
+                }
+              >
+                <AnalyticsCharts showAnalytics={showAnalytics} />
+              </Suspense>
+            </ProductivityPanel>
+
+            <AcademicPipeline className="lg:sticky lg:top-6" />
           </div>
-
-          {!showAnalytics && (
-            <div className="rounded-2xl border border-white/10 bg-black/40 p-6 text-center">
-              <p className="text-sm text-gray-400">
-                Click &quot;Show&quot; to load your study analytics.
-              </p>
-              <p className="text-xs text-gray-600 mt-1">
-                Analytics are loaded on-demand to optimize performance.
-              </p>
-            </div>
-          )}
-
-          {showAnalytics && (
-            <Suspense fallback={
-              <div className="rounded-2xl border border-white/10 bg-black/40 p-6 text-center">
-                <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
-                <p className="text-sm text-gray-400 mt-2">Loading analytics...</p>
-              </div>
-            }>
-              <AnalyticsCharts showAnalytics={showAnalytics} />
-            </Suspense>
-          )}
         </div>
 
         {/* Courses Grid */}
         <div>
           <div className="flex items-center justify-between mb-6 px-1">
-            <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-              <Layout className="w-4 h-4 text-cyan-500" />
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+              <Layout className="w-4 h-4 text-cyan-600 dark:text-cyan-500 shrink-0" aria-hidden />
               Your Courses
             </h2>
             <Button
               variant="outline"
               size="sm"
               onClick={handleCreateCourse}
-              className="rounded-full text-slate-700 dark:text-white bg-slate-100 dark:bg-white/5 border-slate-300 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-cyan-600 dark:hover:text-cyan-400 hover:border-cyan-500/50 dark:hover:border-cyan-500/30 transition-all duration-300"
+              className="border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10 dark:hover:text-cyan-400 dark:hover:border-cyan-500/30 transition-colors"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add Course
@@ -313,13 +357,23 @@ export default function SmartFolderHub() {
                 <motion.div
                   key={course.id}
                   variants={itemVariants}
+                  role="button"
+                  tabIndex={0}
                   onClick={() =>
                     router.push(
                       `/dashboard?contextId=${course.id}&contextType=course`,
                     )
                   }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      router.push(
+                        `/dashboard?contextId=${course.id}&contextType=course`,
+                      );
+                    }
+                  }}
                   whileHover={{ scale: 1.02 }}
-                  className="group relative rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-black/40 shadow-sm dark:shadow-none backdrop-blur-md hover:bg-slate-50 dark:hover:bg-white/10 hover:border-slate-300 dark:hover:border-white/20 cursor-pointer transition-all duration-300 p-5"
+                  className="group relative rounded-xl border border-border bg-card text-card-foreground shadow-sm hover:shadow-md dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:backdrop-blur-md hover:bg-accent/40 dark:hover:bg-white/10 hover:border-border/80 dark:hover:border-white/20 cursor-pointer transition-all duration-300 p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   {/* Icon in top-left */}
                   <div className="flex items-start justify-between mb-4">
@@ -363,7 +417,7 @@ export default function SmartFolderHub() {
                     <span className="text-xs font-mono text-cyan-700 dark:text-cyan-400 bg-cyan-100 dark:bg-cyan-950/40 px-2 py-1 rounded border border-cyan-300 dark:border-cyan-500/20">
                       {course.code}
                     </span>
-                    <span className="text-xs text-slate-500 dark:text-gray-400">
+                    <span className="text-xs text-muted-foreground">
                       {course.modules?.length || 0}{" "}
                       {course.modules?.length === 1 ? "Module" : "Modules"}
                     </span>
@@ -375,10 +429,18 @@ export default function SmartFolderHub() {
             {/* Create New Course Card */}
             <motion.div
               variants={itemVariants}
+              role="button"
+              tabIndex={0}
               onClick={handleCreateCourse}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  void handleCreateCourse();
+                }
+              }}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="rounded-xl border border-dashed border-slate-300 dark:border-white/10 hover:border-cyan-500/50 dark:hover:border-cyan-500/30 hover:bg-cyan-50 dark:hover:bg-cyan-500/5 cursor-pointer transition-all duration-300 flex flex-col items-center justify-center gap-3 p-8 min-h-[180px]"
+              className="rounded-xl border border-dashed border-border bg-card/50 hover:bg-cyan-50/90 dark:border-white/10 hover:border-cyan-600/40 dark:hover:border-cyan-500/30 dark:hover:bg-cyan-500/5 cursor-pointer transition-all duration-300 flex flex-col items-center justify-center gap-3 p-8 min-h-[180px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <div className="w-16 h-16 rounded-full bg-cyan-100 dark:bg-cyan-500/10 flex items-center justify-center">
                 <Plus className="w-8 h-8 text-cyan-600 dark:text-cyan-400" />
@@ -389,58 +451,6 @@ export default function SmartFolderHub() {
             </motion.div>
           </motion.div>
         </div>
-
-        {/* Recent Activity Section */}
-        {recentNotes && recentNotes.length > 0 && (
-          <div className="pb-8">
-            <div className="flex items-center justify-between mb-6 px-1">
-              <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-500" />
-                Recent Notes
-              </h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push("/dashboard")}
-                className="text-xs text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5"
-              >
-                View all
-                <ArrowRight className="w-3 h-3 ml-1" />
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {recentNotes.slice(0, 6).map((note) => (
-                <motion.div
-                  key={note._id}
-                  variants={itemVariants}
-                  onClick={() => router.push(`/dashboard?noteId=${note._id}`)}
-                  whileHover={{ y: -4, x: 2 }}
-                  className="group relative p-5 rounded-2xl border border-slate-200 dark:border-white/5 bg-white dark:bg-[#121212]/60 shadow-sm dark:shadow-none hover:bg-slate-50 dark:hover:bg-[#18181B]/80 hover:border-slate-300 dark:hover:border-white/10 hover:shadow-lg cursor-pointer transition-all duration-300 backdrop-blur-sm"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-indigo-100 dark:bg-indigo-500/10 flex items-center justify-center shrink-0 group-hover:bg-indigo-200 dark:group-hover:bg-indigo-500/20 transition-colors">
-                      <FileText className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-200 transition-colors mb-1">
-                        {note.title}
-                      </h3>
-                      <p className="text-xs text-gray-500 flex items-center gap-2">
-                        <Clock className="w-3 h-3" />
-                        {new Date(note.createdAt).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </p>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-slate-400 dark:text-gray-700 -rotate-45 opacity-0 group-hover:opacity-100 group-hover:rotate-0 transition-all duration-300" />
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        )}
 
         <RenameDialog
           open={!!renameTarget}

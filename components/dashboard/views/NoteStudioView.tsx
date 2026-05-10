@@ -353,19 +353,24 @@ export default function NoteStudioView() {
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {sessions.map((session) => (
-            <button
+            <div
               key={session._id}
-              onClick={() => setActiveSessionId(session._id)}
               className={cn(
-                "group w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-2",
-                activeSessionId === session._id 
-                  ? "bg-primary/10 text-primary font-medium" 
-                  : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                "group flex w-full items-center gap-0 rounded-lg text-sm transition-colors",
+                activeSessionId === session._id
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
-              <MessageSquare className="w-4 h-4 shrink-0" />
-              <span className="truncate flex-1 min-w-0">{session.title}</span>
-              <span className="shrink-0">
+              <button
+                type="button"
+                onClick={() => setActiveSessionId(session._id)}
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <MessageSquare className="h-4 w-4 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">{session.title}</span>
+              </button>
+              <div className="shrink-0 pr-2">
                 <Button
                   type="button"
                   variant="ghost"
@@ -377,8 +382,8 @@ export default function NoteStudioView() {
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
-              </span>
-            </button>
+              </div>
+            </div>
           ))}
         </div>
       </div>
