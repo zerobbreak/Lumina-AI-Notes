@@ -1,11 +1,9 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Sparkles } from "lucide-react";
-import { useEffect, Suspense, lazy } from "react";
+import { Suspense, lazy } from "react";
 
 const NoteView = lazy(() => import("@/components/dashboard/editor/NoteView"));
 const FolderView = lazy(() => import("@/components/dashboard/views/FolderView"));
@@ -48,39 +46,7 @@ function DashboardContent() {
   const view = searchParams.get("view");
   const deckId = searchParams.get("deckId");
 
-  const userData = useQuery(api.users.getUser);
   const router = useRouter();
-
-  // Redirect to onboarding if user doesn't exist or hasn't completed onboarding
-  useEffect(() => {
-    if (userData === null || (userData && !userData.onboardingComplete)) {
-      router.replace("/onboarding");
-    }
-  }, [userData, router]);
-
-  // Loading State
-  if (userData === undefined) {
-    return (
-      <div className="h-full bg-background flex items-center justify-center text-muted-foreground">
-        <div className="flex items-center gap-2 animate-pulse">
-          <Sparkles className="w-5 h-5" />
-          <span>Loading Workspace...</span>
-        </div>
-      </div>
-    );
-  }
-
-  // Waiting for redirect to onboarding
-  if (userData === null || !userData.onboardingComplete) {
-    return (
-      <div className="h-full bg-background flex items-center justify-center text-muted-foreground">
-        <div className="flex items-center gap-2 animate-pulse">
-          <Sparkles className="w-5 h-5" />
-          <span>Redirecting to setup...</span>
-        </div>
-      </div>
-    );
-  }
 
   // --- VIEW 1: NOTE EDITOR ---
   if (noteId) {

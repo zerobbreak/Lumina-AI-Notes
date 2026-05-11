@@ -104,43 +104,84 @@ export function FeatureFlow() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-50px" }}
               transition={{ duration: 0.8, delay: idx * 0.1, ease: [0.16, 1, 0.3, 1] }}
-              className={`${feature.span} group relative overflow-hidden rounded-3xl cursor-default bg-black/40 backdrop-blur-xl border border-white/5 transition-all duration-700 hover:bg-white/[0.02]`}
+              className={`${feature.span} group relative isolate overflow-hidden rounded-3xl cursor-default border border-white/10 bg-[#07090C]/60 transition-[transform,box-shadow,background-color,border-color] duration-500 hover:-translate-y-0.5 hover:border-white/15 hover:bg-[#07090C]/75 hover:shadow-[0_24px_70px_-38px_rgba(0,0,0,0.9)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20`}
             >
-              {/* Internal glow layer */}
-              <div 
-                className="absolute -inset-10 opacity-0 group-hover:opacity-[0.15] transition-opacity duration-1000 blur-3xl pointer-events-none mix-blend-screen"
-                style={{ background: `radial-gradient(circle at center, ${feature.accent}, transparent 70%)` }}
-              />
+              {/* Background layers */}
+              <div className="absolute inset-0 -z-10">
+                <div
+                  className="absolute inset-0 opacity-60"
+                  style={{
+                    background: `radial-gradient(800px 500px at 20% 15%, ${feature.accent}14, transparent 55%)`,
+                  }}
+                />
+                <div
+                  className="absolute inset-0 opacity-70"
+                  style={{
+                    background:
+                      "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 40%, rgba(0,0,0,0.25) 100%)",
+                  }}
+                />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.06)_1px,transparent_0)] [background-size:18px_18px] opacity-[0.08]" />
+              </div>
 
-              <div className="relative h-full p-8 flex flex-col justify-between z-10">
+              <div className="relative h-full p-8 flex flex-col">
                 <div>
                   <div 
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6 transition-all duration-700 group-hover:scale-110 group-hover:rotate-3 shadow-lg"
-                    style={{ background: `linear-gradient(135deg, ${feature.accent}20, transparent)`, border: `1px solid ${feature.accent}30` }}
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6 transition-transform duration-500 group-hover:scale-[1.06] group-hover:rotate-2 shadow-[0_10px_30px_-16px_rgba(0,0,0,0.8)]"
+                    style={{
+                      background: `linear-gradient(135deg, ${feature.accent}26, rgba(255,255,255,0.02))`,
+                      border: `1px solid ${feature.accent}2f`,
+                    }}
                   >
                     <feature.icon className="h-6 w-6" style={{ color: feature.accent }} />
                   </div>
                   <h3 
-                    className="text-xl font-bold text-white tracking-tight mb-3"
+                    className="text-[20px] font-bold text-white tracking-[-0.02em] mb-2.5 leading-tight"
                     style={{ fontFamily: 'var(--font-display)' }}
                   >
                     {feature.title}
                   </h3>
-                  <p className="text-sm leading-relaxed text-gray-400 font-light">
+                  <p className="text-[13px] leading-relaxed text-white/55 font-light max-w-[36ch]">
                     {feature.description}
                   </p>
                 </div>
 
                 {/* Animated visual elements */}
                 {feature.size === "large" && (
-                  <div className="mt-6 flex items-center gap-2 overflow-hidden h-6 opacity-60">
-                    <motion.div animate={{ x: [-100, 300] }} transition={{ repeat: Infinity, duration: 3, ease: "linear" }} className="w-10 h-px bg-amber-400 shadow-[0_0_10px_#d4a853]" />
-                    <motion.div animate={{ x: [-100, 300] }} transition={{ repeat: Infinity, duration: 2.5, ease: "linear", delay: 0.5 }} className="w-6 h-px bg-amber-400 shadow-[0_0_10px_#d4a853]" />
+                  <div className="mt-auto pt-7">
+                    <div className="flex items-center gap-2 overflow-hidden h-6 opacity-70">
+                      <motion.div
+                        animate={{ x: [-100, 300] }}
+                        transition={{ repeat: Infinity, duration: 3.2, ease: "linear" }}
+                        className="w-10 h-px"
+                        style={{
+                          background: feature.accent,
+                          boxShadow: `0 0 14px ${feature.accent}55`,
+                        }}
+                      />
+                      <motion.div
+                        animate={{ x: [-100, 300] }}
+                        transition={{
+                          repeat: Infinity,
+                          duration: 2.6,
+                          ease: "linear",
+                          delay: 0.55,
+                        }}
+                        className="w-6 h-px"
+                        style={{
+                          background: feature.accent,
+                          boxShadow: `0 0 14px ${feature.accent}55`,
+                        }}
+                      />
+                    </div>
+                    <p className="mt-3 text-[10px] tracking-[0.22em] uppercase text-white/40">
+                      live stream · structured signal
+                    </p>
                   </div>
                 )}
 
                 {feature.size === "wide" && (
-                  <div className="mt-4 flex items-center gap-3">
+                  <div className="mt-auto pt-6 flex items-center gap-3">
                     <div className="flex-1 h-10 rounded-xl flex items-center px-4 gap-3 bg-white/5 border border-white/5 shadow-inner">
                       <Search className="h-4 w-4 text-amber-500/50" />
                       <span className="text-xs text-gray-500 font-mono tracking-wider">Search connections...</span>
@@ -149,15 +190,6 @@ export function FeatureFlow() {
                   </div>
                 )}
               </div>
-
-              {/* Border sweep effect */}
-              <div className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none overflow-hidden">
-                <div className="absolute top-0 left-0 w-[200%] h-[200%] -translate-x-1/2 -translate-y-1/2 bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(255,255,255,0.2)_360deg)] animate-[spin_4s_linear_infinite]" />
-              </div>
-              <div className="absolute inset-[1px] bg-black/60 rounded-3xl z-0 group-hover:bg-black/40 transition-colors duration-700" />
-              
-              {/* Bring content above the sweep mask */}
-              <div className="absolute inset-0 z-10 pointer-events-none" />
             </motion.div>
           ))}
         </div>

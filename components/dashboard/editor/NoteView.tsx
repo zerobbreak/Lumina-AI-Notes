@@ -342,12 +342,9 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const [loadedNoteId, setLoadedNoteId] = useState<Id<"notes"> | null>(null);
   // Use ref to track current noteId without causing dependency array issues
   const noteIdRef = useRef(noteId);
-  useEffect(() => {
-    noteIdRef.current = noteId;
-  }, [noteId]);
 
   useEffect(() => {
-    setLoadedNoteId(null);
+    noteIdRef.current = noteId;
   }, [noteId]);
 
   const scheduleEditorUpdate = useCallback((fn: () => void) => {
@@ -400,50 +397,28 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   // Sync content when note loads OR when noteId changes (switching between notes)
   useEffect(() => {
     const loadContent = async () => {
-      if (noteQuery && editor && !editor.isDestroyed) {
-        // Only load content if we haven't loaded for this noteId yet
-        if (noteId !== loadedNoteId) {
-          const htmlContent = await convertMarkdownIfNeeded(
-            noteQuery.content || "",
-          );
-          const raw = noteQuery.content || "";
-          const serverEmpty =
-            !raw.trim() ||
-            raw === "<p></p>" ||
-            raw === "<p><br></p>";
-          scheduleEditorUpdate(() => {
-            if (editor && !editor.isDestroyed) {
-              if (serverEmpty && editor.getText().trim().length > 0) {
-                const html = editor.getHTML();
-                const plainText = html
-                  .replace(/<[^>]*>/g, " ")
-                  .replace(/\s+/g, " ")
-                  .trim();
-                const count =
-                  plainText.length > 0
-                    ? plainText.split(/\s+/).filter((w) => w.length > 0).length
-                    : 0;
-                setLoadedNoteId(noteId);
-                updateNote({ noteId, content: html, wordCount: count }).catch(
-                  () => {},
-                );
-                return;
-              }
-              editor.commands.setContent(htmlContent);
-              setLoadedNoteId(noteId);
-            }
-          });
+      if (!editor || editor.isDestroyed) return;
+      if (noteId === loadedNoteId) return;
+
+      const contentSource = noteQuery ?? syntheticNote;
+      if (!contentSource) return;
+
+      const htmlContent = await convertMarkdownIfNeeded(contentSource.content || "");
+      scheduleEditorUpdate(() => {
+        if (editor && !editor.isDestroyed) {
+          editor.commands.setContent(htmlContent);
+          setLoadedNoteId(noteId);
         }
-      }
+      });
     };
     loadContent();
   }, [
     noteQuery,
+    syntheticNote,
     noteId,
     editor,
     loadedNoteId,
     scheduleEditorUpdate,
-    updateNote,
   ]);
 
   // Inject structured notes from RightSidebar when pendingNotes changes

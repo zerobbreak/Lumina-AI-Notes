@@ -28,6 +28,7 @@ import { OutlineExtension } from "./extensions/OutlineExtension";
 import { DiagramExtension } from "./extensions/DiagramExtension";
 import { MathExtensions } from "./extensions/MathExtension";
 import { OutlineMetadata, NoteStyleType } from "@/types";
+import type { Id } from "@/convex/_generated/dataModel";
 import "./editor.css";
 
 const ResourceMention = Node.create({
@@ -83,6 +84,8 @@ interface EditorProps {
   // Outline-specific props
   outlineData?: string;
   outlineMetadata?: OutlineMetadata;
+  currentNoteId?: Id<"notes">;
+  onReady?: (editor: TiptapEditor | null) => void;
 }
 
 export default function Editor({
@@ -91,12 +94,16 @@ export default function Editor({
   onChange,
   placeholder = "Start writing...",
   styleType = "standard",
-  outlineData,
-  outlineMetadata,
+  currentNoteId,
+  onReady,
 }: EditorProps) {
   const [slashUiTick, setSlashUiTick] = useState(0);
   const bumpSlashUi = useCallback(() => {
     setSlashUiTick((n) => n + 1);
+  }, []);
+  const [wikilinkUiTick, setWikilinkUiTick] = useState(0);
+  const bumpWikilinkUi = useCallback(() => {
+    setWikilinkUiTick((n) => n + 1);
   }, []);
   // Build extensions based on style type
   const extensions: AnyExtension[] = [
@@ -135,11 +142,6 @@ export default function Editor({
     }),
     Placeholder.configure({
       placeholder,
-    }),
-    SlashCommand.configure({
-      suggestion: {
-        render: () => renderItems(bumpSlashUi),
-      },
     }),
     BubbleMenu,
     FloatingMenuExtension,
@@ -220,6 +222,11 @@ export default function Editor({
     },
   });
 
+  useEffect(() => {
+    onReady?.(editor ?? null);
+    return () => onReady?.(null);
+  }, [editor, onReady]);
+
   // Effect to update content if it changes externally
   useEffect(() => {
     if (editor && initialContent !== editor.getHTML()) {
@@ -244,7 +251,11 @@ export default function Editor({
     return (
       <div className="outline-mode-container">
         {/* Editor */}
-        <div className="outline-editor-content relative">
+        <div
+          className="outline-editor-content relative"
+          data-slash-ui={slashUiTick}
+          data-wikilink-ui={wikilinkUiTick}
+        >
           <CodeBlockLanguageBubbleMenu editor={editor} />
           <SlashCommandLayer editor={editor} />
           <EditorContent editor={editor} />
@@ -255,7 +266,10 @@ export default function Editor({
 
   // Default Standard
   return (
-    <div className="relative group/editor" data-slash-ui={slashUiTick}>
+    <div
+      className="relative group/editor"
+      data-slash-ui={slashUiTick}
+    >
       {editor && <CodeBlockLanguageBubbleMenu editor={editor} />}
       {editor && (
         <FloatingMenu
