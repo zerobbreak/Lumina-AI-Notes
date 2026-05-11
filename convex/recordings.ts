@@ -223,6 +223,7 @@ export const saveUploadedRecording = mutation({
     storageId: v.string(),
     duration: v.optional(v.number()), // Duration in seconds
     tzOffsetMinutes: v.optional(v.number()),
+    sessionId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -247,7 +248,7 @@ export const saveUploadedRecording = mutation({
 
     const recordingId = await ctx.db.insert("recordings", {
       userId: identity.tokenIdentifier,
-      sessionId: crypto.randomUUID(),
+      sessionId: args.sessionId || crypto.randomUUID(),
       title: args.title,
       transcript: "", // Will be filled after transcription
       audioUrl: audioUrl || undefined,
@@ -255,8 +256,8 @@ export const saveUploadedRecording = mutation({
       createdAt: Date.now(),
     });
 
-    console.log(`[saveUploadedRecording] Created recording: ${recordingId}`);
-    console.log(
+    if (process.env.NODE_ENV === "development") console.log(`[saveUploadedRecording] Created recording: ${recordingId}`);
+    if (process.env.NODE_ENV === "development") console.log(
       `[saveUploadedRecording] With userId: ${identity.tokenIdentifier}`,
     );
 
@@ -280,28 +281,28 @@ export const updateRecordingTranscript = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
 
-    console.log(
+    if (process.env.NODE_ENV === "development") console.log(
       `[updateRecordingTranscript] Looking for recording: ${args.recordingId}`,
     );
-    console.log(
+    if (process.env.NODE_ENV === "development") console.log(
       `[updateRecordingTranscript] Current user tokenIdentifier: ${identity.tokenIdentifier}`,
     );
 
     const recording = await ctx.db.get(args.recordingId);
-    console.log(
-      `[updateRecordingTranscript] Recording found:`,
-      recording ? "yes" : "no",
-    );
-    if (recording) {
-      console.log(
-        `[updateRecordingTranscript] Recording userId: ${recording.userId}`,
-      );
-      console.log(
-        `[updateRecordingTranscript] Match: ${recording.userId === identity.tokenIdentifier}`,
-      );
+
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[updateRecordingTranscript] Debug Info:`);
+      console.log(`- recordingId: ${args.recordingId}`);
+      console.log(`- identity.tokenIdentifier: "${identity.tokenIdentifier}"`);
+      console.log(`- recording.userId: "${recording?.userId}"`);
+      console.log(`- Exists: ${!!recording}`);
+      if (recording) {
+        console.log(`- Match: ${recording.userId === identity.tokenIdentifier}`);
+      }
     }
 
     if (!recording || recording.userId !== identity.tokenIdentifier) {
+      console.error(`[updateRecordingTranscript] Error: Recording not found or unauthorized. Recording ID: ${args.recordingId}, User: ${identity.tokenIdentifier}, Owner: ${recording?.userId}`);
       throw new Error("Recording not found or unauthorized");
     }
 
@@ -369,9 +370,14 @@ export const cleanupOrphanedRecordings = mutation({
       .collect();
 
     let deletedCount = 0;
+    const TEN_MINUTES = 10 * 60 * 1000;
+    const now = Date.now();
+
     for (const recording of recordings) {
-      // Delete recordings without transcripts (empty or just whitespace)
-      if (!recording.transcript || recording.transcript.trim().length === 0) {
+      // Only delete recordings older than 10 minutes that don't have transcripts
+      // This prevents deleting active recording/transcription sessions
+      const age = now - recording.createdAt;
+      if (age > TEN_MINUTES && (!recording.transcript || recording.transcript.trim().length === 0)) {
         await ctx.db.delete(recording._id);
         deletedCount++;
       }

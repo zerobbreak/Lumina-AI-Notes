@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { LoginButton } from "@/components/auth/LoginButton";
 
 export function CTASection() {
   return (
@@ -20,14 +21,13 @@ export function CTASection() {
           </p>
 
           <div className="flex justify-center">
-            <Link href="/sign-up">
-              <Button
-                size="lg"
-                className="h-14 px-10 bg-black text-white hover:bg-gray-900 rounded-full font-bold text-lg shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all"
-              >
-                Get Started for Free
-              </Button>
-            </Link>
+            <LoginButton
+              mode="signup"
+              size="lg"
+              className="h-14 px-10 bg-black text-white hover:bg-gray-900 rounded-full font-bold text-lg shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all"
+            >
+              Get Started for Free
+            </LoginButton>
           </div>
           <p className="mt-6 text-sm text-black/60 font-medium">
             No credit card required for free tier.

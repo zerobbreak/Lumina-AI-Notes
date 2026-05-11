@@ -35,6 +35,7 @@ export interface NoteBootstrap {
   title: string;
   courseId?: string;
   moduleId?: string;
+  parentNoteId?: Id<"notes">;
   style?: string;
 }
 
@@ -57,9 +58,10 @@ interface DashboardContextType {
   cycleRightSidebar: () => void;
   closeAllSidebars: () => void;
   openAllSidebars: () => void;
-  // Pending notes to inject into editor
+  // Pending notes to inject into editor (scoped to a specific note so other tabs/routes don't receive them)
   pendingNotes: StructuredNotes | null;
-  setPendingNotes: (notes: StructuredNotes) => void;
+  pendingNotesTargetNoteId: Id<"notes"> | null;
+  setPendingNotes: (notes: StructuredNotes, targetNoteId: Id<"notes">) => void;
   clearPendingNotes: () => void;
   // Active context for recording
   activeContext: PinnedContext | null;
@@ -79,8 +81,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [leftSidebarState, setLeftSidebarState] = useState<SidebarState>("open");
   const [rightSidebarState, setRightSidebarState] = useState<SidebarState>("open");
   const [pendingNotes, setPendingNotesState] = useState<StructuredNotes | null>(
-    null
+    null,
   );
+  const [pendingNotesTargetNoteId, setPendingNotesTargetNoteId] =
+    useState<Id<"notes"> | null>(null);
   const [activeContext, setActiveContext] = useState<PinnedContext | null>(
     null
   );
@@ -125,9 +129,17 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setRightSidebarState("open");
   };
 
-  const setPendingNotes = (notes: StructuredNotes) =>
+  const setPendingNotes = (
+    notes: StructuredNotes,
+    targetNoteId: Id<"notes">,
+  ) => {
     setPendingNotesState(notes);
-  const clearPendingNotes = () => setPendingNotesState(null);
+    setPendingNotesTargetNoteId(targetNoteId);
+  };
+  const clearPendingNotes = () => {
+    setPendingNotesState(null);
+    setPendingNotesTargetNoteId(null);
+  };
 
   const isLeftSidebarOpen = leftSidebarState !== "closed";
   const isRightSidebarOpen = rightSidebarState !== "closed";
@@ -149,6 +161,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         closeAllSidebars,
         openAllSidebars,
         pendingNotes,
+        pendingNotesTargetNoteId,
         setPendingNotes,
         clearPendingNotes,
         activeContext,

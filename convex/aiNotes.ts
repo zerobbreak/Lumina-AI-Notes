@@ -166,6 +166,7 @@ Requirements:
 - Include specific examples, numbers, and quotes from the transcript when available
 - Make notes self-contained: a student should understand the material from these notes alone
 - Use LaTeX notation ($$...$$) for any mathematical formulas mentioned
+- For any multi-line code, pseudocode, or file excerpts, use fenced markdown blocks (\`\`\`language ... \`\`\`) so they render as full code blocks, not inline backticks
 
 Format the output as clean, well-organized markdown suitable for studying.`;
 

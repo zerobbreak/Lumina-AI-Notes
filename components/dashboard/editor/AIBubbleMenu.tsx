@@ -119,11 +119,12 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
   return (
     <BubbleMenu
       editor={editor}
+      shouldShow={({ editor: ed }) => !ed.isActive("codeBlock")}
       options={{
         placement: "top",
         offset: 8,
       }}
-      className="flex max-w-none items-center gap-0.5 p-1 bg-zinc-900 border border-white/10 rounded-lg shadow-xl overflow-hidden"
+      className="flex max-w-none items-center gap-0.5 overflow-hidden rounded-lg border border-border bg-background/95 p-1 shadow-md backdrop-blur-sm"
     >
       {/* Formatting Tools */}
       <div className="flex items-center gap-0.5 pr-1 border-r border-white/10">

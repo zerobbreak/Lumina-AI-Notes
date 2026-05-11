@@ -95,6 +95,8 @@ export function useNotesStream() {
       transcript: string;
       title?: string;
       codeBlocks?: CodeBlock[];
+      previousNotesContent?: string;
+      referenceUrls?: string[];
     }) => {
       cancelledRef.current = false;
       stopAnimation();
@@ -125,6 +127,11 @@ export function useNotesStream() {
           codeBlocks: args.codeBlocks
             ? JSON.stringify(args.codeBlocks)
             : undefined,
+          previousNotesContent: args.previousNotesContent,
+          referenceUrls:
+            args.referenceUrls && args.referenceUrls.length > 0
+              ? args.referenceUrls
+              : undefined,
         });
 
         clearInterval(progressInterval);

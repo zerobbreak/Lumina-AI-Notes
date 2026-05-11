@@ -38,5 +38,6 @@ export type {
 export {
   INITIAL_STREAMING_STATE,
   CODE_LANGUAGES,
+  CODE_LANGUAGE_LABELS,
   buildEnrichedTranscript,
 } from "./streaming";

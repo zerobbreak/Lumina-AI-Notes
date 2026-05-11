@@ -20,6 +20,7 @@ import {
   Node,
   ReactFlowProvider,
   useReactFlow,
+  type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,7 @@ interface FlowCanvasProps {
   onChange?: (data: { nodes: Node[]; edges: Edge[] }) => void;
   className?: string;
   isReadOnly?: boolean;
+  onNodeClick?: NodeMouseHandler;
 }
 
 // Custom node types
@@ -65,6 +67,8 @@ function serializeDiagramPropsForSync(
     data: {
       label: String((n.data as { label?: string })?.label ?? ""),
       color: String((n.data as { color?: string })?.color ?? ""),
+      noteId: String((n.data as { noteId?: string })?.noteId ?? ""),
+      isCenter: Boolean((n.data as { isCenter?: boolean })?.isCenter),
     },
   }));
   const cleanEdges = (edges ?? []).map((e) => ({
@@ -82,6 +86,7 @@ function FlowCanvasInner({
   onChange,
   className,
   isReadOnly = false,
+  onNodeClick,
 }: FlowCanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -358,6 +363,7 @@ function FlowCanvasInner({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={isReadOnly ? undefined : onConnect}
+        onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         fitView
         nodesDraggable={!isReadOnly}

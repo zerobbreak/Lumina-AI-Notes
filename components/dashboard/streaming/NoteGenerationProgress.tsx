@@ -1,7 +1,8 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { Loader2, CheckCircle, Sparkles, FileText } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Loader2, CheckCircle, Sparkles, FileText, AlertCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { StreamingPhase } from "@/types/streaming";
 
 interface NoteGenerationProgressProps {
@@ -9,30 +10,66 @@ interface NoteGenerationProgressProps {
   phase: StreamingPhase;
 }
 
-const STEPS: {
-  phase: StreamingPhase[];
-  label: string;
-  icon: React.ElementType;
-}[] = [
-  { phase: ["generating"], label: "Generating", icon: Sparkles },
-  { phase: ["animating"], label: "Formatting", icon: FileText },
-  { phase: ["complete"], label: "Complete", icon: CheckCircle },
-];
+const STAGE_COPY: Record<
+  Exclude<StreamingPhase, "idle" | "error">,
+  { title: string; hint: string; icon: typeof Sparkles }
+> = {
+  generating: {
+    title: "Generating",
+    hint: "Calling the model and drafting your notes…",
+    icon: Sparkles,
+  },
+  animating: {
+    title: "Formatting",
+    hint: "Rendering and revealing your notes…",
+    icon: FileText,
+  },
+  complete: {
+    title: "Complete",
+    hint: "All set — review or insert below.",
+    icon: CheckCircle,
+  },
+};
 
-function getActiveStepIndex(phase: StreamingPhase): number {
-  if (phase === "generating") return 0;
-  if (phase === "animating") return 1;
-  if (phase === "complete") return 2;
-  return -1;
-}
+const stageTransition = {
+  duration: 0.22,
+  ease: [0.22, 1, 0.36, 1] as const,
+};
 
 export function NoteGenerationProgress({
   progress,
   phase,
 }: NoteGenerationProgressProps) {
-  const activeStep = getActiveStepIndex(phase);
-
   if (phase === "idle") return null;
+
+  if (phase === "error") {
+    return (
+      <div className="space-y-3">
+        <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
+          <motion.div
+            className="absolute inset-y-0 left-0 rounded-full bg-red-500/60"
+            initial={{ width: "0%" }}
+            animate={{ width: "100%" }}
+            transition={{ duration: 0.3 }}
+          />
+        </div>
+        <div className="flex items-start gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-500/15 text-red-400">
+            <AlertCircle className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 pt-0.5">
+            <p className="text-sm font-medium text-red-400">Something went wrong</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+              Generation failed. Please try again.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const { title, hint, icon: StageIcon } = STAGE_COPY[phase];
+  const showSpinner = phase === "generating" || phase === "animating";
 
   return (
     <div className="space-y-3">
@@ -42,7 +79,7 @@ export function NoteGenerationProgress({
           className="absolute inset-y-0 left-0 rounded-full bg-linear-to-r from-cyan-500 to-indigo-500"
           initial={{ width: "0%" }}
           animate={{ width: `${progress}%` }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
+          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         />
         {phase === "generating" && (
           <motion.div
@@ -53,60 +90,49 @@ export function NoteGenerationProgress({
         )}
       </div>
 
-      {/* Step indicators */}
-      <div className="flex items-center justify-between">
-        {STEPS.map((step, index) => {
-          const isActive = index === activeStep;
-          const isComplete = index < activeStep || phase === "complete";
-          const Icon = step.icon;
-
-          return (
-            <div key={step.label} className="flex items-center gap-1.5">
-              <div
-                className={`
-                  flex items-center justify-center w-5 h-5 rounded-full transition-all duration-300
-                  ${isComplete ? "bg-cyan-500/20 text-cyan-400" : ""}
-                  ${isActive ? "bg-indigo-500/20 text-indigo-400" : ""}
-                  ${!isActive && !isComplete ? "bg-white/5 text-gray-600" : ""}
-                `}
-              >
-                {isActive && phase !== "complete" ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  <Icon className="w-3 h-3" />
-                )}
-              </div>
-              <span
-                className={`text-xs font-medium transition-colors duration-300 ${
-                  isActive
-                    ? "text-indigo-400"
-                    : isComplete
-                      ? "text-cyan-400"
-                      : "text-gray-600"
-                }`}
-              >
-                {step.label}
-              </span>
-
-              {/* Connector line */}
-              {index < STEPS.length - 1 && (
-                <div
-                  className={`w-8 h-px mx-1 transition-colors duration-300 ${
-                    index < activeStep ? "bg-cyan-500/50" : "bg-white/10"
-                  }`}
-                />
+      {/* One stage at a time — replaces in place (no row of all steps) */}
+      <div className="relative min-h-13">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={phase}
+            role="status"
+            aria-live="polite"
+            initial={{ opacity: 0, x: 14 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -14 }}
+            transition={stageTransition}
+            className="flex items-start gap-2.5"
+          >
+            <div
+              className={cn(
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                showSpinner && "bg-indigo-500/20 text-indigo-400",
+                phase === "complete" && "bg-cyan-500/20 text-cyan-400",
+              )}
+            >
+              {showSpinner ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <StageIcon className="h-4 w-4" />
               )}
             </div>
-          );
-        })}
+            <div className="min-w-0 flex-1 pt-0.5">
+              <p
+                className={cn(
+                  "text-sm font-semibold tracking-tight",
+                  showSpinner && "text-indigo-400",
+                  phase === "complete" && "text-cyan-400",
+                )}
+              >
+                {title}
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                {hint}
+              </p>
+            </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
-
-      {/* Phase-specific message */}
-      {phase === "error" && (
-        <p className="text-xs text-red-400">
-          Generation failed. Please try again.
-        </p>
-      )}
     </div>
   );
 }

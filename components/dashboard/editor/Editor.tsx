@@ -9,6 +9,8 @@ import {
 } from "@tiptap/react";
 import { Node, mergeAttributes } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
+import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
+import { editorLowlight } from "@/lib/editorLowlight";
 import Placeholder from "@tiptap/extension-placeholder";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
@@ -18,6 +20,7 @@ import { FloatingMenu as FloatingMenuExtension } from "@tiptap/extension-floatin
 import { FloatingMenu } from "@tiptap/react/menus";
 import { SlashCommand, renderItems } from "./extensions/SlashCommand";
 import { SlashCommandLayer } from "./SlashCommandLayer";
+import { CodeBlockLanguageBubbleMenu } from "./CodeBlockLanguageBubbleMenu";
 import { Plus, GripVertical } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ResourceMentionNode } from "./ResourceMentionNode";
@@ -25,6 +28,7 @@ import { OutlineExtension } from "./extensions/OutlineExtension";
 import { DiagramExtension } from "./extensions/DiagramExtension";
 import { MathExtensions } from "./extensions/MathExtension";
 import { OutlineMetadata, NoteStyleType } from "@/types";
+import type { Id } from "@/convex/_generated/dataModel";
 import "./editor.css";
 
 const ResourceMention = Node.create({
@@ -80,6 +84,8 @@ interface EditorProps {
   // Outline-specific props
   outlineData?: string;
   outlineMetadata?: OutlineMetadata;
+  currentNoteId?: Id<"notes">;
+  onReady?: (editor: TiptapEditor | null) => void;
 }
 
 export default function Editor({
@@ -88,16 +94,21 @@ export default function Editor({
   onChange,
   placeholder = "Start writing...",
   styleType = "standard",
-  outlineData,
-  outlineMetadata,
+  currentNoteId,
+  onReady,
 }: EditorProps) {
   const [slashUiTick, setSlashUiTick] = useState(0);
   const bumpSlashUi = useCallback(() => {
     setSlashUiTick((n) => n + 1);
   }, []);
+  const [wikilinkUiTick, setWikilinkUiTick] = useState(0);
+  const bumpWikilinkUi = useCallback(() => {
+    setWikilinkUiTick((n) => n + 1);
+  }, []);
   // Build extensions based on style type
   const extensions: AnyExtension[] = [
     StarterKit.configure({
+      codeBlock: false,
       ...(styleType === "outline"
         ? {
             bulletList: {
@@ -122,13 +133,15 @@ export default function Editor({
           }
         : {}),
     }),
+    CodeBlockLowlight.configure({
+      lowlight: editorLowlight,
+      defaultLanguage: "javascript",
+      HTMLAttributes: {
+        class: "lumina-code-block",
+      },
+    }),
     Placeholder.configure({
       placeholder,
-    }),
-    SlashCommand.configure({
-      suggestion: {
-        render: () => renderItems(bumpSlashUi),
-      },
     }),
     BubbleMenu,
     FloatingMenuExtension,
@@ -209,6 +222,11 @@ export default function Editor({
     },
   });
 
+  useEffect(() => {
+    onReady?.(editor ?? null);
+    return () => onReady?.(null);
+  }, [editor, onReady]);
+
   // Effect to update content if it changes externally
   useEffect(() => {
     if (editor && initialContent !== editor.getHTML()) {
@@ -233,7 +251,12 @@ export default function Editor({
     return (
       <div className="outline-mode-container">
         {/* Editor */}
-        <div className="outline-editor-content relative">
+        <div
+          className="outline-editor-content relative"
+          data-slash-ui={slashUiTick}
+          data-wikilink-ui={wikilinkUiTick}
+        >
+          <CodeBlockLanguageBubbleMenu editor={editor} />
           <SlashCommandLayer editor={editor} />
           <EditorContent editor={editor} />
         </div>
@@ -243,7 +266,11 @@ export default function Editor({
 
   // Default Standard
   return (
-    <div className="relative group/editor" data-slash-ui={slashUiTick}>
+    <div
+      className="relative group/editor"
+      data-slash-ui={slashUiTick}
+    >
+      {editor && <CodeBlockLanguageBubbleMenu editor={editor} />}
       {editor && (
         <FloatingMenu
           editor={editor}

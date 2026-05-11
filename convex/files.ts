@@ -25,6 +25,7 @@ export const uploadFile = mutation({
     const isPdf =
       args.type === "pdf" || args.name.toLowerCase().endsWith(".pdf");
 
+    const now = Date.now();
     const fileId = await ctx.db.insert("files", {
       userId: identity.tokenIdentifier,
       name: args.name,
@@ -32,7 +33,8 @@ export const uploadFile = mutation({
       url: args.url,
       storageId: args.storageId,
       courseId: args.courseId,
-      createdAt: Date.now(),
+      createdAt: now,
+      lastAccessedAt: now,
       processingStatus: isPdf ? "pending" : undefined,
     });
 
@@ -133,7 +135,23 @@ export const renameFile = mutation({
       throw new Error("File not found or unauthorized");
     }
 
-    await ctx.db.patch(args.fileId, { name: args.name });
+    await ctx.db.patch(args.fileId, { name: args.name, lastAccessedAt: Date.now() });
+  },
+});
+
+/**
+ * Mark a file as opened/viewed (client should call when opening a file).
+ */
+export const touchFile = mutation({
+  args: { fileId: v.id("files") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const file = await ctx.db.get(args.fileId);
+    if (!file || file.userId !== identity.tokenIdentifier) {
+      throw new Error("File not found or unauthorized");
+    }
+    await ctx.db.patch(args.fileId, { lastAccessedAt: Date.now() });
   },
 });
 

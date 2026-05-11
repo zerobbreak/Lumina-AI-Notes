@@ -55,6 +55,7 @@ export interface Note {
   quickCaptureAudioUrl?: string;
   quickCaptureStatus?: "draft" | "expanded";
   quickCaptureExpandedNoteId?: string;
+  sourceRecordingId?: string;
 }
 
 // Recording type - represents an audio recording
