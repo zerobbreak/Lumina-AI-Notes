@@ -36,18 +36,18 @@ export const ChartExtension = Node.create({
       },
       data: {
         default: [
-          { label: "Item 1", value: 30, color: "#3b82f6" },
-          { label: "Item 2", value: 50, color: "#22c55e" },
-          { label: "Item 3", value: 20, color: "#f59e0b" },
+          { label: "Item 1", value: 30 },
+          { label: "Item 2", value: 50 },
+          { label: "Item 3", value: 20 },
         ] as ChartDataPoint[],
         parseHTML: (element) => {
           try {
             return JSON.parse(element.getAttribute("data-chart-data") || "[]");
           } catch {
             return [
-              { label: "Item 1", value: 30, color: "#3b82f6" },
-              { label: "Item 2", value: 50, color: "#22c55e" },
-              { label: "Item 3", value: 20, color: "#f59e0b" },
+              { label: "Item 1", value: 30 },
+              { label: "Item 2", value: 50 },
+              { label: "Item 3", value: 20 },
             ];
           }
         },
@@ -94,9 +94,9 @@ export const ChartExtension = Node.create({
             attrs: {
               chartType: type,
               data: [
-                { label: "Item 1", value: 30, color: "#3b82f6" },
-                { label: "Item 2", value: 50, color: "#22c55e" },
-                { label: "Item 3", value: 20, color: "#f59e0b" },
+                { label: "Item 1", value: 30 },
+                { label: "Item 2", value: 50 },
+                { label: "Item 3", value: 20 },
               ],
               title: "",
               showLegend: true,
