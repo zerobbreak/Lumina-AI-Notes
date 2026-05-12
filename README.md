@@ -1,27 +1,29 @@
 # Lumina Notes AI
 
-Lumina Notes AI is a Next.js + Convex study workspace for AI-assisted notes, structured capture from audio and PDFs, flashcards, quizzes, search, and sharing. The app targets **version 0.1.0** and ships as a **web app** with an **optional Electron desktop shell** (static export + packaged window) for local use and custom-protocol sign-in.
+Lumina Notes AI is a Next.js + Convex study workspace for AI-assisted notes, structured capture from audio, PDFs, and reference URLs, flashcards, quizzes, search, and sharing. The app targets **version 0.1.0** and ships as a **web app** with an **optional Electron desktop shell** (static export + packaged window) for local use and custom-protocol sign-in.
 
 ## Current application status
 
 **Working today**
 
-- **Authentication** — Clerk sign-in/sign-up, session sync with Convex (`convex/auth.config.ts`).
+- **Authentication** — Clerk sign-in/sign-up (refreshed auth layouts), session sync with Convex (`convex/auth.config.ts`).
 - **Onboarding** — Major, semester, courses, and modules stored on the user profile.
-- **Dashboard** — Course/module sidebar, smart folder hub, note editor (Tiptap), quick notes vs nested pages, archive, tags, and theme preferences.
-- **AI note generation** — Gemini-powered generation from audio, PDFs, and pasted text; multiple note styles (e.g. standard, Cornell, outline, mind map-oriented output).
-- **Rich editor** — Math (KaTeX), diagrams, images, tasks, charts, and mind-map style diagram tooling (`components/diagram/`).
+- **Dashboard** — Course/module sidebar with Notion-style collapse, smart folder hub (including study activity charts), **calendar view** for recordings and notes in a date range, note editor (Tiptap), quick notes vs nested pages, archive, tags, theme preferences, and clearer loading while the shell hydrates (`app/dashboard/loading.tsx`).
+- **AI note generation** — Gemini-powered generation from audio, PDFs, pasted text, and **reference URLs** (fetched server-side via `convex/shared/urlContent.ts`); multiple note styles (e.g. standard, Cornell, outline, mind map-oriented output). Progress UI for streaming generation and recording/save sessions.
+- **Rich editor** — Math (KaTeX), diagrams, images, tasks, charts, and mind-map style diagram tooling (`components/diagram/`). **Code blocks** support per-block language selection, lowlight-based highlighting, and a slash-command layer with a shared registry (`slashCommandRegistry.ts`) for discoverability and keyboard navigation.
 - **Flashcards & quizzes** — Decks and quiz flows tied to notes and courses; quiz results stored for review.
 - **Search** — Global search dialog over notes, files, and flashcard decks (`convex/search.search`) with filters and tags.
 - **Embeddings** — Note vectors for semantic features in the AI layer (`convex/ai.ts`); the database is set up for vector search on notes.
 - **Sharing & collaboration (first phase)** — Public share links for notes, collaborator records, and **presence** (who is currently viewing a note), with heartbeats from the note editor.
 - **Files** — UploadThing uploads and PDF ingestion pipeline.
 - **Usage & engagement** — Monthly usage fields, study streaks, badges, and daily goals (Convex user model).
+- **Marketing home** — Updated landing storytelling (hero, feature flow, synthesis, roadmap) in `components/home/` alongside the static home route.
+- **CI** — GitHub Actions runs `npm run ci-check` (Vitest + production build) on pushes and PRs to `main` / `master`; use `npm run ci-check:strict` locally to include ESLint (see `.github/workflows/ci.yml`).
 
 **In progress / limitations**
 
 - **Paid plans** — Paystack checkout is **temporarily disabled** in the app; all tiers are treated as free until the integration is restored (see `convex/ai.ts`, `components/home/PricingSection.tsx`).
-- **Semantic search query** — The `semanticSearch` **query** in `convex/search.ts` is a stub; meaningful semantic retrieval is implemented via **actions** in `convex/ai.ts`. The dashboard search UI uses the keyword/title-style `search` query.
+- **Semantic search query** — The `semanticSearch` **query** in `convex/search.ts` remains a stub (empty results). Vector-backed semantic search with sources lives in the `semanticSearch` **action** in `convex/ai.ts`. The dashboard search dialog still uses the keyword/title-style `search` query until the UI is wired to the action.
 - **Marketing vs product** — The landing page describes some capabilities (e.g. “live cursors”) as a **vision**; today you get **presence** and **shared notes**, not full real-time co-editing cursors.
 
 ## Upcoming features (in active development)
@@ -34,7 +36,7 @@ These align with the public **Living Roadmap** on the home page (`components/hom
 | **Dynamic Mind Maps** | Richer automatic graph views of note structure (early diagram tooling exists; this extends it toward a fuller “dynamic” experience). |
 | **Adaptive Quiz Forge** | Quizzes that emphasize weak areas using performance history (schema already has hooks such as optional difficulty on questions). |
 | **Payments** | Re-enable Scholar (and related) checkout once the Paystack path is stable. |
-| **Search UX** | Tighter wiring between embeddings-backed search in `ai.ts` and any unified search surface. |
+| **Search UX** | Wire the dashboard search experience to the `ai.semanticSearch` action (and/or retire the stub query) for a single surface. |
 
 Roadmap copy and progress indicators on the marketing site are illustrative and may move faster or slower than the items above.
 
@@ -53,6 +55,7 @@ Roadmap copy and progress indicators on the marketing site are illustrative and 
 ## Project structure
 
 - `app/` — Routes, layouts, API routes, static marketing home, dashboard, share, onboarding, Electron auth callback
+- `.github/workflows/` — CI (test + build)
 - `convex/` — Schema, functions, AI and search actions
 - `components/` — UI, dashboard, editor, diagrams, home sections
 - `electron/` — Main process, preload, desktop window and custom protocol for auth
@@ -149,7 +152,8 @@ npm run dev
 
 The repo includes an Electron wrapper for development and packaging:
 
-- **`npm run electron:dev`** — Runs Next.js dev server and opens an Electron window pointed at `http://localhost:3000`.
+- **`npm run electron:dev`** — Runs Next.js dev server and opens an Electron window pointed at `http://localhost:3000` (plain `electron .`).
+- **`npm run electron:start`** — Same idea as `electron:dev`, but runs **`electron-forge start`** after `wait-on` so Forge hooks run; still starts `next dev` in parallel so `http://localhost:3000` is available.
 - **`npm run build:static`** — Next.js static export (`STATIC_EXPORT=true`) for embedding in the packaged app.
 - **`npm run make`** — Builds static output and runs Electron Forge makers (see `forge.config.js`).
 
@@ -164,7 +168,10 @@ Custom protocol handling and the `/electron-auth` route support bringing Clerk s
 - `npm run build:static` — Static export for Electron
 - `npm run start` — Run production server
 - `npm run electron:dev` — Dev Electron + Next
+- `npm run electron:start` — Next dev + Electron Forge start (Forge dev pipeline)
 - `npm run package` / `npm run make` — Electron Forge package / make installers
+- `npm run ci-check` — Vitest + production build (same as default CI job)
+- `npm run ci-check:strict` — ESLint + Vitest + production build
 - `npm run lint` — ESLint
 - `npm test` — Vitest once
 - `npm run test:watch` — Vitest watch mode
@@ -174,6 +181,7 @@ Custom protocol handling and the `/electron-auth` route support bringing Clerk s
 - Deploy the Next.js app (e.g. Vercel) and set all environment variables.
 - Deploy Convex separately with `npm run convex:deploy`.
 - Ensure Clerk domains and Convex auth settings match deployed URLs.
+- For GitHub Actions CI, add the same public/build-time variables the Next.js build expects as repository secrets (see comments in `.github/workflows/ci.yml`).
 - Electron builds are separate artifacts; ship them through your desktop release process, not only Vercel.
 
 ## Troubleshooting

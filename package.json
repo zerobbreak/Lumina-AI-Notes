@@ -15,7 +15,7 @@
     "convex:dev": "convex dev",
     "convex:deploy": "convex deploy",
     "electron:dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
-    "electron:start": "cross-env NODE_ENV=development electron-forge start",
+    "electron:start": "concurrently \"next dev\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron-forge start\"",
     "build:static": "cross-env STATIC_EXPORT=true next build",
     "package": "electron-forge package",
     "make": "npm run build:static && electron-forge make"
