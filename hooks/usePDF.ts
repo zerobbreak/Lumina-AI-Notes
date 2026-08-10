@@ -1,5 +1,4 @@
 import { useCallback, useState } from "react";
-import { jsPDF } from "jspdf";
 
 // Export method types
 export type ExportMethod = "auto" | "print" | "jspdf";
@@ -10,22 +9,12 @@ export interface ExportOptions {
   onProgress?: (progress: number) => void;
 }
 
-interface PageMetrics {
-  width: number;
-  height: number;
-  marginLeft: number;
-  marginRight: number;
-  marginTop: number;
-  marginBottom: number;
-  contentWidth: number;
-  contentHeight: number;
-}
-
 /**
- * Strip emoji characters from text - jsPDF doesn't handle emojis well
+ * Strip emoji characters from text - jsPDF's built-in fonts can't render
+ * them as vector glyphs (only used for the title, which jsPDF draws as
+ * real text rather than as part of the rasterized page image).
  */
 function stripEmojis(text: string): string {
-  // Remove common emoji ranges
   return text
     .replace(/[\u{1F300}-\u{1F9FF}]/gu, "")
     .replace(/[\u{2600}-\u{26FF}]/gu, "")
@@ -37,26 +26,9 @@ function stripEmojis(text: string): string {
 }
 
 /**
- * Strip emojis from an element's text content recursively
- */
-function stripEmojisFromElement(element: HTMLElement): void {
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null);
-
-  const textNodes: Text[] = [];
-  let node: Text | null;
-  while ((node = walker.nextNode() as Text | null)) {
-    textNodes.push(node);
-  }
-
-  textNodes.forEach((textNode) => {
-    if (textNode.textContent) {
-      textNode.textContent = stripEmojis(textNode.textContent);
-    }
-  });
-}
-
-/**
- * Convert outline task lists for PDF (replace checkboxes with symbols)
+ * Convert outline task lists for PDF (replace checkboxes with symbols) -
+ * native checkbox inputs render inconsistently (or not at all) across
+ * browser print engines.
  */
 function convertOutlineForPDF(element: HTMLElement): HTMLElement {
   const clone = element.cloneNode(true) as HTMLElement;
@@ -90,12 +62,247 @@ function isOutlineFormat(element: HTMLElement): boolean {
   );
 }
 
+/**
+ * Replace <canvas> elements in a clone with <img> snapshots taken from the
+ * matching *live* canvas. cloneNode() only copies attributes, never the
+ * drawn bitmap, so charts and other canvas-based content silently render
+ * blank in any cloned-DOM export path unless this runs first.
+ */
+function inlineCanvasBitmaps(
+  liveRoot: HTMLElement,
+  clonedRoot: HTMLElement,
+): void {
+  const liveCanvases = Array.from(liveRoot.querySelectorAll("canvas"));
+  const clonedCanvases = Array.from(clonedRoot.querySelectorAll("canvas"));
+
+  liveCanvases.forEach((liveCanvas, i) => {
+    const clonedCanvas = clonedCanvases[i];
+    if (!clonedCanvas) return;
+
+    let dataUrl: string;
+    try {
+      dataUrl = liveCanvas.toDataURL("image/png");
+    } catch {
+      // Tainted canvas (cross-origin draw) - leave the empty clone as-is
+      // rather than fail the whole export.
+      return;
+    }
+
+    const img = document.createElement("img");
+    img.src = dataUrl;
+    img.width = liveCanvas.width;
+    img.height = liveCanvas.height;
+    const style = clonedCanvas.getAttribute("style");
+    if (style) img.setAttribute("style", style);
+    const className = clonedCanvas.getAttribute("class");
+    if (className) img.setAttribute("class", className);
+    clonedCanvas.replaceWith(img);
+  });
+}
+
+/**
+ * Resolve relative url(...) references in extracted CSS text against the
+ * document's base URI. Needed because copied stylesheet text is injected
+ * into a popup window whose location is about:blank, where relative paths
+ * (fonts, background images) would otherwise fail to resolve.
+ */
+function absolutizeCssUrls(cssText: string): string {
+  return cssText.replace(
+    /url\((['"]?)([^'")]+)\1\)/g,
+    (match, quote: string, url: string) => {
+      if (/^(data:|https?:|\/\/)/.test(url)) return match;
+      try {
+        const abs = new URL(url, document.baseURI).href;
+        return `url(${quote}${abs}${quote})`;
+      } catch {
+        return match;
+      }
+    },
+  );
+}
+
+/**
+ * Pull the app's actual CSS (Tailwind utilities, CSS variables, the
+ * dedicated `@media print` rules in editor.css) as inline text so it can
+ * be embedded in the popup print window. The previous implementation
+ * wrote a ~20-line hand-rolled stylesheet into that window, so none of
+ * the app's real styling ever applied there - content rendered unstyled
+ * or with the wrong colors.
+ */
+function extractDocumentCss(): string {
+  const chunks: string[] = [];
+  for (const sheet of Array.from(document.styleSheets)) {
+    try {
+      const rules = sheet.cssRules;
+      if (!rules) continue;
+      for (const rule of Array.from(rules)) {
+        chunks.push(absolutizeCssUrls(rule.cssText));
+      }
+    } catch {
+      // Cross-origin stylesheet - can't read its rules. Safe to skip since
+      // export only needs the app's own styles.
+    }
+  }
+  return chunks.join("\n");
+}
+
+/**
+ * Wait for any not-yet-loaded <img> elements under root to finish loading
+ * (or fail) before we rasterize/print, capped by a timeout so a broken
+ * image link can never hang the export.
+ */
+function waitForImages(root: ParentNode, timeoutMs = 8000): Promise<void> {
+  const imgs = Array.from(root.querySelectorAll("img")).filter(
+    (img) => !img.complete,
+  );
+  if (imgs.length === 0) return Promise.resolve();
+
+  return Promise.race([
+    Promise.all(
+      imgs.map(
+        (img) =>
+          new Promise<void>((resolve) => {
+            img.addEventListener("load", () => resolve(), { once: true });
+            img.addEventListener("error", () => resolve(), { once: true });
+          }),
+      ),
+    ).then(() => undefined),
+    new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
+  ]);
+}
+
+/**
+ * Light-theme design tokens, mirroring `:root` in app/globals.css.
+ * (`--chart-*` is intentionally omitted: chart series colors are
+ * self-contained and already legible against a light card.)
+ */
+const LIGHT_THEME_VARS: [string, string][] = [
+  ["--background", "0 0% 100%"],
+  ["--foreground", "240 6% 11%"],
+  ["--card", "0 0% 100%"],
+  ["--card-foreground", "240 6% 11%"],
+  ["--popover", "0 0% 100%"],
+  ["--popover-foreground", "240 6% 11%"],
+  ["--primary", "240 5.9% 10%"],
+  ["--primary-foreground", "0 0% 98%"],
+  ["--secondary", "240 4.8% 95.9%"],
+  ["--secondary-foreground", "240 5.9% 10%"],
+  ["--muted", "240 5% 96%"],
+  ["--muted-foreground", "240 4.5% 38%"],
+  ["--accent", "240 4.8% 95.9%"],
+  ["--accent-foreground", "240 5.9% 10%"],
+  ["--destructive", "0 84.2% 60.2%"],
+  ["--destructive-foreground", "0 0% 98%"],
+  ["--border", "240 6% 86%"],
+  ["--input", "240 6% 86%"],
+  ["--ring", "240 5.9% 10%"],
+];
+
+/**
+ * Exported notes always come from the app's dark-only editor UI. Force a
+ * light, print-safe appearance so the page is legible regardless of the
+ * live theme:
+ *  - swap the app's CSS color variables to their light-mode values, which
+ *    fixes every shadcn/Tailwind-variable-driven surface (cards, badges,
+ *    popovers) automatically, foreground and background together.
+ *  - drop `prose-invert`: Tailwind Typography's light-on-dark palette is
+ *    hard-coded independent of those variables, and is the actual source
+ *    of the washed-out, barely-legible body text.
+ *  - flip the mind-map canvas, which hard-codes a literal dark surface
+ *    color (`bg-slate-950`) instead of using the variables above.
+ * Diagram *node* colors (gradients, white labels) are deliberately left
+ * untouched - they're self-contained and already legible on their own
+ * background, and forcing a single text color onto every descendant would
+ * make plenty of them unreadable instead of fixing anything.
+ */
+function applyPrintSafeTheme(root: HTMLElement): void {
+  for (const [key, value] of LIGHT_THEME_VARS) {
+    root.style.setProperty(key, value);
+  }
+  root.style.setProperty("background-color", "#ffffff", "important");
+
+  root.classList.remove("prose-invert");
+  root
+    .querySelectorAll(".prose-invert")
+    .forEach((el) => el.classList.remove("prose-invert"));
+
+  root.querySelectorAll<HTMLElement>(".bg-slate-950").forEach((el) => {
+    el.style.setProperty("background-color", "#ffffff", "important");
+  });
+}
+
+/**
+ * Supplemental print-safe rules for typography elements whose colors
+ * aren't variable-driven at all (code blocks, katex, the resource-mention
+ * chip button) - safe as broad rules since none of them collide with
+ * diagram content the way a blanket `color` override would.
+ */
+function injectExportPrintStyles(scopeSelector: string): HTMLStyleElement {
+  const style = document.createElement("style");
+  style.textContent = `
+    ${scopeSelector} button {
+      background: #f3f4f6 !important;
+      border: 1px solid #d1d5db !important;
+      color: #000000 !important;
+    }
+    ${scopeSelector} pre { background: #f5f5f5 !important; border: 1px solid #ddd !important; padding: 12px !important; }
+    ${scopeSelector} code { background: #f0f0f0 !important; }
+    ${scopeSelector} blockquote { border-left: 3px solid #666 !important; padding-left: 12px !important; color: #333 !important; }
+    ${scopeSelector} table { border-collapse: collapse !important; }
+    ${scopeSelector} th, ${scopeSelector} td { border: 1px solid #ddd !important; padding: 8px !important; }
+    ${scopeSelector} th { background: #f0f0f0 !important; }
+    ${scopeSelector} img { max-width: 100% !important; }
+    ${scopeSelector} .katex, ${scopeSelector} .katex * { color: #000000 !important; }
+    ${scopeSelector} .katex .frac-line { border-color: #333333 !important; }
+    ${scopeSelector} .inline-math-content,
+    ${scopeSelector} .block-math-content,
+    ${scopeSelector} .inline-math-container,
+    ${scopeSelector} .block-math-container {
+      background: #f3f4f6 !important;
+      color: #000000 !important;
+    }
+  `;
+  document.head.appendChild(style);
+  return style;
+}
+
+/** Shared clean-up applied to any clone before it's exported. */
+function prepareCloneForExport(
+  liveElement: HTMLElement,
+): HTMLElement {
+  const clone = liveElement.cloneNode(true) as HTMLElement;
+  inlineCanvasBitmaps(liveElement, clone);
+
+  const prepared = isOutlineFormat(clone) ? convertOutlineForPDF(clone) : clone;
+
+  prepared
+    .querySelectorAll("[data-html2canvas-ignore]")
+    .forEach((el) => el.remove());
+  prepared
+    .querySelectorAll(".ProseMirror-gapcursor")
+    .forEach((el) => el.remove());
+  // Interactive diagram chrome (zoom controls, minimap, attribution) has
+  // no place in a static export.
+  prepared
+    .querySelectorAll(
+      ".react-flow__minimap, .react-flow__controls, .react-flow__attribution, .outline-toolbar",
+    )
+    .forEach((el) => el.remove());
+
+  applyPrintSafeTheme(prepared);
+
+  return prepared;
+}
+
 export function usePDF() {
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
 
   /**
-   * Export using browser print dialog - most reliable method
+   * Export using the browser's native print dialog. Renders the note in a
+   * popup window that carries over the app's real stylesheet (including
+   * the dedicated `@media print` rules) so output matches what's on
+   * screen, with diagrams/charts included as static images.
    */
   const printExport = useCallback(
     async (
@@ -108,25 +315,12 @@ export function usePDF() {
       const element = document.getElementById(elementId);
       if (!element) throw new Error("Element not found");
 
-      onProgress?.(30);
+      onProgress?.(25);
+      const printContent = prepareCloneForExport(element);
 
-      let printContent = element.cloneNode(true) as HTMLElement;
+      onProgress?.(40);
 
-      if (isOutlineFormat(printContent)) {
-        printContent = convertOutlineForPDF(printContent);
-      }
-
-      printContent
-        .querySelectorAll("[data-html2canvas-ignore]")
-        .forEach((el) => el.remove());
-      printContent
-        .querySelectorAll(".ProseMirror-gapcursor")
-        .forEach((el) => el.remove());
-      stripEmojisFromElement(printContent);
-
-      onProgress?.(50);
-
-      const printWindow = window.open("", "_blank", "width=800,height=600");
+      const printWindow = window.open("", "_blank", "width=900,height=1000");
       if (!printWindow) {
         throw new Error(
           "Could not open print window. Please check popup blocker settings.",
@@ -134,61 +328,65 @@ export function usePDF() {
       }
 
       const printTitle = title ? stripEmojis(title) : "Note Export";
+      const documentCss = extractDocumentCss();
+      const rootClass = document.documentElement.className;
+      const rootTheme = document.documentElement.getAttribute("data-theme");
 
       printWindow.document.write(`
         <!DOCTYPE html>
-        <html>
+        <html class="${rootClass}"${rootTheme ? ` data-theme="${rootTheme}"` : ""}>
           <head>
+            <meta charset="utf-8" />
             <title>${printTitle}</title>
+            <style>${documentCss}</style>
             <style>
               @page { size: A4; margin: 20mm; }
-              body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                font-size: 12pt;
-                line-height: 1.6;
-                color: #000;
-                margin: 0;
-                padding: 20px;
+              #pdf-export-title {
+                font-size: 24pt;
+                font-weight: 700;
+                margin-bottom: 16px;
+                page-break-after: avoid;
               }
-              h1 { font-size: 24pt; margin-bottom: 16px; page-break-after: avoid; }
-              h2 { font-size: 18pt; margin-top: 24px; margin-bottom: 12px; page-break-after: avoid; }
-              h3 { font-size: 14pt; margin-top: 16px; margin-bottom: 8px; page-break-after: avoid; }
-              h4 { font-size: 12pt; margin-top: 12px; margin-bottom: 6px; page-break-after: avoid; }
-              p { margin-bottom: 12px; orphans: 3; widows: 3; }
-              ul, ol { margin-bottom: 12px; padding-left: 24px; }
-              li { margin-bottom: 6px; }
-              blockquote { border-left: 3px solid #666; padding-left: 16px; margin: 16px 0; font-style: italic; color: #444; }
-              pre, code { font-family: 'Consolas', monospace; font-size: 10pt; background: #f5f5f5; padding: 2px 6px; border-radius: 4px; }
-              pre { padding: 16px; overflow-x: auto; page-break-inside: avoid; }
-              table { width: 100%; border-collapse: collapse; margin: 16px 0; page-break-inside: avoid; }
-              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-              th { background: #f0f0f0; font-weight: 600; }
-              hr { border: none; border-top: 1px solid #ddd; margin: 24px 0; }
-              @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+              img, canvas, svg { max-width: 100%; }
+              @media print {
+                body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              }
             </style>
           </head>
           <body>
-            ${title ? `<h1>${printTitle}</h1>` : ""}
-            ${printContent.innerHTML}
+            ${title ? `<h1 id="pdf-export-title">${printTitle}</h1>` : ""}
+            <div id="pdf-export-body">${printContent.outerHTML}</div>
           </body>
         </html>
       `);
 
       printWindow.document.close();
-      onProgress?.(80);
+      onProgress?.(70);
 
-      printWindow.onload = () => {
-        onProgress?.(100);
-        setTimeout(() => {
-          printWindow.print();
-        }, 250);
-      };
+      await new Promise<void>((resolve) => {
+        const finish = () => resolve();
+        if (printWindow.document.readyState === "complete") {
+          finish();
+        } else {
+          printWindow.onload = finish;
+          setTimeout(finish, 3000);
+        }
+      });
+
+      const body = printWindow.document.getElementById("pdf-export-body");
+      if (body) await waitForImages(body);
+
+      onProgress?.(100);
+      setTimeout(() => printWindow.print(), 150);
     },
     [],
   );
 
   /**
-   * Export using jsPDF with DOM-based text rendering
+   * Export by rasterizing the live, fully-styled note content (via
+   * html2canvas) and slicing it across A4 pages in a jsPDF document. This
+   * replaces a previous manual DOM-to-text walker that only understood a
+   * handful of tags and silently dropped every image, chart, and diagram.
    */
   const jspdfExport = useCallback(
     async (
@@ -202,256 +400,138 @@ export function usePDF() {
       const element = document.getElementById(elementId);
       if (!element) throw new Error("Element not found");
 
-      let clonedElement = element.cloneNode(true) as HTMLElement;
-
-      if (isOutlineFormat(clonedElement)) {
-        clonedElement = convertOutlineForPDF(clonedElement);
-      }
+      const preparedClone = prepareCloneForExport(element);
 
       onProgress?.(15);
 
-      clonedElement
-        .querySelectorAll("[data-html2canvas-ignore]")
-        .forEach((el) => el.remove());
-      clonedElement
-        .querySelectorAll(".ProseMirror-gapcursor")
-        .forEach((el) => el.remove());
-      stripEmojisFromElement(clonedElement);
+      // Mount off-screen (not display:none - layout/paint must run for
+      // html2canvas to have anything to capture) at the element's real
+      // width so text reflows exactly as it does on screen.
+      const stageId = "pdf-export-stage";
+      const stage = document.createElement("div");
+      stage.id = stageId;
+      stage.style.position = "fixed";
+      stage.style.top = "0";
+      stage.style.left = "-10000px";
+      stage.style.width = `${element.clientWidth || element.offsetWidth || 800}px`;
+      stage.style.pointerEvents = "none";
+      stage.appendChild(preparedClone);
+      document.body.appendChild(stage);
+      const printStyle = injectExportPrintStyles(`#${stageId}`);
 
-      onProgress?.(25);
-
-      // Initialize PDF
-      const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-        compress: true,
-      });
-
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 15;
-      const contentWidth = pageWidth - margin * 2;
-
-      let currentY = margin;
-
-      // Check page break
-      const checkPageBreak = (requiredHeight: number): void => {
-        if (currentY + requiredHeight > pageHeight - margin) {
-          doc.addPage();
-          currentY = margin;
+      try {
+        await waitForImages(stage);
+        if (typeof document.fonts?.ready?.then === "function") {
+          await document.fonts.ready.catch(() => undefined);
         }
-      };
 
-      // Render wrapped text
-      const renderText = (
-        text: string,
-        fontSize: number,
-        fontStyle: "normal" | "bold" | "italic" = "normal",
-        indent: number = 0,
-      ): void => {
-        const cleanText = stripEmojis(text).trim();
-        if (!cleanText) return;
+        onProgress?.(30);
 
-        doc.setFontSize(fontSize);
-        doc.setFont("helvetica", fontStyle);
-        doc.setTextColor(0, 0, 0);
+        // Loaded on demand: html2canvas/jsPDF are only needed when an
+        // export actually runs, not on every note open.
+        const [{ jsPDF }, html2canvasModule] = await Promise.all([
+          import("jspdf"),
+          import("html2canvas"),
+        ]);
+        const html2canvas = html2canvasModule.default;
 
-        const maxWidth = contentWidth - indent;
-        const lines = doc.splitTextToSize(cleanText, maxWidth);
-        // Convert pt to mm: 1pt = 0.353mm, then multiply by 1.5 for comfortable line height
-        const lh = fontSize * 0.353 * 1.5;
+        const doc = new jsPDF({
+          orientation: "portrait",
+          unit: "mm",
+          format: "a4",
+          compress: true,
+        });
 
-        for (const line of lines) {
-          checkPageBreak(lh);
-          doc.text(line, margin + indent, currentY);
-          currentY += lh;
+        const margin = 15;
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const contentWidth = pageWidth - margin * 2;
+
+        let cursorY = margin;
+
+        if (title) {
+          doc.setFontSize(20);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(0, 0, 0);
+          doc.text(stripEmojis(title), margin, cursorY + 6);
+          cursorY += 12;
+          doc.setDrawColor(0, 0, 0);
+          doc.setLineWidth(0.5);
+          doc.line(margin, cursorY, margin + contentWidth, cursorY);
+          cursorY += 6;
         }
-      };
 
-      // Add title
-      if (title) {
-        doc.setFontSize(22);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(0, 0, 0);
-        doc.text(stripEmojis(title), margin, currentY);
-        currentY += 10;
-        doc.setDrawColor(0, 0, 0);
-        doc.setLineWidth(0.5);
-        doc.line(margin, currentY, margin + contentWidth, currentY);
-        currentY += 8;
+        onProgress?.(45);
+
+        // applyPrintSafeTheme() already swapped the clone onto light-theme
+        // colors, so a plain white canvas background matches it exactly.
+        const canvas = await html2canvas(preparedClone, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          windowWidth: stage.scrollWidth,
+        });
+
+        onProgress?.(70);
+
+        const pxPerMm = canvas.width / contentWidth;
+        const firstPageHeightPx = Math.max(
+          1,
+          Math.floor((pageHeight - cursorY - margin) * pxPerMm),
+        );
+        const fullPageHeightPx = Math.max(
+          1,
+          Math.floor((pageHeight - margin * 2) * pxPerMm),
+        );
+
+        let renderedPx = 0;
+        let isFirstSlice = true;
+
+        while (renderedPx < canvas.height) {
+          const available = isFirstSlice
+            ? firstPageHeightPx
+            : fullPageHeightPx;
+          const sliceHeightPx = Math.min(available, canvas.height - renderedPx);
+          if (sliceHeightPx <= 0) break;
+
+          const pageCanvas = document.createElement("canvas");
+          pageCanvas.width = canvas.width;
+          pageCanvas.height = sliceHeightPx;
+          const ctx = pageCanvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(
+              canvas,
+              0,
+              renderedPx,
+              canvas.width,
+              sliceHeightPx,
+              0,
+              0,
+              canvas.width,
+              sliceHeightPx,
+            );
+            const imgData = pageCanvas.toDataURL("image/png");
+            const sliceHeightMm = sliceHeightPx / pxPerMm;
+            const y = isFirstSlice ? cursorY : margin;
+            doc.addImage(imgData, "PNG", margin, y, contentWidth, sliceHeightMm);
+          }
+
+          renderedPx += sliceHeightPx;
+          isFirstSlice = false;
+
+          if (renderedPx < canvas.height) doc.addPage();
+
+          onProgress?.(70 + Math.min(25, Math.floor((renderedPx / canvas.height) * 25)));
+        }
+
+        onProgress?.(95);
+        doc.save(filename);
+        onProgress?.(100);
+      } finally {
+        document.body.removeChild(stage);
+        printStyle.remove();
       }
-
-      onProgress?.(40);
-
-      // Process elements recursively
-      const processElement = (elem: Element): void => {
-        const tag = elem.tagName?.toLowerCase() || "";
-
-        // Skip hidden/toolbar elements
-        const htmlEl = elem as HTMLElement;
-        if (
-          htmlEl.style?.display === "none" ||
-          elem.classList?.contains("outline-toolbar")
-        ) {
-          return;
-        }
-
-        switch (tag) {
-          case "h1":
-            currentY += 4;
-            checkPageBreak(10);
-            renderText(elem.textContent || "", 20, "bold");
-            currentY += 4;
-            break;
-
-          case "h2":
-            currentY += 4;
-            checkPageBreak(8);
-            renderText(elem.textContent || "", 16, "bold");
-            currentY += 3;
-            break;
-
-          case "h3":
-            currentY += 3;
-            checkPageBreak(7);
-            renderText(elem.textContent || "", 14, "bold");
-            currentY += 2;
-            break;
-
-          case "h4":
-          case "h5":
-          case "h6":
-            currentY += 2;
-            checkPageBreak(6);
-            renderText(elem.textContent || "", 12, "bold");
-            currentY += 2;
-            break;
-
-          case "p":
-            const pText = elem.textContent?.trim();
-            if (pText) {
-              currentY += 2;
-              renderText(pText, 11, "normal");
-              currentY += 3;
-            }
-            break;
-
-          case "blockquote":
-            currentY += 3;
-            checkPageBreak(8);
-            const startY = currentY;
-            const quoteText = elem.textContent?.trim();
-            if (quoteText) {
-              renderText(quoteText, 11, "italic", 8);
-              doc.setDrawColor(150, 150, 150);
-              doc.setLineWidth(0.8);
-              doc.line(margin + 2, startY - 2, margin + 2, currentY);
-            }
-            currentY += 3;
-            break;
-
-          case "ul":
-          case "ol":
-            currentY += 2;
-            const listItems = elem.querySelectorAll(":scope > li");
-            listItems.forEach((li, idx) => {
-              const bullet = tag === "ol" ? `${idx + 1}.` : "•";
-              const liText = li.textContent?.trim();
-              if (liText) {
-                checkPageBreak(6);
-                doc.setFontSize(11);
-                doc.setFont("helvetica", "normal");
-                doc.text(bullet, margin + 2, currentY);
-                renderText(liText, 11, "normal", 8);
-                currentY += 1;
-              }
-            });
-            currentY += 2;
-            break;
-
-          case "pre":
-          case "code":
-            currentY += 4;
-            const codeText = elem.textContent?.trim();
-            if (codeText) {
-              const codeFontSize = 9;
-              const codeLh = codeFontSize * 0.353 * 1.4; // Proper line height for code
-              doc.setFillColor(245, 245, 245);
-              const codeLines = doc.splitTextToSize(
-                codeText,
-                contentWidth - 10,
-              );
-              const codeHeight = codeLines.length * codeLh + 6;
-              checkPageBreak(codeHeight);
-              doc.rect(margin, currentY - 2, contentWidth, codeHeight, "F");
-              doc.setFontSize(codeFontSize);
-              doc.setFont("courier", "normal");
-              currentY += 3;
-              codeLines.forEach((line: string) => {
-                doc.text(line, margin + 4, currentY);
-                currentY += codeLh;
-              });
-            }
-            currentY += 4;
-            break;
-
-          case "hr":
-            currentY += 4;
-            checkPageBreak(4);
-            doc.setDrawColor(200, 200, 200);
-            doc.setLineWidth(0.3);
-            doc.line(margin, currentY, margin + contentWidth, currentY);
-            currentY += 4;
-            break;
-
-          case "br":
-            currentY += 3;
-            break;
-
-          case "table":
-            currentY += 3;
-            const rows = elem.querySelectorAll("tr");
-            rows.forEach((row) => {
-              checkPageBreak(7);
-              const cells = row.querySelectorAll("th, td");
-              const cellWidth = contentWidth / Math.max(cells.length, 1);
-              cells.forEach((cell, cellIdx) => {
-                const cellText = (cell.textContent?.trim() || "").substring(
-                  0,
-                  35,
-                );
-                const isHeader = cell.tagName.toLowerCase() === "th";
-                doc.setFontSize(9);
-                doc.setFont("helvetica", isHeader ? "bold" : "normal");
-                doc.text(cellText, margin + cellIdx * cellWidth, currentY);
-              });
-              currentY += 6;
-            });
-            currentY += 3;
-            break;
-
-          default:
-            // Process children for container elements
-            if (elem.children.length > 0) {
-              Array.from(elem.children).forEach(processElement);
-            } else if (elem.textContent?.trim()) {
-              renderText(elem.textContent.trim(), 11, "normal");
-              currentY += 2;
-            }
-        }
-      };
-
-      // Process all children
-      onProgress?.(50);
-      Array.from(clonedElement.children).forEach((child, idx, arr) => {
-        processElement(child);
-        onProgress?.(50 + Math.floor((idx / arr.length) * 40));
-      });
-
-      onProgress?.(95);
-      doc.save(filename);
-      onProgress?.(100);
     },
     [],
   );
@@ -481,18 +561,11 @@ export function usePDF() {
         const element = document.getElementById(elementId);
         if (!element) throw new Error("Element not found");
 
-        let selectedMethod: "print" | "jspdf" = "jspdf";
-
-        if (method === "auto") {
-          // Auto-detect: use print for complex content
-          const hasComplex =
-            element.querySelector(
-              "svg, canvas, .mermaid, .diagram, [data-type='diagram']",
-            ) !== null;
-          selectedMethod = hasComplex ? "print" : "jspdf";
-        } else {
-          selectedMethod = method === "print" ? "print" : "jspdf";
-        }
+        // Both methods now fully support images, charts, and diagrams, so
+        // "auto" simply prefers the direct download and falls back to the
+        // print dialog if rasterization fails for any reason.
+        const selectedMethod: "print" | "jspdf" =
+          method === "print" ? "print" : "jspdf";
 
         if (selectedMethod === "print") {
           await printExport(elementId, title, progressHandler);

@@ -44,13 +44,14 @@ const exportMethods: {
     value: "print",
     label: "Print Dialog",
     description:
-      "Opens browser print dialog. Most reliable for complex content",
+      "Opens your browser's print dialog so you can save as PDF manually",
     icon: <Printer className="w-4 h-4" />,
   },
   {
     value: "jspdf",
     label: "Direct Download",
-    description: "Downloads PDF directly. Fastest for text-heavy notes",
+    description:
+      "Downloads a PDF straight away, including images, charts, and diagrams",
     icon: <Download className="w-4 h-4" />,
   },
 ];

@@ -5,6 +5,7 @@ import {
   DEFAULT_EASE_FACTOR,
   scheduleNextReviewFromRating,
 } from "../lib/spacedRepetition";
+import { getLocalDayStart } from "../lib/analytics";
 
 type Rating = "easy" | "medium" | "hard";
 
@@ -478,6 +479,28 @@ export const getStudySummary = query({
 });
 
 /**
+ * Count of cards reviewed today (local time), for daily-goal progress.
+ */
+export const getTodayReviewCount = query({
+  args: { tzOffsetMinutes: v.number() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return 0;
+
+    const dayStart = getLocalDayStart(Date.now(), args.tzOffsetMinutes);
+
+    const events = await ctx.db
+      .query("flashcardReviewEvents")
+      .withIndex("by_userId_reviewedAt", (q) =>
+        q.eq("userId", identity.tokenIdentifier).gte("reviewedAt", dayStart),
+      )
+      .collect();
+
+    return events.length;
+  },
+});
+
+/**
  * Rename a deck
  */
 export const renameDeck = mutation({
@@ -790,38 +813,43 @@ export const buildDailyQueuesInternal = internalMutation({
     const todayEnd = getEndOfDay(new Date());
     const now = Date.now();
 
-    for (const user of users) {
-      const dueCards = await ctx.db
-        .query("flashcards")
-        .withIndex("by_userId_nextReviewAt", (q) =>
-          q.eq("userId", user.tokenIdentifier).lte("nextReviewAt", todayEnd),
-        )
-        .collect();
+    // Each user's queue rebuild is independent, so run them concurrently
+    // instead of round-tripping through the whole user table one at a time.
+    await Promise.all(
+      users.map(async (user) => {
+        const [dueCards, existing] = await Promise.all([
+          ctx.db
+            .query("flashcards")
+            .withIndex("by_userId_nextReviewAt", (q) =>
+              q.eq("userId", user.tokenIdentifier).lte("nextReviewAt", todayEnd),
+            )
+            .collect(),
+          ctx.db
+            .query("flashcardReviewQueues")
+            .withIndex("by_userId_date", (q) =>
+              q.eq("userId", user.tokenIdentifier).eq("date", todayStart),
+            )
+            .unique(),
+        ]);
 
-      const existing = await ctx.db
-        .query("flashcardReviewQueues")
-        .withIndex("by_userId_date", (q) =>
-          q.eq("userId", user.tokenIdentifier).eq("date", todayStart),
-        )
-        .unique();
+        const cardIds = dueCards.map((c) => c._id);
 
-      const cardIds = dueCards.map((c) => c._id);
-
-      if (existing) {
-        await ctx.db.patch(existing._id, {
-          cardIds,
-          updatedAt: now,
-        });
-      } else {
-        await ctx.db.insert("flashcardReviewQueues", {
-          userId: user.tokenIdentifier,
-          date: todayStart,
-          cardIds,
-          createdAt: now,
-          updatedAt: now,
-        });
-      }
-    }
+        if (existing) {
+          await ctx.db.patch(existing._id, {
+            cardIds,
+            updatedAt: now,
+          });
+        } else {
+          await ctx.db.insert("flashcardReviewQueues", {
+            userId: user.tokenIdentifier,
+            date: todayStart,
+            cardIds,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      }),
+    );
 
     return { processedUsers: users.length };
   },

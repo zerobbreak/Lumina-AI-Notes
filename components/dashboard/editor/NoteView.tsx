@@ -137,6 +137,8 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
   // Editor State
   const [isSaving, setIsSaving] = useState(false);
+  // Track which note we've loaded content for to detect note changes
+  const [loadedNoteId, setLoadedNoteId] = useState<Id<"notes"> | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [debouncedContent, setDebouncedContent] = useState<string | null>(null);
   const [isRenameOpen, setIsRenameOpen] = useState(false);
@@ -234,6 +236,11 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     if (debouncedContent === null) return;
     if (noteQuery === null) return;
     if (noteQuery === undefined && noteBootstrap?.noteId !== noteId) return;
+    // debouncedContent can still hold a previous note's HTML for a moment after
+    // switching notes (it's only corrected once the editor's content finishes
+    // loading for `noteId`). Block saving until that load has actually happened,
+    // so a stale save can never race ahead and overwrite the new note's content.
+    if (loadedNoteId !== noteId) return;
 
     const handler = setTimeout(() => {
       if (displayNote?.style === "outline") {
@@ -282,6 +289,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     noteBootstrap?.noteId,
     updateNote,
     displayNote?.style,
+    loadedNoteId,
   ]);
 
   // Presence Heartbeat Effect - sends heartbeat on mount and every 30 seconds
@@ -301,10 +309,12 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     };
   }, [noteId, presenceHeartbeat, presenceLeave]);
 
-  const editor = useEditor({
-    editable: true,
-    immediatelyRender: false,
-    extensions: [
+  // Stable identities: useEditor() re-runs editor.setOptions() (a full
+  // ProseMirror state reconciliation) whenever these change identity, so
+  // rebuilding them inline on every render was costing a reconciliation on
+  // top of every keystroke's own transaction.
+  const editorExtensions = useMemo(
+    () => [
       StarterKit.configure({ codeBlock: false }),
       CodeBlockLowlight.configure({
         lowlight: editorLowlight,
@@ -327,19 +337,34 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       ChartExtension,
       ...MathExtensions, // Math formula support (inline $...$ and block $$...$$)
     ],
-    editorProps: {
+    [bumpSlashUi],
+  );
+
+  const editorProps = useMemo(
+    () => ({
       attributes: {
         class: "prose prose-invert max-w-none focus:outline-none min-h-[500px]",
       },
-    },
-    onUpdate: ({ editor }) => {
+    }),
+    [],
+  );
+
+  const handleEditorUpdate = useCallback(
+    ({ editor }: { editor: TiptapEditor }) => {
       setIsSaving(true);
       setDebouncedContent(editor.getHTML());
     },
+    [],
+  );
+
+  const editor = useEditor({
+    editable: true,
+    immediatelyRender: false,
+    extensions: editorExtensions,
+    editorProps,
+    onUpdate: handleEditorUpdate,
   });
 
-  // Track which note we've loaded content for to detect note changes
-  const [loadedNoteId, setLoadedNoteId] = useState<Id<"notes"> | null>(null);
   // Use ref to track current noteId without causing dependency array issues
   const noteIdRef = useRef(noteId);
 

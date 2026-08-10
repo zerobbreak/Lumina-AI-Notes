@@ -29,24 +29,28 @@ export function StepPermissions({ onPermissionGranted }: StepPermissionsProps) {
   };
 
   return (
-    <div className="flex flex-col items-center text-center flex-1 justify-center gap-8 py-2">
+    <div className="flex flex-col items-center text-center flex-1 justify-center gap-6 py-2">
       <motion.div
         initial={{ scale: 0.92, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         className="relative"
       >
-        <div className="absolute inset-0 rounded-full bg-indigo-500/25 blur-2xl scale-150" />
         <div
-          className={`relative flex h-24 w-24 items-center justify-center rounded-full ring-1 transition-colors duration-300 ${
+          className="absolute inset-0 rounded-full blur-2xl scale-150"
+          style={{ background: granted ? "rgba(52,211,153,0.25)" : "var(--obs-amber-glow)" }}
+        />
+        <div
+          className={`relative flex h-20 w-20 items-center justify-center rounded-full ring-1 transition-colors duration-300 ${
             granted
               ? "bg-emerald-500/15 ring-emerald-500/40"
-              : "bg-indigo-500/15 ring-indigo-400/30"
+              : ""
           }`}
+          style={!granted ? { background: "rgba(204,154,76,0.15)", boxShadow: "inset 0 0 0 1px rgba(204,154,76,0.3)" } : undefined}
         >
           {granted ? (
-            <CheckCircle2 className="h-11 w-11 text-emerald-400" strokeWidth={1.5} />
+            <CheckCircle2 className="h-10 w-10 text-emerald-400" strokeWidth={1.5} />
           ) : (
-            <Mic className="h-11 w-11 text-indigo-300" strokeWidth={1.5} />
+            <Mic className="h-10 w-10" style={{ color: "var(--obs-amber)" }} strokeWidth={1.5} />
           )}
         </div>
       </motion.div>
@@ -71,7 +75,8 @@ export function StepPermissions({ onPermissionGranted }: StepPermissionsProps) {
       <Button
         type="button"
         size="lg"
-        className="w-full max-w-sm h-12 rounded-xl bg-linear-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white border border-white/10 shadow-lg shadow-indigo-500/20"
+        className="w-full max-w-sm h-12 rounded-xl text-black font-semibold border border-white/10 shadow-lg hover:brightness-110 transition-[filter]"
+        style={{ background: "linear-gradient(135deg, var(--obs-amber), var(--obs-teal))", boxShadow: "0 10px 24px -8px var(--obs-amber-glow)" }}
         onClick={requestMicrophone}
         disabled={granted}
       >

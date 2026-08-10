@@ -81,10 +81,16 @@ export default function OnboardingPage() {
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
 
   useEffect(() => {
+    // Skip while handleFinish is driving navigation itself (it appends
+    // ?tour=1). Without this guard, the Convex query updates reactively
+    // right after completeOnboarding resolves, re-running this effect and
+    // racing handleFinish's router.push — often winning and stripping the
+    // tour param so the tour never shows.
+    if (isInitializing) return;
     if (userData && userData.onboardingComplete) {
       router.replace("/dashboard");
     }
-  }, [userData, router]);
+  }, [userData, router, isInitializing]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -171,22 +177,23 @@ export default function OnboardingPage() {
 
   if (authLoading || userData === undefined) {
     return (
-      <div className="relative min-h-screen flex items-center justify-center text-zinc-400">
+      <div className="relative h-dvh flex items-center justify-center text-zinc-400">
         <OnboardingBackdrop />
-        <div className="relative z-10 flex flex-col items-center gap-3">
-          <div className="h-10 w-10 rounded-full border-2 border-indigo-500/30 border-t-indigo-400 animate-spin" />
-          <p className="text-sm tracking-wide">Loading workspace…</p>
-        </div>
+        <div
+          className="relative z-10 h-10 w-10 rounded-full border-2 animate-spin"
+          style={{ borderColor: "rgba(204,154,76,0.25)", borderTopColor: "var(--obs-amber)" }}
+        />
+        <p className="sr-only">Loading workspace…</p>
       </div>
     );
   }
 
   if (userData && userData.onboardingComplete) {
     return (
-      <div className="relative min-h-screen flex items-center justify-center text-zinc-400">
+      <div className="relative h-dvh flex items-center justify-center text-zinc-400">
         <OnboardingBackdrop />
         <div className="relative z-10 flex items-center gap-2 text-sm">
-          <Sparkles className="w-4 h-4 text-indigo-400" />
+          <Sparkles className="w-4 h-4" style={{ color: "var(--obs-teal)" }} />
           Redirecting…
         </div>
       </div>
@@ -194,20 +201,23 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="relative min-h-screen text-zinc-100 flex flex-col">
+    <div className="relative h-dvh overflow-hidden text-zinc-100 flex flex-col" style={{ fontFamily: "var(--font-body, 'DM Sans', sans-serif)" }}>
       <OnboardingBackdrop />
 
-      <header className="relative z-10 shrink-0 px-6 pt-8 pb-2 md:px-10">
+      <header className="relative z-10 shrink-0 px-6 pt-5 pb-1 md:px-10">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-500/25">
-              <Sparkles className="h-4 w-4 text-white" strokeWidth={2.2} />
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-xl shadow-lg"
+              style={{ background: "linear-gradient(135deg, var(--obs-amber), var(--obs-teal))", boxShadow: "0 8px 20px -6px var(--obs-amber-glow)" }}
+            >
+              <Sparkles className="h-3.5 w-3.5 text-black" strokeWidth={2.2} />
             </div>
             <div>
-              <p className="text-sm font-semibold tracking-tight text-white">
+              <p className="text-sm font-semibold tracking-tight text-white" style={{ fontFamily: "var(--font-display)" }}>
                 Lumina
               </p>
-              <p className="text-[11px] text-zinc-500 uppercase tracking-[0.2em]">
+              <p className="text-[10px] text-zinc-500 uppercase tracking-[0.2em]">
                 Setup
               </p>
             </div>
@@ -218,19 +228,19 @@ export default function OnboardingPage() {
         </div>
       </header>
 
-      <main className="relative z-10 flex flex-1 flex-col items-center px-4 pb-10 pt-4 md:px-8">
+      <main className="relative z-10 flex flex-1 min-h-0 flex-col items-center px-4 pb-4 pt-2 md:px-8">
         <OnboardingProgress step={step} total={totalSteps} />
 
         <motion.div
           layout
-          className="w-full max-w-6xl grid lg:grid-cols-12 gap-8 lg:gap-10 items-stretch"
+          className="w-full max-w-6xl flex-1 min-h-0 grid lg:grid-cols-12 gap-6 lg:gap-8 items-stretch"
         >
           {/* Form column */}
           <div className="lg:col-span-5 flex flex-col min-h-0">
             <div
-              className="flex flex-col flex-1 rounded-[1.75rem] border border-white/8 bg-zinc-900/40 backdrop-blur-xl shadow-[0_24px_80px_-20px_rgba(0,0,0,0.65)] ring-1 ring-white/4 overflow-hidden"
+              className="flex flex-col flex-1 min-h-0 rounded-[1.75rem] border border-white/8 bg-zinc-900/40 backdrop-blur-xl shadow-[0_24px_80px_-20px_rgba(0,0,0,0.65)] ring-1 ring-white/4 overflow-hidden"
             >
-              <div className="px-6 pt-6 md:px-8 md:pt-8 pb-2 border-b border-white/6">
+              <div className="shrink-0 px-6 pt-5 md:px-8 md:pt-6 pb-2 border-b border-white/6">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={step}
@@ -239,13 +249,13 @@ export default function OnboardingPage() {
                     exit={{ opacity: 0, y: -8 }}
                     transition={{ duration: 0.22 }}
                   >
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-indigo-300/90 mb-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] mb-1" style={{ color: "var(--obs-teal)" }}>
                       {step === 1 && "Welcome"}
                       {step === 2 && "Your focus"}
                       {step === 3 && "Materials"}
                       {step === 4 && "Permissions"}
                     </p>
-                    <h1 className="text-xl md:text-2xl font-semibold text-white tracking-tight">
+                    <h1 className="text-xl md:text-2xl font-semibold text-white tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
                       {step === 1 && "Start your workspace"}
                       {step === 2 && "What do you study?"}
                       {step === 3 && "Add syllabus PDFs"}
@@ -255,7 +265,7 @@ export default function OnboardingPage() {
                 </AnimatePresence>
               </div>
 
-              <div className="flex-1 flex flex-col min-h-[min(420px,55vh)] md:min-h-[460px] px-6 py-6 md:px-8 md:py-8">
+              <div className="flex-1 min-h-0 flex flex-col px-6 py-5 md:px-8 md:py-6 overflow-y-auto [scrollbar-gutter:stable]">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={step}
@@ -266,17 +276,20 @@ export default function OnboardingPage() {
                     className="flex-1 flex flex-col"
                   >
                     {step === 1 && (
-                      <div className="flex flex-col items-center justify-center text-center flex-1 gap-8 py-4">
+                      <div className="flex flex-col items-center justify-center text-center flex-1 gap-6 py-2">
                         <motion.div
                           initial={{ scale: 0.9, opacity: 0 }}
                           animate={{ scale: 1, opacity: 1 }}
                           transition={{ delay: 0.05, type: "spring", damping: 18 }}
                           className="relative"
                         >
-                          <div className="absolute inset-0 rounded-3xl bg-indigo-500/20 blur-2xl scale-150" />
-                          <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-linear-to-br from-indigo-500 to-violet-600 shadow-xl shadow-indigo-500/30 ring-1 ring-white/20">
+                          <div className="absolute inset-0 rounded-3xl blur-2xl scale-150" style={{ background: "var(--obs-amber-glow)" }} />
+                          <div
+                            className="relative flex h-16 w-16 items-center justify-center rounded-2xl shadow-xl ring-1 ring-white/20"
+                            style={{ background: "linear-gradient(135deg, var(--obs-amber), var(--obs-teal))" }}
+                          >
                             <Sparkles
-                              className="h-9 w-9 text-white"
+                              className="h-7 w-7 text-black"
                               strokeWidth={1.5}
                             />
                           </div>
@@ -317,7 +330,7 @@ export default function OnboardingPage() {
                 </AnimatePresence>
               </div>
 
-              <div className="mt-auto flex items-center justify-between gap-3 px-6 py-5 md:px-8 border-t border-white/6 bg-black/20">
+              <div className="shrink-0 mt-auto flex items-center justify-between gap-3 px-6 py-4 md:px-8 border-t border-white/6 bg-black/20">
                 <Button
                   type="button"
                   variant="ghost"
@@ -336,7 +349,8 @@ export default function OnboardingPage() {
                     (step === 2 && !formData.major) ||
                     (step === 4 && !formData.permissionsGranted)
                   }
-                  className="rounded-xl bg-linear-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white px-7 shadow-lg shadow-indigo-500/25 border border-white/10"
+                  className="rounded-xl text-black font-semibold px-7 shadow-lg border border-white/10 hover:brightness-110 transition-[filter]"
+                  style={{ background: "linear-gradient(135deg, var(--obs-amber), var(--obs-teal))", boxShadow: "0 10px 24px -8px var(--obs-amber-glow)" }}
                 >
                   {step === totalSteps ? "Finish & open Lumina" : "Continue"}
                   {step !== totalSteps && (
@@ -348,7 +362,7 @@ export default function OnboardingPage() {
           </div>
 
           {/* Preview column */}
-          <div className="hidden lg:flex lg:col-span-7 flex-col min-h-[560px]">
+          <div className="hidden lg:flex lg:col-span-7 flex-col min-h-0">
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -366,7 +380,7 @@ export default function OnboardingPage() {
                 </span>
               </div>
 
-              <div className="flex-1 p-6 md:p-8 flex flex-col gap-6 overflow-hidden">
+              <div className="flex-1 min-h-0 p-6 md:p-7 flex flex-col gap-5 overflow-y-auto [scrollbar-gutter:stable]">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={step}
@@ -374,10 +388,18 @@ export default function OnboardingPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -12 }}
                     transition={{ duration: 0.28 }}
-                    className="rounded-2xl border border-indigo-500/20 bg-linear-to-br from-indigo-500/10 via-violet-500/5 to-transparent p-6 flex gap-4"
+                    className="shrink-0 rounded-2xl p-5 flex gap-4"
+                    style={{
+                      border: "1px solid var(--obs-teal-glow)",
+                      background:
+                        "linear-gradient(135deg, var(--obs-teal-glow), transparent)",
+                    }}
                   >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 ring-1 ring-indigo-400/25">
-                      <HintIcon className="h-5 w-5 text-indigo-300" />
+                    <div
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1"
+                      style={{ background: "rgba(63,171,156,0.15)", borderColor: "transparent", boxShadow: "inset 0 0 0 1px rgba(63,171,156,0.25)" }}
+                    >
+                      <HintIcon className="h-5 w-5" style={{ color: "var(--obs-teal)" }} />
                     </div>
                     <div className="min-w-0 space-y-1.5">
                       <h3 className="text-base font-semibold text-white leading-snug">
@@ -390,7 +412,7 @@ export default function OnboardingPage() {
                   </motion.div>
                 </AnimatePresence>
 
-                <div className="rounded-2xl border border-white/6 bg-zinc-900/40 p-6 flex flex-col gap-5 flex-1 min-h-0">
+                <div className="rounded-2xl border border-white/6 bg-zinc-900/40 p-5 flex flex-col gap-4 flex-1 min-h-0">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                       <h3 className="text-2xl font-semibold text-white tracking-tight">
@@ -425,7 +447,8 @@ export default function OnboardingPage() {
                     </div>
                     <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
                       <motion.div
-                        className="h-full rounded-full bg-linear-to-r from-indigo-500 to-violet-400"
+                        className="h-full rounded-full"
+                        style={{ background: "linear-gradient(90deg, var(--obs-teal), var(--obs-amber))" }}
                         initial={false}
                         animate={{ width: `${(step / totalSteps) * 100}%` }}
                         transition={{
@@ -466,10 +489,10 @@ export default function OnboardingPage() {
                         {[40, 70, 45, 90, 60, 80, 50].map((h, i) => (
                           <div
                             key={i}
-                            className="flex-1 rounded-t-sm bg-indigo-500/15 relative overflow-hidden"
+                            className="flex-1 rounded-t-sm bg-white/[0.04] relative overflow-hidden"
                           >
                             <motion.div
-                              className="absolute bottom-0 left-0 right-0 rounded-t-sm bg-linear-to-br from-indigo-600 to-violet-500"
+                              className="absolute bottom-0 left-0 right-0 rounded-t-sm bg-linear-to-t from-teal-500/60 to-amber-400/60"
                               initial={{ height: 0 }}
                               animate={{ height: `${h}%` }}
                               transition={{

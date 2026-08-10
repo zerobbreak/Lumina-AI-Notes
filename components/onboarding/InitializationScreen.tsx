@@ -13,7 +13,7 @@ const STEPS = [
 
 export function InitializationScreen() {
   return (
-    <div className="relative min-h-screen w-full text-zinc-100 flex flex-col items-center justify-center p-6">
+    <div className="relative h-dvh w-full text-zinc-100 flex flex-col items-center justify-center p-6">
       <OnboardingBackdrop />
 
       <div className="relative z-10 flex flex-col items-center max-w-md w-full">
@@ -21,7 +21,8 @@ export function InitializationScreen() {
           <motion.div
             animate={{ scale: [1, 1.4, 1], opacity: [0.4, 0, 0.4] }}
             transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute inset-0 rounded-full bg-indigo-500/30 blur-2xl"
+            className="absolute inset-0 rounded-full blur-2xl"
+            style={{ background: "var(--obs-amber-glow)" }}
           />
           <motion.div
             animate={{ scale: [1, 1.6, 1], opacity: [0.25, 0, 0.25] }}
@@ -31,11 +32,15 @@ export function InitializationScreen() {
               ease: "easeInOut",
               delay: 0.4,
             }}
-            className="absolute inset-0 rounded-full bg-violet-500/20 blur-3xl"
+            className="absolute inset-0 rounded-full blur-3xl"
+            style={{ background: "var(--obs-teal-glow)" }}
           />
 
-          <div className="relative z-10 flex h-28 w-28 items-center justify-center rounded-full border border-white/[0.12] bg-zinc-950/80 shadow-[0_0_60px_-10px_rgba(99,102,241,0.5)] backdrop-blur-sm">
-            <Sparkles className="h-11 w-11 text-indigo-300" strokeWidth={1.25} />
+          <div
+            className="relative z-10 flex h-28 w-28 items-center justify-center rounded-full border border-white/[0.12] bg-zinc-950/80 backdrop-blur-sm"
+            style={{ boxShadow: "0 0 60px -10px var(--obs-amber-glow)" }}
+          >
+            <Sparkles className="h-11 w-11" style={{ color: "var(--obs-amber)" }} strokeWidth={1.25} />
           </div>
         </div>
 
@@ -68,7 +73,8 @@ function LoadingStep({ label, delay }: { label: string; delay: number }) {
       <motion.div
         animate={{ rotate: 360 }}
         transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
-        className="h-4 w-4 shrink-0 rounded-full border-2 border-indigo-400/40 border-t-indigo-300"
+        className="h-4 w-4 shrink-0 rounded-full border-2"
+        style={{ borderColor: "rgba(63,171,156,0.35)", borderTopColor: "var(--obs-teal)" }}
       />
       <span className="text-sm text-zinc-400">{label}</span>
     </motion.div>

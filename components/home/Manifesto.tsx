@@ -67,9 +67,9 @@ export function Manifesto() {
         </div>
       </div>
       
-      {/* Immersive ambient glows */}
+      {/* Immersive ambient glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] pointer-events-none -z-10">
-        <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-amber-500/5 to-teal-500/5 blur-[120px] animate-pulse-slow" />
+        <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-amber-500/4 to-transparent blur-[120px] animate-pulse-slow" />
       </div>
     </section>
   );

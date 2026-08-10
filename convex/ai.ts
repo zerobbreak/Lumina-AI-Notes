@@ -66,7 +66,7 @@ const getGeminiModel = (config?: { responseMimeType: string }) => {
   }
   const genAI = new GoogleGenerativeAI(apiKey);
   return genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: "gemini-3.5-flash",
     generationConfig: config,
   });
 };
@@ -1286,6 +1286,100 @@ const extractJsonObject = (text: string): string | null => {
   return match ? match[0] : null;
 };
 
+const ELEVENLABS_STT_URL = "https://api.elevenlabs.io/v1/speech-to-text";
+const ELEVENLABS_ISOLATION_URL = "https://api.elevenlabs.io/v1/audio-isolation";
+
+const mimeToFilename = (mimeType: string): string => {
+  const subtype = mimeType.split("/")[1]?.split(";")[0] || "webm";
+  const ext = subtype.includes("mpeg") || subtype.includes("mp3")
+    ? "mp3"
+    : subtype.includes("mp4") || subtype.includes("m4a")
+      ? "m4a"
+      : subtype.includes("wav")
+        ? "wav"
+        : subtype.includes("ogg")
+          ? "ogg"
+          : subtype.includes("flac")
+            ? "flac"
+            : "webm";
+  return `audio.${ext}`;
+};
+
+/**
+ * Best-effort background-noise removal via ElevenLabs Audio Isolation.
+ * The free tier caps isolation credits, so this must never block
+ * transcription: any failure (quota, network, non-2xx) just falls back
+ * to the original audio.
+ */
+const isolateAudioWithElevenLabs = async (
+  buffer: ArrayBuffer,
+  mimeType: string,
+  apiKey: string,
+): Promise<{ buffer: ArrayBuffer; mimeType: string } | null> => {
+  try {
+    const formData = new FormData();
+    formData.append(
+      "audio",
+      new Blob([buffer], { type: mimeType }),
+      mimeToFilename(mimeType),
+    );
+
+    const res = await fetch(ELEVENLABS_ISOLATION_URL, {
+      method: "POST",
+      headers: { "xi-api-key": apiKey },
+      body: formData,
+    });
+
+    if (!res.ok) {
+      if (process.env.NODE_ENV === "development") console.log(
+        `[transcribeAudio] Audio isolation skipped (status ${res.status}), using original audio`,
+      );
+      return null;
+    }
+
+    const isolatedBuffer = await res.arrayBuffer();
+    return { buffer: isolatedBuffer, mimeType: "audio/mpeg" };
+  } catch (error) {
+    console.warn(
+      "[transcribeAudio] Audio isolation failed, using original audio:",
+      error instanceof Error ? error.message : error,
+    );
+    return null;
+  }
+};
+
+const transcribeWithElevenLabs = async (
+  buffer: ArrayBuffer,
+  mimeType: string,
+  apiKey: string,
+): Promise<string> => {
+  const formData = new FormData();
+  formData.append("model_id", "scribe_v1");
+  formData.append(
+    "file",
+    new Blob([buffer], { type: mimeType }),
+    mimeToFilename(mimeType),
+  );
+
+  const res = await fetch(ELEVENLABS_STT_URL, {
+    method: "POST",
+    headers: { "xi-api-key": apiKey },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(
+      `ElevenLabs STT request failed (${res.status}): ${errText.slice(0, 300)}`,
+    );
+  }
+
+  const data = (await res.json()) as { text?: string };
+  const text = typeof data.text === "string" ? data.text.trim() : "";
+  if (!text) throw new Error("ElevenLabs STT returned an empty transcript");
+  return text;
+};
+
 export const transcribeAudio = action({
   args: {
     storageId: v.id("_storage"),
@@ -1404,30 +1498,81 @@ Focus on accuracy above all else.`,
       };
 
       let responseText = "";
+      let transcriptionProvider: "elevenlabs" | "gemini" = "gemini";
+      let audioIsolationApplied = false;
+      const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
+
+      // ElevenLabs is the priority STT provider. Gemini below is the
+      // fallback if ElevenLabs is unavailable, errors, or has no key set.
+      if (elevenLabsApiKey) {
+        try {
+          if (process.env.NODE_ENV === "development") console.log(
+            "[transcribeAudio] Attempting transcription with ElevenLabs (priority provider)",
+          );
+
+          let sttBuffer = arrayBuffer;
+          let sttMimeType = args.mimeType;
+
+          // Audio isolation is best-effort only (free tier has limited
+          // credits) - never let it block the transcription attempt.
+          const isolated = await isolateAudioWithElevenLabs(
+            arrayBuffer,
+            args.mimeType,
+            elevenLabsApiKey,
+          );
+          if (isolated) {
+            sttBuffer = isolated.buffer;
+            sttMimeType = isolated.mimeType;
+            audioIsolationApplied = true;
+            if (process.env.NODE_ENV === "development") console.log(
+              "[transcribeAudio] Audio isolation applied before STT",
+            );
+          }
+
+          responseText = await transcribeWithElevenLabs(
+            sttBuffer,
+            sttMimeType,
+            elevenLabsApiKey,
+          );
+          transcriptionProvider = "elevenlabs";
+          if (process.env.NODE_ENV === "development") console.log(
+            `[transcribeAudio] ElevenLabs transcription succeeded: ${responseText.length} chars`,
+          );
+        } catch (error) {
+          console.warn(
+            "[transcribeAudio] ElevenLabs STT failed, falling back to Gemini:",
+            error instanceof Error ? error.message : error,
+          );
+        }
+      }
+
       const maxRetries = 3; // Increased for transient errors
       let lastError: Error | null = null;
 
-      // Retry with exponential backoff for transient errors
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          if (process.env.NODE_ENV === "development") console.log(
-            `[transcribeAudio] Attempt ${attempt}/${maxRetries} with gemini-2.5-flash`,
-          );
-          responseText = await generateTranscription("gemini-2.5-flash");
-          break; // Success, exit loop
-        } catch (error) {
-          lastError = error instanceof Error ? error : new Error(String(error));
-          console.warn(
-            `[transcribeAudio] Attempt ${attempt} failed:`,
-            lastError.message,
-          );
+      if (!responseText) {
+        // Retry with exponential backoff for transient errors
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            if (process.env.NODE_ENV === "development") console.log(
+              `[transcribeAudio] Attempt ${attempt}/${maxRetries} with gemini-3.5-flash`,
+            );
+            responseText = await generateTranscription("gemini-3.5-flash");
+            transcriptionProvider = "gemini";
+            break; // Success, exit loop
+          } catch (error) {
+            lastError = error instanceof Error ? error : new Error(String(error));
+            console.warn(
+              `[transcribeAudio] Attempt ${attempt} failed:`,
+              lastError.message,
+            );
 
-          // If this was the last attempt, don't wait
-          if (attempt < maxRetries) {
-            // Exponential backoff: 1s, 2s, 4s
-            const delay = Math.pow(2, attempt - 1) * 1000;
-            if (process.env.NODE_ENV === "development") console.log(`[transcribeAudio] Waiting ${delay}ms before retry...`);
-            await new Promise((resolve) => setTimeout(resolve, delay));
+            // If this was the last attempt, don't wait
+            if (attempt < maxRetries) {
+              // Exponential backoff: 1s, 2s, 4s
+              const delay = Math.pow(2, attempt - 1) * 1000;
+              if (process.env.NODE_ENV === "development") console.log(`[transcribeAudio] Waiting ${delay}ms before retry...`);
+              await new Promise((resolve) => setTimeout(resolve, delay));
+            }
           }
         }
       }
@@ -1495,6 +1640,8 @@ Focus on accuracy above all else.`,
         processingMetadata: {
           cleaned: cleanupMetadata,
           structure: structureResult,
+          transcriptionProvider,
+          audioIsolationApplied,
         },
         success: true,
       };
@@ -2049,7 +2196,7 @@ export const processDocument = action({
       }
 
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
       const base64Data = arrayBufferToBase64(arrayBuffer);
 
@@ -2733,7 +2880,7 @@ export const ingestAndGenerateFlashcards = action({
       }
 
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
       // Step 1: Extract text from PDF using Gemini's native PDF processing
       const extractionResult = await model.generateContent([
@@ -2965,7 +3112,7 @@ export const ingestAndGenerateNote = action({
       }
 
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
       // Step 1: Extract text and generate notes from PDF using Gemini's native PDF processing
       const noteGenerationResult = await model.generateContent([
@@ -3185,7 +3332,7 @@ export const extractFormulaFromImage = action({
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.5-flash",
         generationConfig: {
           responseMimeType: "application/json",
         },

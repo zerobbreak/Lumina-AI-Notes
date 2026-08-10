@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { DashboardProvider } from "@/components/dashboard/DashboardContext";
 import { DragOverlayWrapper } from "@/components/dashboard/DragOverlayWrapper";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
-import { Sparkles } from "lucide-react";
 import { useMutation, useQuery, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -13,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
 import { cn } from "@/lib/utils";
+import { SidebarSkeleton } from "@/components/dashboard/sidebar/SidebarSkeleton";
+import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 
 const CommandPalette = lazy(() => import("@/components/dashboard/CommandPalette").then(m => ({ default: m.CommandPalette })));
 const KeyboardShortcutsDialog = lazy(() => import("@/components/dashboard/KeyboardShortcutsDialog").then(m => ({ default: m.KeyboardShortcutsDialog })));
@@ -22,7 +23,7 @@ const Sidebar = dynamic(
     import("@/components/dashboard/sidebar/Sidebar").then((m) => ({
       default: m.Sidebar,
     })),
-  { ssr: false, loading: () => null },
+  { ssr: false, loading: () => <SidebarSkeleton /> },
 );
 
 const RightSidebar = dynamic(
@@ -51,10 +52,10 @@ const QuickCaptureFabLazy = dynamic(
 
 function DashboardLayoutLoading() {
   return (
-    <div className="h-screen w-full bg-background flex items-center justify-center text-muted-foreground">
-      <div className="flex items-center gap-2 animate-pulse">
-        <Sparkles className="w-5 h-5" />
-        <span>Loading Workspace...</span>
+    <div className="flex h-screen w-full bg-background overflow-hidden">
+      <SidebarSkeleton />
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <DashboardSkeleton />
       </div>
     </div>
   );
@@ -85,7 +86,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthenticated, router, userData]);
 
-  // Defer mounting heavy panels (sidebars, indicators) until after initial paint.
+  // Defer mounting secondary panels (right sidebar, processing indicator, quick
+  // capture) until after initial paint. The left Sidebar is excluded from this
+  // gate and mounts immediately — it's the primary navigation surface, so users
+  // shouldn't have to wait ~250ms-1.2s for search/settings/course links to appear.
   useEffect(() => {
     let cancelled = false;
     const w = window as unknown as {
@@ -163,7 +167,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {mountHeavyPanels ? <Sidebar /> : null}
+        <Sidebar />
         <main className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden relative z-0">
           {/* Left Sidebar Close Handle (when open) */}
           <div 

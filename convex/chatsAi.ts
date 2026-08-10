@@ -165,24 +165,28 @@ export const generateAssistantReply: ReturnType<typeof action> = action({
       noteIds,
     });
 
-    // Auto-title the chat once, based on the first real question.
-    if (shouldAutoTitle(session.title)) {
-      try {
-        const generated = await maybeGenerateSessionTitle({
+    // Auto-title the chat once, based on the first real question. Kicked
+    // off here but not awaited yet — it runs concurrently with the main
+    // answer generation below (or, on the thin-notes path, is awaited on
+    // its own since there's no other async work to overlap it with).
+    const titleTask: Promise<void> = shouldAutoTitle(session.title)
+      ? maybeGenerateSessionTitle({
           mode,
           question: args.question,
           contextNotes,
-        });
-        if (generated) {
-          await ctx.runMutation(api.chats.updateSessionTitle, {
-            sessionId: args.sessionId,
-            title: generated,
-          });
-        }
-      } catch {
-        // Non-critical: title generation shouldn't block answering.
-      }
-    }
+        })
+          .then(async (generated) => {
+            if (generated) {
+              await ctx.runMutation(api.chats.updateSessionTitle, {
+                sessionId: args.sessionId,
+                title: generated,
+              });
+            }
+          })
+          .catch(() => {
+            // Non-critical: title generation shouldn't block answering.
+          })
+      : Promise.resolve();
 
     const notesWordCount = contextNotes.reduce(
       (sum: number, n: ContextNote) => sum + wordCount(n.content || ""),
@@ -191,6 +195,7 @@ export const generateAssistantReply: ReturnType<typeof action> = action({
 
     // Grounded-first fallback: if notes are thin, ask for missing info instead of guessing.
     if (contextNotes.length === 0 || notesWordCount < 60) {
+      await titleTask;
       const missing =
         contextNotes.length === 0
           ? `I don’t have any referenced notes to ground the answer.`
@@ -246,7 +251,10 @@ ${formatContextNotesForPrompt(contextNotes)}
 `;
 
     const model = getGeminiModel();
-    const result = await model.generateContent(prompt);
+    const [result] = await Promise.all([
+      model.generateContent(prompt),
+      titleTask,
+    ]);
     const text = result.response.text().trim();
 
     const messageId: Id<"chatMessages"> = await ctx.runMutation(

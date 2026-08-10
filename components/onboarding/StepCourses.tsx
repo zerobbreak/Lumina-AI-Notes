@@ -53,12 +53,17 @@ export function StepCourses({ value, onChange }: StepCoursesProps) {
         }}
         onClick={() => inputRef.current?.click()}
         className={cn(
-          "relative rounded-2xl border-2 border-dashed transition-all duration-200 min-h-[200px] flex flex-col items-center justify-center text-center px-6 py-12 cursor-pointer",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950",
+          "relative rounded-2xl border-2 border-dashed transition-all duration-200 min-h-[160px] flex flex-col items-center justify-center text-center px-6 py-8 cursor-pointer",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950",
           isDragging
-            ? "border-indigo-400/60 bg-indigo-500/10 scale-[1.01]"
-            : "border-white/[0.1] bg-white/[0.02] hover:border-indigo-500/35 hover:bg-white/[0.04]",
+            ? "scale-[1.01]"
+            : "border-white/[0.1] bg-white/[0.02] hover:bg-white/[0.04]",
         )}
+        style={
+          isDragging
+            ? { borderColor: "rgba(63,171,156,0.6)", background: "rgba(63,171,156,0.1)" }
+            : undefined
+        }
         onDragOver={(e) => {
           e.preventDefault();
           setIsDragging(true);
@@ -80,16 +85,16 @@ export function StepCourses({ value, onChange }: StepCoursesProps) {
         />
         <div className="flex flex-col items-center gap-3">
           <div
-            className={cn(
-              "flex h-14 w-14 items-center justify-center rounded-2xl transition-colors",
-              isDragging ? "bg-indigo-500/25" : "bg-indigo-500/15 ring-1 ring-indigo-400/20",
-            )}
+            className="flex h-12 w-12 items-center justify-center rounded-2xl ring-1 transition-colors"
+            style={{
+              background: isDragging ? "rgba(63,171,156,0.25)" : "rgba(63,171,156,0.15)",
+              borderColor: "transparent",
+              boxShadow: "inset 0 0 0 1px rgba(63,171,156,0.2)",
+            }}
           >
             <UploadCloud
-              className={cn(
-                "h-7 w-7",
-                isDragging ? "text-indigo-200" : "text-indigo-400",
-              )}
+              className="h-6 w-6"
+              style={{ color: isDragging ? "#bfe6de" : "var(--obs-teal)" }}
               strokeWidth={1.5}
             />
           </div>

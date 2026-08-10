@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useQuery, useMutation } from "convex/react";
+import { useUser } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import {
   ArrowRight,
   Layers,
   Loader2,
+  Target,
 } from "lucide-react";
 import { Course } from "@/types";
 import { ActionMenu } from "@/components/shared/ActionMenu";
@@ -32,6 +34,10 @@ import { NotesRail } from "@/components/dashboard/home/NotesRail";
 import { StudyNextActions } from "@/components/dashboard/home/StudyNextActions";
 import { ProductivityPanel } from "@/components/dashboard/home/ProductivityPanel";
 import { AcademicPipeline } from "@/components/dashboard/home/AcademicPipeline";
+import { UploadStatusCard } from "@/components/dashboard/home/UploadStatusCard";
+import { QuizSnapshot } from "@/components/dashboard/home/QuizSnapshot";
+import { GettingStarted } from "@/components/dashboard/home/GettingStarted";
+import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 
 const TourOverlay = lazy(() => import("@/components/dashboard/TourOverlay").then(m => ({ default: m.TourOverlay })));
 import type { TourStep } from "@/components/dashboard/TourOverlay";
@@ -73,6 +79,7 @@ const itemVariants = {
   },
 };
 export default function SmartFolderHub() {
+  const { user: clerkUser } = useUser();
   const userData = useQuery(api.users.getUser);
   const createCourse = useMutation(api.users.createCourse);
   const deleteCourse = useMutation(api.users.deleteCourse);
@@ -80,9 +87,21 @@ export default function SmartFolderHub() {
   const recentNotes = useQuery(api.notes.getRecentNotes);
   const todayQueue = useQuery(api.flashcards.getTodayQueue);
   const gamification = useQuery(api.users.getUserGamificationStats);
+  const files = useQuery(api.files.getFiles);
   const router = useRouter();
   const searchParams = useSearchParams();
   const updateTourProgress = useMutation(api.users.updateTourProgress);
+
+  // Static per-mount window so the query args stay referentially stable.
+  const [weekWindow] = useState(() => ({
+    startMs: Date.now() - 7 * 24 * 60 * 60 * 1000,
+    endMs: Date.now(),
+  }));
+  const weeklyActivity = useQuery(api.calendar.getCalendarActivity, weekWindow);
+  const [tzOffsetMinutes] = useState(() => new Date().getTimezoneOffset());
+  const todayReviewCount = useQuery(api.flashcards.getTodayReviewCount, {
+    tzOffsetMinutes,
+  });
 
   const tourParam = searchParams.get("tour");
   /** Hide overlay immediately on dismiss; cleared when URL requests tour again. */
@@ -194,10 +213,22 @@ export default function SmartFolderHub() {
     [],
   );
 
-  if (!userData) return null;
+  if (!userData) {
+    return <DashboardSkeleton name={clerkUser?.firstName} />;
+  }
 
   // Calculate statistics
   const dueTodayCount = todayQueue?.cardIds?.length ?? 0;
+  const hasProcessingFile =
+    files?.some(
+      (f) => f.processingStatus === "pending" || f.processingStatus === "processing",
+    ) ?? false;
+  const isNewUser = recentNotes !== undefined && recentNotes.length === 0;
+  const dailyGoalCards = gamification?.dailyGoalCards ?? 20;
+  const goalProgressPct = Math.min(
+    100,
+    Math.round(((todayReviewCount ?? 0) / Math.max(1, dailyGoalCards)) * 100),
+  );
 
   const closeTour = async (completed: boolean) => {
     setSuppressTourOverlay(true);
@@ -239,44 +270,69 @@ export default function SmartFolderHub() {
                 </span>
               </h1>
               <p className="text-muted-foreground text-lg max-w-xl">
-                Your academic workspace is ready. Pick up where you left off or
-                start something new.
+                {isNewUser
+                  ? "Here's a quick look at what Lumina can do for you."
+                  : "Your academic workspace is ready. Pick up where you left off or start something new."}
               </p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="rounded-2xl border border-border bg-card text-card-foreground px-5 py-4 min-w-[200px] shadow-sm ring-1 ring-black/5 dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:ring-0 dark:backdrop-blur-md">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-700 dark:text-amber-400">
-                  <Layers className="w-4 h-4 shrink-0" aria-hidden />
-                  Cards Due Today
+            {!isNewUser && (
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="rounded-2xl border border-border bg-card text-card-foreground px-5 py-4 min-w-[200px] shadow-sm ring-1 ring-black/5 dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:ring-0 dark:backdrop-blur-md">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-700 dark:text-amber-400">
+                    <Layers className="w-4 h-4 shrink-0" aria-hidden />
+                    Cards Due Today
+                  </div>
+                  <div className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
+                    {dueTodayCount}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => router.push("/dashboard?view=flashcards")}
+                    className="mt-3 -ml-2 h-8 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent dark:hover:bg-white/5"
+                  >
+                    Start reviewing
+                    <ArrowRight className="w-3 h-3 ml-1" aria-hidden />
+                  </Button>
                 </div>
-                <div className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
-                  {dueTodayCount}
+                <div className="rounded-2xl border border-border bg-card text-card-foreground px-5 py-4 min-w-[200px] shadow-sm ring-1 ring-black/5 dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:ring-0 dark:backdrop-blur-md">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-cyan-700 dark:text-cyan-400">
+                    <Clock className="w-4 h-4 shrink-0" aria-hidden />
+                    Study Streak
+                  </div>
+                  <div className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
+                    {gamification?.currentStreak ?? 0}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Longest: {gamification?.longestStreak ?? 0} days
+                  </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => router.push("/dashboard?view=flashcards")}
-                  className="mt-3 -ml-2 h-8 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent dark:hover:bg-white/5"
-                >
-                  Start reviewing
-                  <ArrowRight className="w-3 h-3 ml-1" aria-hidden />
-                </Button>
+                <div className="rounded-2xl border border-border bg-card text-card-foreground px-5 py-4 min-w-[200px] shadow-sm ring-1 ring-black/5 dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:ring-0 dark:backdrop-blur-md">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
+                    <Target className="w-4 h-4 shrink-0" aria-hidden />
+                    Today&rsquo;s Goal
+                  </div>
+                  <div className="mt-2 flex items-baseline gap-1 text-3xl font-semibold tracking-tight tabular-nums">
+                    {todayReviewCount ?? 0}
+                    <span className="text-sm font-normal text-muted-foreground">
+                      /{dailyGoalCards}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-1.5 w-full rounded-full bg-muted/30 dark:bg-white/5 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                      style={{ width: `${goalProgressPct}%` }}
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="rounded-2xl border border-border bg-card text-card-foreground px-5 py-4 min-w-[200px] shadow-sm ring-1 ring-black/5 dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:ring-0 dark:backdrop-blur-md">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-cyan-700 dark:text-cyan-400">
-                  <Clock className="w-4 h-4 shrink-0" aria-hidden />
-                  Study Streak
-                </div>
-                <div className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
-                  {gamification?.currentStreak ?? 0}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Longest: {gamification?.longestStreak ?? 0} days
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </motion.div>
+
+        {isNewUser && <GettingStarted hasNotes={false} />}
+
+        <UploadStatusCard />
 
         {/* Workspace (stacked sections) */}
         <div className="space-y-6">
@@ -286,24 +342,38 @@ export default function SmartFolderHub() {
             onRequestPinned={() => setWantsPinnedNotes(true)}
             onOpenNote={(id) => router.push(`/dashboard?noteId=${id}`)}
             lookupLabels={labelLookup}
+            emptyStateHint={
+              hasProcessingFile
+                ? {
+                    title: "Your upload is processing…",
+                    body: "Notes will appear here automatically once it's done.",
+                  }
+                : undefined
+            }
           />
 
           <StudyNextActions
             dueTodayCount={dueTodayCount}
             streakDays={gamification?.currentStreak ?? 0}
             recentNote={recentNotes?.[0] as Doc<"notes"> | undefined}
+            isFileProcessing={hasProcessingFile}
             onStartFlashcards={() => router.push("/dashboard?view=flashcards")}
             onOpenRecentNote={(id) => router.push(`/dashboard?noteId=${id}`)}
           />
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             <ProductivityPanel
+              className="lg:col-span-2"
               showAnalytics={showAnalytics}
               onToggle={() => setShowAnalytics((prev) => !prev)}
-              headlineMetric={{
-                value: `${gamification?.currentStreak ?? 0}d`,
-                label: "Study streak",
-              }}
+              headlineMetric={
+                weeklyActivity
+                  ? {
+                      value: `${weeklyActivity.notes.length + weeklyActivity.recordings.length}`,
+                      label: "Notes & recordings (7d)",
+                    }
+                  : undefined
+              }
             >
               <Suspense
                 fallback={
@@ -322,7 +392,12 @@ export default function SmartFolderHub() {
               </Suspense>
             </ProductivityPanel>
 
-            <AcademicPipeline className="lg:sticky lg:top-6" />
+            <div className="space-y-6">
+              <AcademicPipeline />
+              <QuizSnapshot
+                onOpenQuizzes={() => router.push("/dashboard?view=quizzes")}
+              />
+            </div>
           </div>
         </div>
 

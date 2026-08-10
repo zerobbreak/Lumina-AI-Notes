@@ -1,6 +1,12 @@
 "use client";
 
-import React, { createContext, useState, ReactNode } from "react";
+import React, {
+  createContext,
+  useState,
+  useCallback,
+  useMemo,
+  ReactNode,
+} from "react";
 import type { Id } from "@/convex/_generated/dataModel";
 
 // Section type for Notion-like note structure
@@ -92,84 +98,111 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     null,
   );
 
-  const setRightSidebarOpen = (open: boolean) =>
-    setRightSidebarState(open ? "open" : "closed");
+  // useCallback: these only close over stable useState setters, so they can
+  // stay referentially stable across renders. Combined with the useMemo'd
+  // provider value below, an unrelated state change (e.g. toggling one
+  // sidebar) no longer invalidates context identity for every consumer.
+  const setRightSidebarOpen = useCallback(
+    (open: boolean) => setRightSidebarState(open ? "open" : "closed"),
+    [],
+  );
 
-  const toggleLeftSidebar = () => {
+  const toggleLeftSidebar = useCallback(() => {
     setLeftSidebarState((prev) => (prev === "closed" ? "open" : "closed"));
-  };
+  }, []);
 
-  const cycleLeftSidebar = () => {
+  const cycleLeftSidebar = useCallback(() => {
     setLeftSidebarState((prev) => {
       if (prev === "open") return "compact";
       if (prev === "compact") return "closed";
       return "open";
     });
-  };
+  }, []);
 
-  const toggleRightSidebar = () => {
+  const toggleRightSidebar = useCallback(() => {
     setRightSidebarState((prev) => (prev === "closed" ? "open" : "closed"));
-  };
+  }, []);
 
-  const cycleRightSidebar = () => {
+  const cycleRightSidebar = useCallback(() => {
     setRightSidebarState((prev) => {
       if (prev === "open") return "compact";
       if (prev === "compact") return "closed";
       return "open";
     });
-  };
+  }, []);
 
-  const closeAllSidebars = () => {
+  const closeAllSidebars = useCallback(() => {
     setLeftSidebarState("closed");
     setRightSidebarState("closed");
-  };
+  }, []);
 
-  const openAllSidebars = () => {
+  const openAllSidebars = useCallback(() => {
     setLeftSidebarState("open");
     setRightSidebarState("open");
-  };
+  }, []);
 
-  const setPendingNotes = (
-    notes: StructuredNotes,
-    targetNoteId: Id<"notes">,
-  ) => {
-    setPendingNotesState(notes);
-    setPendingNotesTargetNoteId(targetNoteId);
-  };
-  const clearPendingNotes = () => {
+  const setPendingNotes = useCallback(
+    (notes: StructuredNotes, targetNoteId: Id<"notes">) => {
+      setPendingNotesState(notes);
+      setPendingNotesTargetNoteId(targetNoteId);
+    },
+    [],
+  );
+  const clearPendingNotes = useCallback(() => {
     setPendingNotesState(null);
     setPendingNotesTargetNoteId(null);
-  };
+  }, []);
 
   const isLeftSidebarOpen = leftSidebarState !== "closed";
   const isRightSidebarOpen = rightSidebarState !== "closed";
 
+  const value = useMemo<DashboardContextType>(
+    () => ({
+      leftSidebarState,
+      isLeftSidebarOpen,
+      rightSidebarState,
+      isRightSidebarOpen,
+      setLeftSidebarState,
+      setRightSidebarState,
+      setRightSidebarOpen,
+      toggleLeftSidebar,
+      cycleLeftSidebar,
+      toggleRightSidebar,
+      cycleRightSidebar,
+      closeAllSidebars,
+      openAllSidebars,
+      pendingNotes,
+      pendingNotesTargetNoteId,
+      setPendingNotes,
+      clearPendingNotes,
+      activeContext,
+      setActiveContext,
+      noteBootstrap,
+      setNoteBootstrap,
+    }),
+    [
+      leftSidebarState,
+      isLeftSidebarOpen,
+      rightSidebarState,
+      isRightSidebarOpen,
+      setRightSidebarOpen,
+      toggleLeftSidebar,
+      cycleLeftSidebar,
+      toggleRightSidebar,
+      cycleRightSidebar,
+      closeAllSidebars,
+      openAllSidebars,
+      pendingNotes,
+      pendingNotesTargetNoteId,
+      setPendingNotes,
+      clearPendingNotes,
+      activeContext,
+      noteBootstrap,
+    ],
+  );
+
   return (
-    <DashboardContext.Provider
-      value={{
-        leftSidebarState,
-        isLeftSidebarOpen,
-        rightSidebarState,
-        isRightSidebarOpen,
-        setLeftSidebarState,
-        setRightSidebarState,
-        setRightSidebarOpen,
-        toggleLeftSidebar,
-        cycleLeftSidebar,
-        toggleRightSidebar,
-        cycleRightSidebar,
-        closeAllSidebars,
-        openAllSidebars,
-        pendingNotes,
-        pendingNotesTargetNoteId,
-        setPendingNotes,
-        clearPendingNotes,
-        activeContext,
-        setActiveContext,
-        noteBootstrap,
-        setNoteBootstrap,
-      }}
-    >
+    <DashboardContext.Provider value={value}>
       {children}
     </DashboardContext.Provider>
   );

@@ -30,7 +30,7 @@ const roadmapItems = [
     description: "Your knowledge isn't static. Workspace agents actively search your notes, connect new findings to old thoughts, and propose new hypotheses while you sleep.",
     icon: Bot,
     status: "In Development",
-    accent: "#818cf8",
+    accent: "var(--obs-teal)",
     progress: 48,
     offset: "lg:translate-y-24",
   },
@@ -61,7 +61,7 @@ export function WIPRoadmap() {
               style={{ fontFamily: 'var(--font-display)' }}
             >
               The Evolution of{" "}
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-amber-400 to-teal-400">Thought.</span>
+              <span style={{ color: 'var(--obs-amber)' }}>Thought.</span>
             </motion.h2>
             <p className="text-xl text-gray-400 font-light" style={{ fontFamily: 'var(--font-body)' }}>
               We are constantly expanding Lumina's cognitive horizons. This is what's currently in the neural forge.
@@ -72,7 +72,7 @@ export function WIPRoadmap() {
             <div className="flex gap-1.5 h-3">
               <motion.div animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 1, repeat: Infinity }} className="w-1 bg-teal-400" />
               <motion.div animate={{ height: ["100%", "40%", "100%"] }} transition={{ duration: 1, repeat: Infinity, delay: 0.2 }} className="w-1 bg-amber-400" />
-              <motion.div animate={{ height: ["40%", "80%", "40%"] }} transition={{ duration: 1, repeat: Infinity, delay: 0.4 }} className="w-1 bg-indigo-400" />
+              <motion.div animate={{ height: ["40%", "80%", "40%"] }} transition={{ duration: 1, repeat: Infinity, delay: 0.4 }} className="w-1 bg-teal-400/60" />
             </div>
             <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-gray-300">Live Telemetry</span>
           </div>

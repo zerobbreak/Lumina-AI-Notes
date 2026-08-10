@@ -14,11 +14,12 @@ export function Navbar() {
     router.prefetch("/dashboard");
   };
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 transition-all duration-300" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(5,10,20,0.7)', backdropFilter: 'blur(20px)' }}>
+    <nav className="fixed top-0 left-0 right-0 z-50 transition-all duration-300" style={{ borderBottom: '1px solid var(--obs-line)', background: 'rgba(3,5,9,0.75)', backdropFilter: 'blur(20px)' }}>
       <div className="container mx-auto flex h-20 items-center justify-between px-4 md:px-6">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2.5">
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--obs-amber)', boxShadow: '0 0 8px var(--obs-amber-glow)' }} />
           <span className="text-xl font-bold tracking-tight text-white" style={{ fontFamily: 'var(--font-display)' }}>
-            <span style={{ color: 'var(--obs-amber)' }}>Note</span>AI
+            Note<span style={{ color: 'var(--obs-amber)' }}>AI</span>
           </span>
         </Link>
 
@@ -29,13 +30,6 @@ export function Navbar() {
             style={{ color: 'var(--obs-text-dim)', fontFamily: 'var(--font-body)' }}
           >
             Features
-          </Link>
-          <Link
-            href="#pipeline"
-            className="text-sm font-medium transition-colors hover:text-white"
-            style={{ color: 'var(--obs-text-dim)', fontFamily: 'var(--font-body)' }}
-          >
-            Pipeline
           </Link>
           <Link
             href="#roadmap"

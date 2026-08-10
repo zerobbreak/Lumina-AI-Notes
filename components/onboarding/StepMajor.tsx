@@ -64,13 +64,13 @@ export function StepMajor({ value, onChange }: StepMajorProps) {
   }, [value]);
 
   return (
-    <div className="flex flex-col gap-8 flex-1 min-h-0 overflow-y-auto pr-1 -mr-1 [scrollbar-gutter:stable]">
+    <div className="flex flex-col gap-5 flex-1 min-h-0 overflow-y-auto pr-1 -mr-1 [scrollbar-gutter:stable]">
       <p className="text-sm text-zinc-400 leading-relaxed">
         We use this to tune your workspace theme and how the assistant frames
         answers for your discipline.
       </p>
 
-      <div className="space-y-8">
+      <div className="space-y-6">
         {categories.map((category) => (
           <div key={category}>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500 mb-3">
@@ -94,22 +94,32 @@ export function StepMajor({ value, onChange }: StepMajorProps) {
                       onClick={() => onChange(item.id)}
                       className={cn(
                         "relative flex flex-col items-center justify-center gap-2.5 rounded-xl border p-4 text-center transition-colors duration-200",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950",
                         isSelected
-                          ? "border-indigo-500/50 bg-indigo-500/[0.12] shadow-[0_0_0_1px_rgba(99,102,241,0.2)]"
+                          ? "border-white/[0.08] bg-white/[0.03]"
                           : "border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/[0.12]",
                       )}
+                      style={
+                        isSelected
+                          ? {
+                              borderColor: "rgba(204,154,76,0.5)",
+                              background: "rgba(204,154,76,0.12)",
+                              boxShadow: "0 0 0 1px var(--obs-amber-glow)",
+                            }
+                          : undefined
+                      }
                     >
                       {isSelected && (
-                        <span className="absolute top-2 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500 text-white shadow-md">
+                        <span
+                          className="absolute top-2 right-2 flex h-5 w-5 items-center justify-center rounded-full text-black shadow-md"
+                          style={{ background: "var(--obs-amber)" }}
+                        >
                           <Check className="h-3 w-3" strokeWidth={3} />
                         </span>
                       )}
                       <Icon
-                        className={cn(
-                          "h-7 w-7 shrink-0",
-                          isSelected ? "text-indigo-300" : "text-zinc-500",
-                        )}
+                        className="h-7 w-7 shrink-0"
+                        style={{ color: isSelected ? "var(--obs-amber)" : "#71717a" }}
                         strokeWidth={1.5}
                       />
                       <span
@@ -136,11 +146,12 @@ export function StepMajor({ value, onChange }: StepMajorProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.2 }}
-            className="rounded-xl border border-indigo-500/25 bg-indigo-500/[0.08] p-4 space-y-3 shrink-0"
+            className="rounded-xl p-4 space-y-3 shrink-0"
+            style={{ border: "1px solid var(--obs-teal-glow)", background: "rgba(63,171,156,0.08)" }}
           >
             <div className="flex flex-wrap gap-2 text-[11px] font-medium uppercase tracking-wider text-zinc-400">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-2.5 py-1 text-zinc-200 ring-1 ring-white/[0.08]">
-                <Palette className="h-3.5 w-3.5 text-indigo-300" />
+                <Palette className="h-3.5 w-3.5" style={{ color: "var(--obs-teal)" }} />
                 Accent:{" "}
                 <span className="text-white capitalize">{profile.theme.accent}</span>
               </span>

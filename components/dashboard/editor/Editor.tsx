@@ -22,7 +22,9 @@ import { SlashCommand, renderItems } from "./extensions/SlashCommand";
 import { SlashCommandLayer } from "./SlashCommandLayer";
 import { CodeBlockLanguageBubbleMenu } from "./CodeBlockLanguageBubbleMenu";
 import { Plus, GripVertical } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { EditorView } from "@tiptap/pm/view";
+import type { Slice } from "@tiptap/pm/model";
 import { ResourceMentionNode } from "./ResourceMentionNode";
 import { OutlineExtension } from "./extensions/OutlineExtension";
 import { DiagramExtension } from "./extensions/DiagramExtension";
@@ -105,83 +107,96 @@ export default function Editor({
   const bumpWikilinkUi = useCallback(() => {
     setWikilinkUiTick((n) => n + 1);
   }, []);
-  // Build extensions based on style type
-  const extensions: AnyExtension[] = [
-    StarterKit.configure({
-      codeBlock: false,
-      ...(styleType === "outline"
-        ? {
-            bulletList: {
-              HTMLAttributes: {
-                class: "outline-bullet-list",
+  // Build extensions based on style type. Memoized: rebuilding these (and
+  // editorProps below) with a new identity on every render forces Tiptap's
+  // useEditor to run a full editor.setOptions() reconciliation each time,
+  // on top of whatever the actual edit already triggered.
+  const extensions = useMemo<AnyExtension[]>(() => {
+    const exts: AnyExtension[] = [
+      StarterKit.configure({
+        codeBlock: false,
+        ...(styleType === "outline"
+          ? {
+              bulletList: {
+                HTMLAttributes: {
+                  class: "outline-bullet-list",
+                },
+                keepMarks: true,
+                keepAttributes: true,
               },
-              keepMarks: true,
-              keepAttributes: true,
-            },
-            orderedList: {
-              HTMLAttributes: {
-                class: "outline-ordered-list",
+              orderedList: {
+                HTMLAttributes: {
+                  class: "outline-ordered-list",
+                },
+                keepMarks: true,
+                keepAttributes: true,
               },
-              keepMarks: true,
-              keepAttributes: true,
-            },
-            listItem: {
-              HTMLAttributes: {
-                class: "outline-list-item",
+              listItem: {
+                HTMLAttributes: {
+                  class: "outline-list-item",
+                },
               },
-            },
-          }
-        : {}),
-    }),
-    CodeBlockLowlight.configure({
-      lowlight: editorLowlight,
-      defaultLanguage: "javascript",
-      HTMLAttributes: {
-        class: "lumina-code-block",
-      },
-    }),
-    Placeholder.configure({
-      placeholder,
-    }),
-    BubbleMenu,
-    FloatingMenuExtension,
-    ResourceMention,
-    DiagramExtension, // Always include diagram support
-    ...MathExtensions, // Math formula support (inline $...$ and block $$...$$)
-  ];
-
-  // Add outline-specific extensions
-  if (styleType === "outline") {
-    extensions.push(
-      TaskList.configure({
+            }
+          : {}),
+      }),
+      CodeBlockLowlight.configure({
+        lowlight: editorLowlight,
+        defaultLanguage: "javascript",
         HTMLAttributes: {
-          class: "outline-task-list",
+          class: "lumina-code-block",
         },
       }),
-      TaskItem.configure({
-        nested: true,
-        HTMLAttributes: {
-          class: "outline-task-item",
-        },
+      Placeholder.configure({
+        placeholder,
       }),
-      Dropcursor.configure({
-        color: "#6366f1",
-        width: 2,
-      }),
-      OutlineExtension,
-    );
-  }
+      BubbleMenu,
+      FloatingMenuExtension,
+      ResourceMention,
+      DiagramExtension, // Always include diagram support
+      ...MathExtensions, // Math formula support (inline $...$ and block $$...$$)
+    ];
 
-  const editor = useEditor({
-    immediatelyRender: false,
-    extensions,
-    content: initialContent,
-    editable: isEditable,
-    editorProps: {
+    // Add outline-specific extensions
+    if (styleType === "outline") {
+      exts.push(
+        TaskList.configure({
+          HTMLAttributes: {
+            class: "outline-task-list",
+          },
+        }),
+        TaskItem.configure({
+          nested: true,
+          HTMLAttributes: {
+            class: "outline-task-item",
+          },
+        }),
+        Dropcursor.configure({
+          color: "#6366f1",
+          width: 2,
+        }),
+        OutlineExtension,
+      );
+    }
+
+    return exts;
+  }, [styleType, placeholder]);
+
+  // handleDrop needs the live editor instance, but editorProps must stay
+  // referentially stable — so it reads the editor through a ref instead of
+  // closing over the render-scoped `editor` const.
+  const editorRef = useRef<TiptapEditor | null>(null);
+
+  const editorProps = useMemo(
+    () => ({
       attributes: {
         class: "prose prose-invert max-w-none focus:outline-none min-h-[200px]",
       },
-      handleDrop: (view, event, slice, moved) => {
+      handleDrop: (
+        view: EditorView,
+        event: DragEvent,
+        _slice: Slice,
+        moved: boolean,
+      ) => {
         if (!moved && event.dataTransfer) {
           const resourceId = event.dataTransfer.getData(
             "application/lumina-resource-id",
@@ -201,7 +216,7 @@ export default function Editor({
             });
 
             if (coordinates) {
-              editor
+              editorRef.current
                 ?.chain()
                 .focus()
                 .insertContentAt(coordinates.pos, {
@@ -216,11 +231,29 @@ export default function Editor({
         }
         return false;
       },
-    },
-    onUpdate: ({ editor }) => {
+    }),
+    [],
+  );
+
+  const handleEditorUpdate = useCallback(
+    ({ editor }: { editor: TiptapEditor }) => {
       onChange?.(editor.getHTML());
     },
+    [onChange],
+  );
+
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions,
+    content: initialContent,
+    editable: isEditable,
+    editorProps,
+    onUpdate: handleEditorUpdate,
   });
+
+  useEffect(() => {
+    editorRef.current = editor ?? null;
+  }, [editor]);
 
   useEffect(() => {
     onReady?.(editor ?? null);

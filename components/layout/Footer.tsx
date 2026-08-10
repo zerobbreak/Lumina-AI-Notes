@@ -5,7 +5,7 @@ import { Twitter, Github } from "lucide-react";
 
 export function Footer() {
   return (
-    <footer className="relative z-20" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,10,20,0.8)', backdropFilter: 'blur(20px)' }}>
+    <footer className="relative z-20" style={{ borderTop: '1px solid var(--obs-line)', background: 'rgba(3,5,9,0.85)', backdropFilter: 'blur(20px)' }}>
       <div className="container mx-auto px-4 py-12 md:py-16">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 mb-12">
           {/* Brand Column */}

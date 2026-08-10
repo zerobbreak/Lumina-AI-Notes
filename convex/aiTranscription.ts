@@ -175,9 +175,9 @@ Focus on accuracy above all else.`,
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
           if (process.env.NODE_ENV === "development") console.log(
-            `[transcribeAudio] Attempt ${attempt}/${maxRetries} with gemini-2.5-flash`,
+            `[transcribeAudio] Attempt ${attempt}/${maxRetries} with gemini-3.5-flash`,
           );
-          responseText = await generateTranscription("gemini-2.5-flash");
+          responseText = await generateTranscription("gemini-3.5-flash");
           break;
         } catch (error) {
           lastError = error instanceof Error ? error : new Error(String(error));

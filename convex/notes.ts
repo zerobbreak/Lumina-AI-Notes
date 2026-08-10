@@ -73,32 +73,55 @@ Return ONLY the reconstructed, enriched transcript as plain text. Do not add hea
   }
 };
 
-async function getNoteRole(
+// Derives a role from a note doc the caller already has in hand, so
+// batch access-checks (e.g. filtering a list of notes down to accessible
+// ones) don't re-fetch each note a second time via ctx.db.get().
+async function getRoleForNote(
   ctx: any,
-  noteId: any,
+  note: any,
   userId: string,
 ): Promise<NoteRole | null> {
-  const note = await ctx.db.get(noteId);
-  if (!note) return null;
   if (note.userId === userId) return "owner";
   const collab = await ctx.db
     .query("noteCollaborators")
     .withIndex("by_noteId_userId", (q: any) =>
-      q.eq("noteId", noteId).eq("userId", userId),
+      q.eq("noteId", note._id).eq("userId", userId),
     )
     .unique();
   if (!collab) return null;
   return collab.role as "editor" | "viewer";
 }
 
+// Fetches the note once and derives the caller's role from it, so call
+// sites that need both (like requireNoteAccess) don't pay for a second
+// ctx.db.get() of the same document.
+async function getNoteAndRole(
+  ctx: any,
+  noteId: any,
+  userId: string,
+): Promise<{ note: any; role: NoteRole } | null> {
+  const note = await ctx.db.get(noteId);
+  if (!note) return null;
+  const role = await getRoleForNote(ctx, note, userId);
+  if (!role) return null;
+  return { note, role };
+}
+
+async function getNoteRole(
+  ctx: any,
+  noteId: any,
+  userId: string,
+): Promise<NoteRole | null> {
+  const result = await getNoteAndRole(ctx, noteId, userId);
+  return result?.role ?? null;
+}
+
 async function requireNoteAccess(ctx: any, noteId: any) {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) throw new Error("Unauthorized");
-  const role = await getNoteRole(ctx, noteId, identity.tokenIdentifier);
-  if (!role) throw new Error("Unauthorized");
-  const note = await ctx.db.get(noteId);
-  if (!note) throw new Error("Note not found");
-  return { identity, role, note };
+  const result = await getNoteAndRole(ctx, noteId, identity.tokenIdentifier);
+  if (!result) throw new Error("Unauthorized");
+  return { identity, role: result.role, note: result.note };
 }
 
 async function requireNoteEdit(ctx: any, noteId: any) {
@@ -345,8 +368,9 @@ export const getArchivedNotes = query({
 
     const notes = await ctx.db
       .query("notes")
-      .withIndex("by_userId", (q) => q.eq("userId", identity.tokenIdentifier))
-      .filter((q) => q.eq(q.field("isArchived"), true))
+      .withIndex("by_userId_and_archived", (q) =>
+        q.eq("userId", identity.tokenIdentifier).eq("isArchived", true),
+      )
       .order("desc")
       .collect();
 
@@ -368,12 +392,10 @@ export const getNotesByContext = query({
         .query("notes")
         .withIndex("by_moduleId", (q) => q.eq("moduleId", args.moduleId!))
         .collect();
-      const accessible = [];
-      for (const n of notes) {
-        const role = await getNoteRole(ctx, n._id, identity.tokenIdentifier);
-        if (role && !n.parentNoteId) accessible.push(n);
-      }
-      return accessible;
+      const roles = await Promise.all(
+        notes.map((n) => getRoleForNote(ctx, n, identity.tokenIdentifier)),
+      );
+      return notes.filter((n, i) => roles[i] && !n.parentNoteId);
     }
 
     if (args.courseId) {
@@ -381,12 +403,10 @@ export const getNotesByContext = query({
         .query("notes")
         .withIndex("by_courseId", (q) => q.eq("courseId", args.courseId!))
         .collect();
-      const accessible = [];
-      for (const n of notes) {
-        const role = await getNoteRole(ctx, n._id, identity.tokenIdentifier);
-        if (role && !n.parentNoteId) accessible.push(n);
-      }
-      return accessible;
+      const roles = await Promise.all(
+        notes.map((n) => getRoleForNote(ctx, n, identity.tokenIdentifier)),
+      );
+      return notes.filter((n, i) => roles[i] && !n.parentNoteId);
     }
 
     return [];
@@ -414,11 +434,10 @@ export const getChildNotes = query({
       )
       .collect();
 
-    const accessible: typeof children = [];
-    for (const n of children) {
-      const role = await getNoteRole(ctx, n._id, identity.tokenIdentifier);
-      if (role) accessible.push(n);
-    }
+    const roles = await Promise.all(
+      children.map((n) => getRoleForNote(ctx, n, identity.tokenIdentifier)),
+    );
+    const accessible = children.filter((_, i) => roles[i]);
 
     return accessible.sort((a, b) => b.createdAt - a.createdAt);
   },
@@ -669,7 +688,7 @@ export const generateFromPinnedAudio = action({
     if (!apiKey) throw new Error("GEMINI_API_KEY not set");
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
     const normalizedTranscript = normalizeTranscriptForPrompt(args.transcript);
     const referenceUrlsBlock = await fetchReferenceUrlsForPrompt(

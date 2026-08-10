@@ -237,6 +237,38 @@ export const getLatestResult = query({
 });
 
 /**
+ * Most recent quiz result across all of the user's decks, with the deck
+ * title joined in — for a dashboard "last quiz" snapshot.
+ */
+export const getLatestResultForUser = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const result = await ctx.db
+      .query("quizResults")
+      .withIndex("by_userId_completedAt", (q) =>
+        q.eq("userId", identity.tokenIdentifier),
+      )
+      .order("desc")
+      .first();
+
+    if (!result) return null;
+
+    const deck = await ctx.db.get(result.deckId);
+
+    return {
+      deckId: result.deckId,
+      deckTitle: deck?.title ?? "Quiz",
+      score: result.score,
+      totalQuestions: result.totalQuestions,
+      completedAt: result.completedAt,
+    };
+  },
+});
+
+/**
  * Rename a quiz deck
  */
 export const renameDeck = mutation({

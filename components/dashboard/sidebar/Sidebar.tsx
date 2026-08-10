@@ -260,6 +260,7 @@ export function Sidebar() {
             )}
             onClick={handleCreateNote}
             title="New page"
+            data-tour="quick-note"
           >
             <Plus className="w-[15px] h-[15px]" />
           </Button>
@@ -455,6 +456,7 @@ export function Sidebar() {
                   size="icon"
                   className="w-5 h-5 text-muted-foreground/60 dark:text-muted-foreground/35 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 opacity-0 group-hover:opacity-100 transition-all rounded-sm focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
                   onClick={() => setIsUploadOpen(true)}
+                  data-tour="upload-file"
                 >
                   <Upload className="w-3 h-3" />
                 </Button>
@@ -532,6 +534,7 @@ export function Sidebar() {
                 )}
                 onClick={() => router.push("/dashboard?view=flashcards")}
                 title={isCompact ? "Flashcards" : undefined}
+                data-tour="flashcards"
               >
                 <Layers className="w-[14px] h-[14px] shrink-0 text-current opacity-80 group-hover/tool:opacity-100 transition-opacity" />
                 {!isCompact && <span>Flashcards</span>}
@@ -604,6 +607,7 @@ export function Sidebar() {
               size="icon"
               className="w-7 h-7 text-muted-foreground/70 dark:text-muted-foreground/45 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md opacity-0 group-hover/footer:opacity-100 transition-all focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
               onClick={() => setIsSettingsOpen(true)}
+              data-tour="settings"
             >
               <Settings className="w-[14px] h-[14px]" />
             </Button>

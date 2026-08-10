@@ -4,6 +4,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Id } from "@/convex/_generated/dataModel";
 import { Sparkles } from "lucide-react";
 import { Suspense, lazy } from "react";
+import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 
 const NoteView = lazy(() => import("@/components/dashboard/editor/NoteView"));
 const FolderView = lazy(() => import("@/components/dashboard/views/FolderView"));
@@ -130,7 +131,7 @@ function DashboardContent() {
 
   // --- VIEW 6: SMART FOLDER HUB (HOME) ---
   return (
-    <Suspense fallback={<DashboardLoading />}>
+    <Suspense fallback={<DashboardSkeleton />}>
       <SmartFolderHub />
     </Suspense>
   );

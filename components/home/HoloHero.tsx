@@ -9,7 +9,7 @@ import { useEffect, useRef } from "react";
 const noteLines = [
   { label: "Entity Detected", content: "Neural architecture mapping...", color: "var(--obs-amber)" },
   { label: "Synthesis", content: "Transforming unstructured data into semantic graphs.", color: "var(--obs-teal)" },
-  { label: "Insight", content: "Pattern identified across 4 documents.", color: "#818cf8" },
+  { label: "Insight", content: "Pattern identified across 4 documents.", color: "var(--obs-amber)" },
 ];
 
 export function HoloHero() {
@@ -46,44 +46,14 @@ export function HoloHero() {
       ref={containerRef}
       className="relative min-h-screen flex flex-col justify-center overflow-hidden pt-32 pb-20"
     >
-      {/* Dynamic particles / flow lines */}
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
-        <svg className="absolute w-full h-full" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="var(--obs-teal)" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="var(--obs-amber)" stopOpacity="0.8" />
-            </linearGradient>
-          </defs>
-          {Array.from({ length: 15 }).map((_, i) => {
-            // Pseudo-random values for deterministic hydration
-            const rnd1 = Math.abs(Math.sin(i * 12.9898));
-            const rnd2 = Math.abs(Math.sin(i * 78.233));
-            const rnd3 = Math.abs(Math.cos(i * 45.123));
-            const rnd4 = Math.abs(Math.sin(i * 93.234));
-            
-            return (
-            <motion.path
-              key={i}
-              d={`M -100 ${100 + i * 50} Q ${300 + rnd1 * 200} ${200 + rnd2 * 200 - 100}, 1200 ${100 + i * 40}`}
-              fill="none"
-              stroke="url(#glow)"
-              strokeWidth={rnd3 > 0.5 ? 0.5 : 1}
-              strokeDasharray="100 200"
-              initial={{ strokeDashoffset: 1000, opacity: 0 }}
-              animate={{ 
-                strokeDashoffset: [1000, 0], 
-                opacity: [0, 0.4, 0] 
-              }}
-              transition={{
-                duration: 10 + rnd4 * 10,
-                repeat: Infinity,
-                ease: "linear",
-                delay: i * 0.5,
-              }}
-            />
-          )})}
-        </svg>
+      {/* Single signature scanning line, replacing the generic multi-strand particle field */}
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden opacity-30">
+        <motion.div
+          className="absolute left-0 right-0 h-px"
+          style={{ background: 'linear-gradient(90deg, transparent, var(--obs-teal), transparent)' }}
+          animate={{ top: ["8%", "92%", "8%"] }}
+          transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
+        />
       </div>
 
       <motion.div 
@@ -98,11 +68,11 @@ export function HoloHero() {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8 text-xs font-semibold tracking-[0.1em] uppercase backdrop-blur-md"
-              style={{ 
-                background: 'rgba(255,255,255,0.03)', 
-                border: '1px solid rgba(255,255,255,0.1)',
+              style={{
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid var(--obs-line)',
                 color: 'var(--obs-teal)',
-                boxShadow: '0 0 20px rgba(45,212,191,0.1)'
+                boxShadow: '0 0 16px var(--obs-teal-glow)'
               }}
             >
               <Sparkles className="w-3 h-3 animate-pulse" />
@@ -118,7 +88,7 @@ export function HoloHero() {
             >
               <span className="block text-white">Thoughts,</span>
               <span className="block text-white">Evolving.</span>
-              <span className="block mt-2 bg-clip-text text-transparent bg-gradient-to-r from-teal-400 via-indigo-400 to-amber-500 animate-gradient-x mix-blend-plus-lighter pb-2">
+              <span className="block mt-2 bg-clip-text text-transparent bg-gradient-to-b from-teal-400 to-amber-400 mix-blend-plus-lighter pb-2">
                 Not Stored.
               </span>
             </motion.h1>
@@ -140,7 +110,7 @@ export function HoloHero() {
               className="flex flex-col sm:flex-row gap-5"
             >
               <Link href="/sign-up">
-                <Button size="lg" className="h-14 px-10 rounded-full font-bold group transition-all duration-500 text-black hover:scale-105 hover:shadow-[0_0_40px_rgba(212,168,83,0.4)]" style={{ background: 'linear-gradient(135deg, #d4a853, #2dd4bf)', fontFamily: 'var(--font-display)' }}>
+                <Button size="lg" className="h-14 px-10 rounded-full font-bold group transition-all duration-500 text-black hover:scale-105 hover:shadow-[0_0_36px_rgba(204,154,76,0.35)]" style={{ background: 'linear-gradient(135deg, var(--obs-amber), var(--obs-teal))', fontFamily: 'var(--font-display)' }}>
                   Enter Vault
                   <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Button>
@@ -156,7 +126,7 @@ export function HoloHero() {
             className="flex-1 w-full max-w-xl relative"
           >
             {/* Ambient intelligence core */}
-            <div className="absolute inset-0 blur-[80px] bg-gradient-to-tr from-amber-500/20 via-indigo-500/20 to-teal-500/20 animate-pulse-slow rounded-full mix-blend-screen pointer-events-none" />
+            <div className="absolute inset-0 blur-[80px] bg-gradient-to-tr from-amber-500/15 to-teal-500/15 animate-pulse-slow rounded-full mix-blend-screen pointer-events-none" />
             
             <div className="relative rounded-3xl overflow-hidden glass-dark border border-white/5 shadow-2xl backdrop-blur-2xl bg-black/40">
               <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />

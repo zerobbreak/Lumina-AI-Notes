@@ -45,6 +45,7 @@ export function NotesRail({
   onRequestPinned,
   onOpenNote,
   lookupLabels,
+  emptyStateHint,
   className,
 }: {
   recentNotes: NoteLike[] | undefined;
@@ -52,6 +53,8 @@ export function NotesRail({
   onRequestPinned?: () => void;
   onOpenNote: (id: Id<"notes">) => void;
   lookupLabels?: NoteLabelLookup;
+  /** Overrides the generic "no recent notes" copy when there's a more relevant hint, e.g. a file still processing. */
+  emptyStateHint?: { title: string; body: string };
   className?: string;
 }) {
   const [tab, setTab] = useState<TabId>("recent");
@@ -135,10 +138,11 @@ export function NotesRail({
               ) : (
                 <div className="space-y-1">
                   <p className="text-foreground font-medium">
-                    No recent notes yet.
+                    {emptyStateHint?.title ?? "No recent notes yet."}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Create a note and it’ll show up here automatically.
+                    {emptyStateHint?.body ??
+                      "Create a note and it’ll show up here automatically."}
                   </p>
                 </div>
               )}

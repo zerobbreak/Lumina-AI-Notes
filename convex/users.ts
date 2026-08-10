@@ -279,21 +279,24 @@ export const resetStreaksInternal = internalMutation({
     const users = await ctx.db.query("users").collect();
     const now = Date.now();
 
-    let resetCount = 0;
-    for (const user of users) {
-      if (!user.lastStudiedDate) continue;
-
+    // The per-user check is pure/synchronous; only the patch is async, so
+    // filter first and fire the patches concurrently instead of awaiting
+    // each user in sequence.
+    const usersToReset = users.filter((user) => {
+      if (!user.lastStudiedDate) return false;
       const tzOffset = user.lastTimezoneOffsetMinutes ?? 0;
       const todayStart = getLocalDayStart(now, tzOffset);
       const yesterdayStart = todayStart - 24 * 60 * 60 * 1000;
+      return (
+        (user.currentStreak ?? 0) > 0 && user.lastStudiedDate < yesterdayStart
+      );
+    });
 
-      if ((user.currentStreak ?? 0) > 0 && user.lastStudiedDate < yesterdayStart) {
-        await ctx.db.patch(user._id, { currentStreak: 0 });
-        resetCount++;
-      }
-    }
+    await Promise.all(
+      usersToReset.map((user) => ctx.db.patch(user._id, { currentStreak: 0 })),
+    );
 
-    return { resetCount };
+    return { resetCount: usersToReset.length };
   },
 });
 

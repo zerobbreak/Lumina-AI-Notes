@@ -170,14 +170,21 @@ export const getFile = query({
       return null;
     }
 
+    // The 768-float embedding is only used internally by vector search and
+    // has no reader on this query's result anywhere in the app, so strip it
+    // instead of shipping it on every getFile call (including the
+    // Promise.all fan-outs in ai.ts that fetch several files at once).
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { embedding: _embedding, ...fileWithoutEmbedding } = file;
+
     // Get storage URL if applicable
     if (file.storageId) {
       return {
-        ...file,
+        ...fileWithoutEmbedding,
         url: await ctx.storage.getUrl(file.storageId),
       };
     }
-    return file;
+    return fileWithoutEmbedding;
   },
 });
 

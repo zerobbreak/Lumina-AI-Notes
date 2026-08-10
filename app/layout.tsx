@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Outfit } from "next/font/google"; // Using Outfit for that modern tech look
+import { Outfit, Syne, DM_Sans } from "next/font/google"; // Using Outfit for that modern tech look
 import "./globals.css";
 import { ConvexClientProvider } from "@/components/providers/ConvexClientProvider";
 import { Toaster } from "sonner";
@@ -9,6 +9,21 @@ import { ThemeProvider } from "@/components/providers/ThemeProvider";
 const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-outfit",
+});
+
+// Landing page display/body fonts, self-hosted via next/font instead of a
+// render-blocking `@import url(fonts.googleapis.com...)` in globals.css.
+const syne = Syne({
+  subsets: ["latin"],
+  weight: ["400", "600", "700", "800"],
+  variable: "--font-syne",
+  display: "swap",
+});
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-dm-sans",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -57,7 +72,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${outfit.variable} antialiased bg-background text-foreground min-h-screen font-sans selection:bg-primary/20 selection:text-primary`}
+        className={`${outfit.variable} ${syne.variable} ${dmSans.variable} antialiased bg-background text-foreground min-h-screen font-sans selection:bg-primary/20 selection:text-primary`}
         suppressHydrationWarning
       >
         <ThemeProvider

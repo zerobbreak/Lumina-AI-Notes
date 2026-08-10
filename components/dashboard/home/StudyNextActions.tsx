@@ -13,6 +13,7 @@ export function StudyNextActions({
   dueTodayCount,
   streakDays,
   recentNote,
+  isFileProcessing,
   onStartFlashcards,
   onOpenRecentNote,
   className,
@@ -20,6 +21,8 @@ export function StudyNextActions({
   dueTodayCount: number;
   streakDays: number;
   recentNote?: RecentNoteLike;
+  /** True when an upload is still being processed and there's no note yet — swaps the "resume writing" copy. */
+  isFileProcessing?: boolean;
   onStartFlashcards: () => void;
   onOpenRecentNote: (id: Id<"notes">) => void;
   className?: string;
@@ -77,23 +80,14 @@ export function StudyNextActions({
 
         {/* Secondary suggestions */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm ring-1 ring-black/5 dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:ring-0">
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm ring-1 ring-black/5 dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:ring-0 opacity-70">
             <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
               <Brain className="w-4 h-4 text-indigo-600 dark:text-indigo-400" aria-hidden />
               Focus sprint
             </div>
             <p className="mt-1.5 text-xs text-muted-foreground">
-              Try a 25-minute deep work block and log it.
+              25-minute deep work timer — coming soon.
             </p>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mt-2 h-8 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent dark:hover:bg-white/5"
-              onClick={() => {}}
-            >
-              Start timer
-              <ArrowRight className="w-3 h-3 ml-1" aria-hidden />
-            </Button>
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-4 shadow-sm ring-1 ring-black/5 dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:ring-0">
@@ -102,7 +96,11 @@ export function StudyNextActions({
               Resume writing
             </div>
             <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2">
-              {recentNote ? `Open “${recentNote.title}” and keep momentum.` : "Jump back into your last note."}
+              {recentNote
+                ? `Open “${recentNote.title}” and keep momentum.`
+                : isFileProcessing
+                  ? "Your upload is still processing — notes will land here soon."
+                  : "Jump back into your last note."}
             </p>
             <Button
               variant="ghost"

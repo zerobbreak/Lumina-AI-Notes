@@ -24,7 +24,7 @@ const features = [
     title: "Context Links",
     description: "Ideas organically connect forming a knowledge graph.",
     icon: Network,
-    accent: "#818cf8",
+    accent: "var(--obs-teal)",
     span: "col-span-1 row-span-1",
     size: "small",
   },
@@ -48,7 +48,7 @@ const features = [
     title: "Identity Protection",
     description: "Encrypted memory distinct to your cognitive footprint.",
     icon: Fingerprint,
-    accent: "#f59e0b",
+    accent: "var(--obs-amber)",
     span: "col-span-1 row-span-1",
     size: "small",
   },
@@ -57,15 +57,6 @@ const features = [
 export function FeatureFlow() {
   return (
     <section id="features" className="relative py-32 overflow-hidden" style={{ background: 'transparent' }}>
-      
-      {/* Flowing background paths */}
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-20">
-        <svg className="absolute w-full h-full" xmlns="http://www.w3.org/2000/svg">
-          <path d="M 0 200 Q 300 400 600 200 T 1200 400" fill="none" stroke="var(--obs-teal)" strokeWidth="1" opacity="0.3" />
-          <path d="M 0 300 Q 400 100 800 400 T 1600 200" fill="none" stroke="var(--obs-amber)" strokeWidth="1" opacity="0.3" />
-        </svg>
-      </div>
-
       <div className="container mx-auto px-6 relative z-10">
         <div className="max-w-3xl mb-20">
           <motion.div
@@ -88,7 +79,7 @@ export function FeatureFlow() {
           >
             Built for how you
             <br />
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-amber-400 to-teal-400">actually think.</span>
+            <span className="italic font-light" style={{ color: 'var(--obs-amber)' }}>actually think.</span>
           </motion.h2>
           <p className="text-xl leading-relaxed text-gray-400 font-light" style={{ fontFamily: 'var(--font-body)' }}>
             Information flows continuously, organically structured by AI to match your cognitive patterns.

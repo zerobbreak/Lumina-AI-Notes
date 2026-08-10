@@ -6,10 +6,13 @@ import { api } from "@/convex/_generated/api";
 import type { StreamingNotesState, CodeBlock } from "@/types/streaming";
 import { INITIAL_STREAMING_STATE } from "@/types/streaming";
 
-/** Characters revealed per animation frame */
-const CHARS_PER_TICK = 3;
-/** Milliseconds between animation frames */
-const TICK_INTERVAL_MS = 5;
+/**
+ * Characters revealed per animation frame, and milliseconds between frames.
+ * Kept at the same reveal rate (chars/sec) as before, but ticking well
+ * under 60fps instead of ~200 state updates/sec.
+ */
+const CHARS_PER_TICK = 18;
+const TICK_INTERVAL_MS = 30;
 
 /**
  * Hook for streaming-style notes generation.
