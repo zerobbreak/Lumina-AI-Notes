@@ -1,6 +1,14 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
+import {
+  buildKeywordSnippet,
+  countKeywordHits,
+  parseKeywords,
+  stripHtmlToText,
+} from "./shared/keywordSearch";
 const DEFAULT_RESULT_LIMIT = 20;
+/** Candidates pulled from the index before snippet scoring narrows them down. */
+const CONTENT_SCAN_LIMIT = 40;
 
 export type SearchResult = {
   type: "note" | "file" | "deck";
@@ -148,6 +156,77 @@ export const search = query({
       limitReached,
       totalFound: limitReached ? totalFound : undefined,
     };
+  },
+});
+
+export type KeywordMatch = {
+  noteId: string;
+  title: string;
+  /** Plain-text window centred on the first keyword hit. */
+  snippet: string;
+  /** Distinct query keywords actually present in the note body. */
+  matchedKeywords: string[];
+  url: string;
+};
+
+/**
+ * Keyword search across note *bodies* (the `search_title` index only covers
+ * titles). Returns a snippet centred on the hit plus the keywords that matched,
+ * so the caller can highlight them without shipping whole notes to the client.
+ */
+export const searchNoteContent = query({
+  args: {
+    query: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args): Promise<{ matches: KeywordMatch[] }> => {
+    const identity = await ctx.auth.getUserIdentity();
+    const userId = identity?.tokenIdentifier;
+    if (!userId) return { matches: [] };
+
+    const keywords = parseKeywords(args.query);
+    if (keywords.length === 0) return { matches: [] };
+
+    const limit = Math.min(args.limit ?? 6, DEFAULT_RESULT_LIMIT);
+
+    const candidates = await ctx.db
+      .query("notes")
+      .withSearchIndex("search_content", (q) =>
+        q.search("content", args.query).eq("userId", userId),
+      )
+      .filter((q) => q.neq(q.field("isArchived"), true))
+      .take(CONTENT_SCAN_LIMIT);
+
+    const scored: Array<{ hits: number; match: KeywordMatch }> = [];
+
+    for (const note of candidates) {
+      const text = stripHtmlToText(note.content ?? "");
+      if (!text) continue;
+
+      const hits = countKeywordHits(text, keywords);
+      // The index matches on stemmed tokens; require a literal hit so the
+      // snippet we return actually contains something worth highlighting.
+      if (hits === 0) continue;
+
+      scored.push({
+        hits,
+        match: {
+          noteId: note._id,
+          title: note.title,
+          snippet: buildKeywordSnippet(text, keywords),
+          matchedKeywords: keywords.filter((k) =>
+            text.toLowerCase().includes(k),
+          ),
+          url: `/dashboard?noteId=${note._id}`,
+        },
+      });
+    }
+
+    // Most distinct keywords first; the search index already ordered by
+    // relevance, so a stable sort keeps that as the tie-breaker.
+    scored.sort((a, b) => b.hits - a.hits);
+
+    return { matches: scored.slice(0, limit).map((s) => s.match) };
   },
 });
 

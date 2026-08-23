@@ -114,6 +114,10 @@ export default defineSchema({
     .searchIndex("search_title", {
       searchField: "title",
       filterFields: ["userId"],
+    })
+    .searchIndex("search_content", {
+      searchField: "content",
+      filterFields: ["userId"],
     }),
 
   files: defineTable({
