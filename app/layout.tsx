@@ -5,6 +5,7 @@ import { ConvexClientProvider } from "@/components/providers/ConvexClientProvide
 import { Toaster } from "sonner";
 import { MobileWarning } from "@/components/MobileWarning";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { Analytics } from "@vercel/analytics/react";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -84,6 +85,7 @@ export default function RootLayout({
           <ConvexClientProvider>{children}</ConvexClientProvider>
           <MobileWarning />
           <Toaster theme="system" position="bottom-right" />
+          <Analytics />
         </ThemeProvider>
       </body>
     </html>

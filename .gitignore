@@ -41,4 +41,6 @@ yarn-error.log*
 next-env.d.ts
 /docs
 .agents
-.cursor
+.cursor/*
+!.cursor/skills/
+!.cursor/skills/**
