@@ -20,6 +20,11 @@ import {
   splitHighlightSegments,
   stripHtmlToText,
 } from "@/convex/shared/keywordSearch";
+import {
+  MAX_REFERENCE_URLS,
+  normalizeReferenceUrlList,
+} from "@/convex/shared/urlContent";
+import { normalizeTranscriptForPrompt } from "@/convex/shared/transcript";
 
 const base = {
   isRecording: false,
@@ -206,6 +211,87 @@ describe("splitHighlightSegments", () => {
   it("returns the snippet unmarked when there are no usable keywords", () => {
     expect(splitHighlightSegments("plain", [])).toEqual([
       { text: "plain", match: false },
+    ]);
+  });
+});
+
+describe("normalizeReferenceUrlList (reference links accepted by the sidebar)", () => {
+  it("adds a scheme to bare hosts", () => {
+    expect(normalizeReferenceUrlList(["docs.example.com/syllabus"])).toEqual([
+      "https://docs.example.com/syllabus",
+    ]);
+  });
+
+  it("dedupes equivalent URLs", () => {
+    expect(
+      normalizeReferenceUrlList(["example.com", "https://example.com"]),
+    ).toEqual(["https://example.com/"]);
+  });
+
+  it("caps the list at the shared maximum", () => {
+    const many = Array.from({ length: 12 }, (_, i) => `https://e${i}.com`);
+    expect(normalizeReferenceUrlList(many)).toHaveLength(MAX_REFERENCE_URLS);
+  });
+
+  it("rejects junk instead of forwarding it to the fetcher", () => {
+    expect(normalizeReferenceUrlList(["not a url", ""])).toEqual([]);
+  });
+
+  it("rejects loopback and private hosts (server-side fetch safety)", () => {
+    expect(
+      normalizeReferenceUrlList([
+        "http://localhost:8080/admin",
+        "http://127.0.0.1/",
+        "http://192.168.1.1/",
+        "http://169.254.169.254/latest/meta-data/",
+      ]),
+    ).toEqual([]);
+  });
+
+  it("rejects non-http schemes", () => {
+    expect(normalizeReferenceUrlList(["file:///etc/passwd"])).toEqual([]);
+  });
+});
+
+describe("normalizeTranscriptForPrompt (session replay from the sidebar)", () => {
+  it("prefers each chunk's AI-enhanced text over raw dictation", () => {
+    const raw = JSON.stringify([
+      { text: "raw one", enhancedText: "clean one", timestamp: "00:00" },
+    ]);
+    expect(normalizeTranscriptForPrompt(raw)).toBe("[00:00] clean one");
+  });
+
+  it("falls back to raw text when no enhancement exists", () => {
+    const raw = JSON.stringify([{ text: "just raw" }]);
+    expect(normalizeTranscriptForPrompt(raw)).toBe("just raw");
+  });
+
+  it("passes legacy plain-text sessions through unchanged", () => {
+    expect(normalizeTranscriptForPrompt("an older session")).toBe(
+      "an older session",
+    );
+  });
+
+  it("returns empty for an empty transcript", () => {
+    expect(normalizeTranscriptForPrompt("   ")).toBe("");
+  });
+});
+
+describe("normalizeReferenceUrlList — scheme handling regression", () => {
+  it("rejects non-http schemes rather than coining a bogus https URL", () => {
+    for (const bad of [
+      "file:///etc/passwd",
+      "javascript:alert(1)",
+      "data:text/html,<script>",
+      "ftp://example.com/x",
+    ]) {
+      expect(normalizeReferenceUrlList([bad])).toEqual([]);
+    }
+  });
+
+  it("still accepts a bare host that merely contains a colon (port)", () => {
+    expect(normalizeReferenceUrlList(["example.com:8443/docs"])).toEqual([
+      "https://example.com:8443/docs",
     ]);
   });
 });

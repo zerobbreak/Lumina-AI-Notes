@@ -100,12 +100,23 @@ export function TranscriptionPill() {
 
   const { levels, start: startMeter, stop: stopMeter } = useMicLevels(BANDS);
   const { transcript, resetTranscript } = useSpeechRecognition();
-  const { setPendingNotes } = useDashboard();
+  const {
+    setPendingNotes,
+    activeContext,
+    referenceUrls,
+    sessionToLoad,
+    clearLoadedSession,
+  } = useDashboard();
   const { createNoteFlow } = useCreateNoteFlow();
+
+  /** Set when replaying a session from the sidebar, so notes link back to it. */
+  const [sourceRecordingId, setSourceRecordingId] =
+    useState<Id<"recordings"> | null>(null);
 
   const userData = useQuery(api.users.getUser);
   const upsertDraft = useMutation(api.recordings.upsertRecordingDraft);
   const generateStructuredNotes = useAction(api.ai.generateStructuredNotes);
+  const generateFromPinnedAudio = useAction(api.notes.generateFromPinnedAudio);
   const generateUploadUrl = useMutation(api.recordings.generateUploadUrl);
   const saveUploadedRecording = useMutation(
     api.recordings.saveUploadedRecording,
@@ -132,6 +143,21 @@ export function TranscriptionPill() {
   }, [isRecording]);
 
   useEffect(() => stopMeter, [stopMeter]);
+
+  // A session picked in the sidebar replaces whatever the pill was holding and
+  // drops it straight into the "paused" face, ready to generate.
+  useEffect(() => {
+    if (!sessionToLoad) return;
+    SpeechRecognition.stopListening();
+    stopMeter();
+    setIsRecording(false);
+    resetTranscript();
+    setChunks([sessionToLoad.transcript]);
+    setSourceRecordingId(sessionToLoad.recordingId);
+    setNotes(null);
+    setElapsed(0);
+    clearLoadedSession();
+  }, [sessionToLoad, stopMeter, resetTranscript, clearLoadedSession]);
 
   const fullTranscript = useMemo(
     () => [...chunks, transcript.trim()].filter(Boolean).join(" ").trim(),
@@ -194,6 +220,7 @@ export function TranscriptionPill() {
     setChunks([]);
     setElapsed(0);
     setNotes(null);
+    setSourceRecordingId(null);
     sessionIdRef.current = crypto.randomUUID();
   }, [resetTranscript, stopListening]);
 
@@ -204,31 +231,46 @@ export function TranscriptionPill() {
     setIsThinking(true);
     const title = `Session ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
 
-    // Save first: a failed generation should never cost the user the audio.
-    try {
-      await upsertDraft({
-        sessionId: sessionIdRef.current,
-        title,
-        duration: elapsed,
-        transcript: JSON.stringify([
-          {
-            text: fullTranscript,
-            enhancedText: fullTranscript,
-            timestamp: formatElapsed(elapsed),
-            isImportant: false,
-            concepts: [],
-          },
-        ]),
-      });
-    } catch (e) {
-      console.warn("[TranscriptionPill] session autosave failed:", e);
+    // Replaying a saved session must not fork a duplicate draft of it.
+    if (!sourceRecordingId) {
+      // Save first: a failed generation should never cost the user the audio.
+      try {
+        await upsertDraft({
+          sessionId: sessionIdRef.current,
+          title,
+          duration: elapsed,
+          transcript: JSON.stringify([
+            {
+              text: fullTranscript,
+              enhancedText: fullTranscript,
+              timestamp: formatElapsed(elapsed),
+              isImportant: false,
+              concepts: [],
+            },
+          ]),
+        });
+      } catch (e) {
+        console.warn("[TranscriptionPill] session autosave failed:", e);
+      }
     }
 
+    const urls = referenceUrls.length > 0 ? referenceUrls : undefined;
+
     try {
-      const generated = await generateStructuredNotes({
-        transcript: fullTranscript,
-        title,
-      });
+      // A pinned document routes through the context-aware action so the notes
+      // are grounded in that source rather than the transcript alone.
+      const generated =
+        activeContext?.type === "file"
+          ? await generateFromPinnedAudio({
+              transcript: fullTranscript,
+              pinnedFileId: activeContext.id,
+              referenceUrls: urls,
+            })
+          : await generateStructuredNotes({
+              transcript: fullTranscript,
+              title,
+              referenceUrls: urls,
+            });
       setNotes(generated);
     } catch (e) {
       console.error("[TranscriptionPill] note generation failed:", e);
@@ -245,6 +287,10 @@ export function TranscriptionPill() {
     elapsed,
     upsertDraft,
     generateStructuredNotes,
+    generateFromPinnedAudio,
+    activeContext,
+    referenceUrls,
+    sourceRecordingId,
   ]);
 
   const handleInsert = useCallback(async () => {
@@ -258,6 +304,11 @@ export function TranscriptionPill() {
         const result = await createNoteFlow({
           title: "Session notes",
           major: userData?.major || "general",
+          // Links the note back to its recording so the session can later be
+          // re-generated against the note it already produced.
+          ...(sourceRecordingId
+            ? { sourceRecordingId: sourceRecordingId }
+            : {}),
         });
         if (!result?.noteId) return;
         setPendingNotes(notes, result.noteId);
@@ -279,6 +330,7 @@ export function TranscriptionPill() {
     userData?.major,
     router,
     handleReset,
+    sourceRecordingId,
   ]);
 
   const handleAudioImport = useCallback(

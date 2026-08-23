@@ -31,6 +31,7 @@ import { useDashboard } from "@/hooks/useDashboard";
 import { DraggableDocument } from "@/components/documents";
 import { SidebarCourse } from "./SidebarCourse";
 import { SidebarNote } from "./SidebarNote";
+import { SidebarStudio, PinContextButton } from "./SidebarStudio";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { File, FolderOpen, FileText, PenLine } from "lucide-react";
 import {
@@ -443,6 +444,12 @@ export function Sidebar() {
             </div>
           </div>
 
+          {/* Studio — saved sessions, pinned context, reference links.
+              The live capture loop itself lives in the transcription pill. */}
+          <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
+            <SidebarStudio isCompact={isCompact} />
+          </div>
+
           {/* Resources */}
           <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
             {!isCompact && (
@@ -482,7 +489,11 @@ export function Sidebar() {
                       {!isCompact && <span className="truncate flex-1 text-left">{file.name}</span>}
                     </button>
                     {!isCompact && (
-                      <div className="absolute right-1 opacity-0 group-hover/file:opacity-100 transition-opacity">
+                      <div className="absolute right-1 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/file:opacity-100 focus-within:opacity-100">
+                        <PinContextButton
+                          fileId={file._id}
+                          fileName={file.name}
+                        />
                         <ActionMenu
                           onRename={() => openRename(file._id, "file", file.name)}
                           onDelete={() => deleteFile({ fileId: file._id })}

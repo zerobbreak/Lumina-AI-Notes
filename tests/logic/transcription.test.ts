@@ -13,7 +13,7 @@ import { describe, it, expect, vi } from "vitest";
 
 /**
  * Enhanced transcript chunk with AI analysis
- * Mirrors the EnhancedChunk interface in RightSidebar.tsx
+ * Mirrors the EnhancedChunk shape persisted by the capture flow
  */
 interface EnhancedChunk {
   text: string;
@@ -56,7 +56,7 @@ interface Recording {
 
 /**
  * Formats seconds to HH:MM:SS format
- * Mirrors formatTime in RightSidebar.tsx
+ * Mirrors formatElapsed in components/dashboard/transcribe/pillPhases.ts
  */
 function formatTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);

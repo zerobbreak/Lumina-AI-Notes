@@ -413,7 +413,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     scheduleEditorUpdate,
   ]);
 
-  // Inject structured notes from RightSidebar when pendingNotes changes
+  // Inject structured notes from the transcription pill when pendingNotes changes
   // Wait for note to be loaded (loadedNoteId === noteId) to avoid conflicts
   useEffect(() => {
     if (!pendingNotes) return;
