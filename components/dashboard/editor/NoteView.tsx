@@ -12,18 +12,10 @@ import {
   FileText,
   Calendar,
   User,
-  Bold,
-  Italic,
-  Strikethrough,
-  List,
-  Image as ImageIcon,
   Loader2,
   Download,
   Clock,
   Type,
-  Calculator,
-  BarChart3,
-  Sigma,
   Pin,
   Plus,
 } from "lucide-react";
@@ -329,7 +321,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     ],
     editorProps: {
       attributes: {
-        class: "prose prose-invert max-w-none focus:outline-none min-h-[500px]",
+        class: "prose dark:prose-invert max-w-none focus:outline-none min-h-[500px]",
       },
     },
     onUpdate: ({ editor }) => {
@@ -421,7 +413,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     scheduleEditorUpdate,
   ]);
 
-  // Inject structured notes from RightSidebar when pendingNotes changes
+  // Inject structured notes from the transcription pill when pendingNotes changes
   // Wait for note to be loaded (loadedNoteId === noteId) to avoid conflicts
   useEffect(() => {
     if (!pendingNotes) return;
@@ -643,14 +635,14 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   // --- Deleting State ---
   if (isDeleting) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-[#0A0A0A]/50 backdrop-blur-sm z-50">
-        <div className="bg-[#111] border border-white/5 p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-300">
+      <div className="h-full flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm z-50">
+        <div className="bg-card border border-border p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-300">
           <div className="p-3 bg-red-500/10 rounded-full">
             <Loader2 className="w-8 h-8 animate-spin text-red-500" />
           </div>
           <div className="text-center">
-            <h3 className="text-white font-medium mb-1">Deleting Note</h3>
-            <p className="text-gray-500 text-sm">
+            <h3 className="text-foreground font-medium mb-1">Deleting Note</h3>
+            <p className="text-muted-foreground text-sm">
               This action cannot be undone
             </p>
           </div>
@@ -661,9 +653,9 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
   if (!userData || displayNote === undefined) {
     return (
-      <div className="h-full flex flex-col bg-[#0A0A0A] relative">
+      <div className="h-full flex flex-col bg-background relative">
         {isAwaitingRecordingNotes && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-[#0A0A0A]/85 backdrop-blur-sm">
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-background/85 backdrop-blur-sm">
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
             <p className="text-sm font-medium text-foreground">
               {recordingNotesOverlayLabel}
@@ -671,7 +663,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
           </div>
         )}
         {/* Skeleton Navigation */}
-        <div className="h-16 flex items-center px-8 border-b border-white/5">
+        <div className="h-16 flex items-center px-8 border-b border-border">
           <Skeleton className="h-4 w-24 mr-2" />
           <Skeleton className="h-4 w-4 mr-2" />
           <Skeleton className="h-4 w-32 mr-2" />
@@ -723,10 +715,10 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
   if (displayNote === null) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-[#0A0A0A] text-gray-400 gap-4">
-        <FileText className="w-12 h-12 text-gray-600" />
-        <span className="text-lg">Note not found</span>
-        <p className="text-sm text-gray-600">
+      <div className="h-full flex flex-col items-center justify-center bg-background text-muted-foreground gap-4">
+        <FileText className="w-12 h-12 text-muted-foreground/60" />
+        <span className="text-lg text-foreground">Note not found</span>
+        <p className="text-sm text-muted-foreground">
           It may have been deleted or moved.
         </p>
         <Button onClick={onBack} variant="outline" className="mt-4">
@@ -753,7 +745,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         </div>
       )}
       {/* 1. Top Navigation / Breadcrumbs */}
-      <div className="h-16 flex items-center px-4 lg:px-8 bg-background top-0 z-20 sticky justify-between">
+      <div className="h-16 flex items-center px-4 lg:px-8 bg-background/95 backdrop-blur-sm border-b border-border/50 top-0 z-20 sticky justify-between">
         <div className="flex items-center gap-4">
           {/* Left sidebar: single collapse control lives in Sidebar.tsx header (avoids duplicate with main chrome) */}
           <div className="flex items-center text-sm font-medium text-muted-foreground gap-2">
@@ -763,7 +755,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             >
               Dashboard
             </span>
-            <ChevronRight className="w-4 h-4 text-zinc-700" />
+            <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
             <span
               onClick={() => {
                 // Navigate back to course/module context
@@ -785,7 +777,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             </span>
             {parentNote && (
               <>
-                <ChevronRight className="w-4 h-4 text-zinc-700 shrink-0" />
+                <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
                 <span
                   onClick={() =>
                     router.push(`/dashboard?noteId=${parentNote._id}`)
@@ -799,7 +791,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                 </span>
               </>
             )}
-            <ChevronRight className="w-4 h-4 text-zinc-700" />
+            <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
             <span className="text-foreground">
               {note.title.length > 20
                 ? note.title.substring(0, 20) + "..."
@@ -1123,24 +1115,5 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
 
     </div>
-  );
-}
-
-function ToolbarButton({
-  onClick,
-  isActive,
-  icon,
-}: {
-  onClick: () => void;
-  isActive: boolean;
-  icon: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`p-2 rounded-md transition-colors ${isActive ? "bg-white/10 text-white" : "text-gray-400 hover:text-gray-200 hover:bg-white/5"}`}
-    >
-      {icon}
-    </button>
   );
 }

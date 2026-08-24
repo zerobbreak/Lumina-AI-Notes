@@ -290,14 +290,14 @@ export default function Editor({
         >
           <div className="flex items-center gap-0.5 opacity-0 group-hover/editor:opacity-100 transition-opacity pr-2">
             <button
-              className="flex h-5 w-5 items-center justify-center rounded-md text-zinc-500 hover:bg-white/10 hover:text-zinc-300 transition-colors"
+              className="flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
               onClick={() => {
                 editor.chain().focus().insertContent("/").run();
               }}
             >
               <Plus className="w-3.5 h-3.5" />
             </button>
-            <div className="flex h-5 w-5 items-center justify-center rounded-md text-zinc-600 cursor-grab active:cursor-grabbing hover:bg-white/10 hover:text-zinc-400 transition-colors">
+            <div className="flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground/70 cursor-grab active:cursor-grabbing hover:bg-accent hover:text-foreground transition-colors">
               <GripVertical className="w-3.5 h-3.5" />
             </div>
           </div>

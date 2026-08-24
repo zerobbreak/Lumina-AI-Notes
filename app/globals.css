@@ -108,6 +108,18 @@
     from { width: 0%; }
     to { width: var(--progress-width, 60%); }
   }
+
+  /* Transcription pill — travelling fade across the "thinking" dots */
+  @keyframes thinking-fade {
+    0%, 100% { opacity: 0.2; transform: scale(0.85); }
+    50% { opacity: 1; transform: scale(1.15); }
+  }
+
+  /* Transcription pill — slow breathing halo while the mic is live */
+  @keyframes pill-breathe {
+    0%, 100% { opacity: 0.35; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.04); }
+  }
 }
 
   .animate-gradient-x {
@@ -338,6 +350,22 @@
 
   .font-body {
     font-family: var(--font-body);
+  }
+
+  .animate-thinking-fade {
+    animation: thinking-fade 1.25s ease-in-out infinite;
+  }
+
+  .animate-pill-breathe {
+    animation: pill-breathe 3.2s ease-in-out infinite;
+    will-change: transform, opacity;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-thinking-fade,
+    .animate-pill-breathe {
+      animation: none;
+    }
   }
 }
 

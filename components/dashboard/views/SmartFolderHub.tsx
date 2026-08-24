@@ -37,6 +37,13 @@ const TourOverlay = lazy(() => import("@/components/dashboard/TourOverlay").then
 import type { TourStep } from "@/components/dashboard/TourOverlay";
 const AnalyticsCharts = lazy(() => import("./AnalyticsCharts"));
 
+function getGreeting(hour: number) {
+  if (hour < 5) return "Still up";
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
 const getIcon = (code: string) => {
   const c = code.toLowerCase();
   if (c.includes("cs") || c.includes("comp")) return Code;
@@ -223,31 +230,49 @@ export default function SmartFolderHub() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
-          className="relative rounded-3xl p-7 lg:p-8 overflow-hidden"
+          className="relative rounded-3xl p-7 lg:p-8 overflow-hidden border border-border/60 bg-card/40 shadow-sm dark:border-white/5 dark:bg-white/[0.02]"
           data-tour="dashboard-overview"
         >
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl dark:bg-cyan-500/12" />
             <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-indigo-500/10 blur-3xl dark:bg-indigo-500/12" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
+            <div className="noise-overlay absolute inset-0" />
           </div>
           <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="space-y-2">
-              <h1 className="text-4xl lg:text-5xl font-bold text-foreground tracking-tight">
-                Welcome back,{" "}
-                <span className="text-transparent bg-clip-text bg-linear-to-r from-cyan-700 to-blue-700 dark:from-cyan-400 dark:to-blue-500">
-                  {userData.name?.split(" ")[0] || "Student"}
-                </span>
-              </h1>
-              <p className="text-muted-foreground text-lg max-w-xl">
-                Your academic workspace is ready. Pick up where you left off or
-                start something new.
-              </p>
+            <div className="flex items-start gap-4 min-w-0">
+              <div className="hidden sm:flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-cyan-500/20 to-indigo-500/20 border border-border/60 text-lg font-bold text-foreground dark:border-white/10">
+                {(userData.name?.trim()?.[0] || "S").toUpperCase()}
+              </div>
+              <div className="space-y-2 min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  {new Date().toLocaleDateString(undefined, {
+                    weekday: "long",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </p>
+                <h1 className="text-4xl lg:text-5xl font-bold text-foreground tracking-tight">
+                  {getGreeting(new Date().getHours())},{" "}
+                  <span className="text-transparent bg-clip-text bg-linear-to-r from-cyan-700 to-blue-700 dark:from-cyan-400 dark:to-blue-500">
+                    {userData.name?.split(" ")[0] || "Student"}
+                  </span>
+                </h1>
+                <p className="text-muted-foreground text-lg max-w-xl">
+                  Your academic workspace is ready. Pick up where you left off or
+                  start something new.
+                </p>
+              </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="rounded-2xl border border-border bg-card text-card-foreground px-5 py-4 min-w-[200px] shadow-sm ring-1 ring-black/5 dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:ring-0 dark:backdrop-blur-md">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-700 dark:text-amber-400">
-                  <Layers className="w-4 h-4 shrink-0" aria-hidden />
-                  Cards Due Today
+            <div className="flex flex-col sm:flex-row gap-4 shrink-0">
+              <div className="group rounded-2xl border border-border bg-card text-card-foreground px-5 py-4 min-w-[200px] shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:ring-0 dark:backdrop-blur-md">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                    <Layers className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                  </span>
+                  <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                    Cards Due Today
+                  </span>
                 </div>
                 <div className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
                   {dueTodayCount}
@@ -262,13 +287,18 @@ export default function SmartFolderHub() {
                   <ArrowRight className="w-3 h-3 ml-1" aria-hidden />
                 </Button>
               </div>
-              <div className="rounded-2xl border border-border bg-card text-card-foreground px-5 py-4 min-w-[200px] shadow-sm ring-1 ring-black/5 dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:ring-0 dark:backdrop-blur-md">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-cyan-700 dark:text-cyan-400">
-                  <Clock className="w-4 h-4 shrink-0" aria-hidden />
-                  Study Streak
+              <div className="group rounded-2xl border border-border bg-card text-card-foreground px-5 py-4 min-w-[200px] shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:ring-0 dark:backdrop-blur-md">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-700 dark:text-cyan-400">
+                    <Clock className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                  </span>
+                  <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                    Study Streak
+                  </span>
                 </div>
                 <div className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
                   {gamification?.currentStreak ?? 0}
+                  <span className="ml-1 text-sm font-normal text-muted-foreground">days</span>
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
                   Longest: {gamification?.longestStreak ?? 0} days

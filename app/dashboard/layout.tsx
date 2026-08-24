@@ -8,7 +8,7 @@ import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { Sparkles } from "lucide-react";
 import { useMutation, useQuery, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
@@ -25,10 +25,10 @@ const Sidebar = dynamic(
   { ssr: false, loading: () => null },
 );
 
-const RightSidebar = dynamic(
+const TranscriptionPill = dynamic(
   () =>
-    import("@/components/dashboard/sidebar/RightSidebar").then((m) => ({
-      default: m.RightSidebar,
+    import("@/components/dashboard/transcribe/TranscriptionPill").then((m) => ({
+      default: m.TranscriptionPill,
     })),
   { ssr: false, loading: () => null },
 );
@@ -37,14 +37,6 @@ const DocumentProcessingIndicatorLazy = dynamic(
   () =>
     import("@/components/documents").then((m) => ({
       default: m.DocumentProcessingIndicator,
-    })),
-  { ssr: false, loading: () => null },
-);
-
-const QuickCaptureFabLazy = dynamic(
-  () =>
-    import("@/components/dashboard/quick-capture/QuickCaptureFab").then((m) => ({
-      default: m.QuickCaptureFab,
     })),
   { ssr: false, loading: () => null },
 );
@@ -70,11 +62,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
   const userData = useQuery(api.users.getUser);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const hideQuickCapture = Boolean(searchParams.get("noteId"));
-  const { toggleLeftSidebar, isLeftSidebarOpen, isRightSidebarOpen, toggleRightSidebar } = useDashboard();
+  const { toggleLeftSidebar, isLeftSidebarOpen } = useDashboard();
   const [isLeftHovered, setIsLeftHovered] = useState(false);
-  const [isRightHovered, setIsRightHovered] = useState(false);
 
   // Route guard for onboarding (kept in layout so dashboard page doesn't block on this query).
   useEffect(() => {
@@ -183,46 +172,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          {/* Right Sidebar Close Handle (when open) */}
-          <div 
-            className={cn(
-              "absolute right-0 top-0 bottom-0 w-1 z-50 group cursor-pointer transition-opacity duration-300",
-              !isRightSidebarOpen ? "opacity-0 pointer-events-none" : "opacity-100"
-            )}
-            onMouseEnter={() => setIsRightHovered(true)}
-            onMouseLeave={() => setIsRightHovered(false)}
-            onClick={toggleRightSidebar}
-          >
-            <div className={cn(
-              "absolute right-2 top-4 p-1.5 rounded-md bg-background border border-border shadow-sm opacity-0 transition-opacity duration-200",
-              isRightHovered && "opacity-100"
-            )}>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-            </div>
-          </div>
-
-          {/* Right Sidebar Open Handle (when closed) */}
-          <div 
-            className={cn(
-              "fixed right-0 top-0 bottom-0 w-4 z-60 group cursor-pointer transition-opacity duration-300",
-              isRightSidebarOpen ? "opacity-0 pointer-events-none" : "opacity-100"
-            )}
-            onMouseEnter={() => setIsRightHovered(true)}
-            onMouseLeave={() => setIsRightHovered(false)}
-            onClick={toggleRightSidebar}
-          >
-            <div className={cn(
-              "absolute right-1 top-1/2 -translate-y-1/2 w-1.5 h-24 rounded-full bg-muted-foreground/20 transition-all duration-300",
-              isRightHovered && "bg-muted-foreground/40 w-2"
-            )} />
-            <div className={cn(
-              "absolute right-4 top-4 p-1.5 rounded-md bg-background border border-border shadow-sm opacity-0 transition-opacity duration-200",
-              isRightHovered && "opacity-100"
-            )}>
-              <ChevronLeft className="w-4 h-4 text-muted-foreground" />
-            </div>
-          </div>
-
           {/* Mobile: opens navigation when note hub and other views have no header toggle */}
           <div className="flex md:hidden items-center h-11 shrink-0 px-2 border-b border-border bg-background/95 backdrop-blur-sm">
             <Button
@@ -248,8 +197,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             {children}
           </div>
         </main>
-        {mountHeavyPanels ? <RightSidebar /> : null}
-        {mountHeavyPanels ? <QuickCaptureFabLazy hidden={hideQuickCapture} /> : null}
+        {mountHeavyPanels ? <TranscriptionPill /> : null}
 
         {/* Document Processing Indicator - shows when PDFs are being processed */}
         {mountHeavyPanels ? <DocumentProcessingIndicatorLazy /> : null}

@@ -13,7 +13,6 @@ import {
   FileText,
   Plus,
   File,
-  Pin,
 } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import { Course, Module } from "@/types";
@@ -24,6 +23,7 @@ import { DraggableDocument, DocumentStatusBadge } from "@/components/documents";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { useState } from "react";
 import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
+import { NoteCard } from "@/components/dashboard/home/NoteCard";
 
 interface FolderViewProps {
   contextId: string;
@@ -378,7 +378,8 @@ export default function FolderView({
               </motion.div>
 
               {contextNotes
-                ?.sort((a, b) => {
+                ?.slice()
+                .sort((a, b) => {
                   // Pinned notes first
                   if (a.isPinned && !b.isPinned) return -1;
                   if (!a.isPinned && b.isPinned) return 1;
@@ -386,56 +387,33 @@ export default function FolderView({
                   return b.createdAt - a.createdAt;
                 })
                 .map((n) => (
-                  <motion.div
-                    key={n._id}
-                    variants={itemVariants}
-                    onClick={() => {
-                      router.push(`/dashboard?noteId=${n._id}`);
-                    }}
-                    whileHover={{ scale: 1.02 }}
-                    className="group relative rounded-xl border border-sidebar-border bg-sidebar-accent/70 hover:bg-sidebar-accent hover:border-sidebar-border cursor-pointer transition-all duration-300 p-5"
-                  >
-                    {/* Icon in top-left and menu in top-right */}
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="w-10 h-10 rounded-lg bg-sidebar-accent flex items-center justify-center">
-                        <FileText className="w-5 h-5 text-sidebar-primary" />
-                      </div>
-
-                      <div
-                        className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <ActionMenu
-                          onPin={() => togglePinNote({ noteId: n._id })}
-                          isPinned={n.isPinned}
-                          onRename={() =>
-                            setRenameTarget({
-                              id: n._id,
-                              title: n.title,
-                              type: "note",
-                            })
+                  <motion.div key={n._id} variants={itemVariants} className="group relative">
+                    <NoteCard
+                      note={n}
+                      onOpen={(id) => router.push(`/dashboard?noteId=${id}`)}
+                      className="h-full"
+                    />
+                    <div
+                      className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <ActionMenu
+                        onPin={() => togglePinNote({ noteId: n._id })}
+                        isPinned={n.isPinned}
+                        onRename={() =>
+                          setRenameTarget({
+                            id: n._id,
+                            title: n.title,
+                            type: "note",
+                          })
+                        }
+                        onDelete={() => {
+                          if (confirm("Delete this note?")) {
+                            deleteNote({ noteId: n._id });
                           }
-                          onDelete={() => {
-                            if (confirm("Delete this note?")) {
-                              deleteNote({ noteId: n._id });
-                            }
-                          }}
-                          align="right"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Title */}
-                    <h3 className="font-bold text-lg text-sidebar-foreground mb-3 line-clamp-2 transition-colors">
-                      {n.title}
-                    </h3>
-
-                    {/* Identifier badge */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-sidebar-primary bg-sidebar-accent px-2 py-1 rounded border border-sidebar-border">
-                        {n.style?.toUpperCase() || "NOTE"}
-                      </span>
-                      {n.isPinned && <Pin className="w-3 h-3 text-amber-400" />}
+                        }}
+                        align="right"
+                      />
                     </div>
                   </motion.div>
                 ))}

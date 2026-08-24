@@ -1,6 +1,6 @@
 /* Tiptap Editor Styles */
 .ProseMirror {
-  color: #d1d5db;
+  color: hsl(var(--foreground));
 }
 
 /* Hide scrollbar for slash menu */
@@ -51,12 +51,12 @@
 }
 
 .ProseMirror > *:hover {
-  background-color: rgba(255, 255, 255, 0.035);
+  background-color: hsl(var(--foreground) / 0.05);
 }
 
 .ProseMirror > *:hover::after {
   opacity: 1;
-  background: rgba(255, 255, 255, 0.14);
+  background: hsl(var(--foreground) / 0.18);
 }
 
 /*
@@ -74,11 +74,11 @@
 
 /* While the slash menu is open: quieter block chrome so the palette reads clearly */
 [data-slash-menu-open="true"] .ProseMirror > *:hover {
-  background-color: rgba(255, 255, 255, 0.02);
+  background-color: hsl(var(--foreground) / 0.03);
 }
 
 [data-slash-menu-open="true"] .ProseMirror > *:hover::after {
-  background: rgba(99, 102, 241, 0.35);
+  background: hsl(var(--primary) / 0.35);
 }
 
 [data-slash-menu-open="true"] .ProseMirror:focus-within > *:hover {
@@ -105,19 +105,19 @@
   color: inherit;
 }
 
-/* Text selection highlight - make it visible on dark background */
+/* Text selection highlight — themed accent, readable on light and dark surfaces */
 .ProseMirror ::selection {
-  background-color: rgba(99, 102, 241, 0.4); /* indigo with 40% opacity */
-  color: #ffffff;
+  background-color: hsl(var(--primary) / 0.35);
+  color: hsl(var(--foreground));
 }
 
 .ProseMirror ::-moz-selection {
-  background-color: rgba(99, 102, 241, 0.4); /* indigo with 40% opacity */
-  color: #ffffff;
+  background-color: hsl(var(--primary) / 0.35);
+  color: hsl(var(--foreground));
 }
 
 .ProseMirror p.is-editor-empty:first-child::before {
-  color: #4b5563;
+  color: hsl(var(--muted-foreground));
   content: attr(data-placeholder);
   float: left;
   height: 0;
@@ -129,7 +129,7 @@
   font-weight: 700;
   margin-top: 1.5rem;
   margin-bottom: 0.5rem;
-  color: #ffffff;
+  color: hsl(var(--foreground));
 }
 
 .ProseMirror h2 {
@@ -137,7 +137,7 @@
   font-weight: 600;
   margin-top: 1.25rem;
   margin-bottom: 0.5rem;
-  color: #ffffff !important;
+  color: hsl(var(--foreground)) !important;
 }
 
 .ProseMirror h3 {
@@ -145,7 +145,7 @@
   font-weight: 600;
   margin-top: 1rem;
   margin-bottom: 0.5rem;
-  color: #ffffff !important;
+  color: hsl(var(--foreground)) !important;
 }
 
 .ProseMirror h4 {
@@ -153,19 +153,19 @@
   font-weight: 600;
   margin-top: 0.75rem;
   margin-bottom: 0.5rem;
-  color: #e5e7eb !important;
+  color: hsl(var(--foreground) / 0.92) !important;
 }
 
 .ProseMirror hr {
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid hsl(var(--border));
   margin: 1.5rem 0;
 }
 
 .ProseMirror p {
   margin-top: 2px;
   margin-bottom: 2px;
-  color: #d1d5db !important;
+  color: hsl(var(--foreground) / 0.85) !important;
   line-height: 1.6;
 }
 
@@ -184,24 +184,24 @@
 }
 
 .ProseMirror blockquote {
-  border-left: 3px solid #4f46e5;
+  border-left: 3px solid hsl(var(--primary));
   padding-left: 1rem;
-  color: #9ca3af !important;
+  color: hsl(var(--muted-foreground)) !important;
   font-style: italic;
 }
 
 .ProseMirror li {
-  color: #d1d5db !important;
+  color: hsl(var(--foreground) / 0.85) !important;
   margin-bottom: 0.5em;
 }
 
 .ProseMirror strong {
-  color: #ffffff !important;
+  color: hsl(var(--foreground)) !important;
   font-weight: 600;
 }
 
 .ProseMirror em {
-  color: #d1d5db !important;
+  color: hsl(var(--foreground) / 0.85) !important;
 }
 
 .ProseMirror table {
@@ -211,17 +211,17 @@
 }
 
 .ProseMirror tr {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid hsl(var(--border));
 }
 
 .ProseMirror td {
-  color: #d1d5db !important;
+  color: hsl(var(--foreground) / 0.85) !important;
   padding: 0.75rem 1rem;
   vertical-align: top;
 }
 
 .ProseMirror td:first-child {
-  color: #a5b4fc !important;
+  color: hsl(var(--primary)) !important;
   font-weight: 500;
   width: 30%;
 }
@@ -232,7 +232,7 @@
  */
 .ProseMirror pre.lumina-code-block,
 .ProseMirror pre {
-  background-color: hsl(var(--background));
+  background-color: hsl(var(--muted) / 0.5);
   border: 1px solid hsl(var(--border));
   border-radius: 0.625rem;
   box-shadow: 0 1px 2px hsl(var(--foreground) / 0.04);
@@ -242,7 +242,7 @@
   overflow-x: auto;
   font-size: 0.8125rem;
   line-height: 1.6;
-  color: #e5e7eb;
+  color: hsl(var(--foreground) / 0.9);
 }
 
 .ProseMirror pre code {
@@ -252,7 +252,7 @@
   margin: 0;
   background: transparent;
   border-radius: 0;
-  color: #e5e7eb;
+  color: hsl(var(--foreground) / 0.9);
   font-family:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
     monospace;
@@ -262,54 +262,58 @@
   overflow-x: auto;
 }
 
-/* highlight.js / lowlight — cyan keywords, grey comments, readable defaults */
+/*
+ * highlight.js / lowlight syntax colors.
+ * Base rules are tuned for light surfaces (readable on --muted); the .dark
+ * overrides below swap in lighter tints for dark surfaces.
+ */
 .ProseMirror .hljs-keyword,
 .ProseMirror .hljs-selector-tag,
 .ProseMirror .hljs-meta .hljs-keyword {
-  color: #7dd3fc;
+  color: #0369a1;
 }
 
 .ProseMirror .hljs-built_in,
 .ProseMirror .hljs-section,
 .ProseMirror .hljs-selector-class {
-  color: #5eead4;
+  color: #0d9488;
 }
 
 .ProseMirror .hljs-string,
 .ProseMirror .hljs-attr,
 .ProseMirror .hljs-template-tag {
-  color: #86efac;
+  color: #15803d;
 }
 
 .ProseMirror .hljs-comment {
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   font-style: italic;
 }
 
 .ProseMirror .hljs-title,
 .ProseMirror .hljs-name {
-  color: #93c5fd;
+  color: #1d4ed8;
 }
 
 .ProseMirror .hljs-number,
 .ProseMirror .hljs-literal {
-  color: #fcd34d;
+  color: #a16207;
 }
 
 .ProseMirror .hljs-function .hljs-keyword,
 .ProseMirror .hljs-subst {
-  color: #d1d5db;
+  color: hsl(var(--foreground) / 0.85);
 }
 
 .ProseMirror .hljs-variable,
 .ProseMirror .hljs-template-variable,
 .ProseMirror .hljs-params {
-  color: #e5e7eb;
+  color: hsl(var(--foreground) / 0.9);
 }
 
 .ProseMirror .hljs-regexp,
 .ProseMirror .hljs-link {
-  color: #fbb6ce;
+  color: #be185d;
 }
 
 .ProseMirror .hljs-doctag,
@@ -317,10 +321,43 @@
   font-weight: 600;
 }
 
+.dark .ProseMirror .hljs-keyword,
+.dark .ProseMirror .hljs-selector-tag,
+.dark .ProseMirror .hljs-meta .hljs-keyword {
+  color: #7dd3fc;
+}
+
+.dark .ProseMirror .hljs-built_in,
+.dark .ProseMirror .hljs-section,
+.dark .ProseMirror .hljs-selector-class {
+  color: #5eead4;
+}
+
+.dark .ProseMirror .hljs-string,
+.dark .ProseMirror .hljs-attr,
+.dark .ProseMirror .hljs-template-tag {
+  color: #86efac;
+}
+
+.dark .ProseMirror .hljs-title,
+.dark .ProseMirror .hljs-name {
+  color: #93c5fd;
+}
+
+.dark .ProseMirror .hljs-number,
+.dark .ProseMirror .hljs-literal {
+  color: #fcd34d;
+}
+
+.dark .ProseMirror .hljs-regexp,
+.dark .ProseMirror .hljs-link {
+  color: #fbb6ce;
+}
+
 /* Inline code (backticks) — distinct from fenced blocks */
 .ProseMirror :not(pre) code {
-  color: #a5f3fc;
-  background-color: rgba(0, 0, 0, 0.35);
+  color: hsl(var(--primary));
+  background-color: hsl(var(--muted-foreground) / 0.12);
   padding: 0.125em 0.4em;
   border-radius: 0.25rem;
   font-family:
@@ -330,12 +367,12 @@
 }
 
 .ProseMirror a {
-  color: #60a5fa;
+  color: hsl(var(--primary));
   text-decoration: underline;
 }
 
 .ProseMirror a:hover {
-  color: #93c5fd;
+  color: hsl(var(--primary) / 0.8);
 }
 
 /* Outline Mode Container */
@@ -347,7 +384,7 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgba(10, 10, 10, 0.95);
+  background: hsl(var(--background) / 0.95);
   backdrop-filter: blur(8px);
 }
 
@@ -437,7 +474,7 @@
 
 /* Hover effects */
 .outline-list-item:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: hsl(var(--foreground) / 0.03);
   border-radius: 0.25rem;
 }
 
@@ -476,7 +513,7 @@
   flex: 1;
   font-size: 14px;
   line-height: 1.5;
-  color: #d1d5db;
+  color: hsl(var(--foreground) / 0.85);
 }
 
 .outline-node-content-container {
@@ -604,10 +641,10 @@
   display: inline;
 }
 
-/* KaTeX styling overrides for dark theme */
+/* KaTeX styling — follows the app theme rather than a fixed dark palette */
 .katex-content,
 .katex-preview {
-  color: #e2e8f0;
+  color: hsl(var(--foreground));
 }
 
 .katex-content .katex,
@@ -624,9 +661,8 @@
   outline: none;
 }
 
-/* Ensure KaTeX colors work in dark mode */
 .ProseMirror .katex .katex-html {
-  color: #e2e8f0;
+  color: hsl(var(--foreground));
 }
 
 .ProseMirror .katex .mathnormal,
@@ -636,7 +672,7 @@
 .ProseMirror .katex .mathsf,
 .ProseMirror .katex .mathtt,
 .ProseMirror .katex .mathdefault {
-  color: #e2e8f0;
+  color: hsl(var(--foreground));
 }
 
 .ProseMirror .katex .mord,
@@ -646,22 +682,22 @@
 .ProseMirror .katex .mclose,
 .ProseMirror .katex .mpunct,
 .ProseMirror .katex .minner {
-  color: #e2e8f0;
+  color: hsl(var(--foreground));
 }
 
 /* Math operator colors */
 .ProseMirror .katex .mop {
-  color: #a5b4fc;
+  color: hsl(var(--primary));
 }
 
 /* Fraction line color */
 .ProseMirror .katex .frac-line {
-  border-color: #9ca3af;
+  border-color: hsl(var(--muted-foreground));
 }
 
 /* Sqrt symbol color */
 .ProseMirror .katex .sqrt > .sqrt-sign {
-  color: #a5b4fc;
+  color: hsl(var(--primary));
 }
 
 /* ===== Print Styles for PDF Export ===== */

@@ -3,7 +3,7 @@
  * Blocks obvious SSRF targets (localhost / private ranges).
  */
 
-const MAX_REFERENCE_URLS = 5;
+export const MAX_REFERENCE_URLS = 5;
 const MAX_URL_STRING_LEN = 2048;
 const FETCH_TIMEOUT_MS = 18_000;
 const MAX_RESPONSE_BYTES = 600_000;
@@ -47,6 +47,18 @@ export function normalizeReferenceUrlList(
     if (out.length >= MAX_REFERENCE_URLS) break;
     const t = String(item || "").trim();
     if (!t || t.length > MAX_URL_STRING_LEN) continue;
+    // A token carrying any other scheme must be rejected outright. Prefixing
+    // "https://" onto it would otherwise coin a bogus but well-formed URL —
+    // "file:///etc/passwd" became "https://file///etc/passwd" — which then
+    // reads back as an accepted link.
+    //
+    // Two shapes to catch, and neither may swallow a bare "host:port":
+    //   hierarchical — anything "scheme://" that isn't http(s)
+    //   opaque       — schemes with no "//" that are never fetchable
+    const hasForeignHierarchicalScheme =
+      /^[a-z][a-z0-9+.-]*:\/\//i.test(t) && !/^https?:\/\//i.test(t);
+    const hasOpaqueScheme = /^(javascript|data|vbscript|file|mailto|blob):/i.test(t);
+    if (hasForeignHierarchicalScheme || hasOpaqueScheme) continue;
     try {
       const withScheme = /^https?:\/\//i.test(t) ? t : `https://${t}`;
       const u = new URL(withScheme);
