@@ -20,13 +20,13 @@ Lumina Notes AI is a Next.js + Convex study workspace for AI-assisted notes, str
 
 **In progress / limitations**
 
-- **Paid plans** — Paystack checkout is **temporarily disabled** in the app; all tiers are treated as free until the integration is restored (see `convex/ai.ts`, `components/home/PricingSection.tsx`).
+- **Paid plans** — Paystack checkout is **temporarily disabled** in the app; all tiers are treated as free until the integration is restored (see `convex/ai.ts`). The landing page states this plainly rather than advertising paid plans.
 - **Semantic search query** — The `semanticSearch` **query** in `convex/search.ts` is a stub; meaningful semantic retrieval is implemented via **actions** in `convex/ai.ts`. The dashboard search UI uses the keyword/title-style `search` query.
-- **Marketing vs product** — The landing page describes some capabilities (e.g. “live cursors”) as a **vision**; today you get **presence** and **shared notes**, not full real-time co-editing cursors.
+- **Marketing vs product** — The landing page lists unbuilt work (including live co-editing cursors) in its own “Not built yet” section; today you get **presence** and **shared notes**, not full real-time co-editing cursors.
 
 ## Upcoming features (in active development)
 
-These align with the public **Living Roadmap** on the home page (`components/home/WIPRoadmap.tsx`) and ongoing backend work:
+These align with the public roadmap on the home page (`components/home/landing/Roadmap.tsx`) and ongoing backend work:
 
 | Initiative | Direction |
 | --- | --- |
