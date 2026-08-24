@@ -15,7 +15,7 @@ a lecture into revision material is manual, repetitive, and usually skipped.
 Lumina's premise is that these artefacts belong in **one connected store**, so each can feed the
 next:
 
-```
+```text
 lecture audio ──▶ transcript ──▶ structured notes ──▶ flashcards / quizzes ──▶ review history
                                         ▲                                            │
              course PDFs ───────────────┘                                            │
