@@ -24,181 +24,75 @@ import {
   Code,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { SlashRegistryItem } from "./slashCommandRegistry";
 
 interface SlashCommandMenuProps {
   editor: Editor;
   range: { from: number; to: number };
+  /** Text after `/` — used to reset selection when the filter changes */
+  query: string;
+  items: SlashRegistryItem[];
 }
 
-type SlashCommand = (props: {
-  editor: Editor;
-  range: { from: number; to: number };
-}) => void;
-
-type SlashItem = {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  command: SlashCommand;
+const SLASH_ICONS: Record<string, React.ReactNode> = {
+  text: <Type className="size-[15px] stroke-[1.75]" />,
+  "heading-1": <Heading1 className="size-[15px] stroke-[1.75]" />,
+  "heading-2": <Heading2 className="size-[15px] stroke-[1.75]" />,
+  "heading-3": <Heading3 className="size-[15px] stroke-[1.75]" />,
+  "bullet-list": <List className="size-[15px] stroke-[1.75]" />,
+  "numbered-list": <ListOrdered className="size-[15px] stroke-[1.75]" />,
+  "todo-list": <CheckSquare className="size-[15px] stroke-[1.75]" />,
+  "code-block": <Code className="size-[15px] stroke-[1.75]" />,
+  image: <ImageIcon className="size-[15px] stroke-[1.75]" />,
+  math: <Sigma className="size-[15px] stroke-[1.75]" />,
+  "graph-calculator": <Calculator className="size-[15px] stroke-[1.75]" />,
+  chart: <BarChart3 className="size-[15px] stroke-[1.75]" />,
 };
 
-const SLASH_GROUPS: { label: string; items: SlashItem[] }[] = [
-  {
-    label: "Basic blocks",
-    items: [
-      {
-        title: "Text",
-        description: "Plain paragraph text.",
-        icon: <Type className="size-[15px] stroke-[1.75]" />,
-        command: ({ editor, range }) => {
-          editor.chain().focus().deleteRange(range).setNode("paragraph").run();
-        },
-      },
-      {
-        title: "Heading 1",
-        description: "Large section title.",
-        icon: <Heading1 className="size-[15px] stroke-[1.75]" />,
-        command: ({ editor, range }) => {
-          editor
-            .chain()
-            .focus()
-            .deleteRange(range)
-            .setNode("heading", { level: 1 })
-            .run();
-        },
-      },
-      {
-        title: "Heading 2",
-        description: "Medium section title.",
-        icon: <Heading2 className="size-[15px] stroke-[1.75]" />,
-        command: ({ editor, range }) => {
-          editor
-            .chain()
-            .focus()
-            .deleteRange(range)
-            .setNode("heading", { level: 2 })
-            .run();
-        },
-      },
-      {
-        title: "Heading 3",
-        description: "Small section title.",
-        icon: <Heading3 className="size-[15px] stroke-[1.75]" />,
-        command: ({ editor, range }) => {
-          editor
-            .chain()
-            .focus()
-            .deleteRange(range)
-            .setNode("heading", { level: 3 })
-            .run();
-        },
-      },
-    ],
-  },
-  {
-    label: "Lists",
-    items: [
-      {
-        title: "Bullet list",
-        description: "Unordered list with bullets.",
-        icon: <List className="size-[15px] stroke-[1.75]" />,
-        command: ({ editor, range }) => {
-          editor.chain().focus().deleteRange(range).toggleBulletList().run();
-        },
-      },
-      {
-        title: "Numbered list",
-        description: "Ordered list with numbers.",
-        icon: <ListOrdered className="size-[15px] stroke-[1.75]" />,
-        command: ({ editor, range }) => {
-          editor.chain().focus().deleteRange(range).toggleOrderedList().run();
-        },
-      },
-      {
-        title: "Todo list",
-        description: "Checklist with tasks.",
-        icon: <CheckSquare className="size-[15px] stroke-[1.75]" />,
-        command: ({ editor, range }) => {
-          editor.chain().focus().deleteRange(range).toggleTaskList().run();
-        },
-      },
-    ],
-  },
-  {
-    label: "Insert",
-    items: [
-      {
-        title: "Code block",
-        description: "Code with syntax highlighting.",
-        icon: <Code className="size-[15px] stroke-[1.75]" />,
-        command: ({ editor, range }) => {
-          editor.chain().focus().deleteRange(range).toggleCodeBlock().run();
-        },
-      },
-      {
-        title: "Image",
-        description: "Upload or embed an image.",
-        icon: <ImageIcon className="size-[15px] stroke-[1.75]" />,
-        command: ({ editor, range }) => {
-          editor.chain().focus().deleteRange(range).run();
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("open-image-upload"));
-          }
-        },
-      },
-      {
-        title: "Math formula",
-        description: "Inline LaTeX math.",
-        icon: <Sigma className="size-[15px] stroke-[1.75]" />,
-        command: ({ editor, range }) => {
-          editor
-            .chain()
-            .focus()
-            .deleteRange(range)
-            .setInlineMath("x^2 + y^2 = z^2")
-            .run();
-        },
-      },
-      {
-        title: "Graph calculator",
-        description: "Interactive graph.",
-        icon: <Calculator className="size-[15px] stroke-[1.75]" />,
-        command: ({ editor, range }) => {
-          editor.chain().focus().deleteRange(range).insertGraphCalculator().run();
-        },
-      },
-      {
-        title: "Chart",
-        description: "Data visualization.",
-        icon: <BarChart3 className="size-[15px] stroke-[1.75]" />,
-        command: ({ editor, range }) => {
-          editor.chain().focus().deleteRange(range).insertChart().run();
-        },
-      },
-    ],
-  },
-];
+function groupItems(
+  items: SlashRegistryItem[],
+): { label: string; items: SlashRegistryItem[] }[] {
+  const order: string[] = [];
+  const map = new Map<string, SlashRegistryItem[]>();
+  for (const item of items) {
+    if (!map.has(item.group)) {
+      order.push(item.group);
+      map.set(item.group, []);
+    }
+    map.get(item.group)!.push(item);
+  }
+  return order.map((label) => ({
+    label,
+    items: map.get(label) ?? [],
+  }));
+}
 
-export const SlashCommandMenu = ({ editor, range }: SlashCommandMenuProps) => {
+export const SlashCommandMenu = ({
+  editor,
+  range,
+  query,
+  items,
+}: SlashCommandMenuProps) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const selectedIndexRef = useRef(selectedIndex);
+  selectedIndexRef.current = selectedIndex;
 
-  const items = useMemo(
-    () => SLASH_GROUPS.flatMap((g) => g.items),
-    [],
-  );
+  const flatItems = items;
+  const itemCount = flatItems.length;
 
-  const itemCount = items.length;
-  const itemsRef = useRef(items);
-  itemsRef.current = items;
+  const itemsRef = useRef(flatItems);
+  itemsRef.current = flatItems;
   const rangeRef = useRef(range);
   rangeRef.current = range;
   const editorRef = useRef(editor);
   editorRef.current = editor;
   const rowRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
+  const grouped = useMemo(() => groupItems(items), [items]);
+
   useEffect(() => {
     setSelectedIndex(0);
-  }, [range.from, range.to]);
+  }, [range.from, range.to, query]);
 
   useEffect(() => {
     const el = rowRefs.current[selectedIndex];
@@ -208,33 +102,41 @@ export const SlashCommandMenu = ({ editor, range }: SlashCommandMenuProps) => {
   const selectItem = (index: number) => {
     const item = itemsRef.current[index];
     if (item) {
-      item.command({ editor: editorRef.current, range: rangeRef.current });
+      item.run(editorRef.current, rangeRef.current);
     }
   };
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (itemCount === 0) {
+        return;
+      }
       if (e.key === "ArrowUp") {
         e.preventDefault();
+        e.stopPropagation();
         setSelectedIndex((i) => (i + itemCount - 1) % itemCount);
         return;
       }
       if (e.key === "ArrowDown") {
         e.preventDefault();
+        e.stopPropagation();
         setSelectedIndex((i) => (i + 1) % itemCount);
         return;
       }
-      if (e.key === "Enter") {
+      if (e.key === "Enter" || e.key === "NumpadEnter") {
+        if (e.isComposing) {
+          return;
+        }
         e.preventDefault();
-        setSelectedIndex((current) => {
-          selectItem(current);
-          return current;
-        });
+        e.stopPropagation();
+        const idx = selectedIndexRef.current;
+        selectItem(idx);
       }
     };
 
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    // Capture phase: run before ProseMirror/TipTap handle Enter (otherwise a newline is inserted).
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
   }, [itemCount]);
 
   let rowIndex = 0;
@@ -251,7 +153,16 @@ export const SlashCommandMenu = ({ editor, range }: SlashCommandMenuProps) => {
         "ring-1 ring-white/[0.04]",
       )}
     >
-      {SLASH_GROUPS.map((group) => (
+      {itemCount === 0 && (
+        <div className="px-2.5 py-6 text-center text-[12px] text-zinc-500">
+          No commands match that text. Try keywords like{" "}
+          <span className="text-zinc-400">
+            heading, list, code, image, math, chart
+          </span>
+          .
+        </div>
+      )}
+      {grouped.map((group) => (
         <Fragment key={group.label}>
           <div
             className="px-2.5 pb-1.5 pt-2 first:pt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500"
@@ -263,9 +174,13 @@ export const SlashCommandMenu = ({ editor, range }: SlashCommandMenuProps) => {
             {group.items.map((item) => {
               const index = rowIndex++;
               const selected = index === selectedIndex;
+              const icon = SLASH_ICONS[item.id] ?? (
+                <Type className="size-[15px] stroke-[1.75]" />
+              );
+              const keywordHint = item.keywords.slice(0, 8).join(" · ");
               return (
                 <button
-                  key={`${group.label}-${item.title}`}
+                  key={`${group.label}-${item.id}`}
                   ref={(el) => {
                     rowRefs.current[index] = el;
                   }}
@@ -300,7 +215,7 @@ export const SlashCommandMenu = ({ editor, range }: SlashCommandMenuProps) => {
                         "border-indigo-400/25 bg-indigo-500/10 text-indigo-200",
                     )}
                   >
-                    {item.icon}
+                    {icon}
                   </span>
                   <span className="relative z-[1] min-w-0 flex-1 py-0.5">
                     <span
@@ -319,6 +234,17 @@ export const SlashCommandMenu = ({ editor, range }: SlashCommandMenuProps) => {
                     >
                       {item.description}
                     </span>
+                    {keywordHint && (
+                      <span
+                        className={cn(
+                          "mt-1 block text-[10px] leading-snug tracking-wide",
+                          selected ? "text-zinc-500" : "text-zinc-600",
+                        )}
+                        title={`Search: ${item.keywords.join(", ")}`}
+                      >
+                        {keywordHint}
+                      </span>
+                    )}
                   </span>
                 </button>
               );

@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query, action } from "./_generated/server";
 import { api } from "./_generated/api";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, TaskType } from "@google/generative-ai";
+import { embedTextForVectorSearch } from "./geminiEmbedding";
 import {
   normalizeTranscriptForPrompt,
   ENRICHMENT_WORD_THRESHOLD,
@@ -13,6 +14,12 @@ import {
   noteLacksDepth,
 } from "./shared/noteQuality";
 import { buildDiagramData } from "./shared/diagram";
+import {
+  fetchReferenceUrlsForPrompt,
+  normalizeReferenceUrlList,
+} from "./shared/urlContent";
+
+const MAX_PREVIOUS_NOTES_CHARS = 100_000;
 
 type NoteRole = "owner" | "editor" | "viewer";
 
@@ -122,6 +129,7 @@ export const createNote = mutation({
     quickCaptureAudioUrl: v.optional(v.string()),
     quickCaptureStatus: v.optional(v.string()),
     quickCaptureExpandedNoteId: v.optional(v.id("notes")),
+    sourceRecordingId: v.optional(v.id("recordings")),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -129,31 +137,102 @@ export const createNote = mutation({
       throw new Error("Called createNote without authentication present");
     }
 
-    // Determine noteType: if courseId or moduleId is provided, it's a "page", otherwise "quick"
-    const noteType =
-      args.noteType || (args.courseId || args.moduleId ? "page" : "quick");
+    let courseId = args.courseId;
+    let moduleId = args.moduleId;
 
+    if (args.parentNoteId) {
+      const parent = await ctx.db.get(args.parentNoteId);
+      if (!parent) throw new Error("Parent note not found");
+      const parentRole = await getNoteRole(
+        ctx,
+        args.parentNoteId,
+        identity.tokenIdentifier,
+      );
+      if (
+        !parentRole ||
+        (parentRole !== "owner" && parentRole !== "editor")
+      ) {
+        throw new Error("Forbidden");
+      }
+      if (courseId === undefined) courseId = parent.courseId;
+      if (moduleId === undefined) moduleId = parent.moduleId;
+    }
+
+    // Page: folder context, nested page under a parent, or explicit noteType
+    const noteType =
+      args.noteType ||
+      (courseId || moduleId || args.parentNoteId ? "page" : "quick");
+
+    const now = Date.now();
     const noteId = await ctx.db.insert("notes", {
       userId: identity.tokenIdentifier,
       title: args.title,
       noteType,
       major: args.major,
-      courseId: args.courseId,
-      moduleId: args.moduleId,
+      courseId,
+      moduleId,
       parentNoteId: args.parentNoteId,
       style: args.style || "standard",
       content: args.content ?? "",
       isPinned: false,
       tagIds: args.tagIds || [],
       wordCount: args.wordCount || 0,
-      createdAt: Date.now(),
+      createdAt: now,
+      lastAccessedAt: now,
       quickCaptureType: args.quickCaptureType,
       quickCaptureAudioUrl: args.quickCaptureAudioUrl,
       quickCaptureStatus: args.quickCaptureStatus,
       quickCaptureExpandedNoteId: args.quickCaptureExpandedNoteId,
+      sourceRecordingId: args.sourceRecordingId,
     });
 
     return noteId;
+  },
+});
+
+/** Latest saved note content for a recording (for “improve existing notes” regeneration). */
+export const getPriorNoteContentForRecording = query({
+  args: { recordingId: v.id("recordings") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const recording = await ctx.db.get(args.recordingId);
+    if (!recording || recording.userId !== identity.tokenIdentifier) {
+      return null;
+    }
+
+    const matches = await ctx.db
+      .query("notes")
+      .withIndex("by_userId_sourceRecordingId", (q) =>
+        q
+          .eq("userId", identity.tokenIdentifier)
+          .eq("sourceRecordingId", args.recordingId),
+      )
+      .collect();
+
+    if (matches.length === 0) return null;
+
+    matches.sort((a, b) => b.createdAt - a.createdAt);
+
+    const MAX_CHARS = 120_000;
+    for (const note of matches) {
+      const chunks: string[] = [];
+      if (note.content?.trim()) chunks.push(note.content.trim());
+      if (note.outlineData?.trim()) {
+        chunks.push(`[Outline structure]\n${note.outlineData.trim()}`);
+      }
+      const raw = chunks.join("\n\n");
+      if (raw.length === 0) continue;
+
+      return {
+        noteTitle: note.title,
+        content: raw.slice(0, MAX_CHARS),
+        truncated: raw.length > MAX_CHARS,
+      };
+    }
+
+    return null;
   },
 });
 
@@ -172,6 +251,7 @@ export const getQuickNotes = query({
       .filter((q) =>
         q.and(
           q.neq(q.field("isArchived"), true),
+          q.eq(q.field("parentNoteId"), undefined),
           // Quick notes: noteType is "quick" OR (noteType is undefined AND no courseId/moduleId)
           q.or(
             q.eq(q.field("noteType"), "quick"),
@@ -200,10 +280,11 @@ export const getQuickNotes = query({
       if (!n) continue;
       if (n.isArchived) continue;
       const isQuick =
-        n.noteType === "quick" ||
-        (n.noteType === undefined &&
-          n.courseId === undefined &&
-          n.moduleId === undefined);
+        !n.parentNoteId &&
+        (n.noteType === "quick" ||
+          (n.noteType === undefined &&
+            n.courseId === undefined &&
+            n.moduleId === undefined));
       if (isQuick) sharedNotes.push(n);
     }
 
@@ -290,7 +371,7 @@ export const getNotesByContext = query({
       const accessible = [];
       for (const n of notes) {
         const role = await getNoteRole(ctx, n._id, identity.tokenIdentifier);
-        if (role) accessible.push(n);
+        if (role && !n.parentNoteId) accessible.push(n);
       }
       return accessible;
     }
@@ -303,12 +384,43 @@ export const getNotesByContext = query({
       const accessible = [];
       for (const n of notes) {
         const role = await getNoteRole(ctx, n._id, identity.tokenIdentifier);
-        if (role) accessible.push(n);
+        if (role && !n.parentNoteId) accessible.push(n);
       }
       return accessible;
     }
 
     return [];
+  },
+});
+
+/** Direct child pages of a note (nested notes). */
+export const getChildNotes = query({
+  args: { parentNoteId: v.id("notes") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const parentRole = await getNoteRole(
+      ctx,
+      args.parentNoteId,
+      identity.tokenIdentifier,
+    );
+    if (!parentRole) return [];
+
+    const children = await ctx.db
+      .query("notes")
+      .withIndex("by_parentNoteId", (q) =>
+        q.eq("parentNoteId", args.parentNoteId),
+      )
+      .collect();
+
+    const accessible: typeof children = [];
+    for (const n of children) {
+      const role = await getNoteRole(ctx, n._id, identity.tokenIdentifier);
+      if (role) accessible.push(n);
+    }
+
+    return accessible.sort((a, b) => b.createdAt - a.createdAt);
   },
 });
 
@@ -420,11 +532,13 @@ export const updateNote = mutation({
     quickCaptureAudioUrl: v.optional(v.string()),
     quickCaptureStatus: v.optional(v.string()),
     quickCaptureExpandedNoteId: v.optional(v.id("notes")),
+    sourceRecordingId: v.optional(v.id("recordings")),
   },
   handler: async (ctx, args) => {
     await requireNoteEdit(ctx, args.noteId);
 
     const patch: any = {};
+    const now = Date.now();
     if (args.title !== undefined) patch.title = args.title;
     if (args.content !== undefined) patch.content = args.content;
     if (args.style !== undefined) patch.style = args.style;
@@ -441,8 +555,23 @@ export const updateNote = mutation({
       patch.quickCaptureStatus = args.quickCaptureStatus;
     if (args.quickCaptureExpandedNoteId !== undefined)
       patch.quickCaptureExpandedNoteId = args.quickCaptureExpandedNoteId;
+    if (args.sourceRecordingId !== undefined)
+      patch.sourceRecordingId = args.sourceRecordingId;
 
+    // Treat edits as "usage" for stale cleanup.
+    patch.lastAccessedAt = now;
     await ctx.db.patch(args.noteId, patch);
+  },
+});
+
+/**
+ * Mark a note as opened/viewed (client should call when opening a note).
+ */
+export const touchNote = mutation({
+  args: { noteId: v.id("notes") },
+  handler: async (ctx, args) => {
+    await requireNoteAccess(ctx, args.noteId);
+    await ctx.db.patch(args.noteId, { lastAccessedAt: Date.now() });
   },
 });
 
@@ -528,18 +657,24 @@ export const getDocumentsByIds = query({
  * Uses vector search to find relevant chunks from the pinned document
  */
 export const generateFromPinnedAudio = action({
-  args: { transcript: v.string(), pinnedFileId: v.optional(v.string()) },
+  args: {
+    transcript: v.string(),
+    pinnedFileId: v.optional(v.string()),
+    previousNotesContent: v.optional(v.string()),
+    /** Public http(s) pages to fetch and use as extra context (max 5). */
+    referenceUrls: v.optional(v.array(v.string())),
+  },
   handler: async (ctx, args) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("GEMINI_API_KEY not set");
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    const embeddingModel = genAI.getGenerativeModel({
-      model: "text-embedding-004",
-    });
 
     const normalizedTranscript = normalizeTranscriptForPrompt(args.transcript);
+    const referenceUrlsBlock = await fetchReferenceUrlsForPrompt(
+      normalizeReferenceUrlList(args.referenceUrls),
+    );
 
     const fixJson = async (text: string) => {
       const fixPrompt = `Fix the following JSON. Return ONLY valid JSON with the same structure and content, no markdown.
@@ -566,6 +701,7 @@ Pinned document context (use for additional depth):
 """
 ${contextText}
 """
+${referenceUrlsBlock.trim() ? `\n\nSupplementary web pages:\n${referenceUrlsBlock}\n` : ""}
 
 Current JSON (needs improvement):
 ${draftText}
@@ -595,6 +731,7 @@ STRICT quality requirements:
 - NEVER use generic filler phrases
 - Every sentence must add NEW information
 - Cross-reference pinned document content where relevant
+- When supplementary web pages are supplied, use them for accurate extra detail; do not invent unsupported facts
 - Return ONLY valid JSON`;
 
       const repairedResult = await model.generateContent(repairPrompt);
@@ -606,24 +743,28 @@ STRICT quality requirements:
       return tryParseJson(fixedRepairText);
     };
 
-    // 1. Embed the transcript
-    const embeddingResult =
-      await embeddingModel.embedContent(normalizedTranscript);
-    const transcriptEmbedding = embeddingResult.embedding.values;
+    // 1. Embed the transcript (query-style retrieval against indexed documents)
+    const transcriptEmbedding = await embedTextForVectorSearch(
+      genAI,
+      normalizedTranscript,
+      TaskType.RETRIEVAL_QUERY,
+    );
 
     // 2. Search the pinned file (or all documents if no pin)
     let relevantDocs: Array<{ _id: any; _score: number }> = [];
-    if (args.pinnedFileId) {
-      relevantDocs = await ctx.vectorSearch("documents", "by_embedding", {
-        vector: transcriptEmbedding,
-        filter: (q: any) => q.eq("storageId", args.pinnedFileId),
-        limit: 5,
-      });
-    } else {
-      relevantDocs = await ctx.vectorSearch("documents", "by_embedding", {
-        vector: transcriptEmbedding,
-        limit: 5,
-      });
+    if (transcriptEmbedding) {
+      if (args.pinnedFileId) {
+        relevantDocs = await ctx.vectorSearch("documents", "by_embedding", {
+          vector: transcriptEmbedding,
+          filter: (q: any) => q.eq("storageId", args.pinnedFileId),
+          limit: 5,
+        });
+      } else {
+        relevantDocs = await ctx.vectorSearch("documents", "by_embedding", {
+          vector: transcriptEmbedding,
+          limit: 5,
+        });
+      }
     }
 
     // 3. Fetch the actual document texts
@@ -648,14 +789,34 @@ STRICT quality requirements:
       ? `\n\nRelevant Context from Pinned Document:\n"""\n${contextText}\n"""\n\nIMPORTANT: Cross-reference the transcript with this pinned document. Use specific information, definitions, formulas, and examples from the document to enrich your notes. Cite document content when it adds depth to concepts mentioned in the lecture.`
       : "";
 
+    const prevPinned = args.previousNotesContent?.trim();
+    const revisionPinned = prevPinned
+      ? `
+
+REVISION MODE — The student already has notes from this session. The transcript and pinned document are the source of truth. Improve the previous notes: merge in missing transcript and document-backed detail, fix errors, deepen thin sections.
+
+Previous notes:
+"""
+${prevPinned.slice(0, MAX_PREVIOUS_NOTES_CHARS)}
+"""
+
+Output a **complete** replacement JSON in the required schema. Do not reference these instructions in the output.
+`
+      : "";
+
+    const webLinkSection = referenceUrlsBlock.trim()
+      ? `\n\n=== Reference web pages (supplementary — use with transcript and pinned document) ===\n${referenceUrlsBlock}\n`
+      : "";
+
     const prompt = `You are a world-class academic note-taker and subject matter expert. You create comprehensive, exam-ready study materials that students rely on as their PRIMARY study resource.
 
-Your goal: Create notes so thorough and detailed that a student who MISSED the lecture could study ONLY from your notes and still perform excellently on an exam.${contextSection}
+Your goal: Create notes so thorough and detailed that a student who MISSED the lecture could study ONLY from your notes and still perform excellently on an exam.${contextSection}${webLinkSection}
 
 Transcript:
 """
 ${enrichedTranscript}
 """
+${revisionPinned}
 
 CRITICAL CONTEXT: This transcript was captured via voice recording and may be fragmented or incomplete. You MUST:
 - Reconstruct incomplete explanations into full, coherent concepts
@@ -859,6 +1020,7 @@ export const moveNoteToFolder = mutation({
       noteType: "page",
       courseId: args.courseId,
       moduleId: args.moduleId,
+      parentNoteId: undefined,
     });
 
     return args.noteId;
@@ -881,6 +1043,7 @@ export const unassignNoteFromFolder = mutation({
       noteType: "quick",
       courseId: undefined,
       moduleId: undefined,
+      parentNoteId: undefined,
     });
 
     return args.noteId;

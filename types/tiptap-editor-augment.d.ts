@@ -9,6 +9,8 @@ declare module "@tiptap/core" {
     slashCommandProps?: {
       editor: TiptapEditor;
       range: { from: number; to: number };
+      query?: string;
+      items?: unknown[];
       clientRect?: (() => DOMRect | null) | null;
       [key: string]: unknown;
     } | null;

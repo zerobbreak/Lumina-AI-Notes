@@ -2,6 +2,10 @@
 
 import React, { createContext, useState, ReactNode } from "react";
 import type { Id } from "@/convex/_generated/dataModel";
+import {
+  MAX_REFERENCE_URLS,
+  normalizeReferenceUrlList,
+} from "@/convex/shared/urlContent";
 
 // Section type for Notion-like note structure
 export interface NoteSection {
@@ -35,35 +39,45 @@ export interface NoteBootstrap {
   title: string;
   courseId?: string;
   moduleId?: string;
+  parentNoteId?: Id<"notes">;
   style?: string;
 }
 
 export type SidebarState = "open" | "compact" | "closed";
 
+/** A saved recording handed from the sidebar's Sessions list to the pill. */
+export interface LoadedSession {
+  recordingId: Id<"recordings">;
+  title: string;
+  /** Flattened plain-text transcript, ready to generate from. */
+  transcript: string;
+}
+
+export { MAX_REFERENCE_URLS };
+
 interface DashboardContextType {
   leftSidebarState: SidebarState;
   /** True when the left sidebar is visible (open or compact, not fully closed). */
   isLeftSidebarOpen: boolean;
-  rightSidebarState: SidebarState;
-  /** True when the right sidebar is visible (open or compact, not fully closed). */
-  isRightSidebarOpen: boolean;
   setLeftSidebarState: (state: SidebarState) => void;
-  setRightSidebarState: (state: SidebarState) => void;
-  /** @deprecated Prefer setRightSidebarState — kept for call sites that only set open/closed. */
-  setRightSidebarOpen: (open: boolean) => void;
   toggleLeftSidebar: () => void;
   cycleLeftSidebar: () => void;
-  toggleRightSidebar: () => void;
-  cycleRightSidebar: () => void;
-  closeAllSidebars: () => void;
-  openAllSidebars: () => void;
-  // Pending notes to inject into editor
+  // Pending notes to inject into editor (scoped to a specific note so other tabs/routes don't receive them)
   pendingNotes: StructuredNotes | null;
-  setPendingNotes: (notes: StructuredNotes) => void;
+  pendingNotesTargetNoteId: Id<"notes"> | null;
+  setPendingNotes: (notes: StructuredNotes, targetNoteId: Id<"notes">) => void;
   clearPendingNotes: () => void;
-  // Active context for recording
+  // Document pinned as extra context for note generation
   activeContext: PinnedContext | null;
   setActiveContext: (context: PinnedContext | null) => void;
+  /** Public pages fetched server-side and merged into the generation prompt. */
+  referenceUrls: string[];
+  addReferenceUrls: (raw: string) => { added: number; rejected: string[] };
+  removeReferenceUrl: (url: string) => void;
+  /** Sidebar → pill handoff for replaying a saved session. */
+  sessionToLoad: LoadedSession | null;
+  loadSession: (session: LoadedSession) => void;
+  clearLoadedSession: () => void;
   noteBootstrap: NoteBootstrap | null;
   setNoteBootstrap: (b: NoteBootstrap | null) => void;
 }
@@ -77,19 +91,19 @@ export { DashboardContext };
 
 export function DashboardProvider({ children }: { children: ReactNode }) {
   const [leftSidebarState, setLeftSidebarState] = useState<SidebarState>("open");
-  const [rightSidebarState, setRightSidebarState] = useState<SidebarState>("open");
   const [pendingNotes, setPendingNotesState] = useState<StructuredNotes | null>(
-    null
+    null,
   );
+  const [pendingNotesTargetNoteId, setPendingNotesTargetNoteId] =
+    useState<Id<"notes"> | null>(null);
   const [activeContext, setActiveContext] = useState<PinnedContext | null>(
     null
   );
+  const [referenceUrls, setReferenceUrls] = useState<string[]>([]);
+  const [sessionToLoad, setSessionToLoad] = useState<LoadedSession | null>(null);
   const [noteBootstrap, setNoteBootstrap] = useState<NoteBootstrap | null>(
     null,
   );
-
-  const setRightSidebarOpen = (open: boolean) =>
-    setRightSidebarState(open ? "open" : "closed");
 
   const toggleLeftSidebar = () => {
     setLeftSidebarState((prev) => (prev === "closed" ? "open" : "closed"));
@@ -103,56 +117,67 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const toggleRightSidebar = () => {
-    setRightSidebarState((prev) => (prev === "closed" ? "open" : "closed"));
-  };
-
-  const cycleRightSidebar = () => {
-    setRightSidebarState((prev) => {
-      if (prev === "open") return "compact";
-      if (prev === "compact") return "closed";
-      return "open";
-    });
-  };
-
-  const closeAllSidebars = () => {
-    setLeftSidebarState("closed");
-    setRightSidebarState("closed");
-  };
-
-  const openAllSidebars = () => {
-    setLeftSidebarState("open");
-    setRightSidebarState("open");
-  };
-
-  const setPendingNotes = (notes: StructuredNotes) =>
+  const setPendingNotes = (
+    notes: StructuredNotes,
+    targetNoteId: Id<"notes">,
+  ) => {
     setPendingNotesState(notes);
-  const clearPendingNotes = () => setPendingNotesState(null);
+    setPendingNotesTargetNoteId(targetNoteId);
+  };
+  const clearPendingNotes = () => {
+    setPendingNotesState(null);
+    setPendingNotesTargetNoteId(null);
+  };
+
+  /**
+   * Accepts whitespace/comma separated input so a pasted list lands in one go.
+   *
+   * Validation is delegated to the same normalizer the server uses before
+   * fetching these pages, so a link the UI accepts is one the backend will
+   * actually follow — and private/loopback hosts are rejected here too rather
+   * than being silently dropped later.
+   */
+  const addReferenceUrls = (raw: string) => {
+    const tokens = raw.split(/[\s,]+/).filter(Boolean);
+    const rejected = tokens.filter(
+      (t) => normalizeReferenceUrlList([t]).length === 0,
+    );
+
+    let added = 0;
+    setReferenceUrls((prev) => {
+      const next = normalizeReferenceUrlList([...prev, ...tokens]);
+      added = Math.max(0, next.length - prev.length);
+      return next;
+    });
+
+    return { added, rejected };
+  };
+
+  const removeReferenceUrl = (url: string) =>
+    setReferenceUrls((prev) => prev.filter((u) => u !== url));
 
   const isLeftSidebarOpen = leftSidebarState !== "closed";
-  const isRightSidebarOpen = rightSidebarState !== "closed";
 
   return (
     <DashboardContext.Provider
       value={{
         leftSidebarState,
         isLeftSidebarOpen,
-        rightSidebarState,
-        isRightSidebarOpen,
         setLeftSidebarState,
-        setRightSidebarState,
-        setRightSidebarOpen,
         toggleLeftSidebar,
         cycleLeftSidebar,
-        toggleRightSidebar,
-        cycleRightSidebar,
-        closeAllSidebars,
-        openAllSidebars,
         pendingNotes,
+        pendingNotesTargetNoteId,
         setPendingNotes,
         clearPendingNotes,
         activeContext,
         setActiveContext,
+        referenceUrls,
+        addReferenceUrls,
+        removeReferenceUrl,
+        sessionToLoad,
+        loadSession: setSessionToLoad,
+        clearLoadedSession: () => setSessionToLoad(null),
         noteBootstrap,
         setNoteBootstrap,
       }}

@@ -1,23 +1,45 @@
 "use client";
 
-import { Suspense, useState, useCallback, useEffect } from "react";
-import { Sidebar } from "@/components/dashboard/sidebar/Sidebar";
-import { RightSidebar } from "@/components/dashboard/sidebar/RightSidebar";
+import { Suspense, useState, useCallback, useEffect, lazy } from "react";
+import dynamic from "next/dynamic";
 import { DashboardProvider } from "@/components/dashboard/DashboardContext";
-import { DocumentProcessingIndicator } from "@/components/documents";
 import { DragOverlayWrapper } from "@/components/dashboard/DragOverlayWrapper";
-import { CommandPalette } from "@/components/dashboard/CommandPalette";
-import { KeyboardShortcutsDialog } from "@/components/dashboard/KeyboardShortcutsDialog";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { Sparkles } from "lucide-react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useSearchParams } from "next/navigation";
-import { QuickCaptureFab } from "@/components/dashboard/quick-capture/QuickCaptureFab";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
 import { cn } from "@/lib/utils";
+
+const CommandPalette = lazy(() => import("@/components/dashboard/CommandPalette").then(m => ({ default: m.CommandPalette })));
+const KeyboardShortcutsDialog = lazy(() => import("@/components/dashboard/KeyboardShortcutsDialog").then(m => ({ default: m.KeyboardShortcutsDialog })));
+
+const Sidebar = dynamic(
+  () =>
+    import("@/components/dashboard/sidebar/Sidebar").then((m) => ({
+      default: m.Sidebar,
+    })),
+  { ssr: false, loading: () => null },
+);
+
+const TranscriptionPill = dynamic(
+  () =>
+    import("@/components/dashboard/transcribe/TranscriptionPill").then((m) => ({
+      default: m.TranscriptionPill,
+    })),
+  { ssr: false, loading: () => null },
+);
+
+const DocumentProcessingIndicatorLazy = dynamic(
+  () =>
+    import("@/components/documents").then((m) => ({
+      default: m.DocumentProcessingIndicator,
+    })),
+  { ssr: false, loading: () => null },
+);
 
 function DashboardLayoutLoading() {
   return (
@@ -33,20 +55,57 @@ function DashboardLayoutLoading() {
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  const [mountHeavyPanels, setMountHeavyPanels] = useState(false);
   const acceptPendingInvites = useMutation(
     api.collaboration.acceptPendingInvites,
   );
+  const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
   const userData = useQuery(api.users.getUser);
-  const searchParams = useSearchParams();
-  const hideQuickCapture = Boolean(searchParams.get("noteId"));
-  const { toggleLeftSidebar, isLeftSidebarOpen, isRightSidebarOpen, toggleRightSidebar } = useDashboard();
+  const router = useRouter();
+  const { toggleLeftSidebar, isLeftSidebarOpen } = useDashboard();
   const [isLeftHovered, setIsLeftHovered] = useState(false);
-  const [isRightHovered, setIsRightHovered] = useState(false);
 
-  // Accept any pending email invites for the signed-in user.
+  // Route guard for onboarding (kept in layout so dashboard page doesn't block on this query).
   useEffect(() => {
+    if (!isAuthenticated) return;
+    if (userData === undefined) return;
+    if (userData === null || !userData.onboardingComplete) {
+      router.replace("/onboarding");
+    }
+  }, [isAuthenticated, router, userData]);
+
+  // Defer mounting heavy panels (sidebars, indicators) until after initial paint.
+  useEffect(() => {
+    let cancelled = false;
+    const w = window as unknown as {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    const mount = () => {
+      if (!cancelled) setMountHeavyPanels(true);
+    };
+
+    if (typeof w.requestIdleCallback === "function") {
+      const id = w.requestIdleCallback(mount, { timeout: 1200 });
+      return () => {
+        cancelled = true;
+        w.cancelIdleCallback?.(id);
+      };
+    }
+
+    const t = window.setTimeout(mount, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, []);
+
+  // Accept any pending email invites for the signed-in user (after Convex auth is ready).
+  useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
     acceptPendingInvites().catch(() => {});
-  }, [acceptPendingInvites]);
+  }, [acceptPendingInvites, authLoading, isAuthenticated]);
 
   // Global keyboard shortcuts
   useKeyboardShortcut(
@@ -74,7 +133,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         {/* Left Sidebar Toggle Handle (Notion-style) */}
         <div 
           className={cn(
-            "fixed left-0 top-0 bottom-0 w-4 z-[60] group cursor-pointer transition-opacity duration-300",
+            "fixed left-0 top-0 bottom-0 w-4 z-60 group cursor-pointer transition-opacity duration-300",
             isLeftSidebarOpen ? "opacity-0 pointer-events-none" : "opacity-100"
           )}
           onMouseEnter={() => setIsLeftHovered(true)}
@@ -93,7 +152,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <Sidebar />
+        {mountHeavyPanels ? <Sidebar /> : null}
         <main className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden relative z-0">
           {/* Left Sidebar Close Handle (when open) */}
           <div 
@@ -108,46 +167,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             <div className={cn(
               "absolute left-2 top-4 p-1.5 rounded-md bg-background border border-border shadow-sm opacity-0 transition-opacity duration-200",
               isLeftHovered && "opacity-100"
-            )}>
-              <ChevronLeft className="w-4 h-4 text-muted-foreground" />
-            </div>
-          </div>
-
-          {/* Right Sidebar Close Handle (when open) */}
-          <div 
-            className={cn(
-              "absolute right-0 top-0 bottom-0 w-1 z-50 group cursor-pointer transition-opacity duration-300",
-              !isRightSidebarOpen ? "opacity-0 pointer-events-none" : "opacity-100"
-            )}
-            onMouseEnter={() => setIsRightHovered(true)}
-            onMouseLeave={() => setIsRightHovered(false)}
-            onClick={toggleRightSidebar}
-          >
-            <div className={cn(
-              "absolute right-2 top-4 p-1.5 rounded-md bg-background border border-border shadow-sm opacity-0 transition-opacity duration-200",
-              isRightHovered && "opacity-100"
-            )}>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-            </div>
-          </div>
-
-          {/* Right Sidebar Open Handle (when closed) */}
-          <div 
-            className={cn(
-              "fixed right-0 top-0 bottom-0 w-4 z-[60] group cursor-pointer transition-opacity duration-300",
-              isRightSidebarOpen ? "opacity-0 pointer-events-none" : "opacity-100"
-            )}
-            onMouseEnter={() => setIsRightHovered(true)}
-            onMouseLeave={() => setIsRightHovered(false)}
-            onClick={toggleRightSidebar}
-          >
-            <div className={cn(
-              "absolute right-1 top-1/2 -translate-y-1/2 w-1.5 h-24 rounded-full bg-muted-foreground/20 transition-all duration-300",
-              isRightHovered && "bg-muted-foreground/40 w-2"
-            )} />
-            <div className={cn(
-              "absolute right-4 top-4 p-1.5 rounded-md bg-background border border-border shadow-sm opacity-0 transition-opacity duration-200",
-              isRightHovered && "opacity-100"
             )}>
               <ChevronLeft className="w-4 h-4 text-muted-foreground" />
             </div>
@@ -178,24 +197,31 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             {children}
           </div>
         </main>
-        <RightSidebar />
-        <QuickCaptureFab hidden={hideQuickCapture} />
+        {mountHeavyPanels ? <TranscriptionPill /> : null}
 
         {/* Document Processing Indicator - shows when PDFs are being processed */}
-        <DocumentProcessingIndicator />
+        {mountHeavyPanels ? <DocumentProcessingIndicatorLazy /> : null}
       </div>
 
-      {/* Command Palette */}
-      <CommandPalette
-        open={isCommandPaletteOpen}
-        onOpenChange={setIsCommandPaletteOpen}
-      />
+      {/* Command Palette - lazy loaded */}
+      {isCommandPaletteOpen && (
+        <Suspense fallback={null}>
+          <CommandPalette
+            open={isCommandPaletteOpen}
+            onOpenChange={setIsCommandPaletteOpen}
+          />
+        </Suspense>
+      )}
 
-      {/* Keyboard Shortcuts Dialog */}
-      <KeyboardShortcutsDialog
-        open={isShortcutsOpen}
-        onOpenChange={setIsShortcutsOpen}
-      />
+      {/* Keyboard Shortcuts Dialog - lazy loaded */}
+      {isShortcutsOpen && (
+        <Suspense fallback={null}>
+          <KeyboardShortcutsDialog
+            open={isShortcutsOpen}
+            onOpenChange={setIsShortcutsOpen}
+          />
+        </Suspense>
+      )}
     </>
   );
 }

@@ -44,7 +44,6 @@ function SidebarCourseComponent({
   const router = useRouter();
   const [isDragOver, setIsDragOver] = useState(false);
 
-  // Fetch notes strictly for this course (not in a module)
   const courseNotes = useQuery(api.notes.getNotesByContext, {
     courseId: course.id,
   });
@@ -65,7 +64,6 @@ function SidebarCourseComponent({
     [addModule, course.id, isExpanded, onToggle],
   );
 
-  // Drop zone handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -125,24 +123,22 @@ function SidebarCourseComponent({
     onDelete(course.id);
   }, [onDelete, course.id]);
 
-  // Filter notes that don't belong to any module - memoized
   const rootCourseNotes = useMemo(
-    () => courseNotes?.filter((note) => !note.moduleId),
+    () =>
+      courseNotes?.filter((note) => !note.moduleId && !note.parentNoteId),
     [courseNotes],
   );
 
   return (
-    <div className={cn("space-y-0.5 relative group/item px-1", isCompact && "px-0")}>
+    <div className={cn("relative group/item", isCompact && "px-0")}>
       <div className="relative flex items-center group/course">
         <div
           className={cn(
-            "flex-1 flex items-center h-8 px-2 text-[13px] font-medium transition-all duration-200 gap-2 cursor-pointer rounded-lg",
+            "flex-1 flex items-center h-[30px] px-2 text-[13px] font-medium transition-colors gap-1.5 cursor-pointer rounded-md",
             isDragOver
-              ? "bg-indigo-500/20 text-indigo-300 ring-1 ring-indigo-500/30"
-              : isExpanded && !isCompact
-                ? "bg-zinc-800/50 text-sidebar-foreground"
-                : "text-muted-foreground hover:text-sidebar-foreground hover:bg-zinc-800/30",
-            isCompact && "w-10 h-10 justify-center px-0"
+              ? "bg-primary/10 text-primary ring-1 ring-primary/20"
+              : "text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/40",
+            isCompact && "w-9 h-9 justify-center px-0"
           )}
           onClick={handleCourseClick}
           onDragOver={handleDragOver}
@@ -150,54 +146,44 @@ function SidebarCourseComponent({
           onDrop={handleDrop}
           title={isCompact ? course.name : undefined}
         >
-          {/* Toggle Button */}
           {!isCompact && (
             <div
-              className={cn(
-                "p-0.5 rounded-md transition-colors",
-                isExpanded
-                  ? "text-indigo-400"
-                  : "text-zinc-500 hover:bg-zinc-700/50 hover:text-zinc-300",
-              )}
+              className="p-0.5 rounded-sm transition-colors text-muted-foreground/40 hover:text-muted-foreground/70"
               onClick={handleToggleClick}
             >
               {isExpanded ? (
-                <ChevronDown className="w-3.5 h-3.5" />
+                <ChevronDown className="w-3 h-3" />
               ) : (
-                <ChevronRight className="w-3.5 h-3.5" />
+                <ChevronRight className="w-3 h-3" />
               )}
             </div>
           )}
 
-          {/* Title Text or Icon */}
           {isCompact ? (
             <FolderOpen className={cn(
-              "w-4 h-4 transition-colors",
-              isExpanded ? "text-indigo-400" : "text-zinc-500"
+              "w-[15px] h-[15px] transition-colors",
+              isExpanded ? "text-sidebar-foreground/70" : "text-muted-foreground/40"
             )} />
           ) : (
-            <span className="truncate flex-1 tracking-tight">{course.code}</span>
+            <span className="truncate flex-1">{course.code}</span>
           )}
 
-          {/* Drop indicator */}
           {isDragOver && !isCompact && (
-            <span className="text-[10px] bg-indigo-500/30 px-1.5 py-0.5 rounded text-indigo-200 animate-pulse">
+            <span className="text-[9px] bg-primary/10 px-1 py-0.5 rounded text-primary/70 animate-pulse">
               Drop
             </span>
           )}
         </div>
 
-        {/* Action Menu */}
         {!isCompact && (
-          <div className="absolute right-2 opacity-0 group-hover/course:opacity-100 transition-opacity">
+          <div className="absolute right-1 opacity-0 group-hover/course:opacity-100 transition-opacity">
             <ActionMenu onRename={handleRename} onDelete={handleDelete} />
           </div>
         )}
       </div>
 
       {isExpanded && !isCompact && (
-        <div className="pl-3 space-y-0.5 ml-3 border-l border-white/5">
-          {/* MODULES */}
+        <div className="ml-[18px] pl-2.5 border-l border-sidebar-border/40 space-y-px mt-px">
           {course.modules?.map((mod: Module) => (
             <SidebarModule
               key={mod.id}
@@ -211,7 +197,6 @@ function SidebarCourseComponent({
             />
           ))}
 
-          {/* COURSE NOTES (ROOT) */}
           {rootCourseNotes?.map((note) => (
             <SidebarNote
               key={note._id}
@@ -223,19 +208,16 @@ function SidebarCourseComponent({
             />
           ))}
 
-          {/* ADD MODULE BUTTON */}
-          <Button
-            variant="ghost"
-            className="w-full justify-start h-7 px-2 text-[11px] text-zinc-600 hover:text-indigo-400 hover:bg-indigo-500/5 gap-2 transition-all rounded-md"
+          <button
+            className="w-full flex items-center h-[26px] px-2 text-[12px] text-muted-foreground/30 hover:text-muted-foreground/60 hover:bg-sidebar-accent/30 gap-1.5 transition-colors rounded-md"
             onClick={handleCreateModule}
           >
-            <Plus className="w-3 h-3" /> Add Module
-          </Button>
+            <Plus className="w-3 h-3" /> Add module
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-// Memoize to prevent unnecessary re-renders
 export const SidebarCourse = memo(SidebarCourseComponent);

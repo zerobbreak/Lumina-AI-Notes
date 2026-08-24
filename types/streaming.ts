@@ -70,6 +70,31 @@ export const CODE_LANGUAGES = [
 
 export type CodeLanguage = (typeof CODE_LANGUAGES)[number];
 
+/** UI labels for dropdowns (aligned with `CODE_LANGUAGES` order) */
+export const CODE_LANGUAGE_LABELS: Record<CodeLanguage, string> = {
+  javascript: "JavaScript",
+  typescript: "TypeScript",
+  python: "Python",
+  java: "Java",
+  c: "C",
+  cpp: "C++",
+  csharp: "C#",
+  go: "Go",
+  rust: "Rust",
+  sql: "SQL",
+  html: "HTML",
+  css: "CSS",
+  bash: "Bash / Shell",
+  ruby: "Ruby",
+  php: "PHP",
+  swift: "Swift",
+  kotlin: "Kotlin",
+  r: "R",
+  matlab: "MATLAB",
+  pseudocode: "Pseudocode",
+  other: "Other",
+};
+
 /** An extracted code block from a transcript */
 export interface CodeBlock {
   /** Unique identifier */

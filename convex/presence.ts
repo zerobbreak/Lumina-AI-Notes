@@ -114,8 +114,12 @@ export const leave = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return { success: false };
-    // Only users with access can write presence.
-    await requireNoteAccess(ctx, args.noteId);
+    const note = await ctx.db.get(args.noteId);
+    // If the note still exists, require access. If it was deleted, still remove
+    // this user's presence row (cleanup on unmount/navigation).
+    if (note) {
+      await requireNoteAccess(ctx, args.noteId);
+    }
 
     const userId = identity.tokenIdentifier;
 

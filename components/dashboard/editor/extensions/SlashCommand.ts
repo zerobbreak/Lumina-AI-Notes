@@ -1,5 +1,9 @@
-import { Extension } from "@tiptap/core";
+import { Extension, type Editor } from "@tiptap/core";
 import Suggestion from "@tiptap/suggestion";
+import {
+  filterSlashItems,
+  type SlashRegistryItem,
+} from "../slashCommandRegistry";
 
 export const SlashCommand = Extension.create({
   name: "slashCommand",
@@ -8,8 +12,18 @@ export const SlashCommand = Extension.create({
     return {
       suggestion: {
         char: "/",
-        command: ({ editor, range, props }: any) => {
-          props.command({ editor, range });
+        items: ({ query }: { query: string }) =>
+          filterSlashItems(query) as SlashRegistryItem[],
+        command: ({
+          editor,
+          range,
+          props,
+        }: {
+          editor: Editor;
+          range: { from: number; to: number };
+          props: SlashRegistryItem;
+        }) => {
+          props.run(editor, range);
         },
       },
     };

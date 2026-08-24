@@ -4,6 +4,7 @@ import { useLayoutEffect, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import { SlashCommandMenu } from "./SlashCommandMenu";
+import type { SlashRegistryItem } from "./slashCommandRegistry";
 
 type SlashCommandLayerProps = {
   editor: TiptapEditor;
@@ -55,6 +56,8 @@ export function SlashCommandLayer({ editor }: SlashCommandLayerProps) {
 
   if (!sc) return null;
 
+  const slashQuery = typeof sc.query === "string" ? sc.query : "";
+
   return (
     <div
       ref={layerRef}
@@ -67,7 +70,12 @@ export function SlashCommandLayer({ editor }: SlashCommandLayerProps) {
         exit={{ opacity: 0, y: -4 }}
         transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
       >
-        <SlashCommandMenu editor={editor} range={sc.range} />
+        <SlashCommandMenu
+          editor={editor}
+          range={sc.range}
+          query={slashQuery}
+          items={(sc.items as SlashRegistryItem[] | undefined) ?? []}
+        />
       </motion.div>
     </div>
   );

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import {
   Dialog,
   DialogContent,
@@ -44,6 +45,12 @@ interface CommandPaletteProps {
 
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const currentNoteId = searchParams.get("noteId");
+  const openNote = useQuery(
+    api.notes.getNote,
+    currentNoteId ? { noteId: currentNoteId as Id<"notes"> } : "skip",
+  );
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const debouncedQuery = useDebounce(query, 150);
@@ -81,15 +88,26 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     // Action commands
     cmds.push({
       id: "new-note",
-      title: "New Note",
-      subtitle: "Create a new quick note",
+      title: openNote ? "New Sub-page" : "New Note",
+      subtitle: openNote
+        ? "Create a page nested under the open note"
+        : "Create a new quick note",
       icon: Plus,
       category: "actions",
       action: async () => {
+        if (currentNoteId && openNote === undefined) return;
         try {
           const result = await createNoteFlow({
             title: "Untitled Note",
             major: userData?.major || "general",
+            ...(openNote
+              ? {
+                  parentNoteId: openNote._id,
+                  courseId: openNote.courseId,
+                  moduleId: openNote.moduleId,
+                  noteType: "page",
+                }
+              : {}),
           });
           if (result?.noteId) {
             router.push(`/dashboard?noteId=${result.noteId}`);
@@ -99,7 +117,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           console.error("Failed to create note:", error);
         }
       },
-      keywords: ["create", "new", "note"],
+      keywords: ["create", "new", "note", "subpage", "nested"],
     });
 
     // Navigation commands
@@ -218,7 +236,17 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     }
 
     return cmds;
-  }, [userData, quickNotes, recentNotes, files, router, createNoteFlow, onOpenChange]);
+  }, [
+    userData,
+    quickNotes,
+    recentNotes,
+    files,
+    router,
+    createNoteFlow,
+    onOpenChange,
+    currentNoteId,
+    openNote,
+  ]);
 
   // Filter commands based on query
   const filteredCommands = useMemo(() => {

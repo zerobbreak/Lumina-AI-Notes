@@ -1,0 +1,64 @@
+# Runs on GitHub's runners only — it does not run in users' browsers or block your live site.
+# Uses test + build (not eslint) so CI stays green while legacy lint issues are fixed;
+# run `npm run ci-check:strict` locally when you want lint included.
+#
+# Use the same env vars as Vercel: Settings → Environment Variables → copy into
+# Repository secrets (Settings → Secrets and variables → Actions).
+#
+# Recommended: protect `main` with "Require status checks to pass before merging"
+# and require this workflow's job, so broken code never merges and Vercel never
+# deploys a failing build from that path.
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: test-and-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test and production build
+        run: npm run ci-check
+        env:
+          # Convex and Clerk both validate their config at module scope, so the
+          # prerender step needs correctly *shaped* values even though nothing
+          # here ever connects. When a secret is unset it expands to "", which
+          # fails that validation — hence the placeholder fallbacks below.
+          # Set the real secrets to build against an actual deployment.
+          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL || 'https://placeholder.convex.cloud' }}
+          # base64("example.clerk.accounts.dev$") — the format Clerk parses.
+          # Publishable keys are public by design; this one points nowhere.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk' }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || 'sk_test_placeholder' }}
+          NEXT_PUBLIC_CLERK_SIGN_IN_URL: ${{ secrets.NEXT_PUBLIC_CLERK_SIGN_IN_URL || '/sign-in' }}
+          NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${{ secrets.NEXT_PUBLIC_CLERK_SIGN_UP_URL || '/sign-up' }}
+          NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: ${{ secrets.NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL || '/dashboard' }}
+          NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: ${{ secrets.NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL || '/dashboard' }}
+          NEXT_PUBLIC_PAYSTACK_SCHOLAR_PLAN_CODE: ${{ secrets.NEXT_PUBLIC_PAYSTACK_SCHOLAR_PLAN_CODE }}

@@ -4,7 +4,8 @@ import { action } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, TaskType } from "@google/generative-ai";
+import { embedTextForVectorSearch } from "./geminiEmbedding";
 import {
   TranscriptChunkInput,
   normalizeTranscriptForPrompt,
@@ -18,6 +19,10 @@ import {
 } from "./shared/noteQuality";
 import { buildDiagramData } from "./shared/diagram";
 import { arrayBufferToBase64 } from "./encoding";
+import {
+  fetchReferenceUrlsForPrompt,
+  normalizeReferenceUrlList,
+} from "./shared/urlContent";
 
 // Types for subscription tier checking
 type SubscriptionTier = "free" | "scholar" | "institution";
@@ -65,6 +70,9 @@ const getGeminiModel = (config?: { responseMimeType: string }) => {
     generationConfig: config,
   });
 };
+
+/** Cap inline “previous notes” passed to Gemini (per request). */
+const MAX_PREVIOUS_NOTES_CHARS = 100_000;
 
 /**
  * Enrich a sparse or fragmented transcript by using AI to reconstruct
@@ -202,10 +210,16 @@ export const generateNotesStreamingText = action({
     transcript: v.string(),
     title: v.optional(v.string()),
     codeBlocks: v.optional(v.string()),
+    previousNotesContent: v.optional(v.string()),
+    /** Public http(s) pages to fetch and use as extra context (max 5). */
+    referenceUrls: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const model = getGeminiModel();
     const normalizedTranscript = normalizeTranscriptForPrompt(args.transcript);
+    const referenceUrlsBlock = await fetchReferenceUrlsForPrompt(
+      normalizeReferenceUrlList(args.referenceUrls),
+    );
 
     // Build enriched transcript with code blocks if provided
     let enrichedTranscript = normalizedTranscript;
@@ -240,12 +254,34 @@ export const generateNotesStreamingText = action({
       ? `\n6. **Code Examples** - Explain each extracted code block: what it does, key patterns used, and how it connects to the lecture concepts. Use proper markdown code fences.`
       : "";
 
+    const prevStream = args.previousNotesContent?.trim();
+    const revisionStream = prevStream
+      ? `
+
+REVISION MODE: The student already has notes from this session. Use the transcript as the source of truth. Improve the previous notes: add missing ideas from the transcript, correct errors, deepen thin sections, and reorganize if needed. Output a **full** polished markdown document (not a changelog).
+
+Previous notes:
+"""
+${prevStream.slice(0, MAX_PREVIOUS_NOTES_CHARS)}
+"""
+`
+      : "";
+
+    const linkContextStream = referenceUrlsBlock.trim()
+      ? `
+
+=== Reference web pages (supplementary — enrich definitions and examples; the transcript remains primary) ===
+${referenceUrlsBlock}
+`
+      : "";
+
     const prompt = `You are an expert academic note-taker. Convert the following lecture/recording transcript into well-structured, comprehensive study notes.${titleContext}
 
 Transcript:
 """
 ${enrichedTranscript}
 """
+${linkContextStream}${revisionStream}
 
 Create detailed study notes with the following sections:
 1. **Summary** - A concise overview (3-4 sentences capturing the key message)
@@ -258,8 +294,10 @@ Requirements:
 - Use clear markdown formatting with headers, bullet points, and bold/italic emphasis
 - Be thorough — expand on concepts, don't just list keywords
 - Include specific examples, numbers, and quotes from the transcript when available
+- When reference web pages are provided above, weave in accurate details from them where they align with the lecture; do not invent facts not supported by the transcript or references
 - Make notes self-contained: a student should understand the material from these notes alone
 - Use LaTeX notation ($$...$$) for any mathematical formulas mentioned
+- For any multi-line code, pseudocode, or file excerpts, use fenced markdown blocks (\`\`\`language ... \`\`\`) so they render as full code blocks, not inline backticks
 
 Format the output as clean, well-organized markdown suitable for studying.`;
 
@@ -527,10 +565,17 @@ export const generateStructuredNotes = action({
     transcript: v.string(), // JSON stringified array of {text, timestamp}
     title: v.optional(v.string()),
     style: v.optional(v.string()), // "outline" | "standard"
+    /** When set, revise and improve these notes using the transcript as source of truth */
+    previousNotesContent: v.optional(v.string()),
+    /** Public http(s) pages to fetch and use as extra context (max 5). */
+    referenceUrls: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const model = getGeminiModel({ responseMimeType: "application/json" });
     const normalizedTranscript = normalizeTranscriptForPrompt(args.transcript);
+    const referenceUrlsBlock = await fetchReferenceUrlsForPrompt(
+      normalizeReferenceUrlList(args.referenceUrls),
+    );
 
     const fixJson = async (text: string) => {
       const fixPrompt = `Fix the following JSON. Return ONLY valid JSON with the same structure and content, no markdown.
@@ -543,12 +588,16 @@ ${text}`;
 
     const maybeRepairQuality = async (draft: unknown) => {
       const draftText = JSON.stringify(draft);
+      const webRef =
+        referenceUrlsBlock.trim().length > 0
+          ? `\n\nSupplementary web pages (use for depth where relevant):\n${referenceUrlsBlock}\n`
+          : "";
       const repairPrompt = `You are a quality assurance specialist improving generated lecture notes. The current notes are too shallow and lack substantive content.
 
 Original transcript:
 """
 ${enrichedTranscript}
-"""
+"""${webRef}
 
 Current JSON (needs improvement):
 ${draftText}
@@ -578,6 +627,7 @@ STRICT quality requirements:
 - NEVER use generic filler phrases like "this is important", "key concept", "students should understand"
 - Every sentence must add NEW information — no repetition or padding
 - Use your expertise to add academic depth where the transcript was brief
+- When supplementary web pages are supplied, incorporate accurate details from them where they support the lecture; do not fabricate unsupported claims
 - Return ONLY valid JSON`;
 
       const repairedResult = await model.generateContent(repairPrompt);
@@ -596,6 +646,29 @@ STRICT quality requirements:
       args.title,
     );
 
+    const previousTrimmed = args.previousNotesContent?.trim();
+    const revisionBlock = previousTrimmed
+      ? `
+
+REVISION MODE — The student already has study notes from this same recording session. The transcript is the source of truth.
+
+Previous notes (starting point — keep accurate structure and phrasing where still correct; expand thin sections; fix contradictions; reorganize if it helps clarity):
+"""
+${previousTrimmed.slice(0, MAX_PREVIOUS_NOTES_CHARS)}
+"""
+
+Produce a **complete** replacement in the required JSON format. Do not mention "previous notes" or this instruction in the output — only polished final study material.
+`
+      : "";
+
+    const linkContextBlock = referenceUrlsBlock.trim()
+      ? `
+
+=== Reference web pages (supplementary — enrich definitions and examples; the transcript remains primary) ===
+${referenceUrlsBlock}
+`
+      : "";
+
     let prompt = `You are a world-class academic note-taker and subject matter expert with deep knowledge across all university-level disciplines. You have years of experience transforming lecture recordings into comprehensive, exam-ready study materials that students rely on as their PRIMARY study resource.
 
 Your goal: Create notes so thorough and detailed that a student who MISSED the lecture could study ONLY from your notes and still perform excellently on an exam.
@@ -604,7 +677,7 @@ Transcript:
 """
 ${enrichedTranscript}
 """
-
+${linkContextBlock}${revisionBlock}
 ${args.title ? `Lecture Title/Topic: "${args.title}"` : ""}
 
 CRITICAL CONTEXT: This transcript was captured via voice recording and may be fragmented or incomplete. You MUST use your subject matter expertise to:
@@ -1034,7 +1107,6 @@ export const generateEmbedding = action({
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
 
     // Strip HTML tags and limit text length
     const plainText = args.text
@@ -1048,8 +1120,11 @@ export const generateEmbedding = action({
     }
 
     try {
-      const result = await model.embedContent(plainText);
-      return result.embedding.values;
+      return await embedTextForVectorSearch(
+        genAI,
+        plainText,
+        TaskType.RETRIEVAL_DOCUMENT,
+      );
     } catch (error) {
       console.error("generateEmbedding error:", error);
       return null;
@@ -1079,13 +1154,15 @@ export const semanticSearch = action({
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const embeddingModel = genAI.getGenerativeModel({
-      model: "embedding-001",
-    });
 
-    // Generate query embedding
-    const queryResult = await embeddingModel.embedContent(args.query);
-    const queryEmbedding = queryResult.embedding.values;
+    const queryEmbedding = await embedTextForVectorSearch(
+      genAI,
+      args.query,
+      TaskType.RETRIEVAL_QUERY,
+    );
+    if (!queryEmbedding) {
+      return { answer: "", sources: [] };
+    }
 
     // Search using vector index
     const limit = args.limit || 5;
@@ -1217,7 +1294,7 @@ export const transcribeAudio = action({
   },
   handler: async (ctx, args) => {
     const startMs = Date.now();
-    console.log(
+    if (process.env.NODE_ENV === "development") console.log(
       `[transcribeAudio] Start: storageId=${args.storageId}, mimeType=${args.mimeType}`,
     );
     const apiKey = process.env.GEMINI_API_KEY;
@@ -1236,7 +1313,7 @@ export const transcribeAudio = action({
       const fetchStartMs = Date.now();
       // Fetch the audio file from Convex storage
       const audioBlob = await ctx.storage.get(args.storageId);
-      console.log(
+      if (process.env.NODE_ENV === "development") console.log(
         `[transcribeAudio] Storage fetch time: ${Date.now() - fetchStartMs}ms`,
       );
       if (!audioBlob) {
@@ -1263,7 +1340,7 @@ export const transcribeAudio = action({
         };
       }
 
-      console.log(
+      if (process.env.NODE_ENV === "development") console.log(
         `[transcribeAudio] Processing audio: ${(audioBlob.size / 1024).toFixed(1)}KB, mimeType: ${args.mimeType}`,
       );
 
@@ -1272,7 +1349,7 @@ export const transcribeAudio = action({
       const encodeStartMs = Date.now();
       const arrayBuffer = await audioBlob.arrayBuffer();
       const audioBase64 = arrayBufferToBase64(arrayBuffer);
-      console.log(
+      if (process.env.NODE_ENV === "development") console.log(
         `[transcribeAudio] Base64 encode time: ${Date.now() - encodeStartMs}ms, base64Bytes=${audioBase64.length}`,
       );
 
@@ -1296,7 +1373,7 @@ export const transcribeAudio = action({
       };
 
       const generateTranscription = async (modelName: string) => {
-        console.log(
+        if (process.env.NODE_ENV === "development") console.log(
           `[transcribeAudio] Attempting transcription with model: ${modelName}`,
         );
         const model = genAI.getGenerativeModel({ model: modelName });
@@ -1320,7 +1397,7 @@ Focus on accuracy above all else.`,
           ]),
           90000, // 90 seconds
         );
-        console.log(
+        if (process.env.NODE_ENV === "development") console.log(
           `[transcribeAudio] AI call time: ${Date.now() - apiStartMs}ms`,
         );
         return result.response.text().trim();
@@ -1333,7 +1410,7 @@ Focus on accuracy above all else.`,
       // Retry with exponential backoff for transient errors
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          console.log(
+          if (process.env.NODE_ENV === "development") console.log(
             `[transcribeAudio] Attempt ${attempt}/${maxRetries} with gemini-2.5-flash`,
           );
           responseText = await generateTranscription("gemini-2.5-flash");
@@ -1349,7 +1426,7 @@ Focus on accuracy above all else.`,
           if (attempt < maxRetries) {
             // Exponential backoff: 1s, 2s, 4s
             const delay = Math.pow(2, attempt - 1) * 1000;
-            console.log(`[transcribeAudio] Waiting ${delay}ms before retry...`);
+            if (process.env.NODE_ENV === "development") console.log(`[transcribeAudio] Waiting ${delay}ms before retry...`);
             await new Promise((resolve) => setTimeout(resolve, delay));
           }
         }
@@ -1360,10 +1437,10 @@ Focus on accuracy above all else.`,
         throw lastError;
       }
 
-      console.log(
+      if (process.env.NODE_ENV === "development") console.log(
         `[transcribeAudio] Success! Got ${responseText.length} characters of transcription`,
       );
-      console.log(
+      if (process.env.NODE_ENV === "development") console.log(
         `[transcribeAudio] Total action time: ${Date.now() - startMs}ms`,
       );
 
@@ -1372,7 +1449,7 @@ Focus on accuracy above all else.`,
       let structureResult: LectureStructureResult = { segments: [] };
 
       try {
-        console.log("[transcribeAudio] Transcript obtained, now cleaning...");
+        if (process.env.NODE_ENV === "development") console.log("[transcribeAudio] Transcript obtained, now cleaning...");
         const cleanupResult = await ctx.runAction(
           api.ai.cleanLectureTranscript,
           {
@@ -1384,7 +1461,7 @@ Focus on accuracy above all else.`,
           cleanupResult.cleanedTranscript || cleanedTranscript;
         cleanupMetadata = cleanupResult.metadata || cleanupMetadata;
 
-        console.log(
+        if (process.env.NODE_ENV === "development") console.log(
           `[transcribeAudio] Cleaned transcript: removed ${cleanupMetadata.fillerWordsRemoved} filler words, marked ${cleanupMetadata.repetitionsMarked} repetitions, converted ${cleanupMetadata.mathExpressionsConverted} math expressions`,
         );
 
@@ -1399,7 +1476,7 @@ Focus on accuracy above all else.`,
             ? detectedStructure
             : structureResult;
 
-        console.log(
+        if (process.env.NODE_ENV === "development") console.log(
           `[transcribeAudio] Detected ${structureResult.segments?.length || 0} lecture segments`,
         );
       } catch (cleanupError) {
@@ -2072,16 +2149,16 @@ Return ONLY valid JSON, no markdown code fences or explanation.`,
         throw new Error("No text could be extracted from PDF");
       }
 
-      // Generate embedding using existing genAI instance
-      const embeddingModel = genAI.getGenerativeModel({
-        model: "embedding-001",
-      });
-
       // Combine summary and beginning of text for embedding
       const textForEmbedding = `${summary}\n\n${extractedText.substring(0, 5000)}`;
-      const embeddingResult =
-        await embeddingModel.embedContent(textForEmbedding);
-      const embedding = embeddingResult.embedding.values;
+      const embedding = await embedTextForVectorSearch(
+        genAI,
+        textForEmbedding,
+        TaskType.RETRIEVAL_DOCUMENT,
+      );
+      if (!embedding) {
+        throw new Error("Failed to generate document embedding");
+      }
 
       await ctx.runMutation(internal.files.updateProcessingStatus, {
         fileId: args.fileId,
@@ -2154,13 +2231,19 @@ export const unifiedSemanticSearch = action({
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const embeddingModel = genAI.getGenerativeModel({
-      model: "embedding-001",
-    });
 
-    // Generate query embedding
-    const queryResult = await embeddingModel.embedContent(args.query);
-    const queryEmbedding = queryResult.embedding.values;
+    const queryEmbedding = await embedTextForVectorSearch(
+      genAI,
+      args.query,
+      TaskType.RETRIEVAL_QUERY,
+    );
+    if (!queryEmbedding) {
+      return {
+        answer:
+          "I couldn't process your search query. Try rephrasing with more specific terms.",
+        sources: [],
+      };
+    }
 
     const limit = args.limit || 5;
 

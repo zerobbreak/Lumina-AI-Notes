@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Sparkles } from "lucide-react";
 import { AIAssistantPanel } from "./AIAssistantPanel";
-import { useDashboard } from "@/hooks/useDashboard";
 
 interface AskAIProps {
   context?: string;
@@ -19,20 +18,14 @@ export function AskAI({
   onInsertToNote,
 }: AskAIProps) {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const { isRightSidebarOpen, rightSidebarState } = useDashboard();
-
-  const fabRightClass =
-    !isRightSidebarOpen
-      ? "right-6"
-      : rightSidebarState === "compact"
-        ? "right-[88px]"
-        : "right-[340px]";
 
   return (
     <>
-      {/* Floating AI Widget Container */}
+      {/* Floating AI Widget Container.
+          Capture/transcription now lives in the centred pill rather than a
+          right panel, so this no longer offsets for a sidebar width. */}
       <div
-        className={`fixed bottom-6 z-40 flex flex-col items-end gap-4 transition-all duration-300 ease-in-out ${fabRightClass}`}
+        className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-4 transition-all duration-300 ease-in-out"
       >
         <AIAssistantPanel
           isOpen={isPanelOpen}

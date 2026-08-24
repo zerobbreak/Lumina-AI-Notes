@@ -33,6 +33,7 @@ import {
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -268,9 +269,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 <>
                   <div className="p-6 rounded-2xl bg-[#0F0F11] border border-white/5 flex items-center gap-6">
                     <div className="relative group cursor-pointer">
-                      <img
+                      <Image
                         src={user?.imageUrl || "https://github.com/shadcn.png"}
                         alt="Profile"
+                        width={96}
+                        height={96}
                         className="w-24 h-24 rounded-full object-cover border-4 border-[#0F0F11] shadow-xl"
                       />
                       <label

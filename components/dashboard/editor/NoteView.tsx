@@ -12,19 +12,12 @@ import {
   FileText,
   Calendar,
   User,
-  Bold,
-  Italic,
-  Strikethrough,
-  List,
-  Image as ImageIcon,
   Loader2,
   Download,
   Clock,
   Type,
-  Calculator,
-  BarChart3,
-  Sigma,
   Pin,
+  Plus,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -34,6 +27,8 @@ import {
 } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
+import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
+import { editorLowlight } from "@/lib/editorLowlight";
 import { DiagramExtension } from "./extensions/DiagramExtension";
 import Editor from "./Editor";
 import { Button } from "@/components/ui/button";
@@ -46,6 +41,7 @@ import { AskAI } from "@/components/dashboard/ai/AskAI";
 import { useDashboard } from "@/hooks/useDashboard";
 import { usePDF } from "@/hooks/usePDF";
 import { AIBubbleMenu } from "./AIBubbleMenu";
+import { CodeBlockLanguageBubbleMenu } from "./CodeBlockLanguageBubbleMenu";
 import { DocumentDropZone } from "@/components/documents";
 import { marked } from "marked";
 import {
@@ -66,8 +62,8 @@ import { SlashCommandLayer } from "./SlashCommandLayer";
 import { PresenceIndicator } from "@/components/dashboard/PresenceIndicator";
 import { CollaboratorsDialog } from "@/components/dashboard/dialogs/CollaboratorsDialog";
 import { TagPicker } from "@/components/dashboard/tags/TagPicker";
-import { TemplateConversionModal } from "@/components/dashboard/templates/TemplateConversionModal";
-import type { NoteContentSnapshot } from "@/lib/templates/conversion";
+import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
+
 import { toast } from "sonner";
 import "./editor.css";
 
@@ -88,8 +84,9 @@ function buildBootstrapDoc(
     style: b.style ?? "standard",
     courseId: b.courseId,
     moduleId: b.moduleId,
+    parentNoteId: b.parentNoteId,
     createdAt: Date.now(),
-    noteType: "quick",
+    noteType: b.parentNoteId || b.courseId || b.moduleId ? "page" : "quick",
   } as Doc<"notes">;
 }
 
@@ -103,6 +100,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const router = useRouter();
   const {
     pendingNotes,
+    pendingNotesTargetNoteId,
     clearPendingNotes,
     noteBootstrap,
     setNoteBootstrap,
@@ -111,7 +109,13 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
   // Fetch data
   const noteQuery = useQuery(api.notes.getNote, { noteId });
+  const parentNote = useQuery(
+    api.notes.getNote,
+    noteQuery?.parentNoteId ? { noteId: noteQuery.parentNoteId } : "skip",
+  );
+  const childNotes = useQuery(api.notes.getChildNotes, { parentNoteId: noteId });
   const userData = useQuery(api.users.getUser);
+  const { createNoteFlow } = useCreateNoteFlow();
   const updateNote = useMutation(api.notes.updateNote);
   const deleteNote = useMutation(api.notes.deleteNote);
   const toggleArchiveNote = useMutation(api.notes.toggleArchiveNote);
@@ -133,7 +137,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
   const [isCollaboratorsOpen, setIsCollaboratorsOpen] = useState(false);
-  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+
   const [slashUiTick, setSlashUiTick] = useState(0);
   const bumpSlashUi = useCallback(() => {
     setSlashUiTick((n) => n + 1);
@@ -149,6 +153,19 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     if (noteQuery !== undefined) return noteQuery;
     return syntheticNote ?? undefined;
   }, [noteQuery, syntheticNote]);
+
+  // Deleted note or lost access: leave editor (presence leave would fail without server fix too).
+  useEffect(() => {
+    if (userData === undefined || userData === null) return;
+    if (noteQuery === undefined) return;
+    if (noteQuery !== null) return;
+    if (syntheticNote) return;
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      onBack();
+    }
+  }, [userData, noteQuery, syntheticNote, router, onBack]);
 
   // Parse context (Course / Module)
   const courseName = useMemo(() => {
@@ -280,7 +297,14 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     editable: true,
     immediatelyRender: false,
     extensions: [
-      StarterKit,
+      StarterKit.configure({ codeBlock: false }),
+      CodeBlockLowlight.configure({
+        lowlight: editorLowlight,
+        defaultLanguage: "javascript",
+        HTMLAttributes: {
+          class: "lumina-code-block",
+        },
+      }),
       Placeholder.configure({
         placeholder: "Start writing your notes...",
       }),
@@ -297,7 +321,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     ],
     editorProps: {
       attributes: {
-        class: "prose prose-invert max-w-none focus:outline-none min-h-[500px]",
+        class: "prose dark:prose-invert max-w-none focus:outline-none min-h-[500px]",
       },
     },
     onUpdate: ({ editor }) => {
@@ -310,12 +334,9 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const [loadedNoteId, setLoadedNoteId] = useState<Id<"notes"> | null>(null);
   // Use ref to track current noteId without causing dependency array issues
   const noteIdRef = useRef(noteId);
-  useEffect(() => {
-    noteIdRef.current = noteId;
-  }, [noteId]);
 
   useEffect(() => {
-    setLoadedNoteId(null);
+    noteIdRef.current = noteId;
   }, [noteId]);
 
   const scheduleEditorUpdate = useCallback((fn: () => void) => {
@@ -325,6 +346,13 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       });
     });
   }, []);
+
+  /** Recording flow: user chose Insert Notes and we are opening the note / injecting AI content */
+  const isAwaitingRecordingNotes = Boolean(
+    pendingNotes && pendingNotesTargetNoteId === noteId,
+  );
+  const recordingNotesOverlayLabel =
+    loadedNoteId === noteId ? "Adding your notes…" : "Opening your note…";
 
   // Helper function to detect if content is markdown and convert to HTML
   const convertMarkdownIfNeeded = async (content: string): Promise<string> => {
@@ -350,166 +378,168 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     return content;
   };
 
+  /** Convert AI/transcript markdown to HTML for TipTap insertContent (same as DocumentDropZone). */
+  const markdownToHtml = useCallback(async (md: string): Promise<string> => {
+    const trimmed = md.trim();
+    if (!trimmed) return "";
+    const result = await marked.parse(trimmed);
+    return typeof result === "string" ? result : String(result);
+  }, []);
+
   // Sync content when note loads OR when noteId changes (switching between notes)
   useEffect(() => {
     const loadContent = async () => {
-      if (noteQuery && editor && !editor.isDestroyed) {
-        // Only load content if we haven't loaded for this noteId yet
-        if (noteId !== loadedNoteId) {
-          const htmlContent = await convertMarkdownIfNeeded(
-            noteQuery.content || "",
-          );
-          const raw = noteQuery.content || "";
-          const serverEmpty =
-            !raw.trim() ||
-            raw === "<p></p>" ||
-            raw === "<p><br></p>";
-          scheduleEditorUpdate(() => {
-            if (editor && !editor.isDestroyed) {
-              if (serverEmpty && editor.getText().trim().length > 0) {
-                const html = editor.getHTML();
-                const plainText = html
-                  .replace(/<[^>]*>/g, " ")
-                  .replace(/\s+/g, " ")
-                  .trim();
-                const count =
-                  plainText.length > 0
-                    ? plainText.split(/\s+/).filter((w) => w.length > 0).length
-                    : 0;
-                setLoadedNoteId(noteId);
-                updateNote({ noteId, content: html, wordCount: count }).catch(
-                  () => {},
-                );
-                return;
-              }
-              editor.commands.setContent(htmlContent);
-              setLoadedNoteId(noteId);
-            }
-          });
+      if (!editor || editor.isDestroyed) return;
+      if (noteId === loadedNoteId) return;
+
+      const contentSource = noteQuery ?? syntheticNote;
+      if (!contentSource) return;
+
+      const htmlContent = await convertMarkdownIfNeeded(contentSource.content || "");
+      scheduleEditorUpdate(() => {
+        if (editor && !editor.isDestroyed) {
+          editor.commands.setContent(htmlContent);
+          setLoadedNoteId(noteId);
         }
-      }
+      });
     };
     loadContent();
   }, [
     noteQuery,
+    syntheticNote,
     noteId,
     editor,
     loadedNoteId,
     scheduleEditorUpdate,
-    updateNote,
   ]);
 
-  // Inject structured notes from RightSidebar when pendingNotes changes
+  // Inject structured notes from the transcription pill when pendingNotes changes
   // Wait for note to be loaded (loadedNoteId === noteId) to avoid conflicts
   useEffect(() => {
     if (!pendingNotes) return;
+    if (pendingNotesTargetNoteId !== noteId) return;
     // Wait for the note content to be loaded first (important for new notes)
     if (loadedNoteId !== noteIdRef.current) return;
 
     // Build HTML content from structured notes with sections
     if (!editor || editor.isDestroyed) return;
 
-    let html = "";
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-    // Summary
-    if (pendingNotes.summary) {
-      html += `<h2>Summary</h2>`;
-      html += `<blockquote>${pendingNotes.summary}</blockquote>`;
-    }
+    const run = async () => {
+      let html = "";
 
-    // Sections (Notion-like format)
-    if (pendingNotes.sections && pendingNotes.sections.length > 0) {
-      pendingNotes.sections.forEach((section) => {
-        switch (section.type) {
-          case "heading":
-            const level = section.level || 2;
-            html += `<h${level}>${section.content}</h${level}>`;
-            break;
-          case "paragraph":
-            html += `<p>${section.content}</p>`;
-            break;
-          case "bullets":
-            html += `<ul>`;
-            section.content.split("\n").forEach((item) => {
-              const cleaned = item.replace(/^[•\u2022\-–]\s*/, "").trim();
-              if (cleaned) html += `<li>${cleaned}</li>`;
-            });
-            html += `</ul>`;
-            break;
-          case "numbered":
-            html += `<ol>`;
-            section.content.split("\n").forEach((item) => {
-              const cleaned = item.replace(/^\d+\.\s*/, "").trim();
-              if (cleaned) html += `<li>${cleaned}</li>`;
-            });
-            html += `</ol>`;
-            break;
-          case "quote":
-            html += `<blockquote>${section.content}</blockquote>`;
-            break;
-          case "divider":
-            html += `<hr/>`;
-            break;
-          default:
-            html += `<p>${section.content}</p>`;
-        }
-      });
-    }
+      // Summary: backend streaming returns markdown; must parse to HTML — raw markdown
+      // inside <blockquote> was shown as literal # and ** (TipTap does not parse MD in HTML text nodes).
+      if (pendingNotes.summary) {
+        html += `<h2>Summary</h2>`;
+        html += await markdownToHtml(pendingNotes.summary);
+      }
 
-    // Action Items
-    if (pendingNotes.actionItems.length > 0) {
-      html += `<h2>Action Items</h2>`;
-      html += `<ul>`;
-      pendingNotes.actionItems.forEach((item) => {
-        html += `<li>${item}</li>`;
-      });
-      html += `</ul>`;
-    }
-
-    // Review Questions
-    if (pendingNotes.reviewQuestions.length > 0) {
-      html += `<h2>Review Questions</h2>`;
-      html += `<ul>`;
-      pendingNotes.reviewQuestions.forEach((q) => {
-        const cleaned = q.replace(/^[•\u2022\-–]\s+/, "");
-        html += `<li>${cleaned}</li>`;
-      });
-      html += `</ul>`;
-    }
-
-    // Interactive Mind Map (ReactFlow)
-    if (
-      pendingNotes.diagramData &&
-      pendingNotes.diagramData.nodes &&
-      pendingNotes.diagramData.nodes.length > 0
-    ) {
-      html += `<h2>Mind Map</h2>`;
-      html += `<div data-type="diagram" data-nodes='${JSON.stringify(pendingNotes.diagramData.nodes)}' data-edges='${JSON.stringify(pendingNotes.diagramData.edges || [])}'></div>`;
-    }
-
-    // Insert at current cursor position (or end if no selection)
-    const timeoutId = setTimeout(() => {
-      scheduleEditorUpdate(() => {
-        if (editor && !editor.isDestroyed && editor.view) {
-          try {
-            editor.chain().focus().insertContent(html).run();
-            clearPendingNotes();
-          } catch (error) {
-            console.error("Failed to insert pending notes:", error);
-            clearPendingNotes();
+      // Sections (Notion-like format)
+      if (pendingNotes.sections && pendingNotes.sections.length > 0) {
+        for (const section of pendingNotes.sections) {
+          switch (section.type) {
+            case "heading": {
+              const level = section.level || 2;
+              html += `<h${level}>${section.content}</h${level}>`;
+              break;
+            }
+            case "paragraph":
+              html += `<p>${section.content}</p>`;
+              break;
+            case "bullets":
+              html += `<ul>`;
+              section.content.split("\n").forEach((item) => {
+                const cleaned = item.replace(/^[•\u2022\-–]\s*/, "").trim();
+                if (cleaned) html += `<li>${cleaned}</li>`;
+              });
+              html += `</ul>`;
+              break;
+            case "numbered":
+              html += `<ol>`;
+              section.content.split("\n").forEach((item) => {
+                const cleaned = item.replace(/^\d+\.\s*/, "").trim();
+                if (cleaned) html += `<li>${cleaned}</li>`;
+              });
+              html += `</ol>`;
+              break;
+            case "quote":
+              html += await markdownToHtml(section.content);
+              break;
+            case "divider":
+              html += `<hr/>`;
+              break;
+            default:
+              html += `<p>${section.content}</p>`;
           }
         }
-      });
-    }, 200);
+      }
 
-    return () => clearTimeout(timeoutId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      // Action Items
+      if (pendingNotes.actionItems.length > 0) {
+        html += `<h2>Action Items</h2>`;
+        html += `<ul>`;
+        pendingNotes.actionItems.forEach((item) => {
+          html += `<li>${item}</li>`;
+        });
+        html += `</ul>`;
+      }
+
+      // Review Questions
+      if (pendingNotes.reviewQuestions.length > 0) {
+        html += `<h2>Review Questions</h2>`;
+        html += `<ul>`;
+        pendingNotes.reviewQuestions.forEach((q) => {
+          const cleaned = q.replace(/^[•\u2022\-–]\s+/, "");
+          html += `<li>${cleaned}</li>`;
+        });
+        html += `</ul>`;
+      }
+
+      // Interactive Mind Map (ReactFlow)
+      if (
+        pendingNotes.diagramData &&
+        pendingNotes.diagramData.nodes &&
+        pendingNotes.diagramData.nodes.length > 0
+      ) {
+        html += `<h2>Mind Map</h2>`;
+        html += `<div data-type="diagram" data-nodes='${JSON.stringify(pendingNotes.diagramData.nodes)}' data-edges='${JSON.stringify(pendingNotes.diagramData.edges || [])}'></div>`;
+      }
+
+      if (cancelled) return;
+
+      timeoutId = setTimeout(() => {
+        scheduleEditorUpdate(() => {
+          if (editor && !editor.isDestroyed && editor.view) {
+            try {
+              editor.chain().focus().insertContent(html).run();
+              clearPendingNotes();
+            } catch (error) {
+              console.error("Failed to insert pending notes:", error);
+              clearPendingNotes();
+            }
+          }
+        });
+      }, 200);
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    };
   }, [
     pendingNotes,
+    pendingNotesTargetNoteId,
+    noteId,
     editor,
     clearPendingNotes,
     loadedNoteId,
     scheduleEditorUpdate,
+    markdownToHtml,
   ]);
 
   // --- Handlers ---
@@ -521,12 +551,14 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     // Store context before deletion for smart navigation
     const courseId = displayNote?.courseId;
     const moduleId = displayNote?.moduleId;
+    const parentId = displayNote?.parentNoteId;
 
     try {
       await deleteNote({ noteId });
 
-      // Navigate based on original context
-      if (moduleId) {
+      if (parentId) {
+        router.push(`/dashboard?noteId=${parentId}`);
+      } else if (moduleId) {
         router.push(`/dashboard?contextId=${moduleId}&contextType=module`);
       } else if (courseId) {
         router.push(`/dashboard?contextId=${courseId}&contextType=course`);
@@ -547,62 +579,70 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     await renameNote({ noteId, title: newTitle });
   };
 
+  const handleCreateSubPage = useCallback(async () => {
+    if (!displayNote) return;
+    try {
+      const result = await createNoteFlow({
+        title: "Untitled Note",
+        major: userData?.major || "general",
+        parentNoteId: noteId,
+        courseId: displayNote.courseId,
+        moduleId: displayNote.moduleId,
+        noteType: "page",
+      });
+      if (result?.noteId) {
+        router.push(`/dashboard?noteId=${result.noteId}`);
+        toast.success("Sub-page created");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to create sub-page");
+    }
+  }, [
+    createNoteFlow,
+    userData?.major,
+    noteId,
+    displayNote,
+    router,
+  ]);
+
   const handleExportPDF = () => {
     setIsExportOpen(true);
   };
 
-  const buildSnapshot = (): NoteContentSnapshot => ({
-    style: (displayNote?.style as any) || "standard",
-    content: displayNote?.content || "",
-    outlineData: displayNote?.outlineData || "",
-  });
 
-  // Handle inserting AI-generated content into the note
+
+  // Handle inserting AI-generated content into the note (full markdown: fenced code blocks, lists, etc.)
   const handleInsertFromAI = useCallback(
     (content: string) => {
       if (!editor || editor.isDestroyed) return;
 
-      // Convert markdown to HTML for the editor
-      // Simple conversion for common markdown patterns
-      let htmlContent = content
-        .replace(/^### (.*$)/gim, "<h3>$1</h3>")
-        .replace(/^## (.*$)/gim, "<h2>$1</h2>")
-        .replace(/^# (.*$)/gim, "<h1>$1</h1>")
-        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-        .replace(/\*(.*?)\*/g, "<em>$1</em>")
-        .replace(/^\- (.*$)/gim, "<li>$1</li>")
-        .replace(/^\* (.*$)/gim, "<li>$1</li>")
-        .replace(/\n/g, "<br>");
-
-      // Wrap consecutive <li> elements in <ul>
-      htmlContent = htmlContent.replace(/(<li>.*?<\/li>(<br>)?)+/g, (match) => {
-        const items = match.replace(/<br>/g, "");
-        return `<ul>${items}</ul>`;
-      });
-
-      // Insert at the end of the document with a separator
-      editor
-        .chain()
-        .focus("end")
-        .insertContent("<hr><p></p>")
-        .insertContent(htmlContent)
-        .insertContent("<p></p>")
-        .run();
+      void (async () => {
+        const htmlContent = await markdownToHtml(content);
+        if (!editor || editor.isDestroyed) return;
+        editor
+          .chain()
+          .focus("end")
+          .insertContent("<hr><p></p>")
+          .insertContent(htmlContent)
+          .insertContent("<p></p>")
+          .run();
+      })();
     },
-    [editor],
+    [editor, markdownToHtml],
   );
 
   // --- Deleting State ---
   if (isDeleting) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-[#0A0A0A]/50 backdrop-blur-sm z-50">
-        <div className="bg-[#111] border border-white/5 p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-300">
+      <div className="h-full flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm z-50">
+        <div className="bg-card border border-border p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-300">
           <div className="p-3 bg-red-500/10 rounded-full">
             <Loader2 className="w-8 h-8 animate-spin text-red-500" />
           </div>
           <div className="text-center">
-            <h3 className="text-white font-medium mb-1">Deleting Note</h3>
-            <p className="text-gray-500 text-sm">
+            <h3 className="text-foreground font-medium mb-1">Deleting Note</h3>
+            <p className="text-muted-foreground text-sm">
               This action cannot be undone
             </p>
           </div>
@@ -613,9 +653,17 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
   if (!userData || displayNote === undefined) {
     return (
-      <div className="h-full flex flex-col bg-[#0A0A0A]">
+      <div className="h-full flex flex-col bg-background relative">
+        {isAwaitingRecordingNotes && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-background/85 backdrop-blur-sm">
+            <Loader2 className="w-10 h-10 animate-spin text-primary" />
+            <p className="text-sm font-medium text-foreground">
+              {recordingNotesOverlayLabel}
+            </p>
+          </div>
+        )}
         {/* Skeleton Navigation */}
-        <div className="h-16 flex items-center px-8 border-b border-white/5">
+        <div className="h-16 flex items-center px-8 border-b border-border">
           <Skeleton className="h-4 w-24 mr-2" />
           <Skeleton className="h-4 w-4 mr-2" />
           <Skeleton className="h-4 w-32 mr-2" />
@@ -667,10 +715,10 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
   if (displayNote === null) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-[#0A0A0A] text-gray-400 gap-4">
-        <FileText className="w-12 h-12 text-gray-600" />
-        <span className="text-lg">Note not found</span>
-        <p className="text-sm text-gray-600">
+      <div className="h-full flex flex-col items-center justify-center bg-background text-muted-foreground gap-4">
+        <FileText className="w-12 h-12 text-muted-foreground/60" />
+        <span className="text-lg text-foreground">Note not found</span>
+        <p className="text-sm text-muted-foreground">
           It may have been deleted or moved.
         </p>
         <Button onClick={onBack} variant="outline" className="mt-4">
@@ -684,8 +732,20 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
   return (
     <div className="h-full flex flex-col bg-background relative animate-in fade-in duration-500">
+      {isAwaitingRecordingNotes && (
+        <div
+          className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-background/80 backdrop-blur-sm"
+          aria-busy="true"
+          aria-live="polite"
+        >
+          <Loader2 className="w-10 h-10 animate-spin text-primary" />
+          <p className="text-sm font-medium text-foreground">
+            {recordingNotesOverlayLabel}
+          </p>
+        </div>
+      )}
       {/* 1. Top Navigation / Breadcrumbs */}
-      <div className="h-16 flex items-center px-4 lg:px-8 bg-background top-0 z-20 sticky justify-between">
+      <div className="h-16 flex items-center px-4 lg:px-8 bg-background/95 backdrop-blur-sm border-b border-border/50 top-0 z-20 sticky justify-between">
         <div className="flex items-center gap-4">
           {/* Left sidebar: single collapse control lives in Sidebar.tsx header (avoids duplicate with main chrome) */}
           <div className="flex items-center text-sm font-medium text-muted-foreground gap-2">
@@ -695,7 +755,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             >
               Dashboard
             </span>
-            <ChevronRight className="w-4 h-4 text-zinc-700" />
+            <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
             <span
               onClick={() => {
                 // Navigate back to course/module context
@@ -715,7 +775,23 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             >
               {courseName}
             </span>
-            <ChevronRight className="w-4 h-4 text-zinc-700" />
+            {parentNote && (
+              <>
+                <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+                <span
+                  onClick={() =>
+                    router.push(`/dashboard?noteId=${parentNote._id}`)
+                  }
+                  className="hover:text-foreground cursor-pointer transition-colors truncate max-w-[min(40vw,200px)]"
+                  title={parentNote.title}
+                >
+                  {parentNote.title.length > 24
+                    ? `${parentNote.title.slice(0, 24)}…`
+                    : parentNote.title}
+                </span>
+              </>
+            )}
+            <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
             <span className="text-foreground">
               {note.title.length > 20
                 ? note.title.substring(0, 20) + "..."
@@ -761,14 +837,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             )}
           </Button>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsTemplateModalOpen(true)}
-            title="Change template"
-          >
-            <FileText className="w-5 h-5 text-muted-foreground hover:text-foreground" />
-          </Button>
+
 
           <ActionMenu
             onRename={() => setIsRenameOpen(true)}
@@ -859,6 +928,41 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
               </div>
             </div>
 
+            <div className="mt-4 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Sub-pages
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={handleCreateSubPage}
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  New sub-page
+                </Button>
+              </div>
+              {childNotes && childNotes.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {childNotes.map((c) => (
+                    <li key={c._id}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push(`/dashboard?noteId=${c._id}`)
+                        }
+                        className="text-left text-sm text-primary hover:underline w-full truncate"
+                      >
+                        {c.title || "Untitled"}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
             {/* Metadata */}
             <div className="flex flex-wrap items-center gap-x-6 gap-y-1 mt-3 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
@@ -911,6 +1015,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                 />
               ) : (
                 <>
+                  {editor && <CodeBlockLanguageBubbleMenu editor={editor} />}
                   {editor && <AIBubbleMenu editor={editor} />}
                   <div className="relative" data-slash-ui={slashUiTick}>
                     {editor && <SlashCommandLayer editor={editor} />}
@@ -1008,55 +1113,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         noteId={noteId}
       />
 
-      {note && (
-        <TemplateConversionModal
-          open={isTemplateModalOpen}
-          onOpenChange={setIsTemplateModalOpen}
-          noteSnapshot={buildSnapshot()}
-          onConfirm={async (conversion) => {
-            const previous = buildSnapshot();
-            await updateNote({
-              noteId,
-              style: conversion.style,
-              content: conversion.content ?? "",
-              outlineData: conversion.outlineData ?? "",
-            });
-            setIsTemplateModalOpen(false);
-            toast.success("Template changed", {
-              action: {
-                label: "Undo",
-                onClick: async () => {
-                  await updateNote({
-                    noteId,
-                    style: previous.style,
-                    content: previous.content ?? "",
-                    outlineData: previous.outlineData ?? "",
-                  });
-                },
-              },
-            });
-          }}
-        />
-      )}
-    </div>
-  );
-}
 
-function ToolbarButton({
-  onClick,
-  isActive,
-  icon,
-}: {
-  onClick: () => void;
-  isActive: boolean;
-  icon: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`p-2 rounded-md transition-colors ${isActive ? "bg-white/10 text-white" : "text-gray-400 hover:text-gray-200 hover:bg-white/5"}`}
-    >
-      {icon}
-    </button>
+    </div>
   );
 }

@@ -61,53 +61,54 @@ function SidebarNoteComponent({
   return (
     <div
       className={cn(
-        "relative group/note flex items-center px-1",
-        isDragging && "opacity-50",
+        "relative group/note flex items-center",
+        isDragging && "opacity-40",
         isCompact && "px-0"
       )}
       draggable={isDraggable}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <Button
-        variant="ghost"
+      <button
         className={cn(
-          "w-full justify-start h-8 px-2 text-[13px] gap-2.5 transition-all rounded-lg relative overflow-hidden group/btn",
+          "w-full flex items-center h-[30px] px-2 text-[13px] gap-2 transition-colors rounded-md relative",
           isActive
-            ? "bg-indigo-500/10 text-indigo-400 font-medium ring-1 ring-indigo-500/20"
-            : "text-muted-foreground hover:text-sidebar-foreground hover:bg-zinc-800/50",
-          isCompact && "w-10 h-10 justify-center px-0"
+            ? "bg-sidebar-accent/60 text-sidebar-foreground font-medium"
+            : "text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/40",
+          isCompact && "w-9 h-9 justify-center px-0"
         )}
         onClick={handleClick}
         title={isCompact ? note.title : undefined}
       >
         {isDraggable && !isCompact && (
-          <div className="absolute left-0 opacity-0 group-hover/note:opacity-40 cursor-grab active:cursor-grabbing transition-opacity">
+          <div className="absolute left-0.5 opacity-0 group-hover/note:opacity-30 cursor-grab active:cursor-grabbing transition-opacity">
             <GripVertical className="w-3 h-3" />
           </div>
         )}
         <FileText
           className={cn(
-            "w-3.5 h-3.5 transition-colors shrink-0",
+            "w-[14px] h-[14px] shrink-0 transition-colors",
             isActive
-              ? "text-indigo-400"
-              : "text-zinc-500 group-hover/btn:text-zinc-300",
+              ? "text-sidebar-foreground/70"
+              : "text-muted-foreground/40",
           )}
         />
-        {!isCompact && <span className="truncate flex-1 text-left">{note.title}</span>}
+        {!isCompact && (
+          <span className="truncate flex-1 text-left">{note.title}</span>
+        )}
         {note.quickCaptureType === "voice" && !isCompact && (
-          <span className="text-[9px] font-bold uppercase tracking-tighter text-indigo-400/80 bg-indigo-500/10 px-1 py-0.5 rounded shrink-0">
+          <span className="text-[9px] font-semibold uppercase tracking-tight text-primary/60 bg-primary/8 px-1 py-0.5 rounded shrink-0">
             Voice
           </span>
         )}
-      </Button>
+      </button>
       {!isCompact && (
-        <div className="absolute right-2 opacity-0 group-hover/note:opacity-100 transition-all flex items-center gap-0.5">
+        <div className="absolute right-1 opacity-0 group-hover/note:opacity-100 transition-opacity flex items-center gap-0.5">
           {onExpand && (
             <Button
               size="icon"
               variant="ghost"
-              className="h-6 w-6 text-muted-foreground hover:text-indigo-400 hover:bg-indigo-500/10 rounded-md"
+              className="h-5 w-5 text-muted-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-sm"
               onClick={(e) => {
                 e.stopPropagation();
                 onExpand();
@@ -128,7 +129,6 @@ function SidebarNoteComponent({
   );
 }
 
-// Memoize to prevent unnecessary re-renders when parent state changes
 export const SidebarNote = memo(
   SidebarNoteComponent,
   (prevProps, nextProps) => {

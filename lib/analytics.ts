@@ -2,9 +2,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const getLocalDayStart = (timestamp: number, tzOffsetMinutes: number) => {
   const offsetMs = tzOffsetMinutes * 60 * 1000;
-  const local = new Date(timestamp + offsetMs);
-  local.setHours(0, 0, 0, 0);
-  return local.getTime() - offsetMs;
+  return Math.floor((timestamp + offsetMs) / DAY_MS) * DAY_MS - offsetMs;
 };
 
 export const countByLocalDay = (
