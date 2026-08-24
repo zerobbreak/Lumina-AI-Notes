@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { SignIn, useAuth } from "@clerk/nextjs";
 import { Loader2, CheckCircle2 } from "lucide-react";
 import { clerkAuthAppearance } from "@/lib/clerkAppearance";
+import { PaperSurface } from "@/components/paper/PaperSurface";
 
 /**
  * Desktop browser callback: show Clerk sign-in when signed out, then hand off a JWT
@@ -40,24 +41,24 @@ export default function ElectronAuthPage() {
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-secondary/30 backdrop-blur-md border border-border p-8 rounded-2xl shadow-xl text-center space-y-6">
-          <div className="flex justify-center">
-            <Loader2 className="w-12 h-12 text-primary animate-spin" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground">Loading…</h1>
-          <p className="text-muted-foreground">Preparing secure sign-in for Lumina.</p>
+      <PaperSurface className="grain flex min-h-screen items-center justify-center p-4">
+        <div className="card w-full max-w-md space-y-5 p-8 text-center">
+          <Loader2 className="mx-auto h-9 w-9 animate-spin" style={{ color: "var(--vermilion)" }} />
+          <h1 className="display text-[1.6rem]">Loading…</h1>
+          <p className="text-[0.93rem]" style={{ color: "var(--ink-soft)" }}>
+            Preparing secure sign-in for Lumina.
+          </p>
         </div>
-      </div>
+      </PaperSurface>
     );
   }
 
   if (!isSignedIn) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="w-full max-w-lg">
-          <p className="text-center text-muted-foreground text-sm mb-6">
-            Sign in to connect this session to the Lumina desktop app.
+      <PaperSurface className="grain flex min-h-screen items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <p className="mono mb-6 text-center" style={{ color: "var(--ink-faint)" }}>
+            Connect this session to the desktop app
           </p>
           <SignIn
             appearance={clerkAuthAppearance}
@@ -65,37 +66,36 @@ export default function ElectronAuthPage() {
             fallbackRedirectUrl="/electron-auth"
           />
         </div>
-      </div>
+      </PaperSurface>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-secondary/30 backdrop-blur-md border border-border p-8 rounded-2xl shadow-xl text-center space-y-6">
+    <PaperSurface className="grain flex min-h-screen items-center justify-center p-4">
+      <div className="card w-full max-w-md space-y-5 p-8 text-center">
         {status === "loading" && (
           <>
-            <div className="flex justify-center">
-              <Loader2 className="w-12 h-12 text-primary animate-spin" />
-            </div>
-            <h1 className="text-2xl font-bold text-foreground">Authenticating...</h1>
-            <p className="text-muted-foreground">Returning you to the desktop app.</p>
+            <Loader2 className="mx-auto h-9 w-9 animate-spin" style={{ color: "var(--vermilion)" }} />
+            <h1 className="display text-[1.6rem]">Authenticating…</h1>
+            <p className="text-[0.93rem]" style={{ color: "var(--ink-soft)" }}>
+              Returning you to the desktop app.
+            </p>
           </>
         )}
 
         {status === "redirecting" && (
           <>
-            <div className="flex justify-center">
-              <CheckCircle2 className="w-12 h-12 text-emerald-500" />
-            </div>
-            <h1 className="text-2xl font-bold text-foreground">Success!</h1>
-            <p className="text-muted-foreground">
-              You can now close this window and return to the Lumina app.
+            <CheckCircle2 className="mx-auto h-9 w-9" style={{ color: "var(--spruce)" }} />
+            <h1 className="display text-[1.6rem]">Signed in.</h1>
+            <p className="text-[0.93rem]" style={{ color: "var(--ink-soft)" }}>
+              You can close this window and return to the Lumina app.
             </p>
             <div className="pt-4">
               <button
                 type="button"
                 onClick={() => window.location.reload()}
-                className="text-primary hover:underline text-sm"
+                className="rule-link text-[0.85rem]"
+                style={{ color: "var(--vermilion)" }}
               >
                 Didn&apos;t redirect? Try again
               </button>
@@ -105,20 +105,28 @@ export default function ElectronAuthPage() {
 
         {status === "error" && (
           <>
-            <h1 className="text-2xl font-bold text-destructive">Authentication Error</h1>
-            <p className="text-muted-foreground">
+            <h1 className="display text-[1.6rem]" style={{ color: "var(--vermilion)" }}>
+              Authentication error
+            </h1>
+            <p className="text-[0.93rem]" style={{ color: "var(--ink-soft)" }}>
               Something went wrong. Please try logging in again from the app.
             </p>
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="bg-primary text-primary-foreground px-6 py-2 rounded-lg"
+              className="mx-auto flex h-11 items-center border px-6 text-[0.9rem] font-medium transition-transform hover:translate-x-[-2px] hover:translate-y-[-2px]"
+              style={{
+                background: "var(--ink)",
+                color: "var(--paper)",
+                borderColor: "var(--ink)",
+                boxShadow: "4px 4px 0 var(--vermilion)",
+              }}
             >
               Retry
             </button>
           </>
         )}
       </div>
-    </div>
+    </PaperSurface>
   );
 }

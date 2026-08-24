@@ -1,5 +1,4 @@
-import "./landing.css";
-import { editorial, plexSans, plexMono } from "./landing-fonts";
+import { PaperSurface } from "@/components/paper/PaperSurface";
 import { Masthead } from "@/components/home/landing/Masthead";
 import { Hero } from "@/components/home/landing/Hero";
 import { IndexStrip } from "@/components/home/landing/IndexStrip";
@@ -14,10 +13,7 @@ export const dynamic = "force-static";
 
 export default function Home() {
   return (
-    <div
-      className={`lumina-landing grain relative min-h-screen overflow-x-hidden ${editorial.variable} ${plexSans.variable} ${plexMono.variable}`}
-      style={{ ["--tw-ring-color" as string]: "var(--vermilion)" }}
-    >
+    <PaperSurface className="grain relative min-h-screen overflow-x-hidden">
       <Masthead />
 
       <main>
@@ -31,6 +27,6 @@ export default function Home() {
       </main>
 
       <Colophon />
-    </div>
+    </PaperSurface>
   );
 }
