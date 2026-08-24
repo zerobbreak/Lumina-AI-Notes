@@ -8,7 +8,7 @@ import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { Sparkles } from "lucide-react";
 import { useMutation, useQuery, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
@@ -41,14 +41,6 @@ const DocumentProcessingIndicatorLazy = dynamic(
   { ssr: false, loading: () => null },
 );
 
-const QuickCaptureFabLazy = dynamic(
-  () =>
-    import("@/components/dashboard/quick-capture/QuickCaptureFab").then((m) => ({
-      default: m.QuickCaptureFab,
-    })),
-  { ssr: false, loading: () => null },
-);
-
 function DashboardLayoutLoading() {
   return (
     <div className="h-screen w-full bg-background flex items-center justify-center text-muted-foreground">
@@ -70,8 +62,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
   const userData = useQuery(api.users.getUser);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const hideQuickCapture = Boolean(searchParams.get("noteId"));
   const { toggleLeftSidebar, isLeftSidebarOpen } = useDashboard();
   const [isLeftHovered, setIsLeftHovered] = useState(false);
 
@@ -208,7 +198,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </main>
         {mountHeavyPanels ? <TranscriptionPill /> : null}
-        {mountHeavyPanels ? <QuickCaptureFabLazy hidden={hideQuickCapture} /> : null}
 
         {/* Document Processing Indicator - shows when PDFs are being processed */}
         {mountHeavyPanels ? <DocumentProcessingIndicatorLazy /> : null}
