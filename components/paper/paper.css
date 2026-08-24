@@ -1,0 +1,372 @@
+/* ------------------------------------------------------------------
+   Lumina — editorial paper surface
+   A study workspace deserves the look of a well-kept notebook, not a
+   spaceship. Warm paper, ink hairlines, riso-style hard shadows, and
+   one vermilion accent that behaves like a red pen in the margin.
+   Everything here is scoped to .lumina-paper so the dark app shell
+   is untouched.
+   ------------------------------------------------------------------ */
+
+.lumina-paper {
+  --paper: #f2ede3;
+  --paper-warm: #ebe3d5;
+  --paper-deep: #e0d6c3;
+
+  --ink: #191512;
+  --ink-soft: #4d443b;
+  --ink-faint: #8b8073;
+
+  --rule: rgba(25, 21, 18, 0.16);
+  --rule-soft: rgba(25, 21, 18, 0.08);
+
+  --vermilion: #c43d1b;
+  --vermilion-wash: rgba(196, 61, 27, 0.09);
+  --spruce: #17423b;
+  --gold: #a8792a;
+
+  --measure: 62ch;
+
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-plex), ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- type primitives ---------------------------------------------- */
+
+.lumina-paper .display {
+  font-family: var(--font-editorial), ui-serif, Georgia, serif;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  line-height: 0.98;
+  text-wrap: balance;
+}
+
+.lumina-paper .mono {
+  font-family: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+/* A running head: small mono label sitting on a hairline. */
+.lumina-paper .running-head {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink-faint);
+}
+
+.lumina-paper .running-head::after {
+  content: "";
+  flex: 1;
+}
+
+/* --- surfaces ------------------------------------------------------ */
+
+/* Riso-style card: hairline border, hard offset shadow, no blur. */
+.lumina-paper .card {
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 5px 5px 0 var(--ink);
+  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    box-shadow 220ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.lumina-paper .card-lift:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 9px 9px 0 var(--ink);
+}
+
+/* Ruled paper, like a notebook leaf. */
+.lumina-paper .ruled {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 31px,
+    var(--rule-soft) 31px,
+    var(--rule-soft) 32px
+  );
+}
+
+/* The faint plate texture that keeps large paper areas from going flat. */
+.lumina-paper .grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.32;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+/* --- marks --------------------------------------------------------- */
+
+/* Highlighter pass over a phrase — drawn behind the text. */
+.lumina-paper .marked {
+  background-image: linear-gradient(
+    to top,
+    var(--vermilion-wash) 0,
+    var(--vermilion-wash) 0.62em,
+    transparent 0.62em
+  );
+  padding-inline: 0.08em;
+}
+
+/* Underline that grows out of the baseline on hover. */
+.lumina-paper .rule-link {
+  position: relative;
+  color: inherit;
+  text-decoration: none;
+}
+
+.lumina-paper .rule-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.lumina-paper .rule-link:hover::after,
+.lumina-paper .rule-link:focus-visible::after {
+  transform: scaleX(1);
+}
+
+.lumina-paper a:focus-visible,
+.lumina-paper button:focus-visible {
+  outline: 2px solid var(--vermilion);
+  outline-offset: 3px;
+}
+
+/* --- the index band ------------------------------------------------ */
+
+.lumina-paper .marquee {
+  display: flex;
+  width: max-content;
+  animation: lumina-marquee 42s linear infinite;
+}
+
+@keyframes lumina-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* A hand-drawn feel for the annotation strokes in the hero. */
+@keyframes lumina-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.lumina-paper .draw {
+  stroke-dasharray: var(--len, 240);
+  stroke-dashoffset: var(--len, 240);
+  animation: lumina-draw 1.1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lumina-paper .marquee {
+    animation: none;
+  }
+  .lumina-paper .draw {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .lumina-paper .card,
+  .lumina-paper .rule-link::after {
+    transition: none;
+  }
+}
+
+/* --- reveals -------------------------------------------------------
+   Content is visible by default and animates only where the browser
+   can do it without JavaScript. Nothing on this page depends on a
+   script to become readable.
+   ------------------------------------------------------------------ */
+
+@keyframes lumina-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+
+@keyframes lumina-enter-figure {
+  from {
+    opacity: 0;
+    transform: translateY(26px) rotate(-2.6deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* above the fold: plays on load, staggered by --d */
+  .lumina-paper .enter {
+    animation: lumina-enter 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: var(--d, 0s);
+  }
+
+  .lumina-paper .enter-figure {
+    animation: lumina-enter-figure 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: var(--d, 0s);
+  }
+
+  /* below the fold: driven by scroll position where supported */
+  @supports (animation-timeline: view()) {
+    .lumina-paper .reveal {
+      animation: lumina-enter linear both;
+      animation-timeline: view();
+      animation-range: entry 2% cover 20%;
+    }
+  }
+}
+
+/* --- Clerk -------------------------------------------------------
+   Clerk stamps a stable `cl-<element>` class on every part of its
+   widgets, so the auth forms are themed here rather than through
+   utility classes passed in `appearance.elements`.
+   ------------------------------------------------------------------ */
+
+.lumina-paper .cl-rootBox,
+.lumina-paper .cl-cardBox {
+  width: 100%;
+  box-shadow: none;
+  border: 0;
+  border-radius: 0;
+}
+
+.lumina-paper .cl-card {
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  box-shadow: 5px 5px 0 var(--ink);
+  padding: 1.75rem;
+}
+
+.lumina-paper .cl-headerTitle {
+  font-family: var(--font-editorial), ui-serif, Georgia, serif;
+  font-size: 1.55rem;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  color: var(--ink);
+}
+
+.lumina-paper .cl-headerSubtitle {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.lumina-paper .cl-socialButtonsBlockButton {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  color: var(--ink);
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+
+.lumina-paper .cl-socialButtonsBlockButton:hover {
+  background: var(--paper-warm);
+  border-color: var(--ink);
+}
+
+.lumina-paper .cl-dividerLine {
+  background: var(--rule);
+}
+
+.lumina-paper .cl-dividerText,
+.lumina-paper .cl-footerActionText {
+  color: var(--ink-faint);
+}
+
+.lumina-paper .cl-dividerText {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.lumina-paper .cl-formFieldLabel {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.lumina-paper .cl-formFieldInput,
+.lumina-paper .cl-otpCodeFieldInput {
+  background: var(--paper-warm);
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  color: var(--ink);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.lumina-paper .cl-formFieldInput:focus,
+.lumina-paper .cl-otpCodeFieldInput:focus {
+  border-color: var(--vermilion);
+  box-shadow: 0 0 0 1px var(--vermilion);
+  outline: none;
+}
+
+.lumina-paper .cl-formButtonPrimary {
+  background: var(--ink);
+  color: var(--paper);
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  box-shadow: 3px 3px 0 var(--vermilion);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    box-shadow 200ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.lumina-paper .cl-formButtonPrimary:hover {
+  background: var(--ink);
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0 var(--vermilion);
+}
+
+.lumina-paper .cl-footerActionLink,
+.lumina-paper .cl-formFieldAction,
+.lumina-paper .cl-formResendCodeLink,
+.lumina-paper .cl-identityPreviewEditButton {
+  color: var(--vermilion);
+  font-weight: 500;
+}
+
+.lumina-paper .cl-footerActionLink:hover,
+.lumina-paper .cl-formFieldAction:hover,
+.lumina-paper .cl-formResendCodeLink:hover {
+  text-decoration: underline;
+}
+
+.lumina-paper .cl-footer {
+  background: transparent;
+}
+
+.lumina-paper .cl-alert {
+  background: rgba(196, 61, 27, 0.08);
+  border: 1px solid rgba(196, 61, 27, 0.3);
+  border-radius: 0;
+  color: var(--vermilion);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lumina-paper .cl-formButtonPrimary {
+    transition: none;
+  }
+  .lumina-paper .cl-formButtonPrimary:hover {
+    transform: none;
+  }
+}
