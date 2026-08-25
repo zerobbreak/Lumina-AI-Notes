@@ -136,6 +136,11 @@ export function TranscriptionPill() {
     sessionIdRef.current = crypto.randomUUID();
   }, []);
 
+  const fullTranscript = useMemo(
+    () => [...chunks, transcript.trim()].filter(Boolean).join(" ").trim(),
+    [chunks, transcript],
+  );
+
   // Elapsed clock runs only while the mic is actually open.
   useEffect(() => {
     if (!isRecording) return;
@@ -151,6 +156,15 @@ export function TranscriptionPill() {
   // drops it straight into the "paused" face, ready to generate.
   useEffect(() => {
     if (!sessionToLoad) return;
+    if (
+      fullTranscript &&
+      !window.confirm(
+        "Loading a saved session will discard your current capture. Continue?",
+      )
+    ) {
+      clearLoadedSession();
+      return;
+    }
     SpeechRecognition.stopListening();
     stopMeter();
     setIsRecording(false);
@@ -160,12 +174,13 @@ export function TranscriptionPill() {
     setNotes(null);
     setElapsed(0);
     clearLoadedSession();
-  }, [sessionToLoad, stopMeter, resetTranscript, clearLoadedSession]);
-
-  const fullTranscript = useMemo(
-    () => [...chunks, transcript.trim()].filter(Boolean).join(" ").trim(),
-    [chunks, transcript],
-  );
+  }, [
+    sessionToLoad,
+    fullTranscript,
+    stopMeter,
+    resetTranscript,
+    clearLoadedSession,
+  ]);
 
   const wordCount = useMemo(
     () => (fullTranscript ? fullTranscript.split(/\s+/).length : 0),
