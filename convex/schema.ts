@@ -78,6 +78,8 @@ export default defineSchema({
     linkedDocumentIds: v.optional(v.array(v.id("files"))),
     // Tags and Stats
     tagIds: v.optional(v.array(v.id("tags"))),
+    /** True once auto-tagging has run for this note, so it only fires once. */
+    autoTagAttempted: v.optional(v.boolean()),
     wordCount: v.optional(v.number()),
     // Quick capture fields
     quickCaptureType: v.optional(v.string()), // "text" | "voice"
