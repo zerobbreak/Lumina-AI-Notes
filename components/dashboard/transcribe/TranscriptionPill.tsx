@@ -121,6 +121,9 @@ export function TranscriptionPill() {
   const saveUploadedRecording = useMutation(
     api.recordings.saveUploadedRecording,
   );
+  const updateRecordingTranscript = useMutation(
+    api.recordings.updateRecordingTranscript,
+  );
   const transcribeAudio = useAction(api.ai.transcribeAudio);
 
   const matches = useQuery(
@@ -356,7 +359,7 @@ export function TranscriptionPill() {
         if (!res.ok) throw new Error("upload failed");
         const { storageId } = await res.json();
 
-        await saveUploadedRecording({
+        const recordingId = await saveUploadedRecording({
           title: file.name.replace(/\.[^/.]+$/, "") || "Imported audio",
           storageId,
           duration,
@@ -371,6 +374,11 @@ export function TranscriptionPill() {
         });
 
         if (result.success && result.transcript) {
+          await updateRecordingTranscript({
+            recordingId,
+            transcript: result.transcript,
+          });
+          setSourceRecordingId(recordingId);
           setChunks([result.transcript]);
           toast.success("Audio transcribed");
         } else {
@@ -387,6 +395,7 @@ export function TranscriptionPill() {
       generateUploadUrl,
       saveUploadedRecording,
       transcribeAudio,
+      updateRecordingTranscript,
       userData?.major,
     ],
   );
