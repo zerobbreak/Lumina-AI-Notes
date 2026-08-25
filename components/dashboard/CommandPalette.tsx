@@ -128,7 +128,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       icon: FolderOpen,
       category: "navigation",
       action: () => {
-        router.push("/dashboard");
+        router.push("/dashboard?view=home");
         onOpenChange(false);
       },
       keywords: ["home", "dashboard", "main"],

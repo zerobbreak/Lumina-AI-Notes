@@ -209,7 +209,7 @@ export default function SmartFolderHub() {
   const closeTour = async (completed: boolean) => {
     setSuppressTourOverlay(true);
     await updateTourProgress({ completed: completed ? true : false, step: 0 });
-    router.replace("/dashboard");
+    router.replace("/dashboard?view=home");
   };
 
   return (

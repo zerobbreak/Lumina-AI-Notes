@@ -1,9 +1,11 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Sparkles } from "lucide-react";
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 
 const NoteView = lazy(() => import("@/components/dashboard/editor/NoteView"));
 const FolderView = lazy(() => import("@/components/dashboard/views/FolderView"));
@@ -48,13 +50,20 @@ function DashboardContent() {
 
   const router = useRouter();
 
+  // --- VIEW 0: BARE /dashboard — resume the last note, or fall back to Home ---
+  // Asked-for Home (?view=home) always wins and skips this entirely.
+  const hasExplicitDestination = !!(noteId || contextId || view || deckId);
+  if (!hasExplicitDestination) {
+    return <ResumeGate />;
+  }
+
   // --- VIEW 1: NOTE EDITOR ---
   if (noteId) {
     return (
       <Suspense fallback={<DashboardLoading />}>
         <NoteView
           noteId={noteId as Id<"notes">}
-          onBack={() => router.push("/dashboard")}
+          onBack={() => router.push("/dashboard?view=home")}
         />
       </Suspense>
     );
@@ -134,4 +143,26 @@ function DashboardContent() {
       <SmartFolderHub />
     </Suspense>
   );
+}
+
+/**
+ * Decides what a bare `/dashboard` open should show: the note the user was
+ * last in, or the Home hub when resuming wouldn't make sense. Always
+ * redirects to a concrete URL (?noteId=... or ?view=home) so the resolved
+ * destination is shareable/bookmarkable and never re-runs this decision.
+ */
+function ResumeGate() {
+  const router = useRouter();
+  const target = useQuery(api.notes.getResumeTarget);
+
+  useEffect(() => {
+    if (target === undefined) return;
+    if (target.target === "note") {
+      router.replace(`/dashboard?noteId=${target.noteId}`);
+    } else {
+      router.replace("/dashboard?view=home");
+    }
+  }, [target, router]);
+
+  return <DashboardLoading />;
 }

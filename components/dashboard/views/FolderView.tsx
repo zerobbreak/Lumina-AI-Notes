@@ -199,7 +199,7 @@ export default function FolderView({
           >
             <span
               className="hover:text-sidebar-primary cursor-pointer transition-colors"
-              onClick={() => router.push("/dashboard")}
+              onClick={() => router.push("/dashboard?view=home")}
             >
               Smart Folders
             </span>
