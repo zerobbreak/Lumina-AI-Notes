@@ -273,7 +273,7 @@ Respond with a JSON array of strings only, e.g. ["recursion", "midterm review"].
 
       const seen = new Set<string>();
       const tagNames = parsed
-        .filter((t): t is string => typeof t === "string" && t.trim())
+        .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
         .map((t) => t.trim())
         .filter((t) => {
           const key = t.toLowerCase();
