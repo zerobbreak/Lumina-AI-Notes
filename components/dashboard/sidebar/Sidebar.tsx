@@ -29,11 +29,10 @@ import { SettingsDialog } from "@/components/dashboard/dialogs/SettingsDialog";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { useDashboard } from "@/hooks/useDashboard";
 import { DraggableDocument } from "@/components/documents";
-import { SidebarCourse } from "./SidebarCourse";
 import { SidebarNote } from "./SidebarNote";
 import { SidebarStudio, PinContextButton } from "./SidebarStudio";
 import { ActionMenu } from "@/components/shared/ActionMenu";
-import { File, FolderOpen, FileText, PenLine } from "lucide-react";
+import { File, FileText, PenLine } from "lucide-react";
 import {
   useKeyboardShortcut,
   formatShortcut,
@@ -74,17 +73,12 @@ export function Sidebar() {
   const toggleArchiveNote = useMutation(api.notes.toggleArchiveNote);
   const updateNote = useMutation(api.notes.updateNote);
 
-  const createCourse = useMutation(api.users.createCourse);
   const renameCourse = useMutation(api.users.renameCourse);
-  const deleteCourse = useMutation(api.users.deleteCourse);
-
   const renameModule = useMutation(api.users.renameModule);
-  const deleteModule = useMutation(api.users.deleteModule);
 
   const deleteFile = useMutation(api.files.deleteFile);
   const renameFile = useMutation(api.files.renameFile);
 
-  const [expandedCourses, setExpandedCourses] = useState<Record<string, boolean>>({});
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -124,10 +118,6 @@ export function Sidebar() {
     else setLeftSidebarState("compact");
     router.push("/dashboard?view=calendar");
   }, [isNarrowViewport, router, setLeftSidebarState]);
-
-  const toggleCourse = (courseId: string) => {
-    setExpandedCourses((prev) => ({ ...prev, [courseId]: !prev[courseId] }));
-  };
 
   const handleRenameConfirm = async (newValue: string) => {
     if (!renameTarget) return;
@@ -217,14 +207,6 @@ export function Sidebar() {
   );
 
   useKeyboardShortcut("cmd+n", handleCreateNote, { preventDefault: true });
-
-  const handleCreateCourse = async () => {
-    try {
-      await createCourse({ name: "New Course", code: "CSE 101" });
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
   const sidebarInner = (
     <div className={cn(
@@ -395,52 +377,6 @@ export function Sidebar() {
                 <PenLine className="w-[14px] h-[14px] shrink-0 text-current opacity-80 group-hover/tool:opacity-100 transition-opacity" />
                 {!isCompact && <span>Workspace</span>}
               </button>
-            </div>
-          </div>
-
-          {/* Smart Folders / Courses */}
-          <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
-            {!isCompact && (
-              <div className="flex items-center justify-between px-2 mb-0.5 group min-w-0">
-                <h3 className="text-[11px] font-medium text-muted-foreground dark:text-muted-foreground/55 select-none">
-                  Courses
-                </h3>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="w-5 h-5 text-muted-foreground/60 dark:text-muted-foreground/35 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 opacity-0 group-hover:opacity-100 transition-all rounded-sm focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-                  onClick={handleCreateCourse}
-                >
-                  <Plus className="w-3 h-3" />
-                </Button>
-              </div>
-            )}
-            <div className={cn("space-y-px w-full", isCompact && "space-y-3 flex flex-col items-center")}>
-              {userData?.courses?.map((course: Course) => (
-                <SidebarCourse
-                  key={course.id}
-                  course={course}
-                  isCompact={isCompact}
-                  isExpanded={!!expandedCourses[course.id]}
-                  onToggle={() => toggleCourse(course.id)}
-                  onRename={(id, name) => openRename(id, "course", name)}
-                  onDelete={(id) => deleteCourse({ courseId: id })}
-                  onRenameModule={(id, name, parentId) =>
-                    openRename(id, "module", name, parentId)
-                  }
-                  onDeleteModule={(id, parentId) =>
-                    deleteModule({ courseId: parentId, moduleId: id })
-                  }
-                  onRenameNote={(id, title) => openRename(id, "note", title)}
-                  onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
-                  onArchiveNote={(id) =>
-                    toggleArchiveNote({ noteId: id as Id<"notes"> })
-                  }
-                />
-              ))}
-              {isCompact && (!userData?.courses || userData.courses.length === 0) && (
-                <FolderOpen className="w-4 h-4 text-muted-foreground/60 dark:text-muted-foreground/25" />
-              )}
             </div>
           </div>
 
