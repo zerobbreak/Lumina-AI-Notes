@@ -22,6 +22,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 
 import { useRouter } from "next/navigation";
+import { KnowledgeGraph } from "@/components/dashboard/studio/KnowledgeGraph";
 
 type NoteRef = { _id: Id<"notes">; title: string };
 type SelectedNote = NoteRef;
@@ -126,6 +127,7 @@ export default function NoteStudioView() {
   const recentNotes = useQuery(api.notes.getRecentNotes) || [];
   
   const [activeSessionId, setActiveSessionId] = useState<Id<"chatSessions"> | null>(null);
+  const [studioMode, setStudioMode] = useState<"graph" | "chat">("chat");
   const [input, setInput] = useState("");
   const isCreatingFallbackSessionRef = useRef(false);
   
@@ -296,6 +298,18 @@ export default function NoteStudioView() {
     await setSessionMode({ sessionId: activeSessionId, mode: next });
   };
 
+  // Graph → Chat handoff: a node's neighborhood is pinned as context so the
+  // conversation starts already grounded, instead of an empty @mention chat.
+  const handleDiscussInChat = async (noteIds: Id<"notes">[]) => {
+    let targetSessionId = activeSessionId;
+    if (!targetSessionId) {
+      targetSessionId = await createSession({ title: "Graph discussion" });
+      setActiveSessionId(targetSessionId);
+    }
+    await pinNotesToSession({ sessionId: targetSessionId, noteIds });
+    setStudioMode("chat");
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setInput(val);
@@ -343,8 +357,8 @@ export default function NoteStudioView() {
   return (
     <div className="flex h-full w-full bg-background text-foreground overflow-hidden">
       
-      {/* Sidebar - Chat Sessions */}
-      <div className="w-64 border-r bg-muted/20 flex flex-col hidden md:flex">
+      {/* Sidebar - Chat Sessions (graph mode uses the full width instead) */}
+      <div className={cn("w-64 border-r bg-muted/20 flex-col hidden", studioMode === "chat" && "md:flex")}>
         <div className="p-4 border-b">
           <Button onClick={handleNewChat} className="w-full gap-2 justify-start" variant="outline">
             <Plus className="w-4 h-4" />
@@ -401,13 +415,50 @@ export default function NoteStudioView() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="gap-2">
-              <Workflow className="w-4 h-4" />
-              <span>Generate Canvas</span>
-            </Button>
+            <div className="flex items-center gap-0.5 rounded-full border bg-muted p-0.5">
+              <button
+                type="button"
+                onClick={() => setStudioMode("graph")}
+                className={cn(
+                  "h-8 rounded-full px-4 text-xs font-bold transition-colors",
+                  studioMode === "graph"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Graph
+              </button>
+              <button
+                type="button"
+                onClick={() => setStudioMode("chat")}
+                className={cn(
+                  "h-8 rounded-full px-4 text-xs font-bold transition-colors",
+                  studioMode === "chat"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Chat
+              </button>
+            </div>
+            {studioMode === "chat" && (
+              <Button variant="outline" size="sm" className="gap-2">
+                <Workflow className="w-4 h-4" />
+                <span>Generate Canvas</span>
+              </Button>
+            )}
           </div>
         </header>
 
+        {studioMode === "graph" && (
+          <KnowledgeGraph
+            onOpenNote={(noteId) => router.push(`/dashboard?noteId=${noteId}`)}
+            onDiscussInChat={(noteIds) => void handleDiscussInChat(noteIds)}
+          />
+        )}
+
+        {studioMode === "chat" && (
+        <>
         <main ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
           <div className="max-w-3xl mx-auto space-y-6 pb-20">
             {/* Empty State */}
@@ -672,6 +723,8 @@ export default function NoteStudioView() {
             </div>
           </div>
         </footer>
+        </>
+        )}
       </div>
     </div>
   );
