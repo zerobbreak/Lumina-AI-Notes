@@ -12,6 +12,7 @@ import {
   ClipboardList,
   Pin,
   PanelLeftOpen,
+  House,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UserButton, useUser } from "@clerk/nextjs";
@@ -53,6 +54,13 @@ type RenameTarget = {
   parentId?: string;
 };
 
+function formatDueIn(dueAt: number): string {
+  const days = Math.round((dueAt - Date.now()) / (24 * 60 * 60 * 1000));
+  if (days <= 0) return "Due today";
+  if (days === 1) return "in 1 day";
+  return `in ${days} days`;
+}
+
 export function Sidebar() {
   const { user } = useUser();
   const router = useRouter();
@@ -70,6 +78,8 @@ export function Sidebar() {
   const recentFiles = useQuery(api.files.getFiles);
   const pinnedNotes = useQuery(api.notes.getPinnedNotes);
   const tags = useQuery(api.tags.getTagsWithCounts);
+  const todayQueue = useQuery(api.flashcards.getTodayQueue);
+  const upcomingDeadlines = useQuery(api.deadlines.getUpcoming, { limit: 1 });
 
   const deleteNote = useMutation(api.notes.deleteNote);
   const renameNote = useMutation(api.notes.renameNote);
@@ -114,6 +124,16 @@ export function Sidebar() {
   }, []);
 
   const calendarView = searchParams.get("view") === "calendar";
+  const homeView =
+    searchParams.get("view") === "home" &&
+    !searchParams.get("noteId") &&
+    !searchParams.get("contextId");
+
+  const dueTodayCount = todayQueue?.cardIds?.length ?? 0;
+  const nextDeadline = upcomingDeadlines?.[0];
+  const nextDeadlineLabel = nextDeadline
+    ? formatDueIn(nextDeadline.dueAt)
+    : null;
   useEffect(() => {
     if (!calendarView) return;
     if (isNarrowViewport) setLeftSidebarState("closed");
@@ -287,6 +307,66 @@ export function Sidebar() {
       {/* ── Scrollable content ── */}
       <ScrollArea className="flex-1 px-1.5 pb-2 min-w-0">
         <div className={cn("space-y-5 py-1", isCompact && "space-y-6 flex flex-col items-center")}>
+
+          {/* Home + Review — always visible regardless of which note is open,
+              so due cards and the next deadline never depend on being on the hub. */}
+          <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center gap-2")}>
+            {!isCompact && dueTodayCount + (nextDeadlineLabel ? 1 : 0) > 0 && (
+              <button
+                type="button"
+                className="w-full mb-1 rounded-lg border border-primary/20 bg-primary/[0.07] hover:bg-primary/[0.11] transition-colors overflow-hidden text-left"
+                onClick={() => router.push("/dashboard?view=flashcards")}
+              >
+                {dueTodayCount > 0 && (
+                  <div className="h-[34px] px-2 flex items-center gap-2.5 rounded-lg bg-primary/[0.13]">
+                    <Layers className="w-[14px] h-[14px] text-primary shrink-0" />
+                    <span className="flex-1 text-[13px] font-medium text-sidebar-foreground">Review</span>
+                    <span className="text-[11px] font-medium text-primary-foreground bg-primary px-1.5 py-0.5 rounded-full tabular-nums">
+                      {dueTodayCount} due
+                    </span>
+                  </div>
+                )}
+                {nextDeadlineLabel && (
+                  <div className="h-[30px] px-2 flex items-center gap-2.5 text-muted-foreground">
+                    <Calendar className="w-[14px] h-[14px] shrink-0 opacity-80" />
+                    <span className="flex-1 text-[12px] truncate">{nextDeadline!.title}</span>
+                    <span className="text-[11px] text-amber-600 dark:text-amber-400 tabular-nums shrink-0">
+                      {nextDeadlineLabel}
+                    </span>
+                  </div>
+                )}
+              </button>
+            )}
+            {isCompact && dueTodayCount > 0 && (
+              <button
+                type="button"
+                className="relative w-9 h-9 flex items-center justify-center rounded-lg bg-primary/[0.13] text-primary hover:bg-primary/20 transition-colors"
+                onClick={() => router.push("/dashboard?view=flashcards")}
+                title={`${dueTodayCount} card${dueTodayCount === 1 ? "" : "s"} due`}
+              >
+                <Layers className="w-[15px] h-[15px]" />
+                <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-0.5 rounded-full bg-primary text-primary-foreground text-[9px] font-medium flex items-center justify-center tabular-nums">
+                  {dueTodayCount}
+                </span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              className={cn(
+                "w-full flex items-center h-[30px] px-2 text-[13px] font-medium gap-2.5 rounded-md transition-colors",
+                homeView
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-border/40 dark:bg-sidebar-accent/55"
+                  : "text-sidebar-foreground/92 dark:text-muted-foreground/72 hover:text-sidebar-foreground hover:bg-sidebar-accent/40",
+                isCompact && "w-9 h-9 justify-center px-0"
+              )}
+              onClick={() => router.push("/dashboard?view=home")}
+              title={isCompact ? "Home" : undefined}
+            >
+              <House className="w-[14px] h-[14px] shrink-0 opacity-80" />
+              {!isCompact && <span>Home</span>}
+            </button>
+          </div>
 
           {/* Favorites */}
           <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>

@@ -617,6 +617,40 @@ export const touchNote = mutation({
   },
 });
 
+/** Beyond this gap since the note was last opened, resuming it stops being the safe default. */
+const RESUME_STALE_MS = 3 * 24 * 60 * 60 * 1000;
+
+/**
+ * Decides what `/dashboard` should open: the note the user was last in, or
+ * the Home hub when resuming wouldn't make sense (no notes yet, the last
+ * note is gone, or too much time has passed since it was last opened).
+ */
+export const getResumeTarget = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return { target: "home" as const };
+
+    const candidates = await ctx.db
+      .query("notes")
+      .withIndex("by_userId_and_lastAccessedAt", (q) =>
+        q.eq("userId", identity.tokenIdentifier),
+      )
+      .order("desc")
+      .take(5);
+
+    const latest = candidates.find((n) => !n.isArchived);
+    if (!latest) return { target: "home" as const };
+
+    const lastOpened = latest.lastAccessedAt ?? latest.createdAt;
+    if (Date.now() - lastOpened > RESUME_STALE_MS) {
+      return { target: "home" as const };
+    }
+
+    return { target: "note" as const, noteId: latest._id };
+  },
+});
+
 export const toggleShareNote = mutation({
   args: { noteId: v.id("notes") },
   handler: async (ctx, args) => {

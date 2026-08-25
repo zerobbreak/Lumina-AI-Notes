@@ -9,10 +9,11 @@ import { internalMutation } from "./_generated/server";
  */
 export const cleanupStaleNotesAndFilesInternal = internalMutation({
   args: {
-    cutoff: v.number(), // ms timestamp
+    maxAgeMs: v.number(), // how far back "stale" reaches, measured from now
     perUserLimit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const cutoff = Date.now() - args.maxAgeMs;
     const perUserLimit = Math.max(1, Math.min(500, args.perUserLimit ?? 200));
 
     const users = await ctx.db.query("users").collect();
@@ -26,7 +27,7 @@ export const cleanupStaleNotesAndFilesInternal = internalMutation({
       const staleNotes = await ctx.db
         .query("notes")
         .withIndex("by_userId_and_lastAccessedAt", (q) =>
-          q.eq("userId", userId).lte("lastAccessedAt", args.cutoff),
+          q.eq("userId", userId).lte("lastAccessedAt", cutoff),
         )
         .take(perUserLimit);
 
@@ -34,7 +35,7 @@ export const cleanupStaleNotesAndFilesInternal = internalMutation({
       const legacyCandidates = await ctx.db
         .query("notes")
         .withIndex("by_userId_and_createdAt", (q) =>
-          q.eq("userId", userId).lte("createdAt", args.cutoff),
+          q.eq("userId", userId).lte("createdAt", cutoff),
         )
         .take(perUserLimit);
       const legacyNotes = legacyCandidates.filter((n) => n.lastAccessedAt == null);
@@ -48,14 +49,14 @@ export const cleanupStaleNotesAndFilesInternal = internalMutation({
       const staleFiles = await ctx.db
         .query("files")
         .withIndex("by_userId_lastAccessedAt", (q) =>
-          q.eq("userId", userId).lte("lastAccessedAt", args.cutoff),
+          q.eq("userId", userId).lte("lastAccessedAt", cutoff),
         )
         .take(perUserLimit);
 
       const legacyFileCandidates = await ctx.db
         .query("files")
         .withIndex("by_userId_createdAt", (q) =>
-          q.eq("userId", userId).lte("createdAt", args.cutoff),
+          q.eq("userId", userId).lte("createdAt", cutoff),
         )
         .take(perUserLimit);
       const legacyFiles = legacyFileCandidates.filter((f) => f.lastAccessedAt == null);

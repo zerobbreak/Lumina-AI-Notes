@@ -122,6 +122,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const renameNote = useMutation(api.notes.renameNote);
   const toggleShare = useMutation(api.notes.toggleShareNote);
   const togglePinNote = useMutation(api.notes.togglePinNote);
+  const touchNote = useMutation(api.notes.touchNote);
 
   // Presence tracking
   const presenceHeartbeat = useMutation(api.presence.heartbeat);
@@ -275,6 +276,12 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     updateNote,
     displayNote?.style,
   ]);
+
+  // Mark the note as opened so it's eligible to be resumed later and stays
+  // exempt from the stale-note cleanup while the user is reading it.
+  useEffect(() => {
+    touchNote({ noteId }).catch(() => {});
+  }, [noteId, touchNote]);
 
   // Presence Heartbeat Effect - sends heartbeat on mount and every 30 seconds
   useEffect(() => {
