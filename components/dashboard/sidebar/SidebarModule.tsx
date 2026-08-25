@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Folder, ChevronRight, ChevronDown } from "lucide-react";
+import { Folder } from "lucide-react";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
@@ -34,7 +34,6 @@ export function SidebarModule({
   onArchiveNote,
 }: SidebarModuleProps) {
   const router = useRouter();
-  const [isExpanded, setIsExpanded] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
   const moduleNotes = useQuery(api.notes.getNotesByContext, {
@@ -78,7 +77,6 @@ export function SidebarModule({
           moduleId: module.id,
         });
         toast.success(`Moved "${noteTitle}" to ${module.title}`);
-        setIsExpanded(true);
       } catch (error) {
         console.error("Failed to move note:", error);
         toast.error("Failed to move note");
@@ -103,20 +101,6 @@ export function SidebarModule({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          <div
-            className="p-0.5 rounded-sm text-muted-foreground/35 hover:text-muted-foreground/60 cursor-pointer transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsExpanded(!isExpanded);
-            }}
-          >
-            {isExpanded ? (
-              <ChevronDown className="w-2.5 h-2.5" />
-            ) : (
-              <ChevronRight className="w-2.5 h-2.5" />
-            )}
-          </div>
-
           <Folder
             className={cn(
               "w-3.5 h-3.5 shrink-0 transition-colors",
@@ -142,9 +126,9 @@ export function SidebarModule({
         </div>
       </div>
 
-      {isExpanded && (
-        <div className="ml-[14px] pl-2.5 border-l border-sidebar-border/30 space-y-px mt-px">
-          {rootModuleNotes?.map((note) => (
+      {rootModuleNotes && rootModuleNotes.length > 0 && (
+        <div className="ml-[22px] space-y-px mt-px">
+          {rootModuleNotes.map((note) => (
             <SidebarNote
               key={note._id}
               note={note}

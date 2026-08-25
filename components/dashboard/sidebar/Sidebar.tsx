@@ -29,11 +29,12 @@ import { SettingsDialog } from "@/components/dashboard/dialogs/SettingsDialog";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { useDashboard } from "@/hooks/useDashboard";
 import { DraggableDocument } from "@/components/documents";
-import { SidebarCourse } from "./SidebarCourse";
 import { SidebarNote } from "./SidebarNote";
+import { SidebarTag } from "./SidebarTag";
 import { SidebarStudio, PinContextButton } from "./SidebarStudio";
 import { ActionMenu } from "@/components/shared/ActionMenu";
-import { File, FolderOpen, FileText, PenLine } from "lucide-react";
+import { TagManagerDialog } from "@/components/dashboard/tags/TagManagerDialog";
+import { File, FileText, PenLine, Tag as TagIcon } from "lucide-react";
 import {
   useKeyboardShortcut,
   formatShortcut,
@@ -47,7 +48,7 @@ import { toast } from "sonner";
 
 type RenameTarget = {
   id: string;
-  type: "note" | "course" | "module" | "file";
+  type: "note" | "course" | "module" | "file" | "tag";
   name: string;
   parentId?: string;
 };
@@ -68,24 +69,24 @@ export function Sidebar() {
   const quickNotes = useQuery(api.notes.getQuickNotes);
   const recentFiles = useQuery(api.files.getFiles);
   const pinnedNotes = useQuery(api.notes.getPinnedNotes);
+  const tags = useQuery(api.tags.getTagsWithCounts);
 
   const deleteNote = useMutation(api.notes.deleteNote);
   const renameNote = useMutation(api.notes.renameNote);
   const toggleArchiveNote = useMutation(api.notes.toggleArchiveNote);
   const updateNote = useMutation(api.notes.updateNote);
 
-  const createCourse = useMutation(api.users.createCourse);
   const renameCourse = useMutation(api.users.renameCourse);
-  const deleteCourse = useMutation(api.users.deleteCourse);
-
   const renameModule = useMutation(api.users.renameModule);
-  const deleteModule = useMutation(api.users.deleteModule);
+
+  const updateTag = useMutation(api.tags.updateTag);
+  const deleteTag = useMutation(api.tags.deleteTag);
 
   const deleteFile = useMutation(api.files.deleteFile);
   const renameFile = useMutation(api.files.renameFile);
 
-  const [expandedCourses, setExpandedCourses] = useState<Record<string, boolean>>({});
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -125,10 +126,6 @@ export function Sidebar() {
     router.push("/dashboard?view=calendar");
   }, [isNarrowViewport, router, setLeftSidebarState]);
 
-  const toggleCourse = (courseId: string) => {
-    setExpandedCourses((prev) => ({ ...prev, [courseId]: !prev[courseId] }));
-  };
-
   const handleRenameConfirm = async (newValue: string) => {
     if (!renameTarget) return;
     const { id, type, parentId } = renameTarget;
@@ -146,6 +143,8 @@ export function Sidebar() {
           moduleId: id,
           title: newValue,
         });
+      else if (type === "tag")
+        await updateTag({ tagId: id as Id<"tags">, name: newValue });
     } catch (e) {
       console.error(e);
     }
@@ -153,7 +152,7 @@ export function Sidebar() {
 
   const openRename = (
     id: string,
-    type: "note" | "course" | "module" | "file",
+    type: "note" | "course" | "module" | "file" | "tag",
     name: string,
     parentId?: string,
   ) => setRenameTarget({ id, type, name, parentId });
@@ -217,14 +216,6 @@ export function Sidebar() {
   );
 
   useKeyboardShortcut("cmd+n", handleCreateNote, { preventDefault: true });
-
-  const handleCreateCourse = async () => {
-    try {
-      await createCourse({ name: "New Course", code: "CSE 101" });
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
   const sidebarInner = (
     <div className={cn(
@@ -398,48 +389,49 @@ export function Sidebar() {
             </div>
           </div>
 
-          {/* Smart Folders / Courses */}
+          {/* Tags — auto-assigned when a note gets real content, editable by hand */}
           <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
             {!isCompact && (
               <div className="flex items-center justify-between px-2 mb-0.5 group min-w-0">
                 <h3 className="text-[11px] font-medium text-muted-foreground dark:text-muted-foreground/55 select-none">
-                  Courses
+                  Tags
                 </h3>
                 <Button
                   variant="ghost"
                   size="icon"
                   className="w-5 h-5 text-muted-foreground/60 dark:text-muted-foreground/35 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 opacity-0 group-hover:opacity-100 transition-all rounded-sm focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-                  onClick={handleCreateCourse}
+                  onClick={() => setIsTagManagerOpen(true)}
                 >
                   <Plus className="w-3 h-3" />
                 </Button>
               </div>
             )}
             <div className={cn("space-y-px w-full", isCompact && "space-y-3 flex flex-col items-center")}>
-              {userData?.courses?.map((course: Course) => (
-                <SidebarCourse
-                  key={course.id}
-                  course={course}
-                  isCompact={isCompact}
-                  isExpanded={!!expandedCourses[course.id]}
-                  onToggle={() => toggleCourse(course.id)}
-                  onRename={(id, name) => openRename(id, "course", name)}
-                  onDelete={(id) => deleteCourse({ courseId: id })}
-                  onRenameModule={(id, name, parentId) =>
-                    openRename(id, "module", name, parentId)
-                  }
-                  onDeleteModule={(id, parentId) =>
-                    deleteModule({ courseId: parentId, moduleId: id })
-                  }
-                  onRenameNote={(id, title) => openRename(id, "note", title)}
-                  onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
-                  onArchiveNote={(id) =>
-                    toggleArchiveNote({ noteId: id as Id<"notes"> })
-                  }
-                />
-              ))}
-              {isCompact && (!userData?.courses || userData.courses.length === 0) && (
-                <FolderOpen className="w-4 h-4 text-muted-foreground/60 dark:text-muted-foreground/25" />
+              {!isCompact &&
+                tags?.map((tag) => (
+                  <SidebarTag
+                    key={tag._id}
+                    tag={tag}
+                    onRename={(id, name) => openRename(id, "tag", name)}
+                    onDelete={(id) => deleteTag({ tagId: id })}
+                    onRenameNote={(id, title) => openRename(id, "note", title)}
+                    onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
+                    onArchiveNote={(id) =>
+                      toggleArchiveNote({ noteId: id as Id<"notes"> })
+                    }
+                  />
+                ))}
+              {!isCompact && (!tags || tags.length === 0) && (
+                <button
+                  type="button"
+                  className="w-full flex items-center h-[26px] px-2 text-[12px] text-muted-foreground/30 hover:text-muted-foreground/60 hover:bg-sidebar-accent/30 gap-1.5 transition-colors rounded-md"
+                  onClick={() => setIsTagManagerOpen(true)}
+                >
+                  <Plus className="w-3 h-3" /> Add tag
+                </button>
+              )}
+              {isCompact && (
+                <TagIcon className="w-4 h-4 text-muted-foreground/60 dark:text-muted-foreground/25" />
               )}
             </div>
           </div>
@@ -712,13 +704,16 @@ export function Sidebar() {
                 ? "File"
                 : renameTarget.type === "course"
                   ? "Course"
-                  : "Module"
+                  : renameTarget.type === "tag"
+                    ? "Tag"
+                    : "Module"
           }
           onConfirm={handleRenameConfirm}
         />
       )}
       <SearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
       <SettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
+      <TagManagerDialog open={isTagManagerOpen} onOpenChange={setIsTagManagerOpen} />
 
       <Dialog open={!!expandTarget} onOpenChange={(open) => !open && setExpandTarget(null)}>
         <DialogContent className="sm:max-w-md bg-[#0B0B0B] border-white/10 text-white">
