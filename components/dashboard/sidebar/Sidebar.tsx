@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Calendar,
   File,
   FolderOpen,
   Layers,
@@ -41,10 +42,12 @@ import { SearchDialog } from "@/components/dashboard/search/SearchDialog";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { SettingsDialog } from "@/components/dashboard/dialogs/SettingsDialog";
 import { UploadDialog } from "@/components/dashboard/dialogs/UploadDialog";
+import { TagManagerDialog } from "@/components/dashboard/tags/TagManagerDialog";
 import { SidebarCourse } from "./SidebarCourse";
 import { SidebarNavItem } from "./SidebarNavItem";
 import { SidebarNote } from "./SidebarNote";
 import { SidebarSection, SidebarSectionAction } from "./SidebarSection";
+import { SidebarTag } from "./SidebarTag";
 import {
   PinContextButton,
   SessionsCleanupAction,
@@ -53,10 +56,17 @@ import {
 
 type RenameTarget = {
   id: string;
-  type: "note" | "course" | "module" | "file";
+  type: "note" | "course" | "module" | "file" | "tag";
   name: string;
   parentId?: string;
 };
+
+function formatDueIn(dueAt: number): string {
+  const days = Math.round((dueAt - Date.now()) / (24 * 60 * 60 * 1000));
+  if (days <= 0) return "Due today";
+  if (days === 1) return "in 1 day";
+  return `in ${days} days`;
+}
 
 /**
  * The left panel, in four zones: brand and actions, the fixed destinations,
@@ -79,6 +89,9 @@ export function Sidebar() {
   const quickNotes = useQuery(api.notes.getQuickNotes);
   const recentFiles = useQuery(api.files.getFiles);
   const pinnedNotes = useQuery(api.notes.getPinnedNotes);
+  const tags = useQuery(api.tags.getTagsWithCounts);
+  const todayQueue = useQuery(api.flashcards.getTodayQueue);
+  const upcomingDeadlines = useQuery(api.deadlines.getUpcoming, { limit: 1 });
 
   const deleteNote = useMutation(api.notes.deleteNote);
   const renameNote = useMutation(api.notes.renameNote);
@@ -91,6 +104,9 @@ export function Sidebar() {
   const renameModule = useMutation(api.users.renameModule);
   const deleteModule = useMutation(api.users.deleteModule);
 
+  const updateTag = useMutation(api.tags.updateTag);
+  const deleteTag = useMutation(api.tags.deleteTag);
+
   const deleteFile = useMutation(api.files.deleteFile);
   const renameFile = useMutation(api.files.renameFile);
 
@@ -98,6 +114,7 @@ export function Sidebar() {
     Record<string, boolean>
   >({});
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -217,6 +234,8 @@ export function Sidebar() {
           moduleId: id,
           title: newValue,
         });
+      else if (type === "tag")
+        await updateTag({ tagId: id as Id<"tags">, name: newValue });
     } catch (e) {
       console.error(e);
       toast.error("Failed to rename");
@@ -237,6 +256,12 @@ export function Sidebar() {
     () => courses.map((course) => course.code),
     [courses],
   );
+
+  const dueTodayCount = todayQueue?.cardIds?.length ?? 0;
+  const nextDeadline = upcomingDeadlines?.[0];
+  const nextDeadlineLabel = nextDeadline
+    ? formatDueIn(nextDeadline.dueAt)
+    : null;
 
   /* ─────────────────────────────────────────────── zone 1: brand + actions */
 
@@ -376,6 +401,19 @@ export function Sidebar() {
   const railTree = (
     <ScrollArea className="min-h-0 min-w-0 flex-1 px-2 py-2">
       <div className="flex flex-col items-center gap-1">
+        {dueTodayCount > 0 && (
+          <button
+            type="button"
+            className="relative w-9 h-9 flex items-center justify-center rounded-lg bg-primary/[0.13] text-primary hover:bg-primary/20 transition-colors"
+            onClick={() => router.push("/dashboard?view=flashcards")}
+            title={`${dueTodayCount} card${dueTodayCount === 1 ? "" : "s"} due`}
+          >
+            <Layers className="w-[15px] h-[15px]" />
+            <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-0.5 rounded-full bg-primary text-primary-foreground text-[9px] font-medium flex items-center justify-center tabular-nums">
+              {dueTodayCount}
+            </span>
+          </button>
+        )}
         {pinnedNotes?.length ? (
           pinnedNotes.map((note) => (
             <SidebarNote
@@ -428,6 +466,37 @@ export function Sidebar() {
   const tree = (
     <ScrollArea className="min-h-0 min-w-0 flex-1 px-1 py-2">
       <div className="space-y-3">
+        {(dueTodayCount > 0 || nextDeadlineLabel) && (
+          <button
+            type="button"
+            className="w-full rounded-lg border border-primary/20 bg-primary/[0.07] hover:bg-primary/[0.11] transition-colors overflow-hidden text-left"
+            onClick={() => router.push("/dashboard?view=flashcards")}
+          >
+            {dueTodayCount > 0 && (
+              <div className="h-[34px] px-2 flex items-center gap-2.5 rounded-lg bg-primary/[0.13]">
+                <Layers className="w-[14px] h-[14px] text-primary shrink-0" />
+                <span className="flex-1 text-[13px] font-medium text-sidebar-foreground">
+                  Review
+                </span>
+                <span className="text-[11px] font-medium text-primary-foreground bg-primary px-1.5 py-0.5 rounded-full tabular-nums">
+                  {dueTodayCount} due
+                </span>
+              </div>
+            )}
+            {nextDeadlineLabel && (
+              <div className="h-[30px] px-2 flex items-center gap-2.5 text-muted-foreground">
+                <Calendar className="w-[14px] h-[14px] shrink-0 opacity-80" />
+                <span className="flex-1 text-[12px] truncate">
+                  {nextDeadline!.title}
+                </span>
+                <span className="text-[11px] text-amber-600 dark:text-amber-400 tabular-nums shrink-0">
+                  {nextDeadlineLabel}
+                </span>
+              </div>
+            )}
+          </button>
+        )}
+
         <SidebarSection
           id="favorites"
           label="Favorites"
@@ -500,6 +569,34 @@ export function Sidebar() {
               onDeleteModule={(id, parentId) =>
                 deleteModule({ courseId: parentId, moduleId: id })
               }
+              onRenameNote={(id, title) => openRename(id, "note", title)}
+              onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
+              onArchiveNote={(id) =>
+                toggleArchiveNote({ noteId: id as Id<"notes"> })
+              }
+            />
+          ))}
+        </SidebarSection>
+
+        <SidebarSection
+          id="tags"
+          label="Tags"
+          isEmpty={!tags?.length}
+          emptyLabel="No tags yet"
+          action={
+            <SidebarSectionAction
+              icon={Plus}
+              label="Add tag"
+              onClick={() => setIsTagManagerOpen(true)}
+            />
+          }
+        >
+          {tags?.map((tag) => (
+            <SidebarTag
+              key={tag._id}
+              tag={tag}
+              onRename={(id, name) => openRename(id, "tag", name)}
+              onDelete={(id) => deleteTag({ tagId: id })}
               onRenameNote={(id, title) => openRename(id, "note", title)}
               onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
               onArchiveNote={(id) =>
@@ -721,13 +818,19 @@ export function Sidebar() {
                 ? "File"
                 : renameTarget.type === "course"
                   ? "Course"
-                  : "Module"
+                  : renameTarget.type === "tag"
+                    ? "Tag"
+                    : "Module"
           }
           onConfirm={handleRenameConfirm}
         />
       )}
       <SearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
       <SettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
+      <TagManagerDialog
+        open={isTagManagerOpen}
+        onOpenChange={setIsTagManagerOpen}
+      />
     </>
   );
 }

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, action } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { GoogleGenerativeAI, TaskType } from "@google/generative-ai";
 import { embedTextForVectorSearch } from "./geminiEmbedding";
 import {
@@ -393,6 +393,28 @@ export const getNotesByContext = query({
   },
 });
 
+/** Root notes (owned or shared with the caller) carrying a given tag. */
+export const getNotesByTag = query({
+  args: {
+    tagId: v.id("tags"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const notes = await ctx.db
+      .query("notes")
+      .withIndex("by_userId", (q) => q.eq("userId", identity.tokenIdentifier))
+      .collect();
+
+    return notes.filter(
+      (n) =>
+        !n.parentNoteId &&
+        n.tagIds?.includes(args.tagId),
+    );
+  },
+});
+
 /** Direct child pages of a note (nested notes). */
 export const getChildNotes = query({
   args: { parentNoteId: v.id("notes") },
@@ -535,7 +557,7 @@ export const updateNote = mutation({
     sourceRecordingId: v.optional(v.id("recordings")),
   },
   handler: async (ctx, args) => {
-    await requireNoteEdit(ctx, args.noteId);
+    const { note } = await requireNoteEdit(ctx, args.noteId);
 
     const patch: any = {};
     const now = Date.now();
@@ -560,7 +582,27 @@ export const updateNote = mutation({
 
     // Treat edits as "usage" for stale cleanup.
     patch.lastAccessedAt = now;
+
+    // Auto-tag once a note has real content, no tags yet, and hasn't been
+    // through this before. Mark it attempted immediately so a rapid-fire
+    // autosave can't schedule the action twice.
+    const hasExistingTags = (args.tagIds ?? note.tagIds ?? []).length > 0;
+    const shouldAutoTag =
+      args.content !== undefined &&
+      !hasExistingTags &&
+      !note.autoTagAttempted &&
+      (args.wordCount ?? 0) >= 25;
+    if (shouldAutoTag) {
+      patch.autoTagAttempted = true;
+    }
+
     await ctx.db.patch(args.noteId, patch);
+
+    if (shouldAutoTag) {
+      await ctx.scheduler.runAfter(0, internal.tags.autoTagNote, {
+        noteId: args.noteId,
+      });
+    }
   },
 });
 
@@ -572,6 +614,40 @@ export const touchNote = mutation({
   handler: async (ctx, args) => {
     await requireNoteAccess(ctx, args.noteId);
     await ctx.db.patch(args.noteId, { lastAccessedAt: Date.now() });
+  },
+});
+
+/** Beyond this gap since the note was last opened, resuming it stops being the safe default. */
+const RESUME_STALE_MS = 3 * 24 * 60 * 60 * 1000;
+
+/**
+ * Decides what `/dashboard` should open: the note the user was last in, or
+ * the Home hub when resuming wouldn't make sense (no notes yet, the last
+ * note is gone, or too much time has passed since it was last opened).
+ */
+export const getResumeTarget = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return { target: "home" as const };
+
+    const candidates = await ctx.db
+      .query("notes")
+      .withIndex("by_userId_and_lastAccessedAt", (q) =>
+        q.eq("userId", identity.tokenIdentifier),
+      )
+      .order("desc")
+      .take(5);
+
+    const latest = candidates.find((n) => !n.isArchived);
+    if (!latest) return { target: "home" as const };
+
+    const lastOpened = latest.lastAccessedAt ?? latest.createdAt;
+    if (Date.now() - lastOpened > RESUME_STALE_MS) {
+      return { target: "home" as const };
+    }
+
+    return { target: "note" as const, noteId: latest._id };
   },
 });
 
