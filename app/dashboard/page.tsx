@@ -62,6 +62,7 @@ function DashboardContent() {
     return (
       <Suspense fallback={<DashboardLoading />}>
         <NoteView
+          key={noteId}
           noteId={noteId as Id<"notes">}
           onBack={() => router.push("/dashboard?view=home")}
         />
