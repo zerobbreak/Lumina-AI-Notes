@@ -38,10 +38,14 @@ function createWindow() {
     // Clerk/Convex credentials or a running dev server.
     mainWindow.loadURL(process.env.ELECTRON_TEST_URL);
   } else if (isDev) {
-    mainWindow.loadURL('http://localhost:3000');
+    // Desktop builds skip the marketing landing page — Clerk's <SignIn/>
+    // renders straight into the window and forceRedirectUrl="/dashboard"
+    // (see app/(auth)/sign-in) takes over from there, including for an
+    // already-authenticated session restored from a previous launch.
+    mainWindow.loadURL('http://localhost:3000/sign-in');
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(getStaticPath(), 'index.html'));
+    mainWindow.loadFile(path.join(getStaticPath(), 'sign-in', 'index.html'));
   }
 }
 
