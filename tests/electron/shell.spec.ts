@@ -29,9 +29,12 @@ test("preload exposes a locked-down electronAPI bridge to the renderer", async (
 
   const webPreferences = await electronApp.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows()[0];
+    // getLastWebPreferences() is undocumented/untyped but is the only way to
+    // read back the *effective* webPreferences Electron applied to the window.
+    const prefs = (win.webContents as unknown as { getLastWebPreferences(): Electron.WebPreferences }).getLastWebPreferences();
     return {
-      nodeIntegration: win.webContents.getLastWebPreferences().nodeIntegration,
-      contextIsolation: win.webContents.getLastWebPreferences().contextIsolation,
+      nodeIntegration: prefs.nodeIntegration,
+      contextIsolation: prefs.contextIsolation,
     };
   });
   expect(webPreferences.nodeIntegration).toBe(false);
