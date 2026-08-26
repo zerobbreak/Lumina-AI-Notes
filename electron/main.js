@@ -25,11 +25,19 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    show: false,
+    backgroundColor: '#050a14',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
     },
+  });
+
+  // Don't show a blank/white window while the page is still loading
+  // (fonts, Clerk, Convex) — reveal it only once there's something to see.
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
   });
 
   if (process.env.ELECTRON_TEST_URL) {
