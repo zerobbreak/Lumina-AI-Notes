@@ -1,14 +1,19 @@
 import type { NextConfig } from "next";
 
-const isStaticExport = process.env.STATIC_EXPORT === "true";
+// Electron packaging bundles a real Next.js server (see electron/main.js and
+// scripts/prepare-electron-server.js) rather than a static export — Clerk's
+// App Router integration (ClerkProvider/<SignIn>/<SignUp>) ships its own
+// internal Server Actions and isn't compatible with `output: "export"`.
+const isElectronBuild = process.env.ELECTRON_BUILD === "true";
 
 const nextConfig: NextConfig = {
-  ...(isStaticExport && {
-    output: "export",
-    trailingSlash: true,
+  ...(isElectronBuild && {
+    output: "standalone",
   }),
   images: {
-    unoptimized: isStaticExport,
+    // No `sharp` bundled for the packaged app; the desktop shell doesn't
+    // need Next's server-side image optimization pipeline anyway.
+    unoptimized: isElectronBuild,
     remotePatterns: [
       {
         protocol: "https",

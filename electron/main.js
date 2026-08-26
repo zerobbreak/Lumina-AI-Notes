@@ -1,5 +1,6 @@
-const { app, BrowserWindow, ipcMain, shell, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Menu, utilityProcess } = require('electron');
 const path = require('path');
+const net = require('net');
 
 const isDev = process.env.NODE_ENV === 'development';
 const protocol = 'lumina-notes';
@@ -13,15 +14,66 @@ if (process.defaultApp) {
 }
 
 let mainWindow;
+let serverProcess;
+let serverPort;
 
-function getStaticPath() {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'out');
-  }
-  return path.join(__dirname, '../out');
+// Packaged builds bundle a real Next.js server (see scripts/prepare-electron-server.js
+// and npm run build:electron-server) rather than a static export — Clerk's App Router
+// integration doesn't support `output: export`. utilityProcess is Electron's sandboxed
+// way to run a Node.js script without the RunAsNode fuse we deliberately keep disabled
+// (see forge.config.js).
+function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.unref();
+    probe.on('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
 }
 
-function createWindow() {
+function waitForServer(port, timeoutMs = 20000) {
+  const deadline = Date.now() + timeoutMs;
+  return new Promise((resolve, reject) => {
+    const tryConnect = () => {
+      const socket = net.connect(port, '127.0.0.1');
+      socket.once('connect', () => {
+        socket.end();
+        resolve();
+      });
+      socket.once('error', () => {
+        socket.destroy();
+        if (Date.now() > deadline) {
+          reject(new Error(`Bundled server did not start within ${timeoutMs}ms`));
+        } else {
+          setTimeout(tryConnect, 150);
+        }
+      });
+    };
+    tryConnect();
+  });
+}
+
+async function startBundledServer() {
+  if (serverProcess) return;
+
+  serverPort = await getFreePort();
+  const serverEntry = path.join(process.resourcesPath, 'standalone', 'server.js');
+
+  serverProcess = utilityProcess.fork(serverEntry, [], {
+    env: { ...process.env, PORT: String(serverPort), HOSTNAME: '127.0.0.1' },
+    stdio: 'pipe',
+  });
+
+  serverProcess.stderr?.on('data', (chunk) => console.error('[next-server]', chunk.toString()));
+  serverProcess.on('exit', (code) => console.error('Bundled Next.js server exited with code', code));
+
+  await waitForServer(serverPort);
+}
+
+async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -43,17 +95,26 @@ function createWindow() {
   if (process.env.ELECTRON_TEST_URL) {
     // Test-only hook (see tests/electron): loads a lightweight fixture instead
     // of the real Next.js app, so the shell can be tested without live
-    // Clerk/Convex credentials or a running dev server.
+    // Clerk/Convex credentials, a running dev server, or the bundled server.
     mainWindow.loadURL(process.env.ELECTRON_TEST_URL);
-  } else if (isDev) {
-    // Desktop builds skip the marketing landing page — Clerk's <SignIn/>
-    // renders straight into the window and forceRedirectUrl="/dashboard"
-    // (see app/(auth)/sign-in) takes over from there, including for an
-    // already-authenticated session restored from a previous launch.
+    return;
+  }
+
+  // Desktop builds skip the marketing landing page — Clerk's <SignIn/> renders
+  // straight into the window and forceRedirectUrl="/dashboard" (see
+  // app/(auth)/sign-in) takes over from there, including for an
+  // already-authenticated session restored from a previous launch.
+  if (isDev) {
     mainWindow.loadURL('http://localhost:3000/sign-in');
     mainWindow.webContents.openDevTools();
-  } else {
-    mainWindow.loadFile(path.join(getStaticPath(), 'sign-in', 'index.html'));
+    return;
+  }
+
+  try {
+    await startBundledServer();
+    mainWindow.loadURL(`http://127.0.0.1:${serverPort}/sign-in`);
+  } catch (error) {
+    console.error('Failed to start the bundled Next.js server:', error);
   }
 }
 
@@ -103,6 +164,10 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
+});
+
+app.on('before-quit', () => {
+  serverProcess?.kill();
 });
 
 ipcMain.on('login-in-browser', () => {

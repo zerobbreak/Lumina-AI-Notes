@@ -4,7 +4,9 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
-    extraResource: ['out'],
+    // The bundled Next.js server (npm run build:electron-server), copied to
+    // resourcesPath/standalone at runtime — see electron/main.js.
+    extraResource: ['.next/standalone'],
   },
   rebuildConfig: {},
   makers: [

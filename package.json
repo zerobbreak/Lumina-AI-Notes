@@ -16,9 +16,9 @@
     "convex:deploy": "convex deploy",
     "electron:dev": "concurrently \"next dev\" \"wait-on http://localhost:3000/sign-in && cross-env NODE_ENV=development electron .\"",
     "electron:start": "concurrently \"next dev\" \"wait-on http://localhost:3000/sign-in && cross-env NODE_ENV=development electron-forge start\"",
-    "build:static": "cross-env STATIC_EXPORT=true next build",
-    "package": "electron-forge package",
-    "make": "npm run build:static && electron-forge make",
+    "build:electron-server": "cross-env ELECTRON_BUILD=true next build && node scripts/prepare-electron-server.js",
+    "package": "npm run build:electron-server && electron-forge package",
+    "make": "npm run build:electron-server && electron-forge make",
     "test:electron": "playwright test -c tests/electron/playwright.config.ts"
   },
   "dependencies": {

@@ -152,12 +152,12 @@ npm run dev
 
 The repo includes an Electron wrapper for development and packaging:
 
-- **`npm run electron:dev`** — Runs Next.js dev server and opens an Electron window pointed at `http://localhost:3000` (plain `electron .`).
-- **`npm run electron:start`** — Same idea as `electron:dev`, but runs **`electron-forge start`** after `wait-on` so Forge hooks run; still starts `next dev` in parallel so `http://localhost:3000` is available.
-- **`npm run build:static`** — Next.js static export (`STATIC_EXPORT=true`) for embedding in the packaged app.
-- **`npm run make`** — Builds static output and runs Electron Forge makers (see `forge.config.js`).
+- **`npm run electron:dev`** — Runs Next.js dev server and opens an Electron window pointed at `http://localhost:3000/sign-in` (plain `electron .`).
+- **`npm run electron:start`** — Same idea as `electron:dev`, but runs **`electron-forge start`** after `wait-on` so Forge hooks run; still starts `next dev` in parallel.
+- **`npm run build:electron-server`** — Production Next.js build with `output: "standalone"` (`ELECTRON_BUILD=true`), then copies `public/` and `.next/static` into `.next/standalone` per Next's standalone-output docs.
+- **`npm run make`** — Runs `build:electron-server` and Electron Forge makers (see `forge.config.js`).
 
-Custom protocol handling and the `/electron-auth` route support bringing Clerk session tokens into the desktop shell. Treat the desktop target as **experimental** unless you have verified packaging on your OS.
+The packaged app bundles a real Next.js server (`.next/standalone`) rather than a static export — Clerk's App Router integration (`ClerkProvider`/`<SignIn>`/`<SignUp>`) ships its own internal Server Actions and isn't compatible with `output: "export"`. On launch, `electron/main.js` picks a free local port and spawns the standalone server with Electron's `utilityProcess` API (sandboxed, no `RunAsNode` fuse needed), waits for it to accept connections, then loads `/sign-in` from it. Custom protocol handling and the `/electron-auth` route support bringing Clerk session tokens into the desktop shell as a fallback path. Treat the desktop target as **experimental** unless you have verified packaging on your OS.
 
 ## Scripts
 
@@ -165,7 +165,7 @@ Custom protocol handling and the `/electron-auth` route support bringing Clerk s
 - `npm run convex:dev` — Start/sync Convex backend
 - `npm run convex:deploy` — Deploy Convex functions
 - `npm run build` — Production build (web)
-- `npm run build:static` — Static export for Electron
+- `npm run build:electron-server` — Standalone server build for Electron packaging
 - `npm run start` — Run production server
 - `npm run electron:dev` — Dev Electron + Next
 - `npm run electron:start` — Next dev + Electron Forge start (Forge dev pipeline)
