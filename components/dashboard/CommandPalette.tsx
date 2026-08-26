@@ -18,12 +18,12 @@ import {
   Plus,
   Search,
   FolderOpen,
-  Archive,
   Sparkles,
   CornerDownLeft,
   ArrowUp,
   ArrowDown,
 } from "lucide-react";
+import { DASHBOARD_NAV } from "@/constants/dashboardNav";
 import { useKeyboardShortcut, formatShortcut } from "@/hooks/useKeyboardShortcut";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
@@ -120,44 +120,20 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       keywords: ["create", "new", "note", "subpage", "nested"],
     });
 
-    // Navigation commands
-    cmds.push({
-      id: "dashboard",
-      title: "Go to Dashboard",
-      subtitle: "Return to main dashboard",
-      icon: FolderOpen,
-      category: "navigation",
-      action: () => {
-        router.push("/dashboard");
-        onOpenChange(false);
-      },
-      keywords: ["home", "dashboard", "main"],
-    });
-
-    cmds.push({
-      id: "flashcards",
-      title: "Flashcards",
-      subtitle: "View all flashcard decks",
-      icon: Layers,
-      category: "navigation",
-      action: () => {
-        router.push("/dashboard?view=flashcards");
-        onOpenChange(false);
-      },
-      keywords: ["study", "cards", "deck"],
-    });
-
-    cmds.push({
-      id: "archive",
-      title: "Archive",
-      subtitle: "View archived notes and files",
-      icon: Archive,
-      category: "navigation",
-      action: () => {
-        router.push("/dashboard?view=archive");
-        onOpenChange(false);
-      },
-      keywords: ["trash", "archived", "deleted"],
+    // Navigation commands — same source of truth as the sidebar.
+    DASHBOARD_NAV.forEach((item) => {
+      cmds.push({
+        id: item.id,
+        title: item.label,
+        subtitle: item.description,
+        icon: item.icon,
+        category: "navigation",
+        action: () => {
+          router.push(item.href);
+          onOpenChange(false);
+        },
+        keywords: item.keywords,
+      });
     });
 
     // Course navigation

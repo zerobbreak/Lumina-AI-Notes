@@ -35,6 +35,7 @@ import { ThinkingSequence } from "./ThinkingSequence";
 import {
   formatElapsed,
   idleWaveform,
+  ISOLATING_STAGES,
   mirrorLevels,
   phaseLabel,
   resolvePhase,
@@ -72,6 +73,7 @@ const PHASE_ACCENT: Record<string, string> = {
   listening: "text-rose-600 dark:text-rose-400",
   paused: "text-amber-600 dark:text-amber-400",
   thinking: "text-primary",
+  isolating: "text-primary",
   ready: "text-emerald-600 dark:text-emerald-400",
   searching: "text-foreground",
 };
@@ -86,6 +88,7 @@ export function TranscriptionPill() {
   const [elapsed, setElapsed] = useState(0);
   const [chunks, setChunks] = useState<string[]>([]);
   const [isThinking, setIsThinking] = useState(false);
+  const [isIsolating, setIsIsolating] = useState(false);
   const [notes, setNotes] = useState<StructuredNotes | null>(null);
   const [isInserting, setIsInserting] = useState(false);
 
@@ -98,7 +101,8 @@ export function TranscriptionPill() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
 
-  const { levels, start: startMeter, stop: stopMeter } = useMicLevels(BANDS);
+  const { levels, start: startMeter, stop: stopMeter, stopAndCollect } =
+    useMicLevels(BANDS);
   const { transcript, resetTranscript } = useSpeechRecognition();
   const {
     setPendingNotes,
@@ -121,7 +125,7 @@ export function TranscriptionPill() {
   const saveUploadedRecording = useMutation(
     api.recordings.saveUploadedRecording,
   );
-  const transcribeAudio = useAction(api.ai.transcribeAudio);
+  const isolateAndTranscribe = useAction(api.audioIsolation.isolateAndTranscribe);
 
   const matches = useQuery(
     api.search.searchNoteContent,
@@ -151,6 +155,7 @@ export function TranscriptionPill() {
     SpeechRecognition.stopListening();
     stopMeter();
     setIsRecording(false);
+    setIsIsolating(false);
     resetTranscript();
     setChunks([sessionToLoad.transcript]);
     setSourceRecordingId(sessionToLoad.recordingId);
@@ -171,6 +176,7 @@ export function TranscriptionPill() {
 
   const phase = resolvePhase({
     isRecording,
+    isIsolating,
     isThinking,
     isSearchOpen,
     hasTranscript: fullTranscript.length > 0,
@@ -188,14 +194,72 @@ export function TranscriptionPill() {
     setIsRecording(false);
   }, [stopMeter]);
 
+  const isolateCapturedSession = useCallback(
+    async (liveTranscript: string) => {
+      setIsIsolating(true);
+      try {
+        const captured = await stopAndCollect();
+        if (!captured) return;
+
+        const uploadUrl = await generateUploadUrl();
+        const res = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": captured.mimeType },
+          body: captured.blob,
+        });
+        if (!res.ok) throw new Error("upload failed");
+        const { storageId } = (await res.json()) as { storageId: string };
+
+        const result = await isolateAndTranscribe({
+          storageId: storageId as Id<"_storage">,
+          mimeType: captured.mimeType,
+          courseContext: userData?.major || undefined,
+          fallbackToOriginal: liveTranscript.length === 0,
+        });
+
+        if (result.success && result.transcript.trim()) {
+          setChunks([result.transcript.trim()]);
+          resetTranscript();
+          if (result.isolated) {
+            toast.success("Isolated speech from background noise");
+          }
+        } else if (liveTranscript.length === 0) {
+          toast.error("Couldn't transcribe that recording", {
+            description: result.error,
+          });
+        }
+      } catch (e) {
+        console.error("[TranscriptionPill] audio isolation failed:", e);
+        if (!liveTranscript) {
+          toast.error("Couldn't process that recording");
+        }
+      } finally {
+        setIsIsolating(false);
+      }
+    },
+    [
+      stopAndCollect,
+      generateUploadUrl,
+      isolateAndTranscribe,
+      userData?.major,
+      resetTranscript,
+    ],
+  );
+
   const handleToggleRecording = useCallback(async () => {
+    if (isIsolating) return;
+
     if (isRecording) {
       // Fold the in-flight utterance into the session before closing the mic,
-      // otherwise resetTranscript() would discard it.
+      // otherwise resetTranscript() would discard it. Isolation then replaces
+      // this live text when ElevenLabs returns a cleaner transcript.
       const pending = transcript.trim();
+      const liveTranscript = [...chunks, pending].filter(Boolean).join(" ").trim();
       if (pending) setChunks((prev) => [...prev, pending]);
       resetTranscript();
-      stopListening();
+      SpeechRecognition.stopListening();
+      setIsRecording(false);
+      void isolateCapturedSession(liveTranscript);
       return;
     }
 
@@ -212,7 +276,15 @@ export function TranscriptionPill() {
         description: "Check that this site is allowed to use your microphone.",
       });
     }
-  }, [isRecording, transcript, resetTranscript, stopListening, startMeter]);
+  }, [
+    isIsolating,
+    isRecording,
+    transcript,
+    chunks,
+    resetTranscript,
+    isolateCapturedSession,
+    startMeter,
+  ]);
 
   const handleReset = useCallback(() => {
     stopListening();
@@ -220,6 +292,7 @@ export function TranscriptionPill() {
     setChunks([]);
     setElapsed(0);
     setNotes(null);
+    setIsIsolating(false);
     setSourceRecordingId(null);
     sessionIdRef.current = crypto.randomUUID();
   }, [resetTranscript, stopListening]);
@@ -364,17 +437,24 @@ export function TranscriptionPill() {
           sessionId: sessionIdRef.current,
         });
 
-        const result = await transcribeAudio({
+        const result = await isolateAndTranscribe({
           storageId: storageId as Id<"_storage">,
           mimeType: file.type || "audio/mpeg",
           courseContext: userData?.major || undefined,
+          fallbackToOriginal: true,
         });
 
         if (result.success && result.transcript) {
           setChunks([result.transcript]);
-          toast.success("Audio transcribed");
+          toast.success(
+            result.isolated
+              ? "Isolated speech and transcribed"
+              : "Audio transcribed",
+          );
         } else {
-          toast.error("Couldn't transcribe that file");
+          toast.error("Couldn't transcribe that file", {
+            description: result.error,
+          });
         }
       } catch (e) {
         console.error("[TranscriptionPill] audio import failed:", e);
@@ -386,7 +466,7 @@ export function TranscriptionPill() {
     [
       generateUploadUrl,
       saveUploadedRecording,
-      transcribeAudio,
+      isolateAndTranscribe,
       userData?.major,
     ],
   );
@@ -534,7 +614,7 @@ export function TranscriptionPill() {
               <button
                 type="button"
                 onClick={() => void handleToggleRecording()}
-                disabled={isThinking}
+                disabled={isThinking || isIsolating}
                 aria-label={
                   isRecording ? "Stop recording" : "Start recording this session"
                 }
@@ -575,6 +655,13 @@ export function TranscriptionPill() {
 
                     {phase === "thinking" && (
                       <ThinkingSequence className="w-[188px]" />
+                    )}
+
+                    {phase === "isolating" && (
+                      <ThinkingSequence
+                        className="w-[188px]"
+                        stages={ISOLATING_STAGES}
+                      />
                     )}
 
                     {phase === "paused" && (
@@ -648,7 +735,7 @@ export function TranscriptionPill() {
                   </PillIconButton>
                 )}
 
-                {phase !== "thinking" && (
+                {phase !== "thinking" && phase !== "isolating" && (
                   <PillIconButton
                     label="Search note content by keyword"
                     onClick={() => setIsSearchOpen(true)}

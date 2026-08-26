@@ -51,6 +51,17 @@ describe("resolvePhase", () => {
     ).toBe("searching");
   });
 
+  it("prefers isolating over thinking once the mic is closed", () => {
+    expect(
+      resolvePhase({
+        ...base,
+        isIsolating: true,
+        isThinking: true,
+        hasTranscript: true,
+      }),
+    ).toBe("isolating");
+  });
+
   it("never reports listening while the mic is closed", () => {
     expect(resolvePhase({ ...base, isThinking: true })).toBe("thinking");
     expect(resolvePhase({ ...base, isRecording: true, isThinking: true })).toBe(
@@ -121,6 +132,7 @@ describe("waveform helpers", () => {
 describe("phaseLabel", () => {
   it("names every phase", () => {
     expect(phaseLabel("listening")).toBe("Listening");
+    expect(phaseLabel("isolating")).toBe("Isolating speech");
     expect(phaseLabel("thinking")).toBe("Thinking");
     expect(phaseLabel("ready")).toBe("Notes ready");
     expect(phaseLabel("idle")).toBe("Transcribe session");

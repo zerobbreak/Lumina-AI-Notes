@@ -61,7 +61,8 @@ interface DashboardContextType {
   isLeftSidebarOpen: boolean;
   setLeftSidebarState: (state: SidebarState) => void;
   toggleLeftSidebar: () => void;
-  cycleLeftSidebar: () => void;
+  /** Swap between the full panel and the icon rail, never fully hiding it. */
+  toggleLeftSidebarRail: () => void;
   // Pending notes to inject into editor (scoped to a specific note so other tabs/routes don't receive them)
   pendingNotes: StructuredNotes | null;
   pendingNotesTargetNoteId: Id<"notes"> | null;
@@ -109,12 +110,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setLeftSidebarState((prev) => (prev === "closed" ? "open" : "closed"));
   };
 
-  const cycleLeftSidebar = () => {
-    setLeftSidebarState((prev) => {
-      if (prev === "open") return "compact";
-      if (prev === "compact") return "closed";
-      return "open";
-    });
+  const toggleLeftSidebarRail = () => {
+    setLeftSidebarState((prev) => (prev === "compact" ? "open" : "compact"));
   };
 
   const setPendingNotes = (
@@ -165,7 +162,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         isLeftSidebarOpen,
         setLeftSidebarState,
         toggleLeftSidebar,
-        cycleLeftSidebar,
+        toggleLeftSidebarRail,
         pendingNotes,
         pendingNotesTargetNoteId,
         setPendingNotes,

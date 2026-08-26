@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
@@ -13,8 +13,52 @@ const sections = [
   { href: "#roadmap", label: "Roadmap" },
 ];
 
-export function Masthead() {
+function DashboardLinkLabel() {
+  const { pending } = useLinkStatus();
+
+  return (
+    <span className="flex items-center gap-2" aria-live="polite">
+      {pending ? (
+        <span
+          className="h-2 w-2 animate-pulse rounded-full bg-current"
+          aria-hidden="true"
+        />
+      ) : null}
+      {pending ? "Opening workspace..." : "Dashboard"}
+    </span>
+  );
+}
+
+function DashboardLink() {
   const router = useRouter();
+
+  // Warm the protected route as soon as Clerk renders the signed-in controls.
+  // Waiting for hover leaves the first click paying the dashboard route cost.
+  useEffect(() => {
+    router.prefetch("/dashboard");
+  }, [router]);
+
+  return (
+    <Link
+      href="/dashboard"
+      prefetch
+      onMouseEnter={() => router.prefetch("/dashboard")}
+      onFocus={() => router.prefetch("/dashboard")}
+      className="mono flex h-9 items-center border px-4"
+      aria-label="Open dashboard"
+      style={{
+        background: "var(--ink)",
+        color: "var(--paper)",
+        borderColor: "var(--ink)",
+        boxShadow: "3px 3px 0 var(--vermilion)",
+      }}
+    >
+      <DashboardLinkLabel />
+    </Link>
+  );
+}
+
+export function Masthead() {
   const [lifted, setLifted] = useState(false);
 
   useEffect(() => {
@@ -84,20 +128,7 @@ export function Masthead() {
           </SignedOut>
 
           <SignedIn>
-            <Link
-              href="/dashboard"
-              prefetch
-              onMouseEnter={() => router.prefetch("/dashboard")}
-              className="mono flex h-9 items-center border px-4"
-              style={{
-                background: "var(--ink)",
-                color: "var(--paper)",
-                borderColor: "var(--ink)",
-                boxShadow: "3px 3px 0 var(--vermilion)",
-              }}
-            >
-              Dashboard
-            </Link>
+            <DashboardLink />
             <UserButton appearance={{ elements: { avatarBox: "h-8 w-8" } }} />
           </SignedIn>
         </div>

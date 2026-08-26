@@ -3,15 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
-import {
-  FileAudio,
-  Link2,
-  Pin,
-  Sparkles,
-  Trash2,
-  Waves,
-  X,
-} from "lucide-react";
+import { FileAudio, Link2, Pin, Sparkles, Trash2, X } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -28,9 +20,10 @@ import { MAX_REFERENCE_URLS } from "@/components/dashboard/DashboardContext";
  * The pill owns the live loop (record → generate → insert); everything that
  * needs a list or a form — saved sessions, a pinned source document, reference
  * links — lives here in the left rail and feeds the pill through dashboard
- * context.
+ * context. The section header (and its cleanup action) belongs to the enclosing
+ * `SidebarSection`.
  */
-export function SidebarStudio({ isCompact }: { isCompact: boolean }) {
+export function SidebarStudio() {
   const {
     activeContext,
     setActiveContext,
@@ -42,9 +35,6 @@ export function SidebarStudio({ isCompact }: { isCompact: boolean }) {
 
   const recordings = useQuery(api.recordings.getRecordings);
   const deleteRecording = useMutation(api.recordings.deleteRecording);
-  const cleanupOrphaned = useMutation(
-    api.recordings.cleanupOrphanedRecordings,
-  );
 
   const [urlDraft, setUrlDraft] = useState("");
   const [showLinks, setShowLinks] = useState(false);
@@ -52,43 +42,9 @@ export function SidebarStudio({ isCompact }: { isCompact: boolean }) {
   const sessions = (recordings ?? []).filter(
     (r) => r.transcript && r.transcript.trim().length > 0,
   );
-  const failedCount = (recordings ?? []).length - sessions.length;
-
-  if (isCompact) {
-    return (
-      <div className="flex w-full flex-col items-center">
-        <Waves
-          className="h-4 w-4 text-muted-foreground/60 dark:text-muted-foreground/25"
-          aria-label="Studio"
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="w-full min-w-0">
-      <div className="mb-0.5 flex items-center justify-between px-2">
-        <h3 className="select-none text-[11px] font-medium text-muted-foreground dark:text-muted-foreground/55">
-          Studio
-        </h3>
-        {failedCount > 0 && (
-          <button
-            type="button"
-            className="text-[10px] text-amber-600 hover:underline dark:text-amber-500"
-            onClick={async () => {
-              try {
-                const r = await cleanupOrphaned();
-                toast.success(`Removed ${r.deletedCount} failed recording(s)`);
-              } catch {
-                toast.error("Cleanup failed");
-              }
-            }}
-          >
-            Clean up {failedCount}
-          </button>
-        )}
-      </div>
-
       {/* Pinned source document — generation runs against this when set. */}
       {activeContext ? (
         <div className="mx-1 mb-1.5 flex items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-2 py-1.5">
@@ -223,6 +179,38 @@ export function SidebarStudio({ isCompact }: { isCompact: boolean }) {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Header action for the Sessions section: recordings that never produced a
+ * transcript are dead weight, so offer to clear them once some exist.
+ */
+export function SessionsCleanupAction() {
+  const recordings = useQuery(api.recordings.getRecordings);
+  const cleanupOrphaned = useMutation(api.recordings.cleanupOrphanedRecordings);
+
+  const failedCount = (recordings ?? []).filter(
+    (r) => !r.transcript || r.transcript.trim().length === 0,
+  ).length;
+
+  if (failedCount === 0) return null;
+
+  return (
+    <button
+      type="button"
+      className="shrink-0 rounded px-1 py-0.5 text-[10px] text-amber-600 hover:underline dark:text-amber-500"
+      onClick={async () => {
+        try {
+          const r = await cleanupOrphaned();
+          toast.success(`Removed ${r.deletedCount} failed recording(s)`);
+        } catch {
+          toast.error("Cleanup failed");
+        }
+      }}
+    >
+      Clean up {failedCount}
+    </button>
   );
 }
 

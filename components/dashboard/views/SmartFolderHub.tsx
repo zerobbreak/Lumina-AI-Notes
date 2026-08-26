@@ -6,21 +6,14 @@ import { api } from "@/convex/_generated/api";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
-  BookOpen,
   Plus,
-  Code,
-  Dna,
-  TrendingUp,
-  Calculator,
-  Stethoscope,
-  Gavel,
-  Landmark,
-  Layout,
   Clock,
   ArrowRight,
   Layers,
   Loader2,
+  Layout,
 } from "lucide-react";
+import { getCourseIcon } from "@/lib/courseDisplay";
 import { Course } from "@/types";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
@@ -44,17 +37,7 @@ function getGreeting(hour: number) {
   return "Good evening";
 }
 
-const getIcon = (code: string) => {
-  const c = code.toLowerCase();
-  if (c.includes("cs") || c.includes("comp")) return Code;
-  if (c.includes("bio")) return Dna;
-  if (c.includes("bus") || c.includes("econ")) return TrendingUp;
-  if (c.includes("eng") || c.includes("mech")) return Calculator;
-  if (c.includes("med") || c.includes("nur")) return Stethoscope;
-  if (c.includes("law")) return Gavel;
-  if (c.includes("hist")) return Landmark;
-  return BookOpen;
-};
+const getIcon = getCourseIcon;
 
 // Animation Variants
 const containerVariants = {

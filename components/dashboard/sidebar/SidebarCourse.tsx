@@ -1,15 +1,16 @@
 "use client";
 
 import { useState, useCallback, memo, useMemo } from "react";
-import { ChevronRight, ChevronDown, Plus, FolderOpen } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronRight, ChevronDown, Plus, FileText, Hash } from "lucide-react";
 import { ActionMenu } from "@/components/shared/ActionMenu";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
+import { shouldShowCourseCode } from "@/lib/courseDisplay";
 import { Course, Module } from "@/types";
+import { CourseRowIcon } from "./CourseRowIcon";
 import { SidebarModule } from "./SidebarModule";
 import { SidebarNote } from "./SidebarNote";
 import { toast } from "sonner";
@@ -18,6 +19,8 @@ interface SidebarCourseProps {
   course: Course;
   isExpanded: boolean;
   isCompact?: boolean;
+  /** All course codes on the account — used to hide duplicate placeholder chips. */
+  peerCodes?: readonly string[];
   onToggle: () => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
@@ -32,6 +35,7 @@ function SidebarCourseComponent({
   course,
   isExpanded,
   isCompact = false,
+  peerCodes = [],
   onToggle,
   onRename,
   onDelete,
@@ -42,7 +46,11 @@ function SidebarCourseComponent({
   onArchiveNote,
 }: SidebarCourseProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isDragOver, setIsDragOver] = useState(false);
+
+  const activeNoteId = searchParams.get("noteId");
+  const isActive = searchParams.get("contextId") === course.id;
 
   const courseNotes = useQuery(api.notes.getNotesByContext, {
     courseId: course.id,
@@ -129,16 +137,28 @@ function SidebarCourseComponent({
     [courseNotes],
   );
 
+  const noteCount = useMemo(
+    () =>
+      courseNotes?.filter((note) => !note.isArchived && !note.parentNoteId)
+        .length ?? 0,
+    [courseNotes],
+  );
+
+  const showCode = shouldShowCourseCode(course.code, peerCodes);
+
   return (
     <div className={cn("relative group/item", isCompact && "px-0")}>
       <div className="relative flex items-center group/course">
         <div
+          aria-current={isActive ? "page" : undefined}
           className={cn(
-            "flex-1 flex items-center h-[30px] px-2 text-[13px] font-medium transition-colors gap-1.5 cursor-pointer rounded-md",
+            "relative flex-1 flex items-center h-7 px-2 text-[13px] font-medium transition-colors duration-100 gap-1.5 cursor-pointer rounded-md",
             isDragOver
               ? "bg-primary/10 text-primary ring-1 ring-primary/20"
-              : "text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/40",
-            isCompact && "w-9 h-9 justify-center px-0"
+              : isActive
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-sidebar-foreground/75 hover:text-sidebar-foreground hover:bg-sidebar-accent/50",
+            isCompact && "w-8 h-8 justify-center px-0"
           )}
           onClick={handleCourseClick}
           onDragOver={handleDragOver}
@@ -146,6 +166,12 @@ function SidebarCourseComponent({
           onDrop={handleDrop}
           title={isCompact ? course.name : undefined}
         >
+          {isActive && !isDragOver && (
+            <span
+              aria-hidden
+              className="absolute inset-y-1 left-0 w-[2px] rounded-r-full bg-primary"
+            />
+          )}
           {!isCompact && (
             <div
               className="p-0.5 rounded-sm transition-colors text-muted-foreground/40 hover:text-muted-foreground/70"
@@ -160,12 +186,45 @@ function SidebarCourseComponent({
           )}
 
           {isCompact ? (
-            <FolderOpen className={cn(
-              "w-[15px] h-[15px] transition-colors",
-              isExpanded ? "text-sidebar-foreground/70" : "text-muted-foreground/40"
-            )} />
+            <CourseRowIcon
+              name={course.name}
+              code={course.code}
+              isActive={isActive}
+            />
           ) : (
-            <span className="truncate flex-1">{course.code}</span>
+            <>
+              <CourseRowIcon
+                name={course.name}
+                code={course.code}
+                isActive={isActive || isDragOver}
+              />
+              <span className="min-w-0 flex-1 truncate">{course.name}</span>
+              {showCode && (
+                <span
+                  className={cn(
+                    "inline-flex max-w-[4.5rem] shrink-0 items-center gap-0.5 rounded border px-1 py-px",
+                    isActive
+                      ? "border-sidebar-border/70 bg-sidebar-accent/40"
+                      : "border-sidebar-border/40 bg-sidebar-accent/20",
+                  )}
+                  title={`Course code: ${course.code}`}
+                >
+                  <Hash className="h-2 w-2 shrink-0 text-muted-foreground/50" />
+                  <span className="truncate font-mono text-[9px] leading-none text-muted-foreground/70">
+                    {course.code}
+                  </span>
+                </span>
+              )}
+              {!isDragOver && (
+                <span
+                  className="ml-auto flex shrink-0 items-center gap-0.5 tabular-nums text-[10px] text-muted-foreground/45 transition-opacity group-hover/course:opacity-0"
+                  title={`${noteCount} note${noteCount === 1 ? "" : "s"}`}
+                >
+                  <FileText className="h-3 w-3 shrink-0" aria-hidden />
+                  {noteCount}
+                </span>
+              )}
+            </>
           )}
 
           {isDragOver && !isCompact && (
@@ -201,6 +260,7 @@ function SidebarCourseComponent({
             <SidebarNote
               key={note._id}
               note={note}
+              isActive={note._id === activeNoteId}
               isDraggable={false}
               onRename={() => onRenameNote(note._id, note.title)}
               onDelete={() => onDeleteNote(note._id)}

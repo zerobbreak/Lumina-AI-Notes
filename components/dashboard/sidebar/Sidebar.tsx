@@ -1,49 +1,55 @@
 "use client";
 
 import {
+  File,
+  FolderOpen,
+  Layers,
+  Loader2,
+  PanelLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Pin,
+  Plus,
   Search,
   Settings,
-  Layers,
-  Plus,
   Upload,
-  Loader2,
-  Archive,
-  Calendar,
-  ClipboardList,
-  Pin,
-  PanelLeftOpen,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+
 import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, useCallback } from "react";
-import { SearchDialog } from "@/components/dashboard/search/SearchDialog";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { Course } from "@/types";
-import { Id } from "@/convex/_generated/dataModel";
-import { UploadDialog } from "@/components/dashboard/dialogs/UploadDialog";
-import { SettingsDialog } from "@/components/dashboard/dialogs/SettingsDialog";
-import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
+import { DASHBOARD_NAV, activeDashboardNavId } from "@/constants/dashboardNav";
 import { useDashboard } from "@/hooks/useDashboard";
-import { DraggableDocument } from "@/components/documents";
-import { SidebarCourse } from "./SidebarCourse";
-import { SidebarNote } from "./SidebarNote";
-import { SidebarStudio, PinContextButton } from "./SidebarStudio";
-import { ActionMenu } from "@/components/shared/ActionMenu";
-import { File, FolderOpen, FileText, PenLine } from "lucide-react";
+import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
 import {
   useKeyboardShortcut,
   formatShortcut,
 } from "@/hooks/useKeyboardShortcut";
-import { ThemeToggle } from "@/components/shared/ThemeToggle";
-import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
+import { DraggableDocument } from "@/components/documents";
+import { ActionMenu } from "@/components/shared/ActionMenu";
+import { ThemeCycleButton } from "@/components/shared/ThemeToggle";
+import { SearchDialog } from "@/components/dashboard/search/SearchDialog";
+import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
+import { SettingsDialog } from "@/components/dashboard/dialogs/SettingsDialog";
+import { UploadDialog } from "@/components/dashboard/dialogs/UploadDialog";
+import { SidebarCourse } from "./SidebarCourse";
+import { SidebarNavItem } from "./SidebarNavItem";
+import { SidebarNote } from "./SidebarNote";
+import { SidebarSection, SidebarSectionAction } from "./SidebarSection";
+import {
+  PinContextButton,
+  SessionsCleanupAction,
+  SidebarStudio,
+} from "./SidebarStudio";
 
 type RenameTarget = {
   id: string;
@@ -52,16 +58,21 @@ type RenameTarget = {
   parentId?: string;
 };
 
+/**
+ * The left panel, in four zones: brand and actions, the fixed destinations,
+ * the scrolling workspace tree, and the account footer.
+ *
+ * Destinations sit outside the scroll container on purpose — a long course
+ * tree should never be able to push Archive out of reach.
+ */
 export function Sidebar() {
   const { user } = useUser();
   const router = useRouter();
-  const { leftSidebarState, setLeftSidebarState } =
-    useDashboard();
   const searchParams = useSearchParams();
+  const { leftSidebarState, setLeftSidebarState, toggleLeftSidebarRail } =
+    useDashboard();
   const { createNoteFlow } = useCreateNoteFlow();
 
-  const isCompact = leftSidebarState === "compact";
-  const isOpen = leftSidebarState === "open";
   const isClosed = leftSidebarState === "closed";
 
   const userData = useQuery(api.users.getUser);
@@ -72,7 +83,6 @@ export function Sidebar() {
   const deleteNote = useMutation(api.notes.deleteNote);
   const renameNote = useMutation(api.notes.renameNote);
   const toggleArchiveNote = useMutation(api.notes.toggleArchiveNote);
-  const updateNote = useMutation(api.notes.updateNote);
 
   const createCourse = useMutation(api.users.createCourse);
   const renameCourse = useMutation(api.users.renameCourse);
@@ -84,20 +94,15 @@ export function Sidebar() {
   const deleteFile = useMutation(api.files.deleteFile);
   const renameFile = useMutation(api.files.renameFile);
 
-  const [expandedCourses, setExpandedCourses] = useState<Record<string, boolean>>({});
+  const [expandedCourses, setExpandedCourses] = useState<
+    Record<string, boolean>
+  >({});
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [expandTarget, setExpandTarget] = useState<{
-    id: Id<"notes">;
-    title: string;
-    content?: string;
-  } | null>(null);
-  const [expandCourse, setExpandCourse] = useState<string>("");
-  const [expandModule, setExpandModule] = useState<string>("");
 
   useEffect(() => {
     setMounted(true);
@@ -112,56 +117,35 @@ export function Sidebar() {
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  const calendarView = searchParams.get("view") === "calendar";
-  useEffect(() => {
-    if (!calendarView) return;
-    if (isNarrowViewport) setLeftSidebarState("closed");
-    else setLeftSidebarState("compact");
-  }, [calendarView, isNarrowViewport, setLeftSidebarState]);
-
-  const openCalendar = useCallback(() => {
-    if (isNarrowViewport) setLeftSidebarState("closed");
-    else setLeftSidebarState("compact");
-    router.push("/dashboard?view=calendar");
-  }, [isNarrowViewport, router, setLeftSidebarState]);
-
-  const toggleCourse = (courseId: string) => {
-    setExpandedCourses((prev) => ({ ...prev, [courseId]: !prev[courseId] }));
-  };
-
-  const handleRenameConfirm = async (newValue: string) => {
-    if (!renameTarget) return;
-    const { id, type, parentId } = renameTarget;
-
-    try {
-      if (type === "note")
-        await renameNote({ noteId: id as Id<"notes">, title: newValue });
-      else if (type === "file")
-        await renameFile({ fileId: id as Id<"files">, name: newValue });
-      else if (type === "course")
-        await renameCourse({ courseId: id, name: newValue });
-      else if (type === "module" && parentId)
-        await renameModule({
-          courseId: parentId,
-          moduleId: id,
-          title: newValue,
-        });
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const openRename = (
-    id: string,
-    type: "note" | "course" | "module" | "file",
-    name: string,
-    parentId?: string,
-  ) => setRenameTarget({ id, type, name, parentId });
+  // The mobile panel is an overlay, so it is always shown at full width.
+  const isRail = leftSidebarState === "compact" && !isNarrowViewport;
 
   const currentNoteId = searchParams.get("noteId");
+  const activeNavId = activeDashboardNavId({
+    view: searchParams.get("view"),
+    noteId: currentNoteId,
+    contextId: searchParams.get("contextId"),
+  });
+
+  // Views that want the whole screen collapse the panel when they open, whether
+  // that came from a click here or from a pasted link.
+  useEffect(() => {
+    const item = DASHBOARD_NAV.find((n) => n.id === activeNavId);
+    if (!item?.prefersRail) return;
+    setLeftSidebarState(isNarrowViewport ? "closed" : "compact");
+  }, [activeNavId, isNarrowViewport, setLeftSidebarState]);
+
   const openNote = useQuery(
     api.notes.getNote,
     currentNoteId ? { noteId: currentNoteId as Id<"notes"> } : "skip",
+  );
+
+  const handleNavigate = useCallback(
+    (href: string) => {
+      router.push(href);
+      if (isNarrowViewport) setLeftSidebarState("closed");
+    },
+    [isNarrowViewport, router, setLeftSidebarState],
   );
 
   const handleCreateNote = useCallback(async () => {
@@ -182,9 +166,7 @@ export function Sidebar() {
       });
       if (result?.noteId) {
         router.push(`/dashboard?noteId=${result.noteId}`);
-        toast.success(
-          openNote ? "Sub-page created" : "New note created",
-        );
+        toast.success(openNote ? "Sub-page created" : "New note created");
       }
     } catch (e) {
       console.error(e);
@@ -192,446 +174,474 @@ export function Sidebar() {
     } finally {
       setIsCreatingNote(false);
     }
-  }, [
-    createNoteFlow,
-    userData?.major,
-    router,
-    currentNoteId,
-    openNote,
-  ]);
+  }, [createNoteFlow, userData?.major, router, currentNoteId, openNote]);
 
   useKeyboardShortcut(
     "cmd+k",
-    useCallback(() => {
-      setIsSearchOpen((open) => !open);
-    }, []),
+    useCallback(() => setIsSearchOpen((open) => !open), []),
     { preventDefault: true },
   );
 
   useKeyboardShortcut(
     "/",
-    useCallback(() => {
-      setIsSearchOpen((open) => !open);
-    }, []),
+    useCallback(() => setIsSearchOpen((open) => !open), []),
     { preventDefault: true },
   );
 
   useKeyboardShortcut("cmd+n", handleCreateNote, { preventDefault: true });
+
+  const toggleCourse = (courseId: string) =>
+    setExpandedCourses((prev) => ({ ...prev, [courseId]: !prev[courseId] }));
+
+  const openRename = (
+    id: string,
+    type: RenameTarget["type"],
+    name: string,
+    parentId?: string,
+  ) => setRenameTarget({ id, type, name, parentId });
+
+  const handleRenameConfirm = async (newValue: string) => {
+    if (!renameTarget) return;
+    const { id, type, parentId } = renameTarget;
+
+    try {
+      if (type === "note")
+        await renameNote({ noteId: id as Id<"notes">, title: newValue });
+      else if (type === "file")
+        await renameFile({ fileId: id as Id<"files">, name: newValue });
+      else if (type === "course")
+        await renameCourse({ courseId: id, name: newValue });
+      else if (type === "module" && parentId)
+        await renameModule({
+          courseId: parentId,
+          moduleId: id,
+          title: newValue,
+        });
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to rename");
+    }
+  };
 
   const handleCreateCourse = async () => {
     try {
       await createCourse({ name: "New Course", code: "CSE 101" });
     } catch (e) {
       console.error(e);
+      toast.error("Failed to create course");
     }
   };
 
-  const sidebarInner = (
-    <div className={cn(
-      "w-full h-full min-h-0 bg-sidebar flex flex-col overflow-hidden relative transition-all duration-200",
-      isCompact && "items-center"
-    )}>
-      {/* ── Header ── */}
-      <div className={cn(
-        "pt-3 pb-2 px-3 flex flex-col gap-2.5",
-        isCompact && "p-2 items-center"
-      )}>
-        <div className={cn(
-          "flex items-center justify-between",
-          isCompact && "flex-col gap-3"
-        )}>
-          <div className={cn("flex items-center gap-2 min-w-0 flex-1", isCompact && "flex-col w-full")}>
-            <div className={cn("flex items-center gap-2 min-w-0", isCompact && "flex-col gap-1.5")}>
-              <div className="w-[22px] h-[22px] rounded-[5px] bg-linear-to-br from-primary/90 to-primary/60 flex items-center justify-center shrink-0">
-                <Layers className="w-3 h-3 text-primary-foreground" />
-              </div>
-              {!isCompact && (
-                <span className="font-semibold text-[13px] tracking-tight text-sidebar-foreground truncate">
-                  Lumina
-                </span>
-              )}
-            </div>
+  const courses = userData?.courses ?? [];
+  const courseCodes = useMemo(
+    () => courses.map((course) => course.code),
+    [courses],
+  );
+
+  /* ─────────────────────────────────────────────── zone 1: brand + actions */
+
+  const header = (
+    <div className={cn("flex flex-col gap-1.5 px-2 pb-2 pt-2.5", isRail && "px-2")}>
+      <div
+        className={cn(
+          "flex items-center",
+          isRail ? "justify-center" : "justify-between gap-1",
+        )}
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[5px] bg-primary">
+            <Layers className="h-3 w-3 text-primary-foreground" />
           </div>
+          {!isRail && (
+            <span className="truncate text-[13px] font-semibold tracking-tight text-sidebar-foreground">
+              Lumina
+            </span>
+          )}
+        </div>
+        {!isNarrowViewport && (
           <Button
             variant="ghost"
             size="icon"
             className={cn(
-              "w-7 h-7 text-muted-foreground/75 dark:text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md transition-colors shrink-0 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
-              isCompact && "w-9 h-9"
+              "h-7 w-7 shrink-0 rounded-md text-muted-foreground/60 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+              isRail && "hidden",
             )}
-            onClick={handleCreateNote}
-            title="New page"
+            onClick={toggleLeftSidebarRail}
+            aria-label="Collapse to icon rail"
+            title="Collapse to icon rail"
           >
-            <Plus className="w-[15px] h-[15px]" />
-          </Button>
-        </div>
-
-        {/* Search */}
-        {!isCompact ? (
-          <button
-            type="button"
-            className="w-full flex items-center justify-between h-[30px] px-2.5 text-sidebar-foreground/88 dark:text-muted-foreground/55 hover:bg-sidebar-accent/40 rounded-md transition-colors group/search focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-            onClick={() => setIsSearchOpen(true)}
-          >
-            <span className="flex items-center gap-2 text-[13px] font-medium">
-              <Search className="w-[14px] h-[14px]" />
-              <span>Search</span>
-            </span>
-            <span className="text-[11px] text-muted-foreground/70 dark:text-muted-foreground/40 group-hover/search:text-muted-foreground dark:group-hover/search:text-muted-foreground/65 transition-colors">
-              {formatShortcut("cmd+k")}
-            </span>
-          </button>
-        ) : (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="w-9 h-9 text-muted-foreground/75 dark:text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-            onClick={() => setIsSearchOpen(true)}
-          >
-            <Search className="w-[15px] h-[15px]" />
+            <PanelLeftClose className="h-[15px] w-[15px]" />
           </Button>
         )}
       </div>
 
-      {/* ── Scrollable content ── */}
-      <ScrollArea className="flex-1 px-1.5 pb-2 min-w-0">
-        <div className={cn("space-y-5 py-1", isCompact && "space-y-6 flex flex-col items-center")}>
-
-          {/* Favorites */}
-          <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
-            {!isCompact && (
-              <div className="flex items-center justify-between px-2 mb-0.5 group min-w-0">
-                <h3 className="text-[11px] font-medium text-muted-foreground dark:text-muted-foreground/55 select-none">
-                  Favorites
-                </h3>
-              </div>
-            )}
-            <div className={cn("space-y-px w-full", isCompact && "space-y-3 flex flex-col items-center")}>
-              {pinnedNotes?.map((note) => (
-                <SidebarNote
-                  key={note._id}
-                  note={note}
-                  isCompact={isCompact}
-                  onRename={() => openRename(note._id, "note", note.title)}
-                  onDelete={() => deleteNote({ noteId: note._id })}
-                  onArchive={() => toggleArchiveNote({ noteId: note._id })}
-                />
-              ))}
-              {(!pinnedNotes || pinnedNotes.length === 0) && !isCompact && (
-                <div className="px-2 py-1.5 text-[12px] text-muted-foreground/85 dark:text-muted-foreground/45">
-                  No favorites yet
-                </div>
-              )}
-              {(!pinnedNotes || pinnedNotes.length === 0) && isCompact && (
-                <Pin className="w-4 h-4 text-muted-foreground/60 dark:text-muted-foreground/25" />
-              )}
-            </div>
-          </div>
-
-          {/* Recent Notes */}
-          <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
-            {!isCompact && (
-              <div className="flex items-center justify-between px-2 mb-0.5 group min-w-0">
-                <h3 className="text-[11px] font-medium text-muted-foreground dark:text-muted-foreground/55 select-none">
-                  Recent
-                </h3>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="w-5 h-5 text-muted-foreground/60 dark:text-muted-foreground/35 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 opacity-0 group-hover:opacity-100 transition-all rounded-sm focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-                  onClick={handleCreateNote}
-                  disabled={isCreatingNote}
-                >
-                  {isCreatingNote ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Plus className="w-3 h-3" />
-                  )}
-                </Button>
-              </div>
-            )}
-            <div className={cn("space-y-px w-full", isCompact && "space-y-3 flex flex-col items-center")}>
-              {quickNotes?.map((note) => (
-                <SidebarNote
-                  key={note._id}
-                  note={note}
-                  isCompact={isCompact}
-                  onRename={() => openRename(note._id, "note", note.title)}
-                  onDelete={() => deleteNote({ noteId: note._id })}
-                  onArchive={() => toggleArchiveNote({ noteId: note._id })}
-                />
-              ))}
-              {(!quickNotes || quickNotes.length === 0) && !isCompact && (
-                <div className="px-2 py-1.5 text-[12px] text-muted-foreground/85 dark:text-muted-foreground/45">
-                  No recent notes
-                </div>
-              )}
-              {(!quickNotes || quickNotes.length === 0) && isCompact && (
-                <FileText className="w-4 h-4 text-muted-foreground/60 dark:text-muted-foreground/25" />
-              )}
-            </div>
-          </div>
-
-          {/* Note Studio */}
-          <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
-            {!isCompact && (
-              <div className="flex items-center justify-between px-2 mb-0.5 group min-w-0">
-                <h3 className="text-[11px] font-medium text-muted-foreground dark:text-muted-foreground/55 select-none">
-                  Note Studio
-                </h3>
-              </div>
-            )}
-            <div className={cn("space-y-px w-full", isCompact && "space-y-3 flex flex-col items-center")}>
-              <button
-                type="button"
-                className={cn(
-                  "w-full flex items-center h-[30px] px-2 text-[13px] text-sidebar-foreground/92 dark:text-muted-foreground/72 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
-                  isCompact && "w-9 h-9 justify-center px-0",
-                  searchParams.get("view") === "studio" && "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-sm ring-1 ring-sidebar-border/40 dark:bg-sidebar-accent/55 dark:text-sidebar-accent-foreground",
-                )}
-                onClick={() => router.push("/dashboard?view=studio")}
-                title={isCompact ? "Note Studio" : undefined}
-              >
-                <PenLine className="w-[14px] h-[14px] shrink-0 text-current opacity-80 group-hover/tool:opacity-100 transition-opacity" />
-                {!isCompact && <span>Workspace</span>}
-              </button>
-            </div>
-          </div>
-
-          {/* Smart Folders / Courses */}
-          <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
-            {!isCompact && (
-              <div className="flex items-center justify-between px-2 mb-0.5 group min-w-0">
-                <h3 className="text-[11px] font-medium text-muted-foreground dark:text-muted-foreground/55 select-none">
-                  Courses
-                </h3>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="w-5 h-5 text-muted-foreground/60 dark:text-muted-foreground/35 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 opacity-0 group-hover:opacity-100 transition-all rounded-sm focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-                  onClick={handleCreateCourse}
-                >
-                  <Plus className="w-3 h-3" />
-                </Button>
-              </div>
-            )}
-            <div className={cn("space-y-px w-full", isCompact && "space-y-3 flex flex-col items-center")}>
-              {userData?.courses?.map((course: Course) => (
-                <SidebarCourse
-                  key={course.id}
-                  course={course}
-                  isCompact={isCompact}
-                  isExpanded={!!expandedCourses[course.id]}
-                  onToggle={() => toggleCourse(course.id)}
-                  onRename={(id, name) => openRename(id, "course", name)}
-                  onDelete={(id) => deleteCourse({ courseId: id })}
-                  onRenameModule={(id, name, parentId) =>
-                    openRename(id, "module", name, parentId)
-                  }
-                  onDeleteModule={(id, parentId) =>
-                    deleteModule({ courseId: parentId, moduleId: id })
-                  }
-                  onRenameNote={(id, title) => openRename(id, "note", title)}
-                  onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
-                  onArchiveNote={(id) =>
-                    toggleArchiveNote({ noteId: id as Id<"notes"> })
-                  }
-                />
-              ))}
-              {isCompact && (!userData?.courses || userData.courses.length === 0) && (
-                <FolderOpen className="w-4 h-4 text-muted-foreground/60 dark:text-muted-foreground/25" />
-              )}
-            </div>
-          </div>
-
-          {/* Studio — saved sessions, pinned context, reference links.
-              The live capture loop itself lives in the transcription pill. */}
-          <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
-            <SidebarStudio isCompact={isCompact} />
-          </div>
-
-          {/* Resources */}
-          <div className={cn("min-w-0 w-full", isCompact && "flex flex-col items-center")}>
-            {!isCompact && (
-              <div className="flex items-center justify-between px-2 mb-0.5 group min-w-0">
-                <h3 className="text-[11px] font-medium text-muted-foreground dark:text-muted-foreground/55 select-none">
-                  Resources
-                </h3>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="w-5 h-5 text-muted-foreground/60 dark:text-muted-foreground/35 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 opacity-0 group-hover:opacity-100 transition-all rounded-sm focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-                  onClick={() => setIsUploadOpen(true)}
-                >
-                  <Upload className="w-3 h-3" />
-                </Button>
-              </div>
-            )}
-            <div className={cn("space-y-px w-full", isCompact && "space-y-3 flex flex-col items-center")}>
-              {recentFiles?.slice(0, 5).map((file) => (
-                <DraggableDocument
-                  key={file._id}
-                  documentId={file._id}
-                  documentName={file.name}
-                  processingStatus={file.processingStatus}
-                  showDragIndicator={false}
-                >
-                  <div className={cn("relative group/file flex items-center", isCompact && "px-0")}>
-                    <button
-                      type="button"
-                      className={cn(
-                        "w-full flex items-center h-[30px] px-2 text-[13px] text-sidebar-foreground/92 dark:text-muted-foreground/72 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2 transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
-                        isCompact && "w-9 h-9 justify-center px-0"
-                      )}
-                      title={isCompact ? file.name : undefined}
-                    >
-                      <File className="w-[14px] h-[14px] shrink-0 text-current opacity-75" />
-                      {!isCompact && <span className="truncate flex-1 text-left">{file.name}</span>}
-                    </button>
-                    {!isCompact && (
-                      <div className="absolute right-1 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/file:opacity-100 focus-within:opacity-100">
-                        <PinContextButton
-                          fileId={file._id}
-                          fileName={file.name}
-                        />
-                        <ActionMenu
-                          onRename={() => openRename(file._id, "file", file.name)}
-                          onDelete={() => deleteFile({ fileId: file._id })}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </DraggableDocument>
-              ))}
-              {isCompact && (!recentFiles || recentFiles.length === 0) && (
-                <File className="w-4 h-4 text-muted-foreground/60 dark:text-muted-foreground/25" />
-              )}
-            </div>
-          </div>
-
-          {/* Tools */}
-          <div className={cn(
-            "min-w-0 w-full pt-3 border-t border-sidebar-border/50",
-            isCompact && "flex flex-col items-center pt-4"
-          )}>
-            {!isCompact && (
-              <div className="px-2 mb-0.5">
-                <h3 className="text-[11px] font-medium text-muted-foreground dark:text-muted-foreground/55 select-none">
-                  Tools
-                </h3>
-              </div>
-            )}
-            <div className={cn("space-y-px w-full", isCompact && "space-y-3 flex flex-col items-center")}>
-              <button
-                type="button"
-                className={cn(
-                  "w-full flex items-center h-[30px] px-2 text-[13px] text-sidebar-foreground/92 dark:text-muted-foreground/72 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
-                  isCompact && "w-9 h-9 justify-center px-0",
-                  calendarView && "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-sm ring-1 ring-sidebar-border/40 dark:bg-sidebar-accent/55",
-                )}
-                onClick={openCalendar}
-                title={isCompact ? "Calendar" : undefined}
-              >
-                <Calendar className="w-[14px] h-[14px] shrink-0 text-current opacity-80 group-hover/tool:opacity-100 transition-opacity" />
-                {!isCompact && <span>Calendar</span>}
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  "w-full flex items-center h-[30px] px-2 text-[13px] text-sidebar-foreground/92 dark:text-muted-foreground/72 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
-                  isCompact && "w-9 h-9 justify-center px-0",
-                )}
-                onClick={() => router.push("/dashboard?view=flashcards")}
-                title={isCompact ? "Flashcards" : undefined}
-              >
-                <Layers className="w-[14px] h-[14px] shrink-0 text-current opacity-80 group-hover/tool:opacity-100 transition-opacity" />
-                {!isCompact && <span>Flashcards</span>}
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  "w-full flex items-center h-[30px] px-2 text-[13px] text-sidebar-foreground/92 dark:text-muted-foreground/72 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
-                  isCompact && "w-9 h-9 justify-center px-0"
-                )}
-                onClick={() => router.push("/dashboard?view=quizzes")}
-                title={isCompact ? "Quizzes" : undefined}
-              >
-                <ClipboardList className="w-[14px] h-[14px] shrink-0 text-current opacity-80 group-hover/tool:opacity-100 transition-opacity" />
-                {!isCompact && <span>Quizzes</span>}
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  "w-full flex items-center h-[30px] px-2 text-[13px] text-sidebar-foreground/92 dark:text-muted-foreground/72 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2.5 rounded-md transition-colors group/tool focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
-                  isCompact && "w-9 h-9 justify-center px-0"
-                )}
-                onClick={() => router.push("/dashboard?view=archive")}
-                title={isCompact ? "Archive" : undefined}
-              >
-                <Archive className="w-[14px] h-[14px] shrink-0 text-current opacity-80 group-hover/tool:opacity-100 transition-opacity" />
-                {!isCompact && <span>Archive</span>}
-              </button>
-            </div>
-          </div>
-        </div>
-      </ScrollArea>
-
-      {/* ── Footer ── */}
-      <div className={cn(
-        "px-3 py-3 border-t border-sidebar-border/50 transition-all duration-200",
-        isCompact && "p-2 items-center flex flex-col"
-      )}>
-        <div className={cn("flex items-center gap-2.5 group/footer", isCompact && "flex-col gap-2")}>
-          <div className="relative shrink-0">
-            {mounted ? (
-              <UserButton
-                appearance={{
-                  elements: {
-                    avatarBox: cn(
-                      "rounded-md ring-1 ring-sidebar-border hover:ring-sidebar-foreground/20 transition-all",
-                      isCompact ? "w-9 h-9" : "w-7 h-7"
-                    ),
-                  },
-                }}
-              />
+      {isRail ? (
+        <div className="flex flex-col items-center gap-1 pt-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-md text-muted-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+            onClick={toggleLeftSidebarRail}
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
+          >
+            <PanelLeft className="h-[15px] w-[15px]" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-md text-muted-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+            onClick={handleCreateNote}
+            disabled={isCreatingNote}
+            aria-label="New note"
+            title={`New note · ${formatShortcut("cmd+n")}`}
+          >
+            {isCreatingNote ? (
+              <Loader2 className="h-[15px] w-[15px] animate-spin" />
             ) : (
-              <div className={cn("rounded-md bg-sidebar-accent animate-pulse", isCompact ? "w-9 h-9" : "w-7 h-7")} />
+              <Plus className="h-[15px] w-[15px]" />
             )}
-            <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 border-[1.5px] border-sidebar rounded-full" />
-          </div>
-          {!isCompact && (
-            <div className="flex-1 overflow-hidden min-w-0">
-              <p className="text-[13px] font-medium text-sidebar-foreground truncate leading-tight">
-                {user?.fullName || "Student"}
-              </p>
-              <p className="text-[11px] text-muted-foreground dark:text-muted-foreground/60 truncate leading-tight">
-                Pro Plan
-              </p>
-            </div>
-          )}
-          {!isCompact && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="w-7 h-7 text-muted-foreground/70 dark:text-muted-foreground/45 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md opacity-0 group-hover/footer:opacity-100 transition-all focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-              onClick={() => setIsSettingsOpen(true)}
-            >
-              <Settings className="w-[14px] h-[14px]" />
-            </Button>
-          )}
-          {isCompact && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="w-9 h-9 text-muted-foreground/75 dark:text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-md focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-              onClick={() => setIsSettingsOpen(true)}
-            >
-              <Settings className="w-[15px] h-[15px]" />
-            </Button>
-          )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-md text-muted-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+            onClick={() => setIsSearchOpen(true)}
+            aria-label="Search"
+            title={`Search · ${formatShortcut("cmd+k")}`}
+          >
+            <Search className="h-[15px] w-[15px]" />
+          </Button>
         </div>
-        {!isCompact && <div className="mt-2.5"><ThemeToggle /></div>}
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={handleCreateNote}
+            disabled={isCreatingNote}
+            className="flex h-7 w-full items-center justify-center gap-1.5 rounded-md bg-primary text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar disabled:opacity-60"
+          >
+            {isCreatingNote ? (
+              <Loader2 className="h-[13px] w-[13px] animate-spin" />
+            ) : (
+              <Plus className="h-[13px] w-[13px]" />
+            )}
+            <span>{openNote ? "New sub-page" : "New note"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsSearchOpen(true)}
+            className="group/search flex h-7 w-full items-center justify-between rounded-md border border-sidebar-border/70 bg-sidebar-accent/25 px-2 transition-colors hover:bg-sidebar-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar"
+          >
+            <span className="flex items-center gap-2 text-[13px] text-muted-foreground/80">
+              <Search className="h-[13px] w-[13px]" />
+              <span>Search</span>
+            </span>
+            <span className="text-[10px] text-muted-foreground/50 transition-colors group-hover/search:text-muted-foreground/80">
+              {formatShortcut("cmd+k")}
+            </span>
+          </button>
+        </>
+      )}
+    </div>
+  );
+
+  /* ────────────────────────────────────────────── zone 2: fixed destinations */
+
+  const destinations = (
+    <TooltipProvider delayDuration={300}>
+      <nav
+        aria-label="Dashboard"
+        className={cn(
+          "shrink-0 space-y-px pb-2",
+          isRail ? "flex flex-col items-center gap-1 px-2" : "px-2",
+        )}
+      >
+        {DASHBOARD_NAV.map((item) => (
+          <SidebarNavItem
+            key={item.id}
+            label={item.label}
+            icon={item.icon}
+            isRail={isRail}
+            isActive={activeNavId === item.id}
+            onClick={() => handleNavigate(item.href)}
+          />
+        ))}
+      </nav>
+    </TooltipProvider>
+  );
+
+  /* ─────────────────────────────────────────── zone 3: workspace tree (rail) */
+
+  const railTree = (
+    <ScrollArea className="min-h-0 min-w-0 flex-1 px-2 py-2">
+      <div className="flex flex-col items-center gap-1">
+        {pinnedNotes?.length ? (
+          pinnedNotes.map((note) => (
+            <SidebarNote
+              key={note._id}
+              note={note}
+              isCompact
+              isActive={note._id === currentNoteId}
+              onRename={() => openRename(note._id, "note", note.title)}
+              onDelete={() => deleteNote({ noteId: note._id })}
+              onArchive={() => toggleArchiveNote({ noteId: note._id })}
+            />
+          ))
+        ) : (
+          <Pin className="h-4 w-4 text-muted-foreground/25" />
+        )}
+        <div className="my-1 h-px w-6 bg-sidebar-border/70" />
+        {courses.length ? (
+          courses.map((course: Course) => (
+            <SidebarCourse
+              key={course.id}
+              course={course}
+              isCompact
+              peerCodes={courseCodes}
+              isExpanded={!!expandedCourses[course.id]}
+              onToggle={() => toggleCourse(course.id)}
+              onRename={(id, name) => openRename(id, "course", name)}
+              onDelete={(id) => deleteCourse({ courseId: id })}
+              onRenameModule={(id, name, parentId) =>
+                openRename(id, "module", name, parentId)
+              }
+              onDeleteModule={(id, parentId) =>
+                deleteModule({ courseId: parentId, moduleId: id })
+              }
+              onRenameNote={(id, title) => openRename(id, "note", title)}
+              onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
+              onArchiveNote={(id) =>
+                toggleArchiveNote({ noteId: id as Id<"notes"> })
+              }
+            />
+          ))
+        ) : (
+          <FolderOpen className="h-4 w-4 text-muted-foreground/25" />
+        )}
       </div>
+    </ScrollArea>
+  );
+
+  /* ─────────────────────────────────────────── zone 3: workspace tree (open) */
+
+  const tree = (
+    <ScrollArea className="min-h-0 min-w-0 flex-1 px-1 py-2">
+      <div className="space-y-3">
+        <SidebarSection
+          id="favorites"
+          label="Favorites"
+          isEmpty={!pinnedNotes?.length}
+          emptyLabel="Pin a note to keep it here"
+        >
+          {pinnedNotes?.map((note) => (
+            <SidebarNote
+              key={note._id}
+              note={note}
+              isActive={note._id === currentNoteId}
+              onRename={() => openRename(note._id, "note", note.title)}
+              onDelete={() => deleteNote({ noteId: note._id })}
+              onArchive={() => toggleArchiveNote({ noteId: note._id })}
+            />
+          ))}
+        </SidebarSection>
+
+        <SidebarSection
+          id="recent"
+          label="Recent"
+          isEmpty={!quickNotes?.length}
+          emptyLabel="No recent notes"
+          action={
+            <SidebarSectionAction
+              icon={Plus}
+              label="New note"
+              onClick={handleCreateNote}
+              disabled={isCreatingNote}
+            />
+          }
+        >
+          {quickNotes?.map((note) => (
+            <SidebarNote
+              key={note._id}
+              note={note}
+              isActive={note._id === currentNoteId}
+              onRename={() => openRename(note._id, "note", note.title)}
+              onDelete={() => deleteNote({ noteId: note._id })}
+              onArchive={() => toggleArchiveNote({ noteId: note._id })}
+            />
+          ))}
+        </SidebarSection>
+
+        <SidebarSection
+          id="courses"
+          label="Courses"
+          isEmpty={courses.length === 0}
+          emptyLabel="No courses yet"
+          action={
+            <SidebarSectionAction
+              icon={Plus}
+              label="New course"
+              onClick={handleCreateCourse}
+            />
+          }
+        >
+          {courses.map((course: Course) => (
+            <SidebarCourse
+              key={course.id}
+              course={course}
+              peerCodes={courseCodes}
+              isExpanded={!!expandedCourses[course.id]}
+              onToggle={() => toggleCourse(course.id)}
+              onRename={(id, name) => openRename(id, "course", name)}
+              onDelete={(id) => deleteCourse({ courseId: id })}
+              onRenameModule={(id, name, parentId) =>
+                openRename(id, "module", name, parentId)
+              }
+              onDeleteModule={(id, parentId) =>
+                deleteModule({ courseId: parentId, moduleId: id })
+              }
+              onRenameNote={(id, title) => openRename(id, "note", title)}
+              onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
+              onArchiveNote={(id) =>
+                toggleArchiveNote({ noteId: id as Id<"notes"> })
+              }
+            />
+          ))}
+        </SidebarSection>
+
+        <SidebarSection
+          id="sessions"
+          label="Sessions"
+          action={<SessionsCleanupAction />}
+        >
+          <SidebarStudio />
+        </SidebarSection>
+
+        <SidebarSection
+          id="resources"
+          label="Resources"
+          isEmpty={!recentFiles?.length}
+          emptyLabel="No files yet"
+          action={
+            <SidebarSectionAction
+              icon={Upload}
+              label="Upload a file"
+              onClick={() => setIsUploadOpen(true)}
+            />
+          }
+        >
+          {recentFiles?.slice(0, 5).map((file) => (
+            <DraggableDocument
+              key={file._id}
+              documentId={file._id}
+              documentName={file.name}
+              processingStatus={file.processingStatus}
+              showDragIndicator={false}
+            >
+              <div className="group/file relative flex items-center">
+                <button
+                  type="button"
+                  className="flex h-7 w-full items-center gap-2 rounded-md px-2 text-[13px] text-sidebar-foreground/75 transition-colors duration-100 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar"
+                >
+                  <File className="h-[14px] w-[14px] shrink-0 opacity-60" />
+                  <span className="flex-1 truncate text-left">{file.name}</span>
+                </button>
+                <div className="absolute right-1 flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/file:opacity-100">
+                  <PinContextButton fileId={file._id} fileName={file.name} />
+                  <ActionMenu
+                    onRename={() => openRename(file._id, "file", file.name)}
+                    onDelete={() => deleteFile({ fileId: file._id })}
+                  />
+                </div>
+              </div>
+            </DraggableDocument>
+          ))}
+        </SidebarSection>
+      </div>
+    </ScrollArea>
+  );
+
+  /* ───────────────────────────────────────────────────── zone 4: the footer */
+
+  const footer = (
+    <div
+      className={cn(
+        "shrink-0 border-t border-sidebar-border/60 p-2",
+        isRail && "flex flex-col items-center gap-1",
+      )}
+    >
+      {isRail ? (
+        <>
+          {mounted ? (
+            <UserButton
+              appearance={{
+                elements: {
+                  avatarBox:
+                    "w-7 h-7 rounded-md ring-1 ring-sidebar-border hover:ring-sidebar-foreground/20 transition-all",
+                },
+              }}
+            />
+          ) : (
+            <div className="h-7 w-7 animate-pulse rounded-md bg-sidebar-accent" />
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-md text-muted-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+            onClick={() => setIsSettingsOpen(true)}
+            aria-label="Settings"
+            title="Settings"
+          >
+            <Settings className="h-[15px] w-[15px]" />
+          </Button>
+        </>
+      ) : (
+        <div className="flex items-center gap-2">
+          {mounted ? (
+            <UserButton
+              appearance={{
+                elements: {
+                  avatarBox:
+                    "w-7 h-7 rounded-md ring-1 ring-sidebar-border hover:ring-sidebar-foreground/20 transition-all",
+                },
+              }}
+            />
+          ) : (
+            <div className="h-7 w-7 shrink-0 animate-pulse rounded-md bg-sidebar-accent" />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-medium leading-tight text-sidebar-foreground">
+              {user?.fullName || "Student"}
+            </p>
+            {user?.primaryEmailAddress?.emailAddress && (
+              <p className="truncate text-[11px] leading-tight text-muted-foreground/60">
+                {user.primaryEmailAddress.emailAddress}
+              </p>
+            )}
+          </div>
+          <ThemeCycleButton />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0 rounded-md text-muted-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+            onClick={() => setIsSettingsOpen(true)}
+            aria-label="Settings"
+            title="Settings"
+          >
+            <Settings className="h-[14px] w-[14px]" />
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+
+  const sidebarInner = (
+    <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-sidebar">
+      {header}
+      {destinations}
+      <div className="mx-2 h-px shrink-0 bg-sidebar-border/60" />
+      {isRail ? railTree : tree}
+      {footer}
     </div>
   );
 
@@ -641,10 +651,12 @@ export function Sidebar() {
       {!isNarrowViewport && (
         <div
           className={cn(
-            "h-screen shrink-0 z-50 relative overflow-visible border-sidebar-border transition-all duration-200 ease-out",
-            isOpen ? "w-[260px] border-r opacity-100" :
-            isCompact ? "w-[60px] border-r opacity-100" :
-            "w-0 border-transparent opacity-0 pointer-events-none"
+            "relative z-50 h-screen shrink-0 overflow-visible border-sidebar-border transition-[width] duration-200 ease-out",
+            isClosed
+              ? "w-0 border-transparent opacity-0 pointer-events-none"
+              : isRail
+                ? "w-[60px] border-r opacity-100"
+                : "w-[248px] border-r opacity-100",
           )}
         >
           {sidebarInner}
@@ -653,11 +665,11 @@ export function Sidebar() {
             <button
               type="button"
               onClick={() => setLeftSidebarState("open")}
-              className="fixed left-3 top-3 w-8 h-8 bg-sidebar border border-sidebar-border rounded-md flex items-center justify-center text-muted-foreground/75 dark:text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all z-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+              className="fixed left-3 top-3 z-60 flex h-8 w-8 items-center justify-center rounded-md border border-sidebar-border bg-sidebar text-muted-foreground/70 transition-all hover:bg-sidebar-accent/60 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
               aria-label="Show sidebar"
               title="Show sidebar"
             >
-              <PanelLeftOpen className="w-4 h-4" />
+              <PanelLeftOpen className="h-4 w-4" />
             </button>
           )}
         </div>
@@ -672,10 +684,7 @@ export function Sidebar() {
             aria-label="Close sidebar"
             onClick={() => setLeftSidebarState("closed")}
           />
-          <div className={cn(
-            "relative h-full shadow-xl border-r border-sidebar-border bg-sidebar transition-all duration-200",
-            isOpen ? "w-[min(260px,90vw)]" : "w-[60px]"
-          )}>
+          <div className="relative h-full w-[min(272px,88vw)] border-r border-sidebar-border bg-sidebar shadow-xl">
             {sidebarInner}
           </div>
         </div>
@@ -684,9 +693,9 @@ export function Sidebar() {
           type="button"
           onClick={() => setLeftSidebarState("open")}
           aria-label="Open sidebar"
-          className="fixed left-3 bottom-3 w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-primary-foreground shadow-lg z-100 active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="fixed bottom-3 left-3 z-100 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <Plus className="w-5 h-5" />
+          <PanelLeftOpen className="h-5 w-5" />
         </button>
       ) : null}
 
@@ -719,91 +728,6 @@ export function Sidebar() {
       )}
       <SearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
       <SettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
-
-      <Dialog open={!!expandTarget} onOpenChange={(open) => !open && setExpandTarget(null)}>
-        <DialogContent className="sm:max-w-md bg-[#0B0B0B] border-white/10 text-white">
-          <DialogHeader>
-            <DialogTitle>Expand Quick Capture</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="text-sm text-gray-400">
-              Choose a course and module for this capture.
-            </div>
-            <div className="space-y-2">
-              <Label className="text-gray-400">Course</Label>
-              <Select value={expandCourse} onValueChange={(val) => {
-                setExpandCourse(val);
-                setExpandModule("");
-              }}>
-                <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                  <SelectValue placeholder="Select course" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1A1A1A] border-white/10 text-white">
-                  {userData?.courses?.map((course: Course) => (
-                    <SelectItem key={course.id} value={course.id}>
-                      {course.code} - {course.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {expandCourse && (
-              <div className="space-y-2">
-                <Label className="text-gray-400">Module (optional)</Label>
-                <Select value={expandModule} onValueChange={setExpandModule}>
-                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                    <SelectValue placeholder="Select module" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#1A1A1A] border-white/10 text-white">
-                    {(userData?.courses?.find((c: Course) => c.id === expandCourse)?.modules || []).map(
-                      (mod) => (
-                        <SelectItem key={mod.id} value={mod.id}>
-                          {mod.title}
-                        </SelectItem>
-                      ),
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" className="text-gray-400" onClick={() => setExpandTarget(null)}>
-              Cancel
-            </Button>
-            <Button
-              className="bg-cyan-500 hover:bg-cyan-600 text-white"
-              disabled={!expandCourse || !expandTarget}
-              onClick={async () => {
-                if (!expandTarget) return;
-                const result = await createNoteFlow({
-                  title: expandTarget.title || "Quick Capture",
-                  major: userData?.major || "general",
-                  courseId: expandCourse,
-                  moduleId: expandModule || undefined,
-                  noteType: "page",
-                });
-                if (!result?.noteId) return;
-                const content = expandTarget.content || "";
-                await updateNote({
-                  noteId: result.noteId,
-                  content: content ? `<p>${content}</p>` : "",
-                });
-                await updateNote({
-                  noteId: expandTarget.id,
-                  quickCaptureStatus: "expanded",
-                  quickCaptureExpandedNoteId: result.noteId,
-                });
-                setExpandTarget(null);
-                toast.success("Capture expanded into full note");
-                router.push(`/dashboard?noteId=${result.noteId}`);
-              }}
-            >
-              Expand
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

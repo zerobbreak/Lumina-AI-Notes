@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { Folder, ChevronRight, ChevronDown } from "lucide-react";
 import { ActionMenu } from "@/components/shared/ActionMenu";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -34,8 +34,12 @@ export function SidebarModule({
   onArchiveNote,
 }: SidebarModuleProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  const activeNoteId = searchParams.get("noteId");
+  const isActive = searchParams.get("contextId") === module.id;
 
   const moduleNotes = useQuery(api.notes.getNotesByContext, {
     moduleId: module.id,
@@ -90,11 +94,14 @@ export function SidebarModule({
     <div className="relative group/module">
       <div className="flex items-center">
         <div
+          aria-current={isActive ? "page" : undefined}
           className={cn(
-            "flex-1 flex items-center h-[28px] px-2 text-[12px] gap-1.5 transition-colors cursor-pointer rounded-md",
+            "relative flex-1 flex items-center h-7 px-2 text-[12px] gap-1.5 transition-colors duration-100 cursor-pointer rounded-md",
             isDragOver
               ? "text-primary bg-primary/10 ring-1 ring-primary/20"
-              : "text-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/40",
+              : isActive
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50",
           )}
           onClick={() => {
             router.push(`/dashboard?contextId=${module.id}&contextType=module`);
@@ -119,10 +126,8 @@ export function SidebarModule({
 
           <Folder
             className={cn(
-              "w-3.5 h-3.5 shrink-0 transition-colors",
-              isDragOver
-                ? "text-primary/70"
-                : "text-muted-foreground/30",
+              "w-3.5 h-3.5 shrink-0 transition-opacity",
+              isActive || isDragOver ? "opacity-100" : "opacity-55",
             )}
           />
           <span className="truncate flex-1">{module.title}</span>
@@ -148,6 +153,7 @@ export function SidebarModule({
             <SidebarNote
               key={note._id}
               note={note}
+              isActive={note._id === activeNoteId}
               isDraggable={false}
               onRename={() => onRenameNote(note._id, note.title)}
               onDelete={() => onDeleteNote(note._id)}

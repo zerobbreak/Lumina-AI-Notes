@@ -4,6 +4,50 @@ import * as React from "react";
 import { Moon, Sun, Laptop } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+const THEME_CYCLE = ["light", "dark", "system"] as const;
+
+const THEME_ICON = {
+  light: Sun,
+  dark: Moon,
+  system: Laptop,
+} as const;
+
+/**
+ * Single-button variant for tight spots like the sidebar footer, where the
+ * three-segment control costs a whole row.
+ */
+export function ThemeCycleButton({ className }: { className?: string }) {
+  const { setTheme, theme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const current = (
+    mounted && theme && theme in THEME_ICON ? theme : "system"
+  ) as keyof typeof THEME_ICON;
+  const Icon = THEME_ICON[current];
+  const next = THEME_CYCLE[(THEME_CYCLE.indexOf(current) + 1) % THEME_CYCLE.length]!;
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className={cn(
+        "h-7 w-7 rounded-md text-muted-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+        className,
+      )}
+      onClick={() => setTheme(next)}
+      aria-label={`Theme: ${current}. Switch to ${next}.`}
+      title={`Theme: ${current} — switch to ${next}`}
+    >
+      <Icon className="h-[14px] w-[14px]" />
+    </Button>
+  );
+}
 
 export function ThemeToggle() {
   const { setTheme, theme } = useTheme();

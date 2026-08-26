@@ -8,6 +8,7 @@
 export type PillPhase =
   | "idle"
   | "listening"
+  | "isolating"
   | "paused"
   | "thinking"
   | "ready"
@@ -15,6 +16,7 @@ export type PillPhase =
 
 export type PillPhaseInput = {
   isRecording: boolean;
+  isIsolating?: boolean;
   isThinking: boolean;
   isSearchOpen: boolean;
   hasTranscript: boolean;
@@ -30,6 +32,7 @@ export type PillPhaseInput = {
  */
 export function resolvePhase({
   isRecording,
+  isIsolating,
   isThinking,
   isSearchOpen,
   hasTranscript,
@@ -37,6 +40,7 @@ export function resolvePhase({
 }: PillPhaseInput): PillPhase {
   if (isSearchOpen) return "searching";
   if (isRecording) return "listening";
+  if (isIsolating) return "isolating";
   if (isThinking) return "thinking";
   if (hasNotes) return "ready";
   if (hasTranscript) return "paused";
@@ -52,6 +56,12 @@ export const THINKING_STAGES = [
   "Pulling out key ideas",
   "Structuring your notes",
   "Tightening the wording",
+] as const;
+
+/** Captions while ElevenLabs strips background noise from the take. */
+export const ISOLATING_STAGES = [
+  "Isolating speech",
+  "Removing background noise",
 ] as const;
 
 /** Milliseconds each thinking caption holds before the next fades in. */
@@ -87,6 +97,8 @@ export function phaseLabel(phase: PillPhase): string {
   switch (phase) {
     case "listening":
       return "Listening";
+    case "isolating":
+      return "Isolating speech";
     case "paused":
       return "Paused";
     case "thinking":

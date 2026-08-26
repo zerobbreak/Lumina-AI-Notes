@@ -2,25 +2,37 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import {
+  pickRecorderMimeType,
+  recorderContainerMime,
+  type CapturedSessionAudio,
+} from "@/lib/sessionAudio";
+
 /**
- * Live microphone band levels for waveform UI.
+ * Live microphone band levels plus a MediaRecorder capture of the same stream.
  *
- * The Web Speech API exposes no audio data, so the meter runs a parallel
- * getUserMedia stream through an AnalyserNode. Levels are normalised to 0..1
- * and updated on every other frame — 30fps is indistinguishable on bars this
- * small and halves the React work while recording.
+ * The Web Speech API exposes no audio data, so the meter and the session
+ * recording share one getUserMedia stream: an AnalyserNode for the waveform,
+ * a MediaRecorder so ElevenLabs can isolate speech after the user stops.
+ *
+ * Levels are normalised to 0..1 and updated on every other frame — 30fps is
+ * indistinguishable on bars this small and halves the React work while recording.
  */
 export function useMicLevels(bandCount: number) {
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const rafRef = useRef<number | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const mimeTypeRef = useRef("audio/webm");
+  const generationRef = useRef(0);
 
   const [levels, setLevels] = useState<number[]>(() =>
     Array(bandCount).fill(0),
   );
 
-  const stop = useCallback(() => {
+  const stopHardware = useCallback(() => {
     if (rafRef.current != null) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
@@ -37,10 +49,64 @@ export function useMicLevels(bandCount: number) {
     setLevels(Array(bandCount).fill(0));
   }, [bandCount]);
 
+  const stop = useCallback(() => {
+    generationRef.current += 1;
+    const recorder = recorderRef.current;
+    recorderRef.current = null;
+    chunksRef.current = [];
+    if (recorder && recorder.state !== "inactive") {
+      try {
+        recorder.stop();
+      } catch {
+        // Already stopped.
+      }
+    }
+    stopHardware();
+  }, [stopHardware]);
+
+  const stopAndCollect = useCallback((): Promise<CapturedSessionAudio | null> => {
+    return new Promise((resolve) => {
+      const recorder = recorderRef.current;
+      if (!recorder || recorder.state === "inactive") {
+        stop();
+        resolve(null);
+        return;
+      }
+
+      const mimeType = recorderContainerMime(mimeTypeRef.current);
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        chunksRef.current = [];
+        recorderRef.current = null;
+        stopHardware();
+        resolve(blob.size > 0 ? { blob, mimeType: blob.type || mimeType } : null);
+      };
+
+      try {
+        if (recorder.state === "recording") recorder.requestData();
+        recorder.stop();
+      } catch {
+        stop();
+        resolve(null);
+      }
+    });
+  }, [stop, stopHardware]);
+
   const start = useCallback(async () => {
     stop();
+    const generation = generationRef.current;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          autoGainControl: true,
+          channelCount: 1,
+        },
+      });
+      if (generation !== generationRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return false;
+      }
       streamRef.current = stream;
 
       const ctx = new AudioContext();
@@ -84,6 +150,25 @@ export function useMicLevels(bandCount: number) {
       };
 
       rafRef.current = requestAnimationFrame(tick);
+
+      const mimeType = pickRecorderMimeType();
+      mimeTypeRef.current = mimeType || "audio/webm";
+      chunksRef.current = [];
+      try {
+        const recorder = mimeType
+          ? new MediaRecorder(stream, { mimeType })
+          : new MediaRecorder(stream);
+        mimeTypeRef.current = recorder.mimeType || mimeTypeRef.current;
+        recorder.ondataavailable = (event) => {
+          if (generation !== generationRef.current) return;
+          if (event.data.size > 0) chunksRef.current.push(event.data);
+        };
+        recorder.start(1000);
+        recorderRef.current = recorder;
+      } catch (e) {
+        console.warn("[useMicLevels] MediaRecorder unavailable:", e);
+      }
+
       return true;
     } catch (e) {
       console.warn("[useMicLevels] microphone meter unavailable:", e);
@@ -93,5 +178,5 @@ export function useMicLevels(bandCount: number) {
 
   useEffect(() => stop, [stop]);
 
-  return { levels, start, stop };
+  return { levels, start, stop, stopAndCollect };
 }

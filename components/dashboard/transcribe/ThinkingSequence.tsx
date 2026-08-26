@@ -19,16 +19,22 @@ const DOT_COUNT = 5;
  * the loop costs nothing on the main thread while notes generate. Both layers
  * inherit `currentColor` so the parent owns the phase colour.
  */
-export function ThinkingSequence({ className }: { className?: string }) {
+export function ThinkingSequence({
+  className,
+  stages = THINKING_STAGES,
+}: {
+  className?: string;
+  stages?: readonly string[];
+}) {
   const [stage, setStage] = useState(0);
 
   useEffect(() => {
     const startedAt = Date.now();
     const id = window.setInterval(() => {
-      setStage(thinkingStageIndex(Date.now() - startedAt));
+      setStage(thinkingStageIndex(Date.now() - startedAt, stages.length));
     }, 300);
     return () => window.clearInterval(id);
-  }, []);
+  }, [stages]);
 
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
@@ -54,14 +60,14 @@ export function ThinkingSequence({ className }: { className?: string }) {
             transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
             className="absolute inset-0 block truncate text-xs text-current/80"
           >
-            {THINKING_STAGES[stage]}
+            {stages[stage]}
           </motion.span>
         </AnimatePresence>
       </div>
 
       {/* One polite announcement per stage rather than a live-updating meter. */}
       <span className="sr-only" role="status">
-        {THINKING_STAGES[stage]}
+        {stages[stage]}
       </span>
     </div>
   );

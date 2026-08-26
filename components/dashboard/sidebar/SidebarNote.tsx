@@ -70,16 +70,24 @@ function SidebarNoteComponent({
       onDragEnd={handleDragEnd}
     >
       <button
+        aria-current={isActive ? "page" : undefined}
         className={cn(
-          "w-full flex items-center h-[30px] px-2 text-[13px] gap-2 transition-colors rounded-md relative",
+          "w-full flex items-center h-7 px-2 text-[13px] gap-2 transition-colors duration-100 rounded-md relative",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar",
           isActive
-            ? "bg-sidebar-accent/60 text-sidebar-foreground font-medium"
-            : "text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/40",
-          isCompact && "w-9 h-9 justify-center px-0"
+            ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+            : "text-sidebar-foreground/75 hover:text-sidebar-foreground hover:bg-sidebar-accent/50",
+          isCompact && "w-8 h-8 justify-center px-0"
         )}
         onClick={handleClick}
         title={isCompact ? note.title : undefined}
       >
+        {isActive && (
+          <span
+            aria-hidden
+            className="absolute inset-y-1 left-0 w-[2px] rounded-r-full bg-primary"
+          />
+        )}
         {isDraggable && !isCompact && (
           <div className="absolute left-0.5 opacity-0 group-hover/note:opacity-30 cursor-grab active:cursor-grabbing transition-opacity">
             <GripVertical className="w-3 h-3" />
@@ -87,10 +95,8 @@ function SidebarNoteComponent({
         )}
         <FileText
           className={cn(
-            "w-[14px] h-[14px] shrink-0 transition-colors",
-            isActive
-              ? "text-sidebar-foreground/70"
-              : "text-muted-foreground/40",
+            "w-[14px] h-[14px] shrink-0 transition-opacity",
+            isActive ? "opacity-100" : "opacity-60",
           )}
         />
         {!isCompact && (
