@@ -18,7 +18,8 @@
     "electron:start": "concurrently \"next dev\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron-forge start\"",
     "build:static": "cross-env STATIC_EXPORT=true next build",
     "package": "electron-forge package",
-    "make": "npm run build:static && electron-forge make"
+    "make": "npm run build:static && electron-forge make",
+    "test:electron": "playwright test -c tests/electron/playwright.config.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.36.5",
@@ -95,6 +96,7 @@
     "@electron-forge/plugin-auto-unpack-natives": "^7.11.1",
     "@electron-forge/plugin-fuses": "^7.11.1",
     "@electron/fuses": "^1.8.0",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@tailwindcss/typography": "^0.5.19",
     "@testing-library/jest-dom": "^6.9.1",

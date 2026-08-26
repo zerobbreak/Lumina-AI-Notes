@@ -32,7 +32,12 @@ function createWindow() {
     },
   });
 
-  if (isDev) {
+  if (process.env.ELECTRON_TEST_URL) {
+    // Test-only hook (see tests/electron): loads a lightweight fixture instead
+    // of the real Next.js app, so the shell can be tested without live
+    // Clerk/Convex credentials or a running dev server.
+    mainWindow.loadURL(process.env.ELECTRON_TEST_URL);
+  } else if (isDev) {
     mainWindow.loadURL('http://localhost:3000');
     mainWindow.webContents.openDevTools();
   } else {
@@ -66,9 +71,9 @@ if (!gotTheLock) {
 function handleAuthUrl(url) {
   const parsedUrl = new URL(url);
   if (parsedUrl.hostname === 'auth') {
-    const token = parsedUrl.searchParams.get('token');
-    if (token && mainWindow) {
-      mainWindow.webContents.send('auth-token', token);
+    const ticket = parsedUrl.searchParams.get('ticket');
+    if (ticket && mainWindow) {
+      mainWindow.webContents.send('auth-ticket', ticket);
     }
   }
 }

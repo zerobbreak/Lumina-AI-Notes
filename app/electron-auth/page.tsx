@@ -6,11 +6,13 @@ import { Loader2, CheckCircle2 } from "lucide-react";
 import { clerkAuthAppearance } from "@/lib/clerkAppearance";
 
 /**
- * Desktop browser callback: show Clerk sign-in when signed out, then hand off a JWT
- * to the Electron app via custom protocol (lumina-notes://auth?token=...).
+ * Desktop browser callback: show Clerk sign-in when signed out, then hand off a
+ * short-lived sign-in ticket to the Electron app via custom protocol
+ * (lumina-notes://auth?ticket=...). A ticket (not a raw JWT) is required because
+ * this browser tab's Clerk session/cookies aren't visible to the Electron window.
  */
 export default function ElectronAuthPage() {
-  const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
   const [status, setStatus] = useState<"loading" | "redirecting" | "error">("loading");
 
   useEffect(() => {
@@ -18,25 +20,23 @@ export default function ElectronAuthPage() {
       if (isLoaded && isSignedIn) {
         setStatus("redirecting");
         try {
-          const token = await getToken();
-          if (token) {
-            window.location.href = `lumina-notes://auth?token=${encodeURIComponent(token)}`;
+          const res = await fetch("/api/electron/ticket", { method: "POST" });
+          if (!res.ok) throw new Error("Failed to mint sign-in ticket");
+          const { ticket } = await res.json();
+          window.location.href = `lumina-notes://auth?ticket=${encodeURIComponent(ticket)}`;
 
-            setTimeout(() => {
-              setStatus("redirecting");
-            }, 2000);
-          } else {
-            setStatus("error");
-          }
+          setTimeout(() => {
+            setStatus("redirecting");
+          }, 2000);
         } catch (error) {
-          console.error("Failed to get token:", error);
+          console.error("Failed to get auth ticket:", error);
           setStatus("error");
         }
       }
     }
 
     handleAuth();
-  }, [isLoaded, isSignedIn, getToken]);
+  }, [isLoaded, isSignedIn]);
 
   if (!isLoaded) {
     return (
