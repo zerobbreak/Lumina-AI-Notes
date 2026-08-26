@@ -8,6 +8,10 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import {
+  noteContentWordCount,
+  notePlainText,
+} from "./shared/noteQuality";
 
 export const createTag = mutation({
   args: {
@@ -220,6 +224,16 @@ export const applyAutoTags = internalMutation({
   },
 });
 
+/** Allow a later content save to retry after a transient auto-tag failure. */
+export const releaseAutoTagAttempt = internalMutation({
+  args: { noteId: v.id("notes") },
+  handler: async (ctx, args) => {
+    const note = await ctx.db.get(args.noteId);
+    if (!note || (note.tagIds?.length ?? 0) > 0) return;
+    await ctx.db.patch(args.noteId, { autoTagAttempted: undefined });
+  },
+});
+
 export const autoTagNote = internalAction({
   args: { noteId: v.id("notes") },
   handler: async (ctx, args) => {
@@ -228,14 +242,21 @@ export const autoTagNote = internalAction({
     });
     if (!note || (note.tagIds && note.tagIds.length > 0)) return;
 
-    const plainText = (note.content ?? "")
-      .replace(/<[^>]*>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    if (plainText.length < 50) return;
+    const plainText = notePlainText(note.content ?? "");
+    if (noteContentWordCount(note.content ?? "") < 25) {
+      await ctx.runMutation(internal.tags.releaseAutoTagAttempt, {
+        noteId: args.noteId,
+      });
+      return;
+    }
 
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return;
+    if (!apiKey) {
+      await ctx.runMutation(internal.tags.releaseAutoTagAttempt, {
+        noteId: args.noteId,
+      });
+      return;
+    }
 
     const existingTags = await ctx.runQuery(
       internal.tags.getTagsForUserInternal,
@@ -266,10 +287,20 @@ Respond with a JSON array of strings only, e.g. ["recursion", "midterm review"].
 
       const text = result.response.text().trim();
       const jsonMatch = text.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) return;
+      if (!jsonMatch) {
+        await ctx.runMutation(internal.tags.releaseAutoTagAttempt, {
+          noteId: args.noteId,
+        });
+        return;
+      }
 
       const parsed = JSON.parse(jsonMatch[0]);
-      if (!Array.isArray(parsed)) return;
+      if (!Array.isArray(parsed)) {
+        await ctx.runMutation(internal.tags.releaseAutoTagAttempt, {
+          noteId: args.noteId,
+        });
+        return;
+      }
 
       const seen = new Set<string>();
       const tagNames = parsed
@@ -292,6 +323,9 @@ Respond with a JSON array of strings only, e.g. ["recursion", "midterm review"].
       }
     } catch (error) {
       console.error("autoTagNote error:", error);
+      await ctx.runMutation(internal.tags.releaseAutoTagAttempt, {
+        noteId: args.noteId,
+      });
     }
   },
 });

@@ -11,6 +11,7 @@ import {
   tryParseJson,
   sentenceCount,
   wordCountFn,
+  noteContentWordCount,
   noteLacksDepth,
 } from "./shared/noteQuality";
 import { buildDiagramData } from "./shared/diagram";
@@ -556,11 +557,16 @@ export const updateNote = mutation({
     quickCaptureExpandedNoteId: v.optional(v.id("notes")),
     sourceRecordingId: v.optional(v.id("recordings")),
   },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const { note } = await requireNoteEdit(ctx, args.noteId);
 
     const patch: any = {};
     const now = Date.now();
+    const contentWordCount =
+      args.content === undefined
+        ? undefined
+        : noteContentWordCount(args.content);
     if (args.title !== undefined) patch.title = args.title;
     if (args.content !== undefined) patch.content = args.content;
     if (args.style !== undefined) patch.style = args.style;
@@ -568,7 +574,11 @@ export const updateNote = mutation({
     if (args.outlineMetadata !== undefined)
       patch.outlineMetadata = args.outlineMetadata;
     if (args.tagIds !== undefined) patch.tagIds = args.tagIds;
-    if (args.wordCount !== undefined) patch.wordCount = args.wordCount;
+    if (contentWordCount !== undefined) {
+      patch.wordCount = contentWordCount;
+    } else if (args.wordCount !== undefined) {
+      patch.wordCount = args.wordCount;
+    }
     if (args.quickCaptureType !== undefined)
       patch.quickCaptureType = args.quickCaptureType;
     if (args.quickCaptureAudioUrl !== undefined)
@@ -591,7 +601,7 @@ export const updateNote = mutation({
       args.content !== undefined &&
       !hasExistingTags &&
       !note.autoTagAttempted &&
-      (args.wordCount ?? 0) >= 25;
+      (contentWordCount ?? 0) >= 25;
     if (shouldAutoTag) {
       patch.autoTagAttempted = true;
     }
@@ -603,6 +613,7 @@ export const updateNote = mutation({
         noteId: args.noteId,
       });
     }
+    return null;
   },
 });
 
