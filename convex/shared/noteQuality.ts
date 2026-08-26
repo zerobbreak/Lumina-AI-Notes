@@ -14,6 +14,14 @@ export const sentenceCount = (text: string): number =>
 export const wordCountFn = (text: string): number =>
   text.split(/\s+/).filter((w) => w.length > 0).length;
 
+/** Normalize editor HTML into the plain text used by note-quality heuristics. */
+export const notePlainText = (content: string): string =>
+  content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+/** Count the user-visible words in editor HTML or plain-text note content. */
+export const noteContentWordCount = (content: string): number =>
+  wordCountFn(notePlainText(content));
+
 /**
  * Try to extract and parse a JSON object from a string.
  * Returns null if no valid JSON object is found.

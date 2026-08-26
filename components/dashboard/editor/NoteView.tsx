@@ -96,6 +96,11 @@ interface NoteViewProps {
   onBack: () => void;
 }
 
+type PendingContentSave = {
+  content: string;
+  isOutline: boolean;
+};
+
 export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const router = useRouter();
   const {
@@ -132,6 +137,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [debouncedContent, setDebouncedContent] = useState<string | null>(null);
+  const pendingContentSaveRef = useRef<PendingContentSave | null>(null);
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [isFlashcardsOpen, setIsFlashcardsOpen] = useState(false);
   const [isQuizOpen, setIsQuizOpen] = useState(false);
@@ -222,49 +228,58 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     }
   }, [noteQuery, noteId, noteBootstrap, setNoteBootstrap]);
 
-  // Debounce Save Effect
+  const persistContent = useCallback(
+    async ({ content, isOutline }: PendingContentSave) => {
+      if (isOutline) {
+        const structure = extractOutlineStructure(content);
+        await updateNote({
+          noteId,
+          content,
+          outlineData: serializeOutline(structure),
+          outlineMetadata: calculateOutlineMetadata(structure),
+        });
+        return;
+      }
+
+      await updateNote({ noteId, content });
+    },
+    [noteId, updateNote],
+  );
+
+  const queueContentSave = useCallback(
+    (content: string, isOutline: boolean) => {
+      pendingContentSaveRef.current = { content, isOutline };
+      setIsSaving(true);
+      setDebouncedContent(content);
+    },
+    [],
+  );
+
+  // Debounce saves within this keyed note-editor session.
   useEffect(() => {
     if (debouncedContent === null) return;
     if (noteQuery === null) return;
     if (noteQuery === undefined && noteBootstrap?.noteId !== noteId) return;
 
+    const pendingSave = pendingContentSaveRef.current;
+    if (!pendingSave || pendingSave.content !== debouncedContent) return;
+
     const handler = setTimeout(() => {
-      if (displayNote?.style === "outline") {
-        // Extract outline structure and metadata
-        const structure = extractOutlineStructure(debouncedContent);
-        const metadata = calculateOutlineMetadata(structure);
-        const outlineData = serializeOutline(structure);
-
-        updateNote({
-          noteId,
-          content: debouncedContent,
-          outlineData,
-          outlineMetadata: metadata,
-        }).then(() => {
-          setIsSaving(false);
+      if (pendingContentSaveRef.current !== pendingSave) return;
+      pendingContentSaveRef.current = null;
+      persistContent(pendingSave)
+        .then(() => {
+          if (pendingContentSaveRef.current === null) {
+            setIsSaving(false);
+          }
+        })
+        .catch((error: unknown) => {
+          console.error("Failed to save note content:", error);
+          if (pendingContentSaveRef.current === null) {
+            pendingContentSaveRef.current = pendingSave;
+          }
+          toast.error("Could not save your latest changes");
         });
-      } else {
-        // Standard content save
-        // Calculate word count for stats
-        const contentStr =
-          typeof debouncedContent === "string" ? debouncedContent : "";
-        const plainText = contentStr
-          .replace(/<[^>]*>/g, " ")
-          .replace(/\s+/g, " ")
-          .trim();
-        const count =
-          plainText.length > 0
-            ? plainText.split(/\s+/).filter((word) => word.length > 0).length
-            : 0;
-
-        updateNote({
-          noteId,
-          content: debouncedContent,
-          wordCount: count,
-        }).then(() => {
-          setIsSaving(false);
-        });
-      }
     }, 1000);
 
     return () => clearTimeout(handler);
@@ -273,9 +288,23 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     noteQuery,
     noteId,
     noteBootstrap?.noteId,
-    updateNote,
-    displayNote?.style,
+    persistContent,
   ]);
+
+  // A route change unmounts this keyed editor. Flush its pending content using
+  // the note ID captured by this component instance before the timer is cleared.
+  useEffect(
+    () => () => {
+      const pendingSave = pendingContentSaveRef.current;
+      pendingContentSaveRef.current = null;
+      if (pendingSave) {
+        persistContent(pendingSave).catch((error: unknown) => {
+          console.error("Failed to flush note content:", error);
+        });
+      }
+    },
+    [persistContent],
+  );
 
   // Mark the note as opened so it's eligible to be resumed later and stays
   // exempt from the stale-note cleanup while the user is reading it.
@@ -332,8 +361,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       },
     },
     onUpdate: ({ editor }) => {
-      setIsSaving(true);
-      setDebouncedContent(editor.getHTML());
+      queueContentSave(editor.getHTML(), false);
     },
   });
 
@@ -1015,8 +1043,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                   outlineData={note.outlineData}
                   outlineMetadata={note.outlineMetadata}
                   onChange={(content) => {
-                    setIsSaving(true);
-                    setDebouncedContent(content);
+                    queueContentSave(content, true);
                   }}
                   isEditable={true}
                 />
