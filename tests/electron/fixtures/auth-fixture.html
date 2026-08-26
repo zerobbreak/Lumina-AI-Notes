@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Electron Shell Fixture</title>
+  </head>
+  <body>
+    <div id="api-status">no-api</div>
+    <div id="ticket-status">no-ticket</div>
+    <script>
+      document.getElementById('api-status').textContent =
+        window.electronAPI && typeof window.electronAPI.loginInBrowser === 'function' && typeof window.electronAPI.onAuthTicket === 'function'
+          ? 'api-ready'
+          : 'no-api';
+
+      if (window.electronAPI) {
+        window.electronAPI.onAuthTicket((ticket) => {
+          document.getElementById('ticket-status').textContent = `ticket:${ticket}`;
+        });
+      }
+    </script>
+  </body>
+</html>

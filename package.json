@@ -18,7 +18,8 @@
     "electron:start": "cross-env NODE_ENV=development electron-forge start",
     "build:static": "cross-env STATIC_EXPORT=true next build",
     "package": "electron-forge package",
-    "make": "npm run build:static && electron-forge make"
+    "make": "npm run build:static && electron-forge make",
+    "test:electron": "playwright test -c tests/electron/playwright.config.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.36.5",
