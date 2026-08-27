@@ -12,8 +12,8 @@ import {
  * The fixed destinations of the dashboard.
  *
  * Every view lives on `/dashboard` behind a `view` search param, so a
- * destination is identified by that param rather than by a pathname. `null`
- * means bare `/dashboard` — the smart folder hub.
+ * destination is identified by that param rather than by a pathname. Bare
+ * `/dashboard` is reserved for the resume gate.
  */
 export interface DashboardNavItem {
   id: string;
@@ -37,8 +37,8 @@ export const DASHBOARD_NAV: readonly DashboardNavItem[] = [
   {
     id: "home",
     label: "Home",
-    view: null,
-    href: "/dashboard",
+    view: "home",
+    href: "/dashboard?view=home",
     icon: LayoutGrid,
     description: "Your courses and recent work",
     keywords: ["home", "dashboard", "hub", "overview", "main"],

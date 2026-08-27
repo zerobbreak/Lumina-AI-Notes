@@ -7,6 +7,7 @@ import { describe, it, expect } from "vitest";
 import {
   formatElapsed,
   idleWaveform,
+  ISOLATING_STAGES,
   mirrorLevels,
   phaseLabel,
   resolvePhase,
@@ -111,6 +112,10 @@ describe("thinkingStageIndex", () => {
   it("holds on the last stage instead of looping back", () => {
     const last = THINKING_STAGES.length - 1;
     expect(thinkingStageIndex(999_999)).toBe(last);
+  });
+
+  it("supports shorter custom stage sequences", () => {
+    expect(thinkingStageIndex(999_999, ISOLATING_STAGES.length)).toBe(1);
   });
 });
 
