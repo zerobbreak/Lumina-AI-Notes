@@ -6,6 +6,7 @@ import {
   shouldAttemptIsolation,
   MAX_ISOLATION_BYTES,
   MIN_ISOLATION_BYTES,
+  transcribeIsolatedWithFallback,
 } from "@/convex/shared/audioIsolation";
 import {
   pickRecorderMimeType,
@@ -49,6 +50,45 @@ describe("isolationErrorMessage", () => {
   it("maps rate limits and oversize responses", () => {
     expect(isolationErrorMessage(429, "")).toMatch(/rate-limited/i);
     expect(isolationErrorMessage(413, "")).toMatch(/too large/i);
+  });
+});
+
+describe("transcribeIsolatedWithFallback", () => {
+  it("retries the original audio when isolated transcription fails", async () => {
+    const attempted: string[] = [];
+    const attempt = await transcribeIsolatedWithFallback({
+      isolatedStorageId: "isolated",
+      originalStorageId: "original",
+      fallbackToOriginal: true,
+      transcribe: async (storageId) => {
+        attempted.push(storageId);
+        return storageId === "isolated"
+          ? { success: false, transcript: "", error: "timeout" }
+          : { success: true, transcript: "Recovered lecture" };
+      },
+    });
+
+    expect(attempted).toEqual(["isolated", "original"]);
+    expect(attempt).toEqual({
+      result: { success: true, transcript: "Recovered lecture" },
+      isolated: false,
+    });
+  });
+
+  it("does not retry when fallback is disabled", async () => {
+    const attempted: string[] = [];
+    const attempt = await transcribeIsolatedWithFallback({
+      isolatedStorageId: "isolated",
+      originalStorageId: "original",
+      fallbackToOriginal: false,
+      transcribe: async (storageId) => {
+        attempted.push(storageId);
+        return { success: false, transcript: "" };
+      },
+    });
+
+    expect(attempted).toEqual(["isolated"]);
+    expect(attempt.isolated).toBe(true);
   });
 });
 

@@ -12,6 +12,7 @@ import {
   isolationErrorMessage,
   isolationFileName,
   shouldAttemptIsolation,
+  transcribeIsolatedWithFallback,
 } from "./shared/audioIsolation";
 
 const isolateAndTranscribeResult = v.object({
@@ -149,32 +150,51 @@ export const isolateAndTranscribe = action({
       mimeType: args.mimeType,
     });
 
-    const transcribeFrom = isolated.ok
-      ? { storageId: isolated.storageId, mimeType: ISOLATED_AUDIO_MIME }
-      : args.fallbackToOriginal
-        ? { storageId: args.storageId, mimeType: args.mimeType }
-        : null;
-
-    if (!transcribeFrom) {
+    if (!isolated.ok && !args.fallbackToOriginal) {
       return {
         transcript: "",
         success: false,
         isolated: false,
-        error: isolated.ok ? "Couldn't isolate speech from the recording." : isolated.error,
+        error: isolated.error,
       };
     }
 
-    const transcribed = (await ctx.runAction(api.ai.transcribeAudio, {
-      storageId: transcribeFrom.storageId,
-      mimeType: transcribeFrom.mimeType,
-      courseContext: args.courseContext,
-    })) as TranscribeAudioResult;
+    const transcribe = async (
+      storageId: Id<"_storage">,
+      mimeType: string,
+    ): Promise<TranscribeAudioResult> =>
+      (await ctx.runAction(api.ai.transcribeAudio, {
+        storageId,
+        mimeType,
+        courseContext: args.courseContext,
+      })) as TranscribeAudioResult;
+
+    let transcribed: TranscribeAudioResult;
+    let usedIsolated = false;
+    if (isolated.ok) {
+      const attempt = await transcribeIsolatedWithFallback({
+        isolatedStorageId: isolated.storageId,
+        originalStorageId: args.storageId,
+        fallbackToOriginal: args.fallbackToOriginal ?? false,
+        transcribe: async (storageId) =>
+          await transcribe(
+            storageId,
+            storageId === isolated.storageId
+              ? ISOLATED_AUDIO_MIME
+              : args.mimeType,
+          ),
+      });
+      transcribed = attempt.result;
+      usedIsolated = attempt.isolated;
+    } else {
+      transcribed = await transcribe(args.storageId, args.mimeType);
+    }
 
     if (!transcribed.success || !transcribed.transcript.trim()) {
       return {
         transcript: "",
         success: false,
-        isolated: isolated.ok,
+        isolated: usedIsolated,
         isolatedStorageId: isolated.ok ? isolated.storageId : undefined,
         error: transcribed.error || "Couldn't transcribe the isolated audio.",
       };
@@ -183,7 +203,7 @@ export const isolateAndTranscribe = action({
     return {
       transcript: transcribed.transcript,
       success: true,
-      isolated: isolated.ok,
+      isolated: usedIsolated,
       isolatedStorageId: isolated.ok ? isolated.storageId : undefined,
       error: isolated.ok ? undefined : isolated.error,
     };
