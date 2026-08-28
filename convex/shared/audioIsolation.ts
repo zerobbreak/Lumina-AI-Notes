@@ -30,6 +30,39 @@ export function shouldAttemptIsolation(byteLength: number): boolean {
   return byteLength >= MIN_ISOLATION_BYTES && byteLength <= MAX_ISOLATION_BYTES;
 }
 
+type TranscriptionResult = {
+  transcript: string;
+  success: boolean;
+};
+
+/**
+ * Transcribe isolated audio first, retrying the original recording when the
+ * caller requested a fallback and the isolated output cannot be transcribed.
+ */
+export async function transcribeIsolatedWithFallback<
+  StorageId extends string,
+  Result extends TranscriptionResult,
+>(args: {
+  isolatedStorageId: StorageId;
+  originalStorageId: StorageId;
+  fallbackToOriginal: boolean;
+  transcribe: (storageId: StorageId) => Promise<Result>;
+}): Promise<{ result: Result; isolated: boolean }> {
+  const isolatedResult = await args.transcribe(args.isolatedStorageId);
+  if (isolatedResult.success && isolatedResult.transcript.trim()) {
+    return { result: isolatedResult, isolated: true };
+  }
+
+  if (!args.fallbackToOriginal) {
+    return { result: isolatedResult, isolated: true };
+  }
+
+  return {
+    result: await args.transcribe(args.originalStorageId),
+    isolated: false,
+  };
+}
+
 /**
  * Map ElevenLabs HTTP failures to a short, user-facing sentence.
  * Never forwards raw API bodies — they can include account details.

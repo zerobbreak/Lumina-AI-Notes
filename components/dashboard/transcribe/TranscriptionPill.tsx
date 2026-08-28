@@ -29,6 +29,7 @@ import { useDashboard } from "@/hooks/useDashboard";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useMicLevels } from "@/hooks/useMicLevels";
 import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
+import { preferMoreCompleteTranscript } from "@/lib/sessionAudio";
 import type { StructuredNotes } from "@/components/dashboard/DashboardContext";
 import { PillWaveform } from "./PillWaveform";
 import { ThinkingSequence } from "./ThinkingSequence";
@@ -218,9 +219,14 @@ export function TranscriptionPill() {
         });
 
         if (result.success && result.transcript.trim()) {
-          setChunks([result.transcript.trim()]);
+          const isolatedTranscript = result.transcript.trim();
+          const preferredTranscript = preferMoreCompleteTranscript(
+            liveTranscript,
+            isolatedTranscript,
+          );
+          setChunks([preferredTranscript]);
           resetTranscript();
-          if (result.isolated) {
+          if (result.isolated && preferredTranscript === isolatedTranscript) {
             toast.success("Isolated speech from background noise");
           }
         } else if (liveTranscript.length === 0) {

@@ -6,9 +6,11 @@ import {
   shouldAttemptIsolation,
   MAX_ISOLATION_BYTES,
   MIN_ISOLATION_BYTES,
+  transcribeIsolatedWithFallback,
 } from "@/convex/shared/audioIsolation";
 import {
   pickRecorderMimeType,
+  preferMoreCompleteTranscript,
   recorderContainerMime,
   RECORDER_MIME_CANDIDATES,
 } from "@/lib/sessionAudio";
@@ -52,6 +54,45 @@ describe("isolationErrorMessage", () => {
   });
 });
 
+describe("transcribeIsolatedWithFallback", () => {
+  it("retries the original audio when isolated transcription fails", async () => {
+    const attempted: string[] = [];
+    const attempt = await transcribeIsolatedWithFallback({
+      isolatedStorageId: "isolated",
+      originalStorageId: "original",
+      fallbackToOriginal: true,
+      transcribe: async (storageId) => {
+        attempted.push(storageId);
+        return storageId === "isolated"
+          ? { success: false, transcript: "", error: "timeout" }
+          : { success: true, transcript: "Recovered lecture" };
+      },
+    });
+
+    expect(attempted).toEqual(["isolated", "original"]);
+    expect(attempt).toEqual({
+      result: { success: true, transcript: "Recovered lecture" },
+      isolated: false,
+    });
+  });
+
+  it("does not retry when fallback is disabled", async () => {
+    const attempted: string[] = [];
+    const attempt = await transcribeIsolatedWithFallback({
+      isolatedStorageId: "isolated",
+      originalStorageId: "original",
+      fallbackToOriginal: false,
+      transcribe: async (storageId) => {
+        attempted.push(storageId);
+        return { success: false, transcript: "" };
+      },
+    });
+
+    expect(attempted).toEqual(["isolated"]);
+    expect(attempt.isolated).toBe(true);
+  });
+});
+
 describe("pickRecorderMimeType", () => {
   it("prefers the first supported candidate", () => {
     expect(pickRecorderMimeType((type) => type === "audio/mp4")).toBe(
@@ -71,5 +112,25 @@ describe("pickRecorderMimeType", () => {
 describe("recorderContainerMime", () => {
   it("strips codec parameters", () => {
     expect(recorderContainerMime("audio/webm;codecs=opus")).toBe("audio/webm");
+  });
+});
+
+describe("preferMoreCompleteTranscript", () => {
+  it("preserves a longer live transcript when isolation drops words", () => {
+    expect(
+      preferMoreCompleteTranscript(
+        "the complete lecture includes this important final section",
+        "the complete lecture",
+      ),
+    ).toBe("the complete lecture includes this important final section");
+  });
+
+  it("uses isolation when it recovers at least as many words", () => {
+    expect(
+      preferMoreCompleteTranscript(
+        "raw lecture text",
+        "clean lecture text with recovered detail",
+      ),
+    ).toBe("clean lecture text with recovered detail");
   });
 });

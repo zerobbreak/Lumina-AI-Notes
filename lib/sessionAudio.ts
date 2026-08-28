@@ -32,3 +32,18 @@ export function recorderContainerMime(mimeType: string): string {
   const container = mimeType.split(";")[0]?.trim();
   return container && container.length > 0 ? container : "audio/webm";
 }
+
+/** Keep an isolation pass from silently truncating a more complete live transcript. */
+export function preferMoreCompleteTranscript(
+  liveTranscript: string,
+  isolatedTranscript: string,
+): string {
+  const live = liveTranscript.trim();
+  const isolated = isolatedTranscript.trim();
+  if (!live) return isolated;
+  if (!isolated) return live;
+
+  const liveWords = live.split(/\s+/).length;
+  const isolatedWords = isolated.split(/\s+/).length;
+  return isolatedWords >= liveWords ? isolated : live;
+}
