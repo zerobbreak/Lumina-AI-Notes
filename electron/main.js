@@ -62,8 +62,14 @@ async function startBundledServer() {
   serverPort = await getFreePort();
   const serverEntry = path.join(process.resourcesPath, 'standalone', 'server.js');
 
+  // Don't set HOSTNAME here: Next's standalone server.js internally
+  // self-proxies requests to a hardcoded `localhost:PORT` target, and
+  // binding the listener to a specific address (e.g. 127.0.0.1) instead of
+  // the default 0.0.0.0 makes that self-proxy step fail with ECONNREFUSED
+  // and crash the process on the very first request. Confirmed by testing
+  // both ways directly against the built server.
   serverProcess = utilityProcess.fork(serverEntry, [], {
-    env: { ...process.env, PORT: String(serverPort), HOSTNAME: '127.0.0.1' },
+    env: { ...process.env, PORT: String(serverPort) },
     stdio: 'pipe',
   });
 
