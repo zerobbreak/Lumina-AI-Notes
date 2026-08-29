@@ -4,6 +4,7 @@ import {
   isolationErrorMessage,
   isolationFileName,
   shouldAttemptIsolation,
+  storageIdsToDeleteAfterTranscription,
   MAX_ISOLATION_BYTES,
   MIN_ISOLATION_BYTES,
 } from "@/convex/shared/audioIsolation";
@@ -36,6 +37,26 @@ describe("shouldAttemptIsolation", () => {
   it("accepts a normal session recording", () => {
     expect(shouldAttemptIsolation(MIN_ISOLATION_BYTES)).toBe(true);
     expect(shouldAttemptIsolation(1024 * 1024)).toBe(true);
+  });
+});
+
+describe("storageIdsToDeleteAfterTranscription", () => {
+  it("deletes isolated output and ephemeral live source audio", () => {
+    expect(
+      storageIdsToDeleteAfterTranscription("source", "isolated", true),
+    ).toEqual(["isolated", "source"]);
+  });
+
+  it("retains imported source audio while deleting isolated output", () => {
+    expect(
+      storageIdsToDeleteAfterTranscription("source", "isolated", false),
+    ).toEqual(["isolated"]);
+  });
+
+  it("deletes the live source when isolation produces no output", () => {
+    expect(
+      storageIdsToDeleteAfterTranscription("source", undefined, true),
+    ).toEqual(["source"]);
   });
 });
 

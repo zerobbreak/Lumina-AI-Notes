@@ -144,6 +144,7 @@ export default defineSchema({
     errorMessage: v.optional(v.string()),
   })
     .index("by_userId", ["userId"])
+    .index("by_storageId", ["storageId"])
     .index("by_userId_courseId", ["userId", "courseId"])
     .index("by_userId_createdAt", ["userId", "createdAt"])
     .index("by_userId_lastAccessedAt", ["userId", "lastAccessedAt"])
@@ -164,10 +165,12 @@ export default defineSchema({
     title: v.string(),
     transcript: v.string(),
     audioUrl: v.optional(v.string()),
+    storageId: v.optional(v.string()),
     duration: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_userId", ["userId"])
+    .index("by_storageId", ["storageId"])
     .index("by_userId_sessionId", ["userId", "sessionId"])
     .index("by_userId_createdAt", ["userId", "createdAt"]),
 
@@ -268,11 +271,13 @@ export default defineSchema({
     courseId: v.string(), // e.g., "REQ-001"
     text: v.string(),
     embedding: v.array(v.float64()),
-  }).vectorIndex("by_embedding", {
-    vectorField: "embedding",
-    dimensions: 768, // gemini-embedding-001 @ 768
-    filterFields: ["storageId", "courseId"], // <--- CRITICAL ADDITION
-  }),
+  })
+    .index("by_storageId", ["storageId"])
+    .vectorIndex("by_embedding", {
+      vectorField: "embedding",
+      dimensions: 768, // gemini-embedding-001 @ 768
+      filterFields: ["storageId", "courseId"], // <--- CRITICAL ADDITION
+    }),
 
   // Real-time presence tracking for collaborative features
   presence: defineTable({
