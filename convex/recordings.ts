@@ -410,10 +410,13 @@ export const deleteRecording = mutation({
       throw new Error("Recording not found or unauthorized");
     }
 
-    if (recording.storageId) {
+    await ctx.db.delete(args.recordingId);
+    if (
+      recording.storageId &&
+      !(await storageIsReferenced(ctx, recording.storageId))
+    ) {
       await ctx.storage.delete(recording.storageId);
     }
-    await ctx.db.delete(args.recordingId);
     return null;
   },
 });
@@ -440,10 +443,13 @@ export const cleanupOrphanedRecordings = mutation({
       // This prevents deleting active recording/transcription sessions
       const age = now - recording.createdAt;
       if (age > TEN_MINUTES && (!recording.transcript || recording.transcript.trim().length === 0)) {
-        if (recording.storageId) {
+        await ctx.db.delete(recording._id);
+        if (
+          recording.storageId &&
+          !(await storageIsReferenced(ctx, recording.storageId))
+        ) {
           await ctx.storage.delete(recording.storageId);
         }
-        await ctx.db.delete(recording._id);
         deletedCount++;
       }
     }

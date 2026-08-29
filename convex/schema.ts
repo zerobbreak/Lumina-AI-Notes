@@ -165,7 +165,7 @@ export default defineSchema({
     title: v.string(),
     transcript: v.string(),
     audioUrl: v.optional(v.string()),
-    storageId: v.optional(v.string()),
+    storageId: v.optional(v.id("_storage")),
     duration: v.optional(v.number()),
     createdAt: v.number(),
   })
