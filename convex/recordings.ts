@@ -1,6 +1,14 @@
-import { mutation, query } from "./_generated/server";
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 
 const AUDIO_LIMIT_MINUTES = 300;
 
@@ -220,11 +228,12 @@ export const upsertRecordingDraft = mutation({
 export const saveUploadedRecording = mutation({
   args: {
     title: v.string(),
-    storageId: v.string(),
+    storageId: v.id("_storage"),
     duration: v.optional(v.number()), // Duration in seconds
     tzOffsetMinutes: v.optional(v.number()),
     sessionId: v.optional(v.string()),
   },
+  returns: v.id("recordings"),
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
@@ -252,6 +261,7 @@ export const saveUploadedRecording = mutation({
       title: args.title,
       transcript: "", // Will be filled after transcription
       audioUrl: audioUrl || undefined,
+      storageId: args.storageId,
       duration: args.duration,
       createdAt: Date.now(),
     });
@@ -268,6 +278,52 @@ export const saveUploadedRecording = mutation({
     }
 
     return recordingId;
+  },
+});
+
+/** Whether application data still needs this blob after transcription. */
+async function storageIsReferenced(
+  ctx: QueryCtx | MutationCtx,
+  storageId: Id<"_storage">,
+): Promise<boolean> {
+  const recording = await ctx.db
+    .query("recordings")
+    .withIndex("by_storageId", (q) => q.eq("storageId", storageId))
+    .first();
+  if (recording) return true;
+
+  const file = await ctx.db
+    .query("files")
+    .withIndex("by_storageId", (q) => q.eq("storageId", storageId))
+    .first();
+  if (file) return true;
+
+  const document = await ctx.db
+    .query("documents")
+    .withIndex("by_storageId", (q) => q.eq("storageId", storageId))
+    .first();
+  return document !== null;
+}
+
+export const isStorageReferenced = internalQuery({
+  args: { storageId: v.id("_storage") },
+  returns: v.boolean(),
+  handler: async (ctx, args) =>
+    await storageIsReferenced(ctx, args.storageId),
+});
+
+/**
+ * Delete only unreferenced temporary audio. Used immediately by the isolation
+ * action and by its delayed failsafe job if the action is interrupted.
+ */
+export const deleteTemporaryStorage = internalMutation({
+  args: { storageId: v.id("_storage") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if (await storageIsReferenced(ctx, args.storageId)) return null;
+    if ((await ctx.storage.getUrl(args.storageId)) === null) return null;
+    await ctx.storage.delete(args.storageId);
+    return null;
   },
 });
 
@@ -344,6 +400,7 @@ export const getRecording = query({
 // Delete a recording
 export const deleteRecording = mutation({
   args: { recordingId: v.id("recordings") },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
@@ -354,12 +411,20 @@ export const deleteRecording = mutation({
     }
 
     await ctx.db.delete(args.recordingId);
+    if (
+      recording.storageId &&
+      !(await storageIsReferenced(ctx, recording.storageId))
+    ) {
+      await ctx.storage.delete(recording.storageId);
+    }
+    return null;
   },
 });
 
 // Cleanup orphaned recordings (those without valid transcripts)
 export const cleanupOrphanedRecordings = mutation({
   args: {},
+  returns: v.object({ deletedCount: v.number() }),
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
@@ -379,6 +444,12 @@ export const cleanupOrphanedRecordings = mutation({
       const age = now - recording.createdAt;
       if (age > TEN_MINUTES && (!recording.transcript || recording.transcript.trim().length === 0)) {
         await ctx.db.delete(recording._id);
+        if (
+          recording.storageId &&
+          !(await storageIsReferenced(ctx, recording.storageId))
+        ) {
+          await ctx.storage.delete(recording.storageId);
+        }
         deletedCount++;
       }
     }

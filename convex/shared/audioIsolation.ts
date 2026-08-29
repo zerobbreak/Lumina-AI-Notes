@@ -31,6 +31,20 @@ export function shouldAttemptIsolation(byteLength: number): boolean {
 }
 
 /**
+ * Isolation output is always temporary. Live microphone uploads are temporary
+ * too, while imported recordings retain their source audio for replay.
+ */
+export function storageIdsToDeleteAfterTranscription<T extends string>(
+  sourceStorageId: T,
+  isolatedStorageId: T | undefined,
+  deleteSourceAfterProcessing: boolean,
+): T[] {
+  const ids = isolatedStorageId ? [isolatedStorageId] : [];
+  if (deleteSourceAfterProcessing) ids.push(sourceStorageId);
+  return Array.from(new Set(ids));
+}
+
+/**
  * Map ElevenLabs HTTP failures to a short, user-facing sentence.
  * Never forwards raw API bodies — they can include account details.
  */

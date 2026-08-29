@@ -1,7 +1,7 @@
 "use node";
 
 import { action, type ActionCtx } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -12,13 +12,13 @@ import {
   isolationErrorMessage,
   isolationFileName,
   shouldAttemptIsolation,
+  storageIdsToDeleteAfterTranscription,
 } from "./shared/audioIsolation";
 
 const isolateAndTranscribeResult = v.object({
   transcript: v.string(),
   success: v.boolean(),
   isolated: v.boolean(),
-  isolatedStorageId: v.optional(v.id("_storage")),
   error: v.optional(v.string()),
 });
 
@@ -26,7 +26,6 @@ type IsolateAndTranscribeResult = {
   transcript: string;
   success: boolean;
   isolated: boolean;
-  isolatedStorageId?: Id<"_storage">;
   error?: string;
 };
 
@@ -35,6 +34,8 @@ type TranscribeAudioResult = {
   success: boolean;
   error?: string;
 };
+
+const TEMP_AUDIO_CLEANUP_DELAY_MS = 30 * 60 * 1000;
 
 async function isolateStoredAudio(
   ctx: ActionCtx,
@@ -144,48 +145,86 @@ export const isolateAndTranscribe = action({
       };
     }
 
-    const isolated = await isolateStoredAudio(ctx, {
-      storageId: args.storageId,
-      mimeType: args.mimeType,
-    });
+    let isolatedStorageId: Id<"_storage"> | undefined;
+    const sourceIsReferenced = await ctx.runQuery(
+      internal.recordings.isStorageReferenced,
+      { storageId: args.storageId },
+    );
+    try {
+      if (!sourceIsReferenced) {
+        await ctx.scheduler.runAfter(
+          TEMP_AUDIO_CLEANUP_DELAY_MS,
+          internal.recordings.deleteTemporaryStorage,
+          { storageId: args.storageId },
+        );
+      }
 
-    const transcribeFrom = isolated.ok
-      ? { storageId: isolated.storageId, mimeType: ISOLATED_AUDIO_MIME }
-      : args.fallbackToOriginal
-        ? { storageId: args.storageId, mimeType: args.mimeType }
-        : null;
+      const isolated = await isolateStoredAudio(ctx, {
+        storageId: args.storageId,
+        mimeType: args.mimeType,
+      });
+      if (isolated.ok) {
+        isolatedStorageId = isolated.storageId;
+        await ctx.scheduler.runAfter(
+          TEMP_AUDIO_CLEANUP_DELAY_MS,
+          internal.recordings.deleteTemporaryStorage,
+          { storageId: isolated.storageId },
+        );
+      }
 
-    if (!transcribeFrom) {
+      if (!isolated.ok && !args.fallbackToOriginal) {
+        return {
+          transcript: "",
+          success: false,
+          isolated: false,
+          error: isolated.error,
+        };
+      }
+
+      const transcribeFrom = isolated.ok
+        ? { storageId: isolated.storageId, mimeType: ISOLATED_AUDIO_MIME }
+        : { storageId: args.storageId, mimeType: args.mimeType };
+
+      const transcribed = (await ctx.runAction(api.ai.transcribeAudio, {
+        storageId: transcribeFrom.storageId,
+        mimeType: transcribeFrom.mimeType,
+        courseContext: args.courseContext,
+      })) as TranscribeAudioResult;
+
+      if (!transcribed.success || !transcribed.transcript.trim()) {
+        return {
+          transcript: "",
+          success: false,
+          isolated: isolated.ok,
+          error: transcribed.error || "Couldn't transcribe the isolated audio.",
+        };
+      }
+
       return {
-        transcript: "",
-        success: false,
-        isolated: false,
-        error: isolated.ok ? "Couldn't isolate speech from the recording." : isolated.error,
-      };
-    }
-
-    const transcribed = (await ctx.runAction(api.ai.transcribeAudio, {
-      storageId: transcribeFrom.storageId,
-      mimeType: transcribeFrom.mimeType,
-      courseContext: args.courseContext,
-    })) as TranscribeAudioResult;
-
-    if (!transcribed.success || !transcribed.transcript.trim()) {
-      return {
-        transcript: "",
-        success: false,
+        transcript: transcribed.transcript,
+        success: true,
         isolated: isolated.ok,
-        isolatedStorageId: isolated.ok ? isolated.storageId : undefined,
-        error: transcribed.error || "Couldn't transcribe the isolated audio.",
+        error: isolated.ok ? undefined : isolated.error,
       };
+    } finally {
+      const storageIds = storageIdsToDeleteAfterTranscription(
+        args.storageId,
+        isolatedStorageId,
+        !sourceIsReferenced,
+      );
+      for (const storageId of storageIds) {
+        try {
+          await ctx.runMutation(
+            internal.recordings.deleteTemporaryStorage,
+            { storageId },
+          );
+        } catch (error) {
+          console.error(
+            `[isolateAndTranscribe] Failed to delete temporary audio ${storageId}:`,
+            error,
+          );
+        }
+      }
     }
-
-    return {
-      transcript: transcribed.transcript,
-      success: true,
-      isolated: isolated.ok,
-      isolatedStorageId: isolated.ok ? isolated.storageId : undefined,
-      error: isolated.ok ? undefined : isolated.error,
-    };
   },
 });

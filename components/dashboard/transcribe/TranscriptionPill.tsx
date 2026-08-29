@@ -427,7 +427,9 @@ export function TranscriptionPill() {
           body: file,
         });
         if (!res.ok) throw new Error("upload failed");
-        const { storageId } = await res.json();
+        const { storageId } = (await res.json()) as {
+          storageId: Id<"_storage">;
+        };
 
         await saveUploadedRecording({
           title: file.name.replace(/\.[^/.]+$/, "") || "Imported audio",
