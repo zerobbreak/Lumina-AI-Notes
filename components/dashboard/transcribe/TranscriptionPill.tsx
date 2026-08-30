@@ -100,6 +100,7 @@ export function TranscriptionPill() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
+  const isolationGenerationRef = useRef(0);
 
   const { levels, start: startMeter, stop: stopMeter, stopAndCollect } =
     useMicLevels(BANDS);
@@ -152,6 +153,10 @@ export function TranscriptionPill() {
   // drops it straight into the "paused" face, ready to generate.
   useEffect(() => {
     if (!sessionToLoad) return;
+    // The isolation request itself cannot be aborted, so invalidate its result
+    // before replacing the capture. Otherwise a late response from the previous
+    // recording can overwrite this session's transcript.
+    isolationGenerationRef.current += 1;
     SpeechRecognition.stopListening();
     stopMeter();
     setIsRecording(false);
@@ -196,12 +201,14 @@ export function TranscriptionPill() {
 
   const isolateCapturedSession = useCallback(
     async (liveTranscript: string) => {
+      const generation = ++isolationGenerationRef.current;
       setIsIsolating(true);
       try {
         const captured = await stopAndCollect();
-        if (!captured) return;
+        if (!captured || generation !== isolationGenerationRef.current) return;
 
         const uploadUrl = await generateUploadUrl();
+        if (generation !== isolationGenerationRef.current) return;
         const res = await fetch(uploadUrl, {
           method: "POST",
           headers: { "Content-Type": captured.mimeType },
@@ -209,6 +216,7 @@ export function TranscriptionPill() {
         });
         if (!res.ok) throw new Error("upload failed");
         const { storageId } = (await res.json()) as { storageId: string };
+        if (generation !== isolationGenerationRef.current) return;
 
         const result = await isolateAndTranscribe({
           storageId: storageId as Id<"_storage">,
@@ -217,6 +225,7 @@ export function TranscriptionPill() {
           fallbackToOriginal: liveTranscript.length === 0,
         });
 
+        if (generation !== isolationGenerationRef.current) return;
         if (result.success && result.transcript.trim()) {
           setChunks([result.transcript.trim()]);
           resetTranscript();
@@ -229,12 +238,15 @@ export function TranscriptionPill() {
           });
         }
       } catch (e) {
+        if (generation !== isolationGenerationRef.current) return;
         console.error("[TranscriptionPill] audio isolation failed:", e);
         if (!liveTranscript) {
           toast.error("Couldn't process that recording");
         }
       } finally {
-        setIsIsolating(false);
+        if (generation === isolationGenerationRef.current) {
+          setIsIsolating(false);
+        }
       }
     },
     [
@@ -287,6 +299,7 @@ export function TranscriptionPill() {
   ]);
 
   const handleReset = useCallback(() => {
+    isolationGenerationRef.current += 1;
     stopListening();
     resetTranscript();
     setChunks([]);
