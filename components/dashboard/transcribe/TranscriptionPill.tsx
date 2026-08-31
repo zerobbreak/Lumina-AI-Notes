@@ -194,6 +194,15 @@ export function TranscriptionPill() {
     setIsRecording(false);
   }, [stopMeter]);
 
+  const startFreshSession = useCallback(() => {
+    resetTranscript();
+    setChunks([]);
+    setElapsed(0);
+    setNotes(null);
+    setSourceRecordingId(null);
+    sessionIdRef.current = crypto.randomUUID();
+  }, [resetTranscript]);
+
   const isolateCapturedSession = useCallback(
     async (liveTranscript: string) => {
       setIsIsolating(true);
@@ -264,6 +273,7 @@ export function TranscriptionPill() {
     }
 
     try {
+      startFreshSession();
       await SpeechRecognition.startListening({
         continuous: true,
         language: "en-US",
@@ -283,19 +293,15 @@ export function TranscriptionPill() {
     chunks,
     resetTranscript,
     isolateCapturedSession,
+    startFreshSession,
     startMeter,
   ]);
 
   const handleReset = useCallback(() => {
     stopListening();
-    resetTranscript();
-    setChunks([]);
-    setElapsed(0);
-    setNotes(null);
     setIsIsolating(false);
-    setSourceRecordingId(null);
-    sessionIdRef.current = crypto.randomUUID();
-  }, [resetTranscript, stopListening]);
+    startFreshSession();
+  }, [startFreshSession, stopListening]);
 
   const handleGenerate = useCallback(async () => {
     if (isRecording) stopListening();
@@ -417,6 +423,7 @@ export function TranscriptionPill() {
         return;
       }
 
+      startFreshSession();
       setIsThinking(true);
       try {
         const duration = await readAudioDuration(file);
@@ -468,6 +475,7 @@ export function TranscriptionPill() {
       saveUploadedRecording,
       isolateAndTranscribe,
       userData?.major,
+      startFreshSession,
     ],
   );
 
