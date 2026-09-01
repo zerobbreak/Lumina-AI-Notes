@@ -1,6 +1,6 @@
 "use node";
 
-import { action } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getGeminiModel } from "./shared/aiClient";
@@ -55,7 +55,7 @@ const extractJsonObject = (text: string): string | null => {
  * Supports MP3, WAV, M4A, OGG, FLAC formats
  * Fetches audio from Convex storage to avoid argument size limits
  */
-export const transcribeAudio = action({
+export const transcribeAudio = internalAction({
   args: {
     storageId: v.id("_storage"),
     mimeType: v.string(),

@@ -7,6 +7,7 @@ import {
   MAX_ISOLATION_BYTES,
   MIN_ISOLATION_BYTES,
 } from "@/convex/shared/audioIsolation";
+import { audioDurationMinutes } from "@/convex/shared/audioUsage";
 import {
   pickRecorderMimeType,
   recorderContainerMime,
@@ -36,6 +37,18 @@ describe("shouldAttemptIsolation", () => {
   it("accepts a normal session recording", () => {
     expect(shouldAttemptIsolation(MIN_ISOLATION_BYTES)).toBe(true);
     expect(shouldAttemptIsolation(1024 * 1024)).toBe(true);
+  });
+});
+
+describe("audioDurationMinutes", () => {
+  it("converts valid processing durations to billable minutes", () => {
+    expect(audioDurationMinutes(90)).toBe(1.5);
+  });
+
+  it("rejects durations that could bypass or corrupt usage accounting", () => {
+    expect(audioDurationMinutes(0)).toBeNull();
+    expect(audioDurationMinutes(Number.NaN)).toBeNull();
+    expect(audioDurationMinutes(24 * 60 * 60 + 1)).toBeNull();
   });
 });
 

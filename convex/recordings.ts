@@ -1,6 +1,7 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
+import { audioDurationMinutes } from "./shared/audioUsage";
 
 const AUDIO_LIMIT_MINUTES = 300;
 
@@ -60,6 +61,13 @@ async function checkAndUpdateAudioUsage(
   const { usage, userId } = await getUserUsage(ctx, tokenIdentifier);
   const limit = AUDIO_LIMIT_MINUTES;
 
+  if (!userId) {
+    return {
+      allowed: false,
+      error: "User account not found. Complete account setup and try again.",
+    };
+  }
+
   if (limit !== Infinity) {
     const newTotal = usage.audioMinutesUsed + durationMinutes;
     if (newTotal > limit) {
@@ -89,6 +97,40 @@ async function checkAndUpdateAudioUsage(
         : limit - usage.audioMinutesUsed - durationMinutes,
   };
 }
+
+/**
+ * Reserve a user's monthly allowance before an action invokes paid audio APIs.
+ * Keeping this internal prevents clients from charging another user's account.
+ */
+export const reserveAudioProcessing = internalMutation({
+  args: {
+    tokenIdentifier: v.string(),
+    durationSeconds: v.number(),
+  },
+  returns: v.object({
+    allowed: v.boolean(),
+    error: v.optional(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    const durationMinutes = audioDurationMinutes(args.durationSeconds);
+    if (durationMinutes === null) {
+      return {
+        allowed: false,
+        error: "Audio duration must be between 1 second and 24 hours.",
+      };
+    }
+
+    const result = await checkAndUpdateAudioUsage(
+      ctx,
+      args.tokenIdentifier,
+      durationMinutes,
+    );
+    return {
+      allowed: result.allowed,
+      error: result.error,
+    };
+  },
+});
 
 // Generate upload URL for audio files
 export const generateUploadUrl = mutation(async (ctx) => {
@@ -228,20 +270,6 @@ export const saveUploadedRecording = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
-
-    // Convert duration to minutes and check limit
-    const durationMinutes = (args.duration || 0) / 60;
-    if (durationMinutes > 0) {
-      const usageCheck = await checkAndUpdateAudioUsage(
-        ctx,
-        identity.tokenIdentifier,
-        durationMinutes,
-      );
-
-      if (!usageCheck.allowed) {
-        throw new Error(usageCheck.error || "Audio limit exceeded");
-      }
-    }
 
     // Get the audio URL from storage
     const audioUrl = await ctx.storage.getUrl(args.storageId);

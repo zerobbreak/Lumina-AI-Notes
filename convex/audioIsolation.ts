@@ -1,9 +1,11 @@
 "use node";
 
 import { action, type ActionCtx } from "./_generated/server";
-import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
+import { parseBlob } from "music-metadata";
+import { parseWebm } from "webm-meta-lite";
 import {
   ELEVENLABS_ISOLATION_URL,
   ISOLATED_AUDIO_MIME,
@@ -13,6 +15,7 @@ import {
   isolationFileName,
   shouldAttemptIsolation,
 } from "./shared/audioIsolation";
+import { audioDurationMinutes } from "./shared/audioUsage";
 
 const isolateAndTranscribeResult = v.object({
   transcript: v.string(),
@@ -35,6 +38,60 @@ type TranscribeAudioResult = {
   success: boolean;
   error?: string;
 };
+
+async function storedAudioDuration(
+  ctx: ActionCtx,
+  args: { storageId: Id<"_storage">; mimeType: string },
+): Promise<{ ok: true; seconds: number } | { ok: false; error: string }> {
+  const source = await ctx.storage.get(args.storageId);
+  if (!source) {
+    return { ok: false, error: "Audio file not found in storage." };
+  }
+  if (!shouldAttemptIsolation(source.size)) {
+    return {
+      ok: false,
+      error:
+        source.size > MAX_ISOLATION_BYTES
+          ? "That recording is too large to process."
+          : "Recording is too short to process.",
+    };
+  }
+
+  try {
+    const mimeType = (args.mimeType || source.type).toLowerCase();
+    let seconds: number | undefined;
+    if (mimeType.includes("webm")) {
+      const metadata = await parseWebm(source);
+      if (!metadata.tracks.some((track) => track.trackType === 2)) {
+        return { ok: false, error: "That file does not contain audio." };
+      }
+      const durationMs = metadata.durationMilliSeconds;
+      seconds = durationMs === undefined ? undefined : durationMs / 1000;
+    } else {
+      const metadata = await parseBlob(source, {
+        duration: true,
+        skipCovers: true,
+      });
+      if (!metadata.format.hasAudio) {
+        return { ok: false, error: "That file does not contain audio." };
+      }
+      seconds = metadata.format.duration;
+    }
+    if (seconds === undefined || audioDurationMinutes(seconds) === null) {
+      return {
+        ok: false,
+        error: "Couldn't determine the recording duration.",
+      };
+    }
+    return { ok: true, seconds };
+  } catch (error) {
+    console.error("[isolateAndTranscribe] Audio metadata parsing failed:", error);
+    return {
+      ok: false,
+      error: "Couldn't read that audio file.",
+    };
+  }
+}
 
 async function isolateStoredAudio(
   ctx: ActionCtx,
@@ -144,6 +201,35 @@ export const isolateAndTranscribe = action({
       };
     }
 
+    const duration = await storedAudioDuration(ctx, {
+      storageId: args.storageId,
+      mimeType: args.mimeType,
+    });
+    if (!duration.ok) {
+      return {
+        transcript: "",
+        success: false,
+        isolated: false,
+        error: duration.error,
+      };
+    }
+
+    const usage = await ctx.runMutation(
+      internal.recordings.reserveAudioProcessing,
+      {
+        tokenIdentifier: identity.tokenIdentifier,
+        durationSeconds: duration.seconds,
+      },
+    );
+    if (!usage.allowed) {
+      return {
+        transcript: "",
+        success: false,
+        isolated: false,
+        error: usage.error ?? "Audio limit exceeded.",
+      };
+    }
+
     const isolated = await isolateStoredAudio(ctx, {
       storageId: args.storageId,
       mimeType: args.mimeType,
@@ -164,7 +250,7 @@ export const isolateAndTranscribe = action({
       };
     }
 
-    const transcribed = (await ctx.runAction(api.ai.transcribeAudio, {
+    const transcribed = (await ctx.runAction(internal.ai.transcribeAudio, {
       storageId: transcribeFrom.storageId,
       mimeType: transcribeFrom.mimeType,
       courseContext: args.courseContext,
