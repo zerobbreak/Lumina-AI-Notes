@@ -1,6 +1,6 @@
 "use node";
 
-import { action } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
@@ -1286,7 +1286,7 @@ const extractJsonObject = (text: string): string | null => {
   return match ? match[0] : null;
 };
 
-export const transcribeAudio = action({
+export const transcribeAudio = internalAction({
   args: {
     storageId: v.id("_storage"),
     mimeType: v.string(),

@@ -223,7 +223,10 @@ export function TranscriptionPill() {
           if (result.isolated) {
             toast.success("Isolated speech from background noise");
           }
-        } else if (liveTranscript.length === 0) {
+        } else if (
+          liveTranscript.length === 0 ||
+          result.error?.includes("Audio limit")
+        ) {
           toast.error("Couldn't transcribe that recording", {
             description: result.error,
           });
