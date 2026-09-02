@@ -167,6 +167,8 @@ export function useMicLevels(bandCount: number) {
         recorderRef.current = recorder;
       } catch (e) {
         console.warn("[useMicLevels] MediaRecorder unavailable:", e);
+        stopHardware();
+        return false;
       }
 
       return true;
@@ -174,7 +176,7 @@ export function useMicLevels(bandCount: number) {
       console.warn("[useMicLevels] microphone meter unavailable:", e);
       return false;
     }
-  }, [bandCount, stop]);
+  }, [bandCount, stop, stopHardware]);
 
   useEffect(() => stop, [stop]);
 

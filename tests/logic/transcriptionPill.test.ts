@@ -7,6 +7,7 @@ import { describe, it, expect } from "vitest";
 import {
   formatElapsed,
   idleWaveform,
+  mergeIsolatedSegment,
   mirrorLevels,
   phaseLabel,
   resolvePhase,
@@ -126,6 +127,14 @@ describe("waveform helpers", () => {
   it("produces a deterministic idle shape (no hydration drift)", () => {
     expect(idleWaveform(6)).toEqual(idleWaveform(6));
     expect(idleWaveform(6)).toHaveLength(6);
+  });
+});
+
+describe("mergeIsolatedSegment", () => {
+  it("preserves prior segments while replacing the current live transcript", () => {
+    expect(
+      mergeIsolatedSegment(["first isolated segment"], " second isolated segment "),
+    ).toEqual(["first isolated segment", "second isolated segment"]);
   });
 });
 

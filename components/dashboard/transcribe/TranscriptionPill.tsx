@@ -36,6 +36,7 @@ import {
   formatElapsed,
   idleWaveform,
   ISOLATING_STAGES,
+  mergeIsolatedSegment,
   mirrorLevels,
   phaseLabel,
   resolvePhase,
@@ -146,7 +147,13 @@ export function TranscriptionPill() {
     };
   }, [isRecording]);
 
-  useEffect(() => stopMeter, [stopMeter]);
+  useEffect(
+    () => () => {
+      SpeechRecognition.stopListening();
+      stopMeter();
+    },
+    [stopMeter],
+  );
 
   // A session picked in the sidebar replaces whatever the pill was holding and
   // drops it straight into the "paused" face, ready to generate.
@@ -195,7 +202,7 @@ export function TranscriptionPill() {
   }, [stopMeter]);
 
   const isolateCapturedSession = useCallback(
-    async (liveTranscript: string) => {
+    async (segmentTranscript: string, priorChunks: string[]) => {
       setIsIsolating(true);
       try {
         const captured = await stopAndCollect();
@@ -214,23 +221,23 @@ export function TranscriptionPill() {
           storageId: storageId as Id<"_storage">,
           mimeType: captured.mimeType,
           courseContext: userData?.major || undefined,
-          fallbackToOriginal: liveTranscript.length === 0,
+          fallbackToOriginal: segmentTranscript.length === 0,
         });
 
         if (result.success && result.transcript.trim()) {
-          setChunks([result.transcript.trim()]);
+          setChunks(mergeIsolatedSegment(priorChunks, result.transcript));
           resetTranscript();
           if (result.isolated) {
             toast.success("Isolated speech from background noise");
           }
-        } else if (liveTranscript.length === 0) {
+        } else if (segmentTranscript.length === 0) {
           toast.error("Couldn't transcribe that recording", {
             description: result.error,
           });
         }
       } catch (e) {
         console.error("[TranscriptionPill] audio isolation failed:", e);
-        if (!liveTranscript) {
+        if (!segmentTranscript) {
           toast.error("Couldn't process that recording");
         }
       } finally {
@@ -252,25 +259,31 @@ export function TranscriptionPill() {
     if (isRecording) {
       // Fold the in-flight utterance into the session before closing the mic,
       // otherwise resetTranscript() would discard it. Isolation then replaces
-      // this live text when ElevenLabs returns a cleaner transcript.
+      // this segment's live text when ElevenLabs returns a cleaner transcript.
       const pending = transcript.trim();
-      const liveTranscript = [...chunks, pending].filter(Boolean).join(" ").trim();
       if (pending) setChunks((prev) => [...prev, pending]);
       resetTranscript();
       SpeechRecognition.stopListening();
       setIsRecording(false);
-      void isolateCapturedSession(liveTranscript);
+      void isolateCapturedSession(pending, chunks);
       return;
     }
 
     try {
+      const captureStarted = await startMeter();
+      if (!captureStarted) {
+        toast.error("Couldn't start recording", {
+          description: "Check that this site is allowed to use your microphone.",
+        });
+        return;
+      }
       await SpeechRecognition.startListening({
         continuous: true,
         language: "en-US",
       });
-      void startMeter();
       setIsRecording(true);
     } catch (e) {
+      stopMeter();
       console.error("[TranscriptionPill] failed to start listening:", e);
       toast.error("Couldn't start recording", {
         description: "Check that this site is allowed to use your microphone.",
@@ -284,6 +297,7 @@ export function TranscriptionPill() {
     resetTranscript,
     isolateCapturedSession,
     startMeter,
+    stopMeter,
   ]);
 
   const handleReset = useCallback(() => {
