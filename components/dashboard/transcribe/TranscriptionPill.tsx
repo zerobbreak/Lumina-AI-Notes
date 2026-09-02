@@ -147,7 +147,13 @@ export function TranscriptionPill() {
     };
   }, [isRecording]);
 
-  useEffect(() => stopMeter, [stopMeter]);
+  useEffect(
+    () => () => {
+      SpeechRecognition.stopListening();
+      stopMeter();
+    },
+    [stopMeter],
+  );
 
   // A session picked in the sidebar replaces whatever the pill was holding and
   // drops it straight into the "paused" face, ready to generate.
