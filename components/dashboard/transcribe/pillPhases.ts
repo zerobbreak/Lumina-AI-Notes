@@ -135,3 +135,12 @@ export function mirrorLevels(levels: number[]): number[] {
   const head = levels.slice(0, half);
   return [...[...head].reverse(), ...head];
 }
+
+/** Replace only the latest live segment while preserving earlier captures. */
+export function mergeIsolatedSegment(
+  priorChunks: readonly string[],
+  isolatedTranscript: string,
+): string[] {
+  const isolated = isolatedTranscript.trim();
+  return isolated ? [...priorChunks, isolated] : [...priorChunks];
+}
