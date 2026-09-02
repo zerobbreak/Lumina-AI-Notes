@@ -264,13 +264,20 @@ export function TranscriptionPill() {
     }
 
     try {
+      const captureStarted = await startMeter();
+      if (!captureStarted) {
+        toast.error("Couldn't start recording", {
+          description: "Check that this site is allowed to use your microphone.",
+        });
+        return;
+      }
       await SpeechRecognition.startListening({
         continuous: true,
         language: "en-US",
       });
-      void startMeter();
       setIsRecording(true);
     } catch (e) {
+      stopMeter();
       console.error("[TranscriptionPill] failed to start listening:", e);
       toast.error("Couldn't start recording", {
         description: "Check that this site is allowed to use your microphone.",
@@ -284,6 +291,7 @@ export function TranscriptionPill() {
     resetTranscript,
     isolateCapturedSession,
     startMeter,
+    stopMeter,
   ]);
 
   const handleReset = useCallback(() => {
