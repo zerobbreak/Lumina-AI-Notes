@@ -1,8 +1,7 @@
 import { v } from "convex/values";
-import { mutation, query, action } from "./_generated/server";
-import { api, internal } from "./_generated/api";
-import { GoogleGenerativeAI, TaskType } from "@google/generative-ai";
-import { embedTextForVectorSearch } from "./geminiEmbedding";
+import { mutation, query, action, internalQuery } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import {
   normalizeTranscriptForPrompt,
   ENRICHMENT_WORD_THRESHOLD,
@@ -21,7 +20,71 @@ import {
 
 const MAX_PREVIOUS_NOTES_CHARS = 100_000;
 
+const noteSectionType = v.union(
+  v.literal("heading"),
+  v.literal("paragraph"),
+  v.literal("bullets"),
+  v.literal("numbered"),
+  v.literal("quote"),
+  v.literal("divider"),
+);
+
+const structuredNotesResult = v.object({
+  summary: v.string(),
+  sections: v.array(
+    v.object({
+      id: v.string(),
+      type: noteSectionType,
+      content: v.string(),
+      level: v.optional(v.number()),
+    }),
+  ),
+  actionItems: v.array(v.string()),
+  reviewQuestions: v.array(v.string()),
+  diagramData: v.optional(
+    v.object({
+      nodes: v.array(
+        v.object({
+          id: v.string(),
+          type: v.string(),
+          data: v.object({ label: v.string(), color: v.string() }),
+          position: v.object({ x: v.number(), y: v.number() }),
+        }),
+      ),
+      edges: v.array(
+        v.object({
+          id: v.string(),
+          source: v.string(),
+          target: v.string(),
+          animated: v.boolean(),
+        }),
+      ),
+    }),
+  ),
+});
+
 type NoteRole = "owner" | "editor" | "viewer";
+type NoteSectionType =
+  | "heading"
+  | "paragraph"
+  | "bullets"
+  | "numbered"
+  | "quote"
+  | "divider";
+
+function normalizeNoteSectionType(value: unknown): NoteSectionType {
+  switch (value) {
+    case "heading":
+    case "paragraph":
+    case "bullets":
+    case "numbered":
+    case "quote":
+    case "divider":
+      return value;
+    default:
+      return "paragraph";
+  }
+}
 
 /**
  * Enrich a sparse or fragmented transcript by using AI to reconstruct
@@ -715,16 +778,17 @@ export const unlinkDocument = mutation({
   },
 });
 
-/**
- * Helper query to fetch documents by their IDs (for use in actions)
- */
-export const getDocumentsByIds = query({
-  args: { documentIds: v.array(v.id("files")) },
+/** Read processed file content for an authenticated backend generation action. */
+export const getPinnedFileContent = internalQuery({
+  args: {
+    fileId: v.id("files"),
+    userId: v.string(),
+  },
+  returns: v.union(v.string(), v.null()),
   handler: async (ctx, args) => {
-    const docs = await Promise.all(
-      args.documentIds.map((id) => ctx.db.get(id)),
-    );
-    return docs.filter((doc) => doc !== null);
+    const file = await ctx.db.get(args.fileId);
+    if (!file || file.userId !== args.userId) return null;
+    return file.extractedText?.trim() || null;
   },
 });
 
@@ -735,12 +799,16 @@ export const getDocumentsByIds = query({
 export const generateFromPinnedAudio = action({
   args: {
     transcript: v.string(),
-    pinnedFileId: v.optional(v.string()),
+    pinnedFileId: v.optional(v.id("files")),
     previousNotesContent: v.optional(v.string()),
     /** Public http(s) pages to fetch and use as extra context (max 5). */
     referenceUrls: v.optional(v.array(v.string())),
   },
+  returns: structuredNotesResult,
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("GEMINI_API_KEY not set");
 
@@ -751,6 +819,17 @@ export const generateFromPinnedAudio = action({
     const referenceUrlsBlock = await fetchReferenceUrlsForPrompt(
       normalizeReferenceUrlList(args.referenceUrls),
     );
+    const pinnedFileContent = args.pinnedFileId
+      ? await ctx.runQuery(internal.notes.getPinnedFileContent, {
+          fileId: args.pinnedFileId,
+          userId: identity.tokenIdentifier,
+        })
+      : "";
+
+    if (args.pinnedFileId && !pinnedFileContent) {
+      throw new Error("Pinned file is unavailable or has not finished processing");
+    }
+    const contextText = pinnedFileContent ?? "";
 
     const fixJson = async (text: string) => {
       const fixPrompt = `Fix the following JSON. Return ONLY valid JSON with the same structure and content, no markdown.
@@ -819,41 +898,7 @@ STRICT quality requirements:
       return tryParseJson(fixedRepairText);
     };
 
-    // 1. Embed the transcript (query-style retrieval against indexed documents)
-    const transcriptEmbedding = await embedTextForVectorSearch(
-      genAI,
-      normalizedTranscript,
-      TaskType.RETRIEVAL_QUERY,
-    );
-
-    // 2. Search the pinned file (or all documents if no pin)
-    let relevantDocs: Array<{ _id: any; _score: number }> = [];
-    if (transcriptEmbedding) {
-      if (args.pinnedFileId) {
-        relevantDocs = await ctx.vectorSearch("documents", "by_embedding", {
-          vector: transcriptEmbedding,
-          filter: (q: any) => q.eq("storageId", args.pinnedFileId),
-          limit: 5,
-        });
-      } else {
-        relevantDocs = await ctx.vectorSearch("documents", "by_embedding", {
-          vector: transcriptEmbedding,
-          limit: 5,
-        });
-      }
-    }
-
-    // 3. Fetch the actual document texts
-    let contextText = "";
-    if (relevantDocs.length > 0) {
-      const docIds = relevantDocs.map((d) => d._id);
-      const documents = await ctx.runQuery(api.notes.getDocumentsByIds, {
-        documentIds: docIds,
-      });
-      contextText = documents.map((doc: any) => doc.text).join("\n\n---\n\n");
-    }
-
-    // 4. Enrich the transcript before note generation
+    // Enrich the transcript before note generation.
     const enrichedTranscript = await enrichTranscriptForPinned(
       model,
       normalizedTranscript,
@@ -978,10 +1023,13 @@ MANDATORY QUALITY REQUIREMENTS:
         let normalizedSections = Array.isArray(workingParsed.sections)
           ? workingParsed.sections
               .map((section: any, idx: number) => ({
-                id: section.id || `sec-${idx}`,
-                type: section.type || "paragraph",
+                id: String(section.id || `sec-${idx}`),
+                type: normalizeNoteSectionType(section.type),
                 content: String(section.content || "").trim(),
-                level: section.level,
+                level:
+                  typeof section.level === "number"
+                    ? section.level
+                    : undefined,
               }))
               .filter((section: any) => section.content.length > 0)
           : [];
@@ -1012,10 +1060,13 @@ MANDATORY QUALITY REQUIREMENTS:
             normalizedSections = Array.isArray(workingParsed.sections)
               ? workingParsed.sections
                   .map((section: any, idx: number) => ({
-                    id: section.id || `sec-${idx}`,
-                    type: section.type || "paragraph",
+                    id: String(section.id || `sec-${idx}`),
+                    type: normalizeNoteSectionType(section.type),
                     content: String(section.content || "").trim(),
-                    level: section.level,
+                    level:
+                      typeof section.level === "number"
+                        ? section.level
+                        : undefined,
                   }))
                   .filter((section: any) => section.content.length > 0)
               : [];
@@ -1048,7 +1099,7 @@ MANDATORY QUALITY REQUIREMENTS:
         const diagramData = buildDiagramData(diagramNodes, diagramEdges);
 
         return {
-          summary: workingParsed.summary || "",
+          summary: String(workingParsed.summary || ""),
           sections: normalizedSections,
           actionItems: normalizedActionItems,
           reviewQuestions: normalizedReviewQuestions,
