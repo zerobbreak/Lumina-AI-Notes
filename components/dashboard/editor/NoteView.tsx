@@ -512,7 +512,17 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         pendingNotes.diagramData.nodes.length > 0
       ) {
         html += `<h2>Mind Map</h2>`;
-        html += `<div data-type="diagram" data-nodes='${JSON.stringify(pendingNotes.diagramData.nodes)}' data-edges='${JSON.stringify(pendingNotes.diagramData.edges || [])}'></div>`;
+        const nodes = JSON.stringify(pendingNotes.diagramData.nodes)
+          .replaceAll("&", "&amp;")
+          .replaceAll("'", "&#39;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;");
+        const edges = JSON.stringify(pendingNotes.diagramData.edges || [])
+          .replaceAll("&", "&amp;")
+          .replaceAll("'", "&#39;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;");
+        html += `<div data-type="diagram" data-nodes='${nodes}' data-edges='${edges}'></div>`;
       }
 
       if (cancelled) return;
@@ -521,11 +531,19 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         scheduleEditorUpdate(() => {
           if (editor && !editor.isDestroyed && editor.view) {
             try {
-              editor.chain().focus().insertContent(html).run();
-              clearPendingNotes();
+              const inserted = editor.chain().focus().insertContent(html).run();
+              if (inserted) {
+                clearPendingNotes();
+              } else {
+                toast.error("Couldn't insert generated notes", {
+                  description: "Your generated notes are still queued. Reopen this page to retry.",
+                });
+              }
             } catch (error) {
               console.error("Failed to insert pending notes:", error);
-              clearPendingNotes();
+              toast.error("Couldn't insert generated notes", {
+                description: "Your generated notes are still queued. Reopen this page to retry.",
+              });
             }
           }
         });
