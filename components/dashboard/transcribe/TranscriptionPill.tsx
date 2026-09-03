@@ -214,7 +214,10 @@ export function TranscriptionPill() {
           storageId: storageId as Id<"_storage">,
           mimeType: captured.mimeType,
           courseContext: userData?.major || undefined,
-          fallbackToOriginal: liveTranscript.length === 0,
+          // Browser speech is only a partial safety net. If isolation fails,
+          // transcribe the complete captured blob instead of silently keeping
+          // a truncated live transcript.
+          fallbackToOriginal: true,
         });
 
         if (result.success && result.transcript.trim()) {
