@@ -219,7 +219,7 @@ export function PinContextButton({
   fileId,
   fileName,
 }: {
-  fileId: string;
+  fileId: Id<"files">;
   fileName: string;
 }) {
   const { activeContext, setActiveContext } = useDashboard();

@@ -27,11 +27,9 @@ export interface StructuredNotes {
   };
 }
 
-export interface PinnedContext {
-  id: string;
-  name: string;
-  type: "file" | "note";
-}
+export type PinnedContext =
+  | { id: Id<"files">; name: string; type: "file" }
+  | { id: Id<"notes">; name: string; type: "note" };
 
 /** Shown in NoteView while Convex getNote subscription catches up after createNote */
 export interface NoteBootstrap {
