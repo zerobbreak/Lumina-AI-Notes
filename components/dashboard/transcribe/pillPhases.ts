@@ -23,6 +23,22 @@ export type PillPhaseInput = {
   hasNotes: boolean;
 };
 
+type GeneratedNotesLike = {
+  sections?: ReadonlyArray<{ content?: string }>;
+};
+
+/**
+ * Generation actions currently return an empty structure when the model fails
+ * or produces invalid JSON. Do not let that error-shaped response advance the
+ * pill to "Notes ready", where its fallback summary could be inserted as note
+ * content.
+ */
+export function hasGeneratedNoteContent(notes: GeneratedNotesLike): boolean {
+  return (
+    notes.sections?.some((section) => Boolean(section.content?.trim())) ?? false
+  );
+}
+
 /**
  * Single source of truth for which face the pill shows.
  *
