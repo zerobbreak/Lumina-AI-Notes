@@ -34,6 +34,7 @@ import { PillWaveform } from "./PillWaveform";
 import { ThinkingSequence } from "./ThinkingSequence";
 import {
   formatElapsed,
+  hasGeneratedNoteContent,
   idleWaveform,
   ISOLATING_STAGES,
   mirrorLevels,
@@ -344,6 +345,9 @@ export function TranscriptionPill() {
               title,
               referenceUrls: urls,
             });
+      if (!hasGeneratedNoteContent(generated)) {
+        throw new Error("Note generation returned no usable sections");
+      }
       setNotes(generated);
     } catch (e) {
       console.error("[TranscriptionPill] note generation failed:", e);

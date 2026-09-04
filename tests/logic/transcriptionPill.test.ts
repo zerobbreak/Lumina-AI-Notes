@@ -6,6 +6,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   formatElapsed,
+  hasGeneratedNoteContent,
   idleWaveform,
   mirrorLevels,
   phaseLabel,
@@ -77,6 +78,29 @@ describe("resolvePhase", () => {
 
   it("falls back to paused when a transcript exists but notes do not", () => {
     expect(resolvePhase({ ...base, hasTranscript: true })).toBe("paused");
+  });
+});
+
+describe("hasGeneratedNoteContent", () => {
+  it("rejects backend failure responses with no usable sections", () => {
+    expect(
+      hasGeneratedNoteContent({
+        sections: [],
+      }),
+    ).toBe(false);
+    expect(
+      hasGeneratedNoteContent({
+        sections: [{ content: "   " }],
+      }),
+    ).toBe(false);
+  });
+
+  it("accepts generated notes with substantive section content", () => {
+    expect(
+      hasGeneratedNoteContent({
+        sections: [{ content: "A generated explanation." }],
+      }),
+    ).toBe(true);
   });
 });
 
