@@ -397,6 +397,9 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   useEffect(() => {
     const loadContent = async () => {
       if (!editor || editor.isDestroyed) return;
+      // Outline notes are owned by the keyed Editor rendered below. Loading
+      // them into this standard editor emits an update from the wrong instance.
+      if (displayNote?.style === "outline") return;
       if (noteId === loadedNoteId) return;
 
       const contentSource = noteQuery ?? syntheticNote;
@@ -417,6 +420,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     noteId,
     editor,
     loadedNoteId,
+    displayNote?.style,
     scheduleEditorUpdate,
   ]);
 
@@ -1010,6 +1014,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             >
               {note?.style === "outline" ? (
                 <Editor
+                  key={noteId}
                   styleType="outline"
                   initialContent={note.content || ""}
                   outlineData={note.outlineData}

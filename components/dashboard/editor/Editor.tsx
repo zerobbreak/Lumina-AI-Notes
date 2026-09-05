@@ -227,21 +227,6 @@ export default function Editor({
     return () => onReady?.(null);
   }, [editor, onReady]);
 
-  // Effect to update content if it changes externally
-  useEffect(() => {
-    if (editor && initialContent !== editor.getHTML()) {
-      queueMicrotask(() => {
-        if (editor && !editor.isDestroyed) {
-          if (initialContent) {
-            editor.commands.setContent(initialContent);
-          } else {
-            editor.commands.clearContent();
-          }
-        }
-      });
-    }
-  }, [initialContent, editor]);
-
   if (!editor) {
     return null;
   }
