@@ -30,6 +30,14 @@ export function shouldAttemptIsolation(byteLength: number): boolean {
   return byteLength >= MIN_ISOLATION_BYTES && byteLength <= MAX_ISOLATION_BYTES;
 }
 
+export function recordingOwnsStorage(
+  recording: { userId: string; storageId?: string } | null,
+  userId: string,
+  storageId: string,
+): boolean {
+  return recording?.userId === userId && recording.storageId === storageId;
+}
+
 /**
  * Map ElevenLabs HTTP failures to a short, user-facing sentence.
  * Never forwards raw API bodies — they can include account details.
