@@ -210,7 +210,14 @@ export function TranscriptionPill() {
         if (!res.ok) throw new Error("upload failed");
         const { storageId } = (await res.json()) as { storageId: string };
 
+        const recordingId = await saveUploadedRecording({
+          title: `Session ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
+          storageId: storageId as Id<"_storage">,
+          sessionId: sessionIdRef.current,
+        });
+
         const result = await isolateAndTranscribe({
+          recordingId,
           storageId: storageId as Id<"_storage">,
           mimeType: captured.mimeType,
           courseContext: userData?.major || undefined,
@@ -240,6 +247,7 @@ export function TranscriptionPill() {
     [
       stopAndCollect,
       generateUploadUrl,
+      saveUploadedRecording,
       isolateAndTranscribe,
       userData?.major,
       resetTranscript,
@@ -429,15 +437,16 @@ export function TranscriptionPill() {
         if (!res.ok) throw new Error("upload failed");
         const { storageId } = await res.json();
 
-        await saveUploadedRecording({
+        const recordingId = await saveUploadedRecording({
           title: file.name.replace(/\.[^/.]+$/, "") || "Imported audio",
-          storageId,
+          storageId: storageId as Id<"_storage">,
           duration,
           tzOffsetMinutes: new Date().getTimezoneOffset(),
           sessionId: sessionIdRef.current,
         });
 
         const result = await isolateAndTranscribe({
+          recordingId,
           storageId: storageId as Id<"_storage">,
           mimeType: file.type || "audio/mpeg",
           courseContext: userData?.major || undefined,

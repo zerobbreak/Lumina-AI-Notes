@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   isolationErrorMessage,
   isolationFileName,
+  recordingOwnsStorage,
   shouldAttemptIsolation,
   MAX_ISOLATION_BYTES,
   MIN_ISOLATION_BYTES,
@@ -36,6 +37,26 @@ describe("shouldAttemptIsolation", () => {
   it("accepts a normal session recording", () => {
     expect(shouldAttemptIsolation(MIN_ISOLATION_BYTES)).toBe(true);
     expect(shouldAttemptIsolation(1024 * 1024)).toBe(true);
+  });
+});
+
+describe("recordingOwnsStorage", () => {
+  const recording = {
+    userId: "user-a",
+    storageId: "storage-a",
+  };
+
+  it("requires both the recording owner and storage ID to match", () => {
+    expect(recordingOwnsStorage(recording, "user-a", "storage-a")).toBe(true);
+    expect(recordingOwnsStorage(recording, "user-b", "storage-a")).toBe(false);
+    expect(recordingOwnsStorage(recording, "user-a", "storage-b")).toBe(false);
+  });
+
+  it("rejects missing and unbound recordings", () => {
+    expect(recordingOwnsStorage(null, "user-a", "storage-a")).toBe(false);
+    expect(
+      recordingOwnsStorage({ userId: "user-a" }, "user-a", "storage-a"),
+    ).toBe(false);
   });
 });
 

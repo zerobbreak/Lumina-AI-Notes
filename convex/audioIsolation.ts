@@ -1,7 +1,7 @@
 "use node";
 
 import { action, type ActionCtx } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -127,6 +127,7 @@ async function isolateStoredAudio(
  */
 export const isolateAndTranscribe = action({
   args: {
+    recordingId: v.id("recordings"),
     storageId: v.id("_storage"),
     mimeType: v.string(),
     courseContext: v.optional(v.string()),
@@ -141,6 +142,20 @@ export const isolateAndTranscribe = action({
         success: false,
         isolated: false,
         error: "Not authenticated",
+      };
+    }
+
+    const ownsStorage = await ctx.runQuery(internal.recordings.ownsAudioStorage, {
+      recordingId: args.recordingId,
+      storageId: args.storageId,
+      userId: identity.tokenIdentifier,
+    });
+    if (!ownsStorage) {
+      return {
+        transcript: "",
+        success: false,
+        isolated: false,
+        error: "Recording not found or unauthorized",
       };
     }
 

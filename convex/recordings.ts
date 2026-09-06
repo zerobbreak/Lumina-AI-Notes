@@ -1,6 +1,7 @@
-import { mutation, query } from "./_generated/server";
+import { internalQuery, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
+import { recordingOwnsStorage } from "./shared/audioIsolation";
 
 const AUDIO_LIMIT_MINUTES = 300;
 
@@ -220,14 +221,37 @@ export const upsertRecordingDraft = mutation({
 export const saveUploadedRecording = mutation({
   args: {
     title: v.string(),
-    storageId: v.string(),
+    storageId: v.id("_storage"),
     duration: v.optional(v.number()), // Duration in seconds
     tzOffsetMinutes: v.optional(v.number()),
     sessionId: v.optional(v.string()),
   },
+  returns: v.id("recordings"),
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
+
+    const existingRecording = await ctx.db
+      .query("recordings")
+      .withIndex("by_storageId", (q) => q.eq("storageId", args.storageId))
+      .first();
+    if (existingRecording) {
+      if (
+        existingRecording.userId === identity.tokenIdentifier &&
+        existingRecording.sessionId === args.sessionId
+      ) {
+        return existingRecording._id;
+      }
+      throw new Error("Audio upload is already assigned to another recording");
+    }
+
+    const existingFile = await ctx.db
+      .query("files")
+      .withIndex("by_storageId", (q) => q.eq("storageId", args.storageId))
+      .first();
+    if (existingFile && existingFile.userId !== identity.tokenIdentifier) {
+      throw new Error("Audio upload is not owned by the current user");
+    }
 
     // Convert duration to minutes and check limit
     const durationMinutes = (args.duration || 0) / 60;
@@ -252,6 +276,7 @@ export const saveUploadedRecording = mutation({
       title: args.title,
       transcript: "", // Will be filled after transcription
       audioUrl: audioUrl || undefined,
+      storageId: args.storageId,
       duration: args.duration,
       createdAt: Date.now(),
     });
@@ -268,6 +293,19 @@ export const saveUploadedRecording = mutation({
     }
 
     return recordingId;
+  },
+});
+
+export const ownsAudioStorage = internalQuery({
+  args: {
+    recordingId: v.id("recordings"),
+    storageId: v.id("_storage"),
+    userId: v.string(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const recording = await ctx.db.get(args.recordingId);
+    return recordingOwnsStorage(recording, args.userId, args.storageId);
   },
 });
 

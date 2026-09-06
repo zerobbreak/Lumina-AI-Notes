@@ -144,6 +144,7 @@ export default defineSchema({
     errorMessage: v.optional(v.string()),
   })
     .index("by_userId", ["userId"])
+    .index("by_storageId", ["storageId"])
     .index("by_userId_courseId", ["userId", "courseId"])
     .index("by_userId_createdAt", ["userId", "createdAt"])
     .index("by_userId_lastAccessedAt", ["userId", "lastAccessedAt"])
@@ -164,10 +165,12 @@ export default defineSchema({
     title: v.string(),
     transcript: v.string(),
     audioUrl: v.optional(v.string()),
+    storageId: v.optional(v.id("_storage")),
     duration: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_userId", ["userId"])
+    .index("by_storageId", ["storageId"])
     .index("by_userId_sessionId", ["userId", "sessionId"])
     .index("by_userId_createdAt", ["userId", "createdAt"]),
 
