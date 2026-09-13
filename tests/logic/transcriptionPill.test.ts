@@ -25,6 +25,7 @@ import {
   normalizeReferenceUrlList,
 } from "@/convex/shared/urlContent";
 import { normalizeTranscriptForPrompt } from "@/convex/shared/transcript";
+import { parseTranscriptionDraft } from "@/lib/sessionAudio";
 
 const base = {
   isRecording: false,
@@ -286,6 +287,46 @@ describe("normalizeTranscriptForPrompt (session replay from the sidebar)", () =>
 
   it("returns empty for an empty transcript", () => {
     expect(normalizeTranscriptForPrompt("   ")).toBe("");
+  });
+});
+
+describe("parseTranscriptionDraft (interrupted live-session recovery)", () => {
+  it("restores a valid persisted transcript draft", () => {
+    expect(
+      parseTranscriptionDraft(
+        JSON.stringify({
+          version: 1,
+          savedAt: 123,
+          sessionId: "session-1",
+          elapsed: 17.9,
+          chunks: ["first segment", "  "],
+          liveTranscript: " latest words ",
+        }),
+      ),
+    ).toEqual({
+      version: 1,
+      savedAt: 123,
+      sessionId: "session-1",
+      elapsed: 17,
+      chunks: ["first segment"],
+      liveTranscript: "latest words",
+    });
+  });
+
+  it("rejects malformed browser storage instead of crashing the dashboard", () => {
+    expect(parseTranscriptionDraft("{not-json")).toBeNull();
+    expect(
+      parseTranscriptionDraft(
+        JSON.stringify({
+          version: 1,
+          savedAt: 123,
+          sessionId: "",
+          elapsed: 5,
+          chunks: ["text"],
+          liveTranscript: "",
+        }),
+      ),
+    ).toBeNull();
   });
 });
 
