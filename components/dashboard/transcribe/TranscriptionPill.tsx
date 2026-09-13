@@ -30,6 +30,11 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { useMicLevels } from "@/hooks/useMicLevels";
 import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
 import type { StructuredNotes } from "@/components/dashboard/DashboardContext";
+import {
+  parseTranscriptionDraft,
+  TRANSCRIPTION_DRAFT_STORAGE_KEY,
+  type TranscriptionDraft,
+} from "@/lib/sessionAudio";
 import { PillWaveform } from "./PillWaveform";
 import { ThinkingSequence } from "./ThinkingSequence";
 import {
@@ -133,8 +138,29 @@ export function TranscriptionPill() {
   );
 
   useEffect(() => {
-    setMounted(true);
     sessionIdRef.current = crypto.randomUUID();
+    try {
+      const rawDraft = localStorage.getItem(TRANSCRIPTION_DRAFT_STORAGE_KEY);
+      const draft = rawDraft ? parseTranscriptionDraft(rawDraft) : null;
+      if (draft) {
+        sessionIdRef.current = draft.sessionId;
+        setChunks(
+          [...draft.chunks, draft.liveTranscript].filter(
+            (chunk) => chunk.trim().length > 0,
+          ),
+        );
+        setElapsed(draft.elapsed);
+        toast.info("Recovered unsaved recording draft", {
+          description: "Your interrupted transcript has been restored.",
+        });
+      } else if (rawDraft) {
+        localStorage.removeItem(TRANSCRIPTION_DRAFT_STORAGE_KEY);
+      }
+    } catch (error) {
+      console.warn("[TranscriptionPill] failed to restore local draft:", error);
+    } finally {
+      setMounted(true);
+    }
   }, []);
 
   // Elapsed clock runs only while the mic is actually open.
@@ -147,6 +173,14 @@ export function TranscriptionPill() {
   }, [isRecording]);
 
   useEffect(() => stopMeter, [stopMeter]);
+
+  const clearRecordingDraft = useCallback(() => {
+    try {
+      localStorage.removeItem(TRANSCRIPTION_DRAFT_STORAGE_KEY);
+    } catch (error) {
+      console.warn("[TranscriptionPill] failed to clear local draft:", error);
+    }
+  }, []);
 
   // A session picked in the sidebar replaces whatever the pill was holding and
   // drops it straight into the "paused" face, ready to generate.
@@ -161,8 +195,15 @@ export function TranscriptionPill() {
     setSourceRecordingId(sessionToLoad.recordingId);
     setNotes(null);
     setElapsed(0);
+    clearRecordingDraft();
     clearLoadedSession();
-  }, [sessionToLoad, stopMeter, resetTranscript, clearLoadedSession]);
+  }, [
+    sessionToLoad,
+    stopMeter,
+    resetTranscript,
+    clearRecordingDraft,
+    clearLoadedSession,
+  ]);
 
   const fullTranscript = useMemo(
     () => [...chunks, transcript.trim()].filter(Boolean).join(" ").trim(),
@@ -173,6 +214,86 @@ export function TranscriptionPill() {
     () => (fullTranscript ? fullTranscript.split(/\s+/).length : 0),
     [fullTranscript],
   );
+
+  // Keep every in-progress transcript recoverable across refreshes and route
+  // changes. Browser storage is the immediate safety net while the backend
+  // autosave below is intentionally debounced.
+  useEffect(() => {
+    if (!mounted || sourceRecordingId || notes) return;
+    if (!fullTranscript) {
+      clearRecordingDraft();
+      return;
+    }
+
+    const draft: TranscriptionDraft = {
+      version: 1,
+      savedAt: Date.now(),
+      sessionId: sessionIdRef.current,
+      elapsed,
+      chunks,
+      liveTranscript: transcript.trim(),
+    };
+    try {
+      localStorage.setItem(
+        TRANSCRIPTION_DRAFT_STORAGE_KEY,
+        JSON.stringify(draft),
+      );
+    } catch (error) {
+      console.warn("[TranscriptionPill] failed to save local draft:", error);
+    }
+  }, [
+    mounted,
+    sourceRecordingId,
+    notes,
+    fullTranscript,
+    elapsed,
+    chunks,
+    transcript,
+    clearRecordingDraft,
+  ]);
+
+  useEffect(() => {
+    if (
+      !mounted ||
+      sourceRecordingId ||
+      notes ||
+      isThinking ||
+      !fullTranscript
+    ) {
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        await upsertDraft({
+          sessionId: sessionIdRef.current,
+          title: `Session ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
+          duration: elapsed,
+          transcript: JSON.stringify([
+            {
+              text: fullTranscript,
+              enhancedText: fullTranscript,
+              timestamp: formatElapsed(elapsed),
+              isImportant: false,
+              concepts: [],
+            },
+          ]),
+        });
+      } catch (error) {
+        console.warn("[TranscriptionPill] backend autosave failed:", error);
+      }
+    }, 2500);
+
+    return () => clearTimeout(timeoutId);
+  }, [
+    mounted,
+    sourceRecordingId,
+    notes,
+    isThinking,
+    fullTranscript,
+    elapsed,
+    upsertDraft,
+  ]);
 
   const phase = resolvePhase({
     isRecording,
@@ -295,7 +416,8 @@ export function TranscriptionPill() {
     setIsIsolating(false);
     setSourceRecordingId(null);
     sessionIdRef.current = crypto.randomUUID();
-  }, [resetTranscript, stopListening]);
+    clearRecordingDraft();
+  }, [resetTranscript, stopListening, clearRecordingDraft]);
 
   const handleGenerate = useCallback(async () => {
     if (isRecording) stopListening();
