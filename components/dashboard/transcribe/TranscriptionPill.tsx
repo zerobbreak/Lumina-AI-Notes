@@ -105,6 +105,7 @@ export function TranscriptionPill() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
+  const asyncTaskGenerationRef = useRef(0);
 
   const { levels, start: startMeter, stop: stopMeter, stopAndCollect } =
     useMicLevels(BANDS);
@@ -186,10 +187,12 @@ export function TranscriptionPill() {
   // drops it straight into the "paused" face, ready to generate.
   useEffect(() => {
     if (!sessionToLoad) return;
+    asyncTaskGenerationRef.current += 1;
     SpeechRecognition.stopListening();
     stopMeter();
     setIsRecording(false);
     setIsIsolating(false);
+    setIsThinking(false);
     resetTranscript();
     setChunks([sessionToLoad.transcript]);
     setSourceRecordingId(sessionToLoad.recordingId);
@@ -408,11 +411,13 @@ export function TranscriptionPill() {
   ]);
 
   const handleReset = useCallback(() => {
+    asyncTaskGenerationRef.current += 1;
     stopListening();
     resetTranscript();
     setChunks([]);
     setElapsed(0);
     setNotes(null);
+    setIsThinking(false);
     setIsIsolating(false);
     setSourceRecordingId(null);
     sessionIdRef.current = crypto.randomUUID();
@@ -423,6 +428,7 @@ export function TranscriptionPill() {
     if (isRecording) stopListening();
     if (!fullTranscript) return;
 
+    const taskGeneration = ++asyncTaskGenerationRef.current;
     setIsThinking(true);
     const title = `Session ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
 
@@ -466,14 +472,18 @@ export function TranscriptionPill() {
               title,
               referenceUrls: urls,
             });
+      if (taskGeneration !== asyncTaskGenerationRef.current) return;
       setNotes(generated);
     } catch (e) {
+      if (taskGeneration !== asyncTaskGenerationRef.current) return;
       console.error("[TranscriptionPill] note generation failed:", e);
       toast.error("Couldn't generate notes", {
         description: "Your transcript is saved — try again in a moment.",
       });
     } finally {
-      setIsThinking(false);
+      if (taskGeneration === asyncTaskGenerationRef.current) {
+        setIsThinking(false);
+      }
     }
   }, [
     isRecording,
@@ -539,6 +549,7 @@ export function TranscriptionPill() {
         return;
       }
 
+      const taskGeneration = ++asyncTaskGenerationRef.current;
       setIsThinking(true);
       try {
         const duration = await readAudioDuration(file);
@@ -566,6 +577,7 @@ export function TranscriptionPill() {
           fallbackToOriginal: true,
         });
 
+        if (taskGeneration !== asyncTaskGenerationRef.current) return;
         if (result.success && result.transcript) {
           setChunks([result.transcript]);
           toast.success(
@@ -579,10 +591,13 @@ export function TranscriptionPill() {
           });
         }
       } catch (e) {
+        if (taskGeneration !== asyncTaskGenerationRef.current) return;
         console.error("[TranscriptionPill] audio import failed:", e);
         toast.error("Couldn't import that audio file");
       } finally {
-        setIsThinking(false);
+        if (taskGeneration === asyncTaskGenerationRef.current) {
+          setIsThinking(false);
+        }
       }
     },
     [
