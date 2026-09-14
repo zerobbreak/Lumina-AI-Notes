@@ -107,6 +107,8 @@ export default defineSchema({
     .index("by_userId_and_noteType", ["userId", "noteType"])
     .index("by_courseId", ["courseId"])
     .index("by_moduleId", ["moduleId"])
+    .index("by_userId_courseId", ["userId", "courseId"])
+    .index("by_userId_courseId_moduleId", ["userId", "courseId", "moduleId"])
     .index("by_parentNoteId", ["parentNoteId"])
     .vectorIndex("by_embedding", {
       vectorField: "embedding",
