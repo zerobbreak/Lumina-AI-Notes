@@ -251,6 +251,34 @@ export function Sidebar() {
     }
   };
 
+  const handleDeleteCourse = useCallback(
+    async (courseId: string) => {
+      if (!window.confirm("Delete this course?")) return;
+      try {
+        await deleteCourse({ courseId });
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to delete course",
+        );
+      }
+    },
+    [deleteCourse],
+  );
+
+  const handleDeleteModule = useCallback(
+    async (moduleId: string, courseId: string) => {
+      if (!window.confirm("Delete this module?")) return;
+      try {
+        await deleteModule({ courseId, moduleId });
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to delete module",
+        );
+      }
+    },
+    [deleteModule],
+  );
+
   const courses = userData?.courses ?? [];
   const courseCodes = useMemo(
     () => courses.map((course) => course.code),
@@ -440,13 +468,11 @@ export function Sidebar() {
               isExpanded={!!expandedCourses[course.id]}
               onToggle={() => toggleCourse(course.id)}
               onRename={(id, name) => openRename(id, "course", name)}
-              onDelete={(id) => deleteCourse({ courseId: id })}
+              onDelete={handleDeleteCourse}
               onRenameModule={(id, name, parentId) =>
                 openRename(id, "module", name, parentId)
               }
-              onDeleteModule={(id, parentId) =>
-                deleteModule({ courseId: parentId, moduleId: id })
-              }
+              onDeleteModule={handleDeleteModule}
               onRenameNote={(id, title) => openRename(id, "note", title)}
               onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
               onArchiveNote={(id) =>
@@ -562,13 +588,11 @@ export function Sidebar() {
               isExpanded={!!expandedCourses[course.id]}
               onToggle={() => toggleCourse(course.id)}
               onRename={(id, name) => openRename(id, "course", name)}
-              onDelete={(id) => deleteCourse({ courseId: id })}
+              onDelete={handleDeleteCourse}
               onRenameModule={(id, name, parentId) =>
                 openRename(id, "module", name, parentId)
               }
-              onDeleteModule={(id, parentId) =>
-                deleteModule({ courseId: parentId, moduleId: id })
-              }
+              onDeleteModule={handleDeleteModule}
               onRenameNote={(id, title) => openRename(id, "note", title)}
               onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
               onArchiveNote={(id) =>

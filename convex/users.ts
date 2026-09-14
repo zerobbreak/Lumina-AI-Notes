@@ -414,6 +414,7 @@ export const addModuleToCourse = mutation({
 
 export const deleteCourse = mutation({
   args: { courseId: v.string() },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
@@ -423,15 +424,41 @@ export const deleteCourse = mutation({
         q.eq("tokenIdentifier", identity.tokenIdentifier)
       )
       .unique();
-    if (!user || !user.courses) return;
+    if (!user || !user.courses) return null;
+
+    const [note, file] = await Promise.all([
+      ctx.db
+        .query("notes")
+        .withIndex("by_userId_courseId", (q) =>
+          q
+            .eq("userId", identity.tokenIdentifier)
+            .eq("courseId", args.courseId),
+        )
+        .first(),
+      ctx.db
+        .query("files")
+        .withIndex("by_userId_courseId", (q) =>
+          q
+            .eq("userId", identity.tokenIdentifier)
+            .eq("courseId", args.courseId),
+        )
+        .first(),
+    ]);
+    if (note || file) {
+      throw new Error(
+        "Move or delete every note and file in this course before deleting it",
+      );
+    }
 
     const updatedCourses = user.courses.filter((c) => c.id !== args.courseId);
     await ctx.db.patch(user._id, { courses: updatedCourses });
+    return null;
   },
 });
 
 export const deleteModule = mutation({
   args: { courseId: v.string(), moduleId: v.string() },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
@@ -441,7 +468,22 @@ export const deleteModule = mutation({
         q.eq("tokenIdentifier", identity.tokenIdentifier)
       )
       .unique();
-    if (!user || !user.courses) return;
+    if (!user || !user.courses) return null;
+
+    const note = await ctx.db
+      .query("notes")
+      .withIndex("by_userId_courseId_moduleId", (q) =>
+        q
+          .eq("userId", identity.tokenIdentifier)
+          .eq("courseId", args.courseId)
+          .eq("moduleId", args.moduleId),
+      )
+      .first();
+    if (note) {
+      throw new Error(
+        "Move or delete every note in this module before deleting it",
+      );
+    }
 
     const updatedCourses = user.courses.map((c) => {
       if (c.id === args.courseId && c.modules) {
@@ -454,6 +496,7 @@ export const deleteModule = mutation({
     });
 
     await ctx.db.patch(user._id, { courses: updatedCourses });
+    return null;
   },
 });
 
