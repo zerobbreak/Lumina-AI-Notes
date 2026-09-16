@@ -448,9 +448,35 @@ export const getChildNotes = query({
 
 export const deleteNote = mutation({
   args: { noteId: v.id("notes") },
+  returns: v.null(),
   handler: async (ctx, args) => {
-    const { role } = await requireNoteAccess(ctx, args.noteId);
+    const { note, role } = await requireNoteAccess(ctx, args.noteId);
     if (role !== "owner") throw new Error("Forbidden");
+
+    // Keep direct children reachable after their parent is deleted. Preserve
+    // the surrounding hierarchy only when each child's owner can access the
+    // grandparent; otherwise promote the child to a root page.
+    const children = await ctx.db
+      .query("notes")
+      .withIndex("by_parentNoteId", (q) =>
+        q.eq("parentNoteId", args.noteId),
+      )
+      .collect();
+    for (const child of children) {
+      let parentNoteId = note.parentNoteId;
+      if (
+        parentNoteId &&
+        !(await getNoteRole(ctx, parentNoteId, child.userId))
+      ) {
+        parentNoteId = undefined;
+      }
+      await ctx.db.patch(child._id, {
+        parentNoteId,
+        ...(!parentNoteId && !child.courseId && !child.moduleId
+          ? { noteType: "quick" }
+          : {}),
+      });
+    }
 
     // Cascade: clean up collaborators
     const collabs = await ctx.db
@@ -467,6 +493,7 @@ export const deleteNote = mutation({
     for (const i of invites) await ctx.db.delete(i._id);
 
     await ctx.db.delete(args.noteId);
+    return null;
   },
 });
 
