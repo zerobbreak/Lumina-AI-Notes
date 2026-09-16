@@ -470,7 +470,12 @@ export const deleteNote = mutation({
       ) {
         parentNoteId = undefined;
       }
-      await ctx.db.patch(child._id, { parentNoteId });
+      await ctx.db.patch(child._id, {
+        parentNoteId,
+        ...(!parentNoteId && !child.courseId && !child.moduleId
+          ? { noteType: "quick" }
+          : {}),
+      });
     }
 
     // Cascade: clean up collaborators
