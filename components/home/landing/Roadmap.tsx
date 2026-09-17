@@ -2,12 +2,12 @@ const items = [
   {
     title: "Lumina Brain Sync",
     status: "In development",
-    body: "Cross-note and cross-course linking, so the system surfaces the connection between week 3 and week 11 before you find it yourself.",
+    body: "Studio's Knowledge Graph now surfaces cross-note and cross-course connections on its own — week 3 and week 11 show up linked without you searching. What's still missing: those same backlinks living inside the note editor itself, not just in Studio.",
   },
   {
-    title: "Dynamic mind maps",
-    status: "In development",
-    body: "The diagram tooling exists today; this extends it into graph views that are generated and kept current from note structure.",
+    title: "In-editor backlinks",
+    status: "Not started",
+    body: "A panel under a note's own content listing what links to it, so the connection is visible while you're writing — not just when you open the graph.",
   },
   {
     title: "Adaptive quiz forge",

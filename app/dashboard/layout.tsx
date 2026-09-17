@@ -8,7 +8,7 @@ import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { Sparkles } from "lucide-react";
 import { useMutation, useQuery, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
@@ -62,6 +62,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
   const userData = useQuery(api.users.getUser);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // The Studio's own AI chat is unrelated to live transcription — the
+  // floating recording pill shouldn't hover over it.
+  const isStudioView = searchParams.get("view") === "studio";
   const { toggleLeftSidebar, isLeftSidebarOpen } = useDashboard();
   const [isLeftHovered, setIsLeftHovered] = useState(false);
 
@@ -197,7 +201,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             {children}
           </div>
         </main>
-        {mountHeavyPanels ? <TranscriptionPill /> : null}
+        {mountHeavyPanels && !isStudioView ? <TranscriptionPill /> : null}
 
         {/* Document Processing Indicator - shows when PDFs are being processed */}
         {mountHeavyPanels ? <DocumentProcessingIndicatorLazy /> : null}

@@ -5,6 +5,7 @@ import {
   FileUp,
   MonitorDown,
   Sigma,
+  Share2,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -171,6 +172,46 @@ export function Apparatus() {
               An optional Electron shell packages the same workspace as a
               desktop app, with sign-in handed back through a custom protocol.
             </p>
+          </Panel>
+
+          <Panel span="md:col-span-12">
+            <Head icon={<Share2 size={15} strokeWidth={1.75} />} label="Studio" />
+            <h3 className="display text-[1.55rem]">
+              A knowledge graph, not just a chat with citations
+            </h3>
+            <p className="mt-3.5 max-w-[46ch] text-[0.93rem] leading-relaxed" style={{ color: "var(--ink-soft)" }}>
+              Studio now has a Graph mode next to Chat: every note plotted by
+              embedding similarity and by the [[wikilinks]] you write, sized by
+              how connected it is, with unlinked notes flagged instead of
+              quietly forgotten. Select a note to see what links to it and
+              what&apos;s merely related, then hand that whole neighborhood
+              straight to Studio&apos;s chat.
+            </p>
+
+            <div
+              className="mt-7 border p-4"
+              style={{ borderColor: "var(--rule)", background: "var(--paper-warm)" }}
+            >
+              <div className="mono mb-3 flex items-center gap-2" style={{ color: "var(--ink-faint)" }}>
+                <Share2 size={12} strokeWidth={2} />
+                Linked to
+              </div>
+              <p className="display text-[1.05rem]" style={{ fontStyle: "italic" }}>
+                &ldquo;Cellular Respiration&rdquo;
+              </p>
+              <div className="mt-4 grid gap-2 border-t pt-3 sm:grid-cols-3" style={{ borderColor: "var(--rule)" }}>
+                {[
+                  "Krebs Cycle — wikilink",
+                  "Mitochondria Structure — 91% match",
+                  "Photosynthesis — 84% match",
+                ].map((r) => (
+                  <p key={r} className="mono flex items-center gap-2.5 text-[0.85rem]" style={{ color: "var(--ink-soft)" }}>
+                    <span style={{ color: "var(--vermilion)" }}>→</span>
+                    {r}
+                  </p>
+                ))}
+              </div>
+            </div>
           </Panel>
         </div>
       </div>
