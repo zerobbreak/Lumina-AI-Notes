@@ -1,0 +1,86 @@
+# Static vulnerability scanning that needs no API key and no setup.
+#
+# CodeQL finds injection, XSS, path traversal, SSRF and similar patterns in
+# the JS/TS source; the audit job flags known CVEs in dependencies.
+# Results appear under the repository's Security -> Code scanning tab, and
+# CodeQL annotates the PR diff directly.
+#
+# Both jobs are advisory today (the audit step does not fail the build). To
+# make them gating, drop the `|| true` in the audit step and require these
+# jobs in the branch protection rules for `main`.
+
+name: CodeQL
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    # Weekly, so newly published advisories are caught on unchanged code.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: codeql-analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          # security-extended adds lower-severity security queries on top of
+          # the default set. Swap to `security-and-quality` to add non-security
+          # lint-style queries as well.
+          queries: security-extended
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
+
+  audit:
+    name: dependency-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Audit dependencies
+        # Reports high and critical advisories in the job summary. Advisory
+        # for now — remove `|| true` to make a vulnerable dependency block
+        # the merge.
+        run: |
+          npm audit --audit-level=high --omit=dev > audit.txt 2>&1 || true
+          {
+            echo "### npm audit (high and critical, production deps)"
+            echo '```'
+            cat audit.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat audit.txt
