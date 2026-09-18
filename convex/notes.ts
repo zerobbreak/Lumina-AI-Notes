@@ -18,6 +18,10 @@ import {
   fetchReferenceUrlsForPrompt,
   normalizeReferenceUrlList,
 } from "./shared/urlContent";
+import {
+  getNoteEmbeddingSnapshot,
+  NOTE_EMBEDDING_DELAY_MS,
+} from "./shared/noteEmbedding";
 
 const MAX_PREVIOUS_NOTES_CHARS = 100_000;
 
@@ -131,6 +135,7 @@ export const createNote = mutation({
     quickCaptureExpandedNoteId: v.optional(v.id("notes")),
     sourceRecordingId: v.optional(v.id("recordings")),
   },
+  returns: v.id("notes"),
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
@@ -185,6 +190,18 @@ export const createNote = mutation({
       quickCaptureExpandedNoteId: args.quickCaptureExpandedNoteId,
       sourceRecordingId: args.sourceRecordingId,
     });
+
+    const embeddingSnapshot = getNoteEmbeddingSnapshot(null, {
+      title: args.title,
+      content: args.content ?? "",
+    });
+    if (embeddingSnapshot) {
+      await ctx.scheduler.runAfter(
+        NOTE_EMBEDDING_DELAY_MS,
+        internal.noteEmbeddings.refresh,
+        { noteId, ...embeddingSnapshot },
+      );
+    }
 
     return noteId;
   },
@@ -514,11 +531,24 @@ export const getPinnedNotes = query({
 
 export const renameNote = mutation({
   args: { noteId: v.id("notes"), title: v.string() },
+  returns: v.null(),
   handler: async (ctx, args) => {
-    const { role } = await requireNoteEdit(ctx, args.noteId);
+    const { note } = await requireNoteEdit(ctx, args.noteId);
     // Allow owners + editors to rename (shared editing experience)
 
+    const embeddingSnapshot = getNoteEmbeddingSnapshot(
+      { title: note.title, content: note.content ?? "" },
+      { title: args.title, content: note.content ?? "" },
+    );
     await ctx.db.patch(args.noteId, { title: args.title });
+    if (embeddingSnapshot) {
+      await ctx.scheduler.runAfter(
+        NOTE_EMBEDDING_DELAY_MS,
+        internal.noteEmbeddings.refresh,
+        { noteId: args.noteId, ...embeddingSnapshot },
+      );
+    }
+    return null;
   },
 });
 
@@ -556,9 +586,17 @@ export const updateNote = mutation({
     quickCaptureExpandedNoteId: v.optional(v.id("notes")),
     sourceRecordingId: v.optional(v.id("recordings")),
   },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const { note } = await requireNoteEdit(ctx, args.noteId);
 
+    const embeddingSnapshot = getNoteEmbeddingSnapshot(
+      { title: note.title, content: note.content ?? "" },
+      {
+        title: args.title ?? note.title,
+        content: args.content ?? note.content ?? "",
+      },
+    );
     const patch: any = {};
     const now = Date.now();
     if (args.title !== undefined) patch.title = args.title;
@@ -603,6 +641,14 @@ export const updateNote = mutation({
         noteId: args.noteId,
       });
     }
+    if (embeddingSnapshot) {
+      await ctx.scheduler.runAfter(
+        NOTE_EMBEDDING_DELAY_MS,
+        internal.noteEmbeddings.refresh,
+        { noteId: args.noteId, ...embeddingSnapshot },
+      );
+    }
+    return null;
   },
 });
 
