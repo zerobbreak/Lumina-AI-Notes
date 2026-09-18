@@ -1,48 +1,59 @@
-import dagre from "dagre";
+import ELK, { ElkNode } from "elkjs/lib/elk.bundled.js";
 import { Node, Edge } from "@xyflow/react";
 import { LayoutType, LayoutOptions } from "@/types";
 
+const elk = new ELK();
+
+// Maps our TB/LR/BT/RL convention (dagre's rankdir) to ELK's compass direction.
+const ELK_DIRECTION: Record<string, string> = {
+  TB: "DOWN",
+  BT: "UP",
+  LR: "RIGHT",
+  RL: "LEFT",
+};
+
 /**
- * Apply hierarchical layout using Dagre
+ * Apply hierarchical (layered) layout using ELK
  */
-export function applyHierarchicalLayout(
+export async function applyHierarchicalLayout(
   nodes: Node[],
   edges: Edge[],
   options: LayoutOptions = {}
-): Node[] {
+): Promise<Node[]> {
   const { direction = "TB", nodeSpacing = 150, rankSpacing = 100 } = options;
 
-  const dagreGraph = new dagre.graphlib.Graph();
-  dagreGraph.setDefaultEdgeLabel(() => ({}));
-  dagreGraph.setGraph({
-    rankdir: direction,
-    nodesep: nodeSpacing,
-    ranksep: rankSpacing,
-  });
+  const elkGraph: ElkNode = {
+    id: "root",
+    layoutOptions: {
+      "elk.algorithm": "layered",
+      "elk.direction": ELK_DIRECTION[direction] ?? "DOWN",
+      "elk.spacing.nodeNode": String(nodeSpacing),
+      "elk.layered.spacing.nodeNodeBetweenLayers": String(rankSpacing),
+    },
+    children: nodes.map((node) => ({
+      id: node.id,
+      width: getNodeWidth(node.type),
+      height: getNodeHeight(node.type),
+    })),
+    edges: edges.map((edge) => ({
+      id: edge.id,
+      sources: [edge.source],
+      targets: [edge.target],
+    })),
+  };
 
-  // Add nodes to dagre
-  nodes.forEach((node) => {
-    const width = getNodeWidth(node.type);
-    const height = getNodeHeight(node.type);
-    dagreGraph.setNode(node.id, { width, height });
-  });
+  const layout = await elk.layout(elkGraph);
+  const positions = new Map(
+    (layout.children ?? []).map((child) => [child.id, child])
+  );
 
-  // Add edges to dagre
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
-  });
-
-  // Calculate layout
-  dagre.layout(dagreGraph);
-
-  // Update node positions
   return nodes.map((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id);
+    const positioned = positions.get(node.id);
     return {
       ...node,
       position: {
-        x: nodeWithPosition.x - nodeWithPosition.width / 2,
-        y: nodeWithPosition.y - nodeWithPosition.height / 2,
+        x: positioned?.x ?? node.position.x,
+        y: positioned?.y ?? node.position.y,
       },
     };
   });

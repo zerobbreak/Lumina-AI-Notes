@@ -247,7 +247,7 @@ function FlowCanvasInner({
 
   // Apply layout
   const handleApplyLayout = useCallback(
-    (layout: LayoutType) => {
+    async (layout: LayoutType) => {
       const currentNodes = getNodes();
       const currentEdges = getEdges();
 
@@ -255,7 +255,10 @@ function FlowCanvasInner({
 
       switch (layout) {
         case "hierarchical":
-          layoutedNodes = applyHierarchicalLayout(currentNodes, currentEdges);
+          layoutedNodes = await applyHierarchicalLayout(
+            currentNodes,
+            currentEdges
+          );
           break;
         case "radial":
           layoutedNodes = applyRadialLayout(currentNodes, currentEdges);
