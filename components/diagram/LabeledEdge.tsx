@@ -28,6 +28,8 @@ export const LabeledEdge = memo(
     targetPosition,
     label,
     markerEnd,
+    markerStart,
+    data,
     style,
     selected,
   }: EdgeProps) => {
@@ -42,9 +44,22 @@ export const LabeledEdge = memo(
 
     const text = typeof label === "string" ? label.trim() : "";
 
+    // The layout points every edge shallow -> deep, which can be the opposite of
+    // the relationship the model stated. When it is, the arrowhead goes on the
+    // start of the path so "causes" still reads from cause to effect. ReactFlow's
+    // markers are orient="auto-start-reverse", so one marker faces correctly at
+    // either end.
+    const isReversed = Boolean((data as { reversed?: boolean } | undefined)?.reversed);
+
     return (
       <>
-        <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={style} />
+        <BaseEdge
+          id={id}
+          path={edgePath}
+          markerEnd={isReversed ? undefined : markerEnd}
+          markerStart={isReversed ? (markerStart ?? markerEnd) : undefined}
+          style={style}
+        />
         {text ? (
           <EdgeLabelRenderer>
             <div

@@ -19,6 +19,7 @@ import {
   Node,
   ReactFlowProvider,
   useReactFlow,
+  MarkerType,
   type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -60,6 +61,14 @@ const edgeTypes = {
   labeled: LabeledEdge,
 };
 
+/** Arrowhead shared by both ends; LabeledEdge draws whichever end is correct. */
+const EDGE_MARKER = {
+  type: MarkerType.ArrowClosed,
+  color: "#60a5fa",
+  width: 18,
+  height: 18,
+} as const;
+
 /** Serializable subset for comparing external props (avoids handler churn). */
 function serializeDiagramPropsForSync(
   nodes: Node[] | undefined,
@@ -83,6 +92,8 @@ function serializeDiagramPropsForSync(
     animated: e.animated,
     // Included so a label-only change upstream still re-seeds internal state.
     label: typeof e.label === "string" ? e.label : "",
+    // Same reason: a flip changes which end the arrowhead is drawn on.
+    reversed: Boolean((e.data as { reversed?: boolean } | undefined)?.reversed),
   }));
   return JSON.stringify({ nodes: cleanNodes, edges: cleanEdges });
 }
@@ -405,6 +416,11 @@ function FlowCanvasInner({
           type: "labeled",
           animated: true,
           style: { stroke: "#60a5fa", strokeWidth: 2 },
+          // Both ends are defined so LabeledEdge can pick which one to draw: an
+          // edge the layout flipped needs its arrowhead at the start to keep a
+          // directional label ("causes") reading the right way round.
+          markerEnd: EDGE_MARKER,
+          markerStart: EDGE_MARKER,
         }}
       >
         <Background gap={12} size={1} color="#333" />

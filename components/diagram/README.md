@@ -108,6 +108,11 @@ The AI returns `diagramNodes` and `diagramEdges`; `buildDiagramData` in
   claiming `concept` is demoted to `topic`.
 - An edge is `"sourceIndex-targetIndex"` with an optional `": label"` suffix
   naming the relationship (max 40 chars), rendered as a chip by `LabeledEdge`.
+- The layout points every edge shallow -> deep, which is sometimes the opposite
+  of the relationship the model stated. Those edges are tagged `data.reversed`
+  and `LabeledEdge` draws their arrowhead at the *start* of the path, so
+  "Smoking -> causes -> Cancer" still reads correctly with Cancer as the root.
+  The label text is never rewritten.
 - A declared kind wins; when it is absent or invalid, type and colour fall back
   to BFS depth off the root as before.
 - Both older forms (bare string nodes, bare `"0-1"` edges) still parse, so

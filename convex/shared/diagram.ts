@@ -30,6 +30,13 @@ export type DiagramEdge = {
   target: string;
   animated: boolean;
   label?: string;
+  /**
+   * Set when the layout flipped this edge so it points shallow -> deep. The
+   * geometry no longer matches the direction the model stated, so a directional
+   * label ("causes") reads backwards unless the arrowhead is drawn at the start
+   * instead of the end. LabeledEdge does exactly that.
+   */
+  data?: { reversed?: boolean };
 };
 
 export type DiagramData = {
@@ -148,7 +155,12 @@ function depthsFromRootBFS(
   return depth;
 }
 
-/** Point edges from shallower BFS depth to deeper so the TB layout matches the mind map. */
+/**
+ * Point edges from shallower BFS depth to deeper so the TB layout matches the
+ * mind map. Flipping an edge inverts what a directional label means, so a
+ * flipped edge is tagged `data.reversed` for the renderer to draw its arrowhead
+ * at the other end; the label itself is never rewritten.
+ */
 function orientEdgesForLayout(
   edges: DiagramEdge[],
   depths: Map<number, number>,
@@ -158,16 +170,11 @@ function orientEdgesForLayout(
     const t = parseInt(e.target, 10);
     const ds = depths.has(s) ? depths.get(s)! : 999;
     const dt = depths.has(t) ? depths.get(t)! : 999;
-    if (ds < dt) {
+    const keepDirection = ds < dt || (ds === dt && s <= t);
+    if (keepDirection) {
       return { ...e, source: String(s), target: String(t) };
     }
-    if (ds > dt) {
-      return { ...e, source: String(t), target: String(s) };
-    }
-    if (s <= t) {
-      return { ...e, source: String(s), target: String(t) };
-    }
-    return { ...e, source: String(t), target: String(s) };
+    return { ...e, source: String(t), target: String(s), data: { reversed: true } };
   });
 }
 

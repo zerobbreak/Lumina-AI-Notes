@@ -289,6 +289,29 @@ describe("edge labels", () => {
     expect(swapped.source).toBe("0");
     expect(swapped.target).toBe("2");
   });
+
+  it("flags a swapped edge so its arrowhead can be drawn at the other end", () => {
+    // "Smoking causes Cancer" with Cancer as the root: the layout must draw
+    // Cancer above Smoking, which inverts the edge relative to the stated
+    // relationship. The label is never rewritten, so the flag is what keeps
+    // "causes" readable.
+    const data = buildDiagramData(["Cancer", "Smoking"], ["1-0: causes"])!;
+    const edge = data.edges[0];
+
+    expect(edge.source).toBe("0");
+    expect(edge.target).toBe("1");
+    expect(edge.label).toBe("causes");
+    expect(edge.data?.reversed).toBe(true);
+  });
+
+  it("leaves an edge already pointing root-outwards unflagged", () => {
+    const data = buildDiagramData(["Cancer", "Smoking"], ["0-1: treated by"])!;
+    const edge = data.edges[0];
+
+    expect(edge.source).toBe("0");
+    expect(edge.target).toBe("1");
+    expect(edge.data?.reversed).toBeUndefined();
+  });
 });
 
 describe("node kinds", () => {
