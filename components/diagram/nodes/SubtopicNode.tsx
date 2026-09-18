@@ -58,7 +58,7 @@ export const SubtopicNode = memo(({ data, selected }: NodeProps) => {
     <div
       className={`px-4 py-2 rounded-lg shadow-md border ${
         selected ? "border-cyan-400" : "border-white/20"
-      } ${bgColor} min-w-[100px] transition-all duration-200 hover:scale-105`}
+      } ${bgColor} min-w-[100px] max-w-[180px] transition-all duration-200 hover:scale-105`}
       onDoubleClick={handleDoubleClick}
     >
       <Handle
@@ -97,7 +97,9 @@ export const SubtopicNode = memo(({ data, selected }: NodeProps) => {
             {label}
           </div>
         ) : (
-          <div className="text-white font-medium text-sm">{label}</div>
+          <div className="text-white font-medium text-sm break-words line-clamp-3">
+            {label}
+          </div>
         )}
       </div>
     </div>

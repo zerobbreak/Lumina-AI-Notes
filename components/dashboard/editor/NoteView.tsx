@@ -90,6 +90,20 @@ function buildBootstrapDoc(
   } as Doc<"notes">;
 }
 
+/**
+ * Serialise a value into a single-quoted HTML attribute. Diagram payloads carry
+ * free text (node labels, edge relationship labels like "doesn't cause"), and an
+ * unescaped apostrophe would terminate the attribute and silently drop the rest
+ * of the graph on parse.
+ */
+function toHtmlAttrJson(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/&/g, "&amp;")
+    .replace(/'/g, "&#39;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 // Props for the NoteView
 interface NoteViewProps {
   noteId: Id<"notes">;
@@ -512,7 +526,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         pendingNotes.diagramData.nodes.length > 0
       ) {
         html += `<h2>Mind Map</h2>`;
-        html += `<div data-type="diagram" data-nodes='${JSON.stringify(pendingNotes.diagramData.nodes)}' data-edges='${JSON.stringify(pendingNotes.diagramData.edges || [])}'></div>`;
+        html += `<div data-type="diagram" data-nodes='${toHtmlAttrJson(pendingNotes.diagramData.nodes)}' data-edges='${toHtmlAttrJson(pendingNotes.diagramData.edges || [])}'></div>`;
       }
 
       if (cancelled) return;

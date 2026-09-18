@@ -60,7 +60,7 @@ export const ConceptNode = memo(({ data, selected }: NodeProps) => {
     <div
       className={`px-6 py-4 rounded-2xl shadow-2xl border-4 ${
         selected ? "border-cyan-400" : "border-white/20"
-      } ${bgColor} min-w-[180px] transition-all duration-200 hover:scale-105`}
+      } ${bgColor} min-w-[180px] max-w-[260px] transition-all duration-200 hover:scale-105`}
       onDoubleClick={handleDoubleClick}
     >
       <Handle
@@ -99,7 +99,9 @@ export const ConceptNode = memo(({ data, selected }: NodeProps) => {
             {label}
           </div>
         ) : (
-          <div className="text-white font-bold text-lg">{label}</div>
+          <div className="text-white font-bold text-lg break-words line-clamp-3">
+            {label}
+          </div>
         )}
       </div>
       {nodeData.description && (

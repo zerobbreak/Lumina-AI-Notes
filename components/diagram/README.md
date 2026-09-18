@@ -26,6 +26,10 @@ All nodes support:
 - Color customization
 - Multiple connection handles
 
+Each node type has a `max-w-[…]` cap and a `line-clamp`. These MUST stay in step
+with `NODE_METRICS` in `convex/shared/diagram.ts`, which both layout engines use
+to reserve space — if a node renders wider than the layout reserved, nodes overlap.
+
 ### MindMapToolbar (`MindMapToolbar.tsx`)
 Floating toolbar with controls:
 - Add Node (with type selector)
@@ -36,17 +40,21 @@ Floating toolbar with controls:
 - Export (PNG, SVG, PDF)
 
 ### Layout Algorithms (`layouts.ts`)
-- **Hierarchical**: Top-down tree layout using Dagre
+- **Hierarchical**: Top-down layered layout using ELK
 - **Radial**: Circular layout from center
 - **Force**: Physics-based force-directed layout
+
+Node sizes come from `getNodeDimensions` in `convex/shared/diagram.ts` so the
+client and server agree on how much space a node needs.
 
 ### Export Utilities (`export.ts`)
 - PNG export using html2canvas
 - PDF export using jsPDF
 - SVG export using native browser APIs
 
-### Type Definitions (`types.ts`)
-TypeScript interfaces for nodes, edges, layouts, and export options.
+### Type Definitions
+`LayoutType` and `LayoutOptions` live in `@/types`; the shared node/edge shapes
+and the server-side layered layout live in `convex/shared/diagram.ts`.
 
 ## Usage
 
@@ -83,11 +91,29 @@ const editor = useEditor({
 - Double-click node: Edit label
 
 ## AI Generation
-The AI generates mind maps with:
-- Proper node types based on hierarchy
-- Color coding by type
-- Optimized positioning using Dagre layout
-- Animated edges showing relationships
+The AI returns `diagramNodes` and `diagramEdges`; `buildDiagramData` in
+`convex/shared/diagram.ts` turns them into a ReactFlow graph.
+
+```jsonc
+"diagramNodes": [
+  {"label": "Central Topic", "kind": "concept"},
+  {"label": "Key Concept A", "kind": "topic"}
+],
+"diagramEdges": ["0-1: causes", "0-2"]
+```
+
+- A node is either a bare `"label"` string or `{label, kind}`, where kind is
+  `concept | topic | subtopic | note` and reflects importance to the material,
+  not tree position. Index 0 is always forced to `concept`; any other node
+  claiming `concept` is demoted to `topic`.
+- An edge is `"sourceIndex-targetIndex"` with an optional `": label"` suffix
+  naming the relationship (max 40 chars), rendered as a chip by `LabeledEdge`.
+- A declared kind wins; when it is absent or invalid, type and colour fall back
+  to BFS depth off the root as before.
+- Both older forms (bare string nodes, bare `"0-1"` edges) still parse, so
+  diagrams already stored in notes keep rendering.
+- Initial positions come from a dependency-free layered layout, which runs in
+  Convex's default runtime (ELK's browser bundle cannot load there).
 
 ## Data Structure
 Nodes and edges follow the ReactFlow format:
@@ -117,7 +143,7 @@ Nodes and edges follow the ReactFlow format:
 
 ## Dependencies
 - `@xyflow/react`: ReactFlow library for node-based UIs
-- `dagre`: Graph layout algorithm
+- `elkjs`: Graph layout algorithm (client only)
 - `html2canvas`: Canvas-based screenshot
 - `jspdf`: PDF generation
 - `sonner`: Toast notifications

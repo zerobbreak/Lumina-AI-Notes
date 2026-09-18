@@ -24,7 +24,12 @@ import {
   CLARITY_RULES,
   getDepthRequirements,
 } from "./shared/notePrompts";
-import { buildDiagramData } from "./shared/diagram";
+import {
+  applyLayeredLayout,
+  buildDiagramData,
+  layeredRanks,
+} from "./shared/diagram";
+import type { DiagramNodeInput } from "./shared/diagram";
 import { arrayBufferToBase64 } from "./encoding";
 import {
   fetchReferenceUrlsForPrompt,
@@ -417,54 +422,17 @@ export const generateCourseRoadmap = action({
         edges: RoadmapEdge[];
       };
 
-      // Apply dagre layout for better positioning
+      // Apply layered layout for better positioning
       if (data.nodes && data.nodes.length > 0) {
-        // Dynamic import for dagre
-        const dagre = await import("dagre");
-        const dagreGraph = new dagre.graphlib.Graph();
-        dagreGraph.setDefaultEdgeLabel(() => ({}));
-        dagreGraph.setGraph({ rankdir: "TB", nodesep: 150, ranksep: 100 });
-
-        // Add nodes with estimated dimensions
-        data.nodes.forEach((node: RoadmapNode) => {
-          const width =
-            node.type === "concept"
-              ? 200
-              : node.type === "topic"
-                ? 160
-                : node.type === "subtopic"
-                  ? 120
-                  : 100;
-          const height =
-            node.type === "concept"
-              ? 80
-              : node.type === "topic"
-                ? 60
-                : node.type === "subtopic"
-                  ? 50
-                  : 40;
-          dagreGraph.setNode(node.id, { width, height });
-        });
-
-        // Add edges
-        data.edges.forEach((edge: RoadmapEdge) => {
-          dagreGraph.setEdge(edge.source, edge.target);
-        });
-
-        // Calculate layout
-        dagre.layout(dagreGraph);
-
-        // Update positions
-        data.nodes = data.nodes.map((node: RoadmapNode) => {
-          const nodeWithPosition = dagreGraph.node(node.id);
-          return {
-            ...node,
-            position: {
-              x: nodeWithPosition.x - nodeWithPosition.width / 2,
-              y: nodeWithPosition.y - nodeWithPosition.height / 2,
-            },
-          };
-        });
+        const edges = data.edges ?? [];
+        data.nodes = applyLayeredLayout(
+          data.nodes,
+          edges,
+          layeredRanks(
+            data.nodes.map((node: RoadmapNode) => node.id),
+            edges,
+          ),
+        );
       }
 
       return data;
@@ -627,12 +595,12 @@ Return JSON with EXACT keys:
   ],
   "actionItems": ["..."],
   "reviewQuestions": ["..."],
-  "diagramNodes": ["..."],
-  "diagramEdges": ["..."]
+  "diagramNodes": [{"label": "Central Topic", "kind": "concept"}, {"label": "Key Concept A", "kind": "topic"}, "..."],
+  "diagramEdges": ["0-1: causes", "..."]
 }
 
 STRICT quality requirements:
-- diagramNodes/diagramEdges: If present, index 0 is the root; edges must reference valid node indices only; keep labels concise for on-canvas display.
+- diagramNodes/diagramEdges: If present, index 0 is the root and MUST have kind "concept". Each node is either a plain string label or an object {"label": "...", "kind": "concept"|"topic"|"subtopic"|"note"}, where kind reflects importance to the material, not tree position. Edges are "sourceIndex-targetIndex" referencing valid node indices only, optionally suffixed with ":label" giving a short verb-phrase relationship (max 40 characters, e.g. "0-1: causes") — omit the label rather than emitting a vacuous one like "is related to". Keep labels concise for on-canvas display.
 ${getDepthRequirements(wordCountFn(enrichedTranscript))}
 - Use bullet points for key ideas, important explanations, and lists
 - Each section must follow: Concept introduction → Explanation → Example (from the transcript) → Significance
@@ -738,8 +706,13 @@ Return as HTML with proper <ul>, <ol>, and task list structure using data-type="
     "Comparison question: Compare and contrast [concept A] with [concept B]. What are the key differences?",
     "Analysis question: Why does [phenomenon] occur? What factors contribute to it?"
   ],
-  "diagramNodes": ["Central Topic", "Key Concept A", "Key Concept B", "Sub-concept A1"],
-  "diagramEdges": ["0-1", "0-2", "1-3"]
+  "diagramNodes": [
+    {"label": "Central Topic", "kind": "concept"},
+    {"label": "Key Concept A", "kind": "topic"},
+    {"label": "Key Concept B", "kind": "topic"},
+    {"label": "Sub-concept A1", "kind": "subtopic"}
+  ],
+  "diagramEdges": ["0-1: causes", "0-2: contrasts with", "1-3: example of"]
 }
 
 SECTION TYPES AVAILABLE:
@@ -755,8 +728,10 @@ ${getDepthRequirements(wordCountFn(enrichedTranscript))}
 - Each heading should be a specific term, concept name, or topic — NOT a vague phrase
 - Bullets: Use for key points, important explanations, and lists of related items
 - reviewQuestions: Create 3-7 varied questions spanning Bloom's taxonomy levels, scaled to how many distinct concepts the transcript actually covers
-- diagramNodes: One label per distinct concept actually discussed (typically 4-10, max ~80 characters each). Index 0 MUST be the single central topic (root) for the mind map.
-- diagramEdges: Use only "sourceIndex-targetIndex" with valid indices into diagramNodes. Build a tree or sparse DAG from the root: every node except index 0 must be reachable from node 0. No self-loops; avoid redundant duplicate connections between the same two nodes.
+- diagramNodes: One label per distinct concept actually discussed (typically 4-10, max ~80 characters each). Each entry is EITHER a plain string label OR an object {"label": "...", "kind": "..."} where kind is one of "concept", "topic", "subtopic", "note". Index 0 MUST be the single central topic (root) for the mind map and MUST have kind "concept"; exactly one node may be "concept".
+- diagramNodes kind: kind reflects IMPORTANCE TO THE MATERIAL, not tree position — a genuinely central idea several hops from the root is still "topic", never "note". kind is optional; omit it to fall back to depth-based styling.
+- diagramEdges: Use "sourceIndex-targetIndex" with valid indices into diagramNodes, optionally followed by ":label" describing the relationship (e.g. "0-1: causes", "1-3: example of"). The bare "0-1" form is still valid. Build a tree or sparse DAG from the root: every node except index 0 must be reachable from node 0. No self-loops; avoid redundant duplicate connections between the same two nodes.
+- diagramEdges labels: Short verb phrases for on-canvas display — max 40 characters, ideally 1-3 words, lowercase unless a proper noun, no newlines. Good: "causes", "depends on", "measured by", "contrasts with". Never write full sentences, and omit the label entirely rather than emitting a vacuous one like "is related to" or "connects to".
 - actionItems: Only include explicitly mentioned tasks (empty array if none)
 - Return ONLY valid JSON, no markdown code fences`;
     }
@@ -828,10 +803,22 @@ ${getDepthRequirements(wordCountFn(enrichedTranscript))}
           }
         }
 
-        const diagramNodes = Array.isArray(workingParsed.diagramNodes)
+        // Entries may be plain string labels or {label, kind} objects; pass
+        // objects through untouched (String() would mangle them) and let the
+        // shared parser do the real validation.
+        const diagramNodes: DiagramNodeInput[] = Array.isArray(
+          workingParsed.diagramNodes,
+        )
           ? workingParsed.diagramNodes
-              .map((label: unknown) => String(label || "").trim())
-              .filter((label: string) => label.length > 0)
+              .map((node: unknown): DiagramNodeInput =>
+                node !== null && typeof node === "object"
+                  ? (node as DiagramNodeInput)
+                  : String(node ?? "").trim(),
+              )
+              .filter(
+                (node: DiagramNodeInput) =>
+                  typeof node !== "string" || node.length > 0,
+              )
           : [];
         const diagramEdges = Array.isArray(workingParsed.diagramEdges)
           ? workingParsed.diagramEdges

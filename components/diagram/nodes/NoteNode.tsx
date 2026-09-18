@@ -65,7 +65,7 @@ export const NoteNode = memo(({ data, selected }: NodeProps) => {
   return (
     <div
       className={cn(
-        `px-3 py-2 rounded-md shadow-sm border min-w-[80px] transition-all duration-200 hover:scale-105`,
+        `px-3 py-2 rounded-md shadow-sm border min-w-[80px] max-w-[160px] transition-all duration-200 hover:scale-105`,
         selected ? "border-cyan-400" : "border-white/20",
         bgColor,
         graphNote ? "cursor-pointer" : "",
@@ -106,7 +106,9 @@ export const NoteNode = memo(({ data, selected }: NodeProps) => {
             {label}
           </div>
         ) : (
-          <div className="text-white text-xs line-clamp-2">{label}</div>
+          <div className="text-white text-xs break-words line-clamp-2">
+            {label}
+          </div>
         )}
       </div>
     </div>

@@ -1,6 +1,8 @@
 import ELK, { ElkNode } from "elkjs/lib/elk.bundled.js";
 import { Node, Edge } from "@xyflow/react";
 import { LayoutType, LayoutOptions } from "@/types";
+// Shared with the server-side layout so both reserve the same box for a node.
+import { getNodeDimensions } from "@/convex/shared/diagram";
 
 const elk = new ELK();
 
@@ -30,11 +32,13 @@ export async function applyHierarchicalLayout(
       "elk.spacing.nodeNode": String(nodeSpacing),
       "elk.layered.spacing.nodeNodeBetweenLayers": String(rankSpacing),
     },
-    children: nodes.map((node) => ({
-      id: node.id,
-      width: getNodeWidth(node.type),
-      height: getNodeHeight(node.type),
-    })),
+    children: nodes.map((node) => {
+      const { width, height } = getNodeDimensions(
+        node.type ?? "",
+        typeof node.data?.label === "string" ? node.data.label : undefined,
+      );
+      return { id: node.id, width, height };
+    }),
     edges: edges.map((edge) => ({
       id: edge.id,
       sources: [edge.source],
@@ -257,43 +261,5 @@ export function applyForceLayout(nodes: Node[], edges: Edge[]): Node[] {
   }
 
   return positionedNodes;
-}
-
-/**
- * Get estimated node width based on type
- */
-function getNodeWidth(type?: string): number {
-  switch (type) {
-    case "concept":
-    case "input":
-      return 200;
-    case "topic":
-      return 160;
-    case "subtopic":
-      return 120;
-    case "note":
-      return 100;
-    default:
-      return 150;
-  }
-}
-
-/**
- * Get estimated node height based on type
- */
-function getNodeHeight(type?: string): number {
-  switch (type) {
-    case "concept":
-    case "input":
-      return 80;
-    case "topic":
-      return 60;
-    case "subtopic":
-      return 50;
-    case "note":
-      return 40;
-    default:
-      return 60;
-  }
 }
 

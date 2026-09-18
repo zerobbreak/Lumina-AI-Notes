@@ -28,6 +28,7 @@ import { ConceptNode } from "./nodes/ConceptNode";
 import { TopicNode } from "./nodes/TopicNode";
 import { SubtopicNode } from "./nodes/SubtopicNode";
 import { NoteNode } from "./nodes/NoteNode";
+import { LabeledEdge } from "./LabeledEdge";
 import {
   applyHierarchicalLayout,
   applyRadialLayout,
@@ -54,6 +55,11 @@ const nodeTypes = {
   note: NoteNode,
 };
 
+// Custom edge types
+const edgeTypes = {
+  labeled: LabeledEdge,
+};
+
 /** Serializable subset for comparing external props (avoids handler churn). */
 function serializeDiagramPropsForSync(
   nodes: Node[] | undefined,
@@ -75,6 +81,8 @@ function serializeDiagramPropsForSync(
     source: e.source,
     target: e.target,
     animated: e.animated,
+    // Included so a label-only change upstream still re-seeds internal state.
+    label: typeof e.label === "string" ? e.label : "",
   }));
   return JSON.stringify({ nodes: cleanNodes, edges: cleanEdges });
 }
@@ -191,7 +199,10 @@ function FlowCanvasInner({
   }, [nodes]);
 
   const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
+    (params: Connection) =>
+      // A user-drawn edge has no relationship label yet; spell that out so it can
+      // never inherit one from a previous connection attempt.
+      setEdges((eds) => addEdge({ ...params, label: undefined }, eds)),
     [setEdges]
   );
 
@@ -382,12 +393,16 @@ function FlowCanvasInner({
         onConnect={isReadOnly ? undefined : onConnect}
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
         nodesDraggable={!isReadOnly}
         nodesConnectable={!isReadOnly}
         elementsSelectable={!isReadOnly}
         proOptions={{ hideAttribution: true }}
         defaultEdgeOptions={{
+          // `type` is applied at render time only — it is not written into edge
+          // state, so the stored data-edges payload stays the plain DiagramEdge.
+          type: "labeled",
           animated: true,
           style: { stroke: "#60a5fa", strokeWidth: 2 },
         }}

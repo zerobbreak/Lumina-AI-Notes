@@ -13,6 +13,7 @@ import {
   noteLacksDepth,
 } from "./shared/noteQuality";
 import { buildDiagramData } from "./shared/diagram";
+import type { DiagramNodeInput } from "./shared/diagram";
 import {
   getGeminiModel,
   enrichTranscript,
@@ -231,12 +232,12 @@ Return JSON with EXACT keys:
   ],
   "actionItems": ["..."],
   "reviewQuestions": ["..."],
-  "diagramNodes": ["..."],
-  "diagramEdges": ["..."]
+  "diagramNodes": [{"label": "Central Topic", "kind": "concept"}, {"label": "Key Concept A", "kind": "topic"}, "..."],
+  "diagramEdges": ["0-1: causes", "..."]
 }
 
 STRICT quality requirements:
-- diagramNodes/diagramEdges: If present, index 0 is the root; edges must reference valid node indices only; keep labels concise for on-canvas display.
+- diagramNodes/diagramEdges: If present, index 0 is the root and MUST have kind "concept". Each node is either a plain string label or an object {"label": "...", "kind": "concept"|"topic"|"subtopic"|"note"}, where kind reflects importance to the material, not tree position. Edges are "sourceIndex-targetIndex" referencing valid node indices only, optionally suffixed with ":label" giving a short verb-phrase relationship (max 40 characters, e.g. "0-1: causes") — omit the label rather than emitting a vacuous one like "is related to". Keep labels concise for on-canvas display.
 - 6-10 content sections with clear headings
 - Each paragraph MUST be 5-8 sentences (80-120 words minimum)
 - Use bullet points for key ideas, important explanations, and lists
@@ -320,8 +321,18 @@ Return as HTML with proper <ul>, <ol>, and task list structure using data-type="
     "Synthesis question: How do [concept A] and [concept B] work together to produce [outcome]?",
     "Evaluation question: What are the strengths and limitations of [theory/approach]?"
   ],
-  "diagramNodes": ["Central Topic", "Key Concept A", "Key Concept B", "Key Concept C", "Sub-concept A1", "Sub-concept A2", "Sub-concept B1", "Sub-concept C1", "Related Framework"],
-  "diagramEdges": ["0-1", "0-2", "0-3", "1-4", "1-5", "2-6", "3-7", "0-8"]
+  "diagramNodes": [
+    {"label": "Central Topic", "kind": "concept"},
+    {"label": "Key Concept A", "kind": "topic"},
+    {"label": "Key Concept B", "kind": "topic"},
+    {"label": "Key Concept C", "kind": "topic"},
+    {"label": "Sub-concept A1", "kind": "subtopic"},
+    {"label": "Sub-concept A2", "kind": "subtopic"},
+    {"label": "Sub-concept B1", "kind": "subtopic"},
+    {"label": "Sub-concept C1", "kind": "note"},
+    {"label": "Related Framework", "kind": "topic"}
+  ],
+  "diagramEdges": ["0-1: causes", "0-2: contrasts with", "0-3", "1-4: example of", "1-5: measured by", "2-6: depends on", "3-7", "0-8: applies"]
 }
 
 SECTION TYPES AVAILABLE:
@@ -344,8 +355,10 @@ MANDATORY QUALITY REQUIREMENTS:
 - Bullets: Use for key points, important explanations, and lists of related items
 - If the transcript mentions something briefly, EXPAND it using your subject matter knowledge to give the full academic explanation
 - reviewQuestions: Create 5-7 varied, thought-provoking questions spanning Bloom's taxonomy levels
-- diagramNodes: 7-10 short labels (max ~80 characters each). Index 0 MUST be the single central topic (root) for the mind map.
-- diagramEdges: Use only "sourceIndex-targetIndex" with valid indices into diagramNodes. Build a tree or sparse DAG from the root: every node except index 0 must be reachable from node 0. No self-loops; avoid redundant duplicate connections between the same two nodes.
+- diagramNodes: 7-10 short labels (max ~80 characters each). Each entry is EITHER a plain string label OR an object {"label": "...", "kind": "..."} where kind is one of "concept", "topic", "subtopic", "note". Index 0 MUST be the single central topic (root) for the mind map and MUST have kind "concept"; exactly one node may be "concept".
+- diagramNodes kind: kind reflects IMPORTANCE TO THE MATERIAL, not tree position — a genuinely central idea several hops from the root is still "topic", never "note". kind is optional; omit it to fall back to depth-based styling.
+- diagramEdges: Use "sourceIndex-targetIndex" with valid indices into diagramNodes, optionally followed by ":label" describing the relationship (e.g. "0-1: causes", "1-3: example of"). The bare "0-1" form is still valid. Build a tree or sparse DAG from the root: every node except index 0 must be reachable from node 0. No self-loops; avoid redundant duplicate connections between the same two nodes.
+- diagramEdges labels: Short verb phrases for on-canvas display — max 40 characters, ideally 1-3 words, lowercase unless a proper noun, no newlines. Good: "causes", "depends on", "measured by", "contrasts with". Never write full sentences, and omit the label entirely rather than emitting a vacuous one like "is related to" or "connects to".
 - actionItems: Only include explicitly mentioned tasks (empty array if none)
 - Return ONLY valid JSON, no markdown code fences`;
     }
@@ -425,10 +438,22 @@ MANDATORY QUALITY REQUIREMENTS:
           }
         }
 
-        const diagramNodes = Array.isArray(workingParsed.diagramNodes)
+        // Entries may be plain string labels or {label, kind} objects; pass
+        // objects through untouched (String() would mangle them) and let the
+        // shared parser do the real validation.
+        const diagramNodes: DiagramNodeInput[] = Array.isArray(
+          workingParsed.diagramNodes,
+        )
           ? workingParsed.diagramNodes
-              .map((label: unknown) => String(label || "").trim())
-              .filter((label: string) => label.length > 0)
+              .map((node: unknown): DiagramNodeInput =>
+                node !== null && typeof node === "object"
+                  ? (node as DiagramNodeInput)
+                  : String(node ?? "").trim(),
+              )
+              .filter(
+                (node: DiagramNodeInput) =>
+                  typeof node !== "string" || node.length > 0,
+              )
           : [];
         const diagramEdges = Array.isArray(workingParsed.diagramEdges)
           ? workingParsed.diagramEdges
