@@ -7,6 +7,7 @@ import {
   internalAction,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
+import type { Doc } from "./_generated/dataModel";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const createTag = mutation({
@@ -101,7 +102,7 @@ export const updateTag = mutation({
       throw new Error("Tag not found or unauthorized");
     }
 
-    const updates: any = {};
+    const updates: Partial<Doc<"tags">> = {};
     if (args.name) updates.name = args.name;
     if (args.color) updates.color = args.color;
 

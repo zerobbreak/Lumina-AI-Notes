@@ -1,6 +1,6 @@
 "use node";
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
 import { ENRICHMENT_WORD_THRESHOLD } from "./transcript";
 
 // Types for subscription tier checking
@@ -51,7 +51,7 @@ export const getGeminiModel = (config?: { responseMimeType: string }) => {
  * This dramatically improves downstream note generation quality.
  */
 export const enrichTranscript = async (
-  model: any,
+  model: GenerativeModel,
   normalizedTranscript: string,
   title?: string,
 ): Promise<string> => {

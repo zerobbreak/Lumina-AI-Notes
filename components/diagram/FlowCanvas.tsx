@@ -3,7 +3,6 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -116,42 +115,57 @@ function FlowCanvasInner({
   );
 
   // Keep canvas in sync when parent-provided nodes/edges change (e.g. AI insert, load note).
-  useLayoutEffect(() => {
+  // Deferred via queueMicrotask: this effect also fires on a brand-new node view's
+  // initial mount, and Tiptap's ReactNodeViewRenderer flushSyncs that mount — calling
+  // setNodes/setEdges synchronously here (this used to be a useLayoutEffect) would
+  // update state while React is still inside that flushSync (see onChange below).
+  useEffect(() => {
     const incoming = serializeDiagramPropsForSync(initialNodes, initialEdges);
     if (incoming === lastAppliedPropsRef.current) return;
 
     const prevSnap = lastAppliedPropsRef.current;
     lastAppliedPropsRef.current = incoming;
 
-    setNodes(attachLabelHandlers(initialNodes ?? []));
-    setEdges(initialEdges ?? []);
+    let cancelled = false;
+    let fitTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
-    let shouldFit = false;
-    if (prevSnap === "") {
-      shouldFit = (initialNodes?.length ?? 0) > 0;
-    } else {
-      try {
-        const prev = JSON.parse(prevSnap) as {
-          nodes: unknown[];
-          edges: unknown[];
-        };
-        const oldN = Array.isArray(prev.nodes) ? prev.nodes.length : 0;
-        const newN = initialNodes?.length ?? 0;
-        const oldE = Array.isArray(prev.edges) ? prev.edges.length : 0;
-        const newE = initialEdges?.length ?? 0;
-        shouldFit = oldN !== newN || oldE !== newE;
-      } catch {
-        shouldFit = true;
+    queueMicrotask(() => {
+      if (cancelled) return;
+
+      setNodes(attachLabelHandlers(initialNodes ?? []));
+      setEdges(initialEdges ?? []);
+
+      let shouldFit = false;
+      if (prevSnap === "") {
+        shouldFit = (initialNodes?.length ?? 0) > 0;
+      } else {
+        try {
+          const prev = JSON.parse(prevSnap) as {
+            nodes: unknown[];
+            edges: unknown[];
+          };
+          const oldN = Array.isArray(prev.nodes) ? prev.nodes.length : 0;
+          const newN = initialNodes?.length ?? 0;
+          const oldE = Array.isArray(prev.edges) ? prev.edges.length : 0;
+          const newE = initialEdges?.length ?? 0;
+          shouldFit = oldN !== newN || oldE !== newE;
+        } catch {
+          shouldFit = true;
+        }
       }
-    }
 
-    if (shouldFit) {
-      const t = setTimeout(
-        () => fitView({ duration: 300, padding: 0.2 }),
-        50,
-      );
-      return () => clearTimeout(t);
-    }
+      if (shouldFit) {
+        fitTimeoutId = setTimeout(
+          () => fitView({ duration: 300, padding: 0.2 }),
+          50,
+        );
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      if (fitTimeoutId !== undefined) clearTimeout(fitTimeoutId);
+    };
   }, [
     initialNodes,
     initialEdges,

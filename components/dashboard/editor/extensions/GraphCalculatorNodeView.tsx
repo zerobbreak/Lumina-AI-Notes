@@ -98,9 +98,15 @@ export function GraphCalculatorNodeView({ node, updateAttributes }: NodeViewProp
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0, xMin: 0, yMin: 0 });
 
-  // Update node attributes when expressions or settings change
+  // Update node attributes when expressions or settings change.
+  // Deferred via queueMicrotask: this effect also fires on mount, and Tiptap's
+  // ReactNodeViewRenderer flushSyncs a node view's initial mount — calling
+  // updateAttributes synchronously here would dispatch a nested transaction
+  // while React is still inside that flushSync (see FlowCanvas's onChange).
   useEffect(() => {
-    updateAttributes({ expressions, settings });
+    queueMicrotask(() => {
+      updateAttributes({ expressions, settings });
+    });
   }, [expressions, settings, updateAttributes]);
 
   // Draw the graph

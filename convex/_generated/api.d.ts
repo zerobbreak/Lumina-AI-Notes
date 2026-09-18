@@ -34,6 +34,7 @@ import type * as shared_aiClient from "../shared/aiClient.js";
 import type * as shared_audioIsolation from "../shared/audioIsolation.js";
 import type * as shared_diagram from "../shared/diagram.js";
 import type * as shared_keywordSearch from "../shared/keywordSearch.js";
+import type * as shared_notePrompts from "../shared/notePrompts.js";
 import type * as shared_noteQuality from "../shared/noteQuality.js";
 import type * as shared_transcript from "../shared/transcript.js";
 import type * as shared_urlContent from "../shared/urlContent.js";
@@ -73,6 +74,7 @@ declare const fullApi: ApiFromModules<{
   "shared/audioIsolation": typeof shared_audioIsolation;
   "shared/diagram": typeof shared_diagram;
   "shared/keywordSearch": typeof shared_keywordSearch;
+  "shared/notePrompts": typeof shared_notePrompts;
   "shared/noteQuality": typeof shared_noteQuality;
   "shared/transcript": typeof shared_transcript;
   "shared/urlContent": typeof shared_urlContent;

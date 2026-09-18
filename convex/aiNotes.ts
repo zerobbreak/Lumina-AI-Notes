@@ -383,30 +383,30 @@ MANDATORY QUALITY REQUIREMENTS:
         // Normalize sections array
         let normalizedSections = Array.isArray(workingParsed.sections)
           ? workingParsed.sections
-              .map((section: any, idx: number) => ({
+              .map((section, idx: number) => ({
                 id: section.id || `sec-${idx}`,
                 type: section.type || "paragraph",
                 content: String(section.content || "").trim(),
                 level: section.level,
               }))
-              .filter((section: any) => section.content.length > 0)
+              .filter((section) => section.content.length > 0)
           : [];
 
         // Quality check: repair if too few sections or sections lack depth
         const paragraphSections = normalizedSections.filter(
-          (s: any) => s.type === "paragraph"
+          (s) => s.type === "paragraph"
         );
         const avgParagraphWords =
           paragraphSections.length > 0
             ? paragraphSections.reduce(
-                (sum: number, s: any) => sum + wordCountFn(s.content),
+                (sum, s) => sum + wordCountFn(s.content),
                 0
               ) / paragraphSections.length
             : 0;
         const needsRepair =
           normalizedSections.length < 5 ||
           avgParagraphWords < 50 ||
-          paragraphSections.some((s: any) => noteLacksDepth(s.content));
+          paragraphSections.some((s) => noteLacksDepth(s.content));
 
         if (needsRepair) {
           const repaired = await maybeRepairQuality(workingParsed);
@@ -414,13 +414,13 @@ MANDATORY QUALITY REQUIREMENTS:
             workingParsed = repaired as StructuredNotesDraft;
             normalizedSections = Array.isArray(workingParsed.sections)
               ? workingParsed.sections
-                  .map((section: any, idx: number) => ({
+                  .map((section, idx: number) => ({
                     id: section.id || `sec-${idx}`,
                     type: section.type || "paragraph",
                     content: String(section.content || "").trim(),
                     level: section.level,
                   }))
-                  .filter((section: any) => section.content.length > 0)
+                  .filter((section) => section.content.length > 0)
               : [];
           }
         }

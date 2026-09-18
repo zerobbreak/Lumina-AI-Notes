@@ -1,10 +1,12 @@
 import { mutation, query } from "./_generated/server";
+import type { QueryCtx, MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 
 // How long before a presence entry is considered stale (3 minutes, matches 120s heartbeat interval)
 const PRESENCE_TIMEOUT_MS = 180 * 1000;
 
-async function requireNoteAccess(ctx: any, noteId: any) {
+async function requireNoteAccess(ctx: QueryCtx | MutationCtx, noteId: Id<"notes">) {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) throw new Error("Unauthorized");
   const note = await ctx.db.get(noteId);
@@ -12,7 +14,7 @@ async function requireNoteAccess(ctx: any, noteId: any) {
   if (note.userId === identity.tokenIdentifier) return identity;
   const collab = await ctx.db
     .query("noteCollaborators")
-    .withIndex("by_noteId_userId", (q: any) =>
+    .withIndex("by_noteId_userId", (q) =>
       q.eq("noteId", noteId).eq("userId", identity.tokenIdentifier),
     )
     .unique();

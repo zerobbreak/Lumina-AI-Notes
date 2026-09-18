@@ -1,17 +1,19 @@
 import { mutation, query } from "./_generated/server";
+import type { QueryCtx, MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-async function requireIdentity(ctx: any) {
+async function requireIdentity(ctx: QueryCtx | MutationCtx) {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) throw new Error("Unauthorized");
   return identity;
 }
 
-async function requireOwner(ctx: any, noteId: any) {
+async function requireOwner(ctx: MutationCtx, noteId: Id<"notes">) {
   const identity = await requireIdentity(ctx);
   const note = await ctx.db.get(noteId);
   if (!note) throw new Error("Note not found");
@@ -34,7 +36,7 @@ export const inviteToNote = mutation({
     // If the user already exists, add/update collaborator immediately.
     const invitedUser = await ctx.db
       .query("users")
-      .withIndex("by_email", (q: any) => q.eq("email", email))
+      .withIndex("by_email", (q) => q.eq("email", email))
       .unique();
 
     if (invitedUser) {
@@ -45,7 +47,7 @@ export const inviteToNote = mutation({
 
       const existing = await ctx.db
         .query("noteCollaborators")
-        .withIndex("by_noteId_userId", (q: any) =>
+        .withIndex("by_noteId_userId", (q) =>
           q.eq("noteId", args.noteId).eq("userId", invitedUser.tokenIdentifier)
         )
         .unique();
@@ -69,7 +71,7 @@ export const inviteToNote = mutation({
     // Otherwise, store an email invite to be accepted later.
     const existingInvite = await ctx.db
       .query("noteInvites")
-      .withIndex("by_noteId_email", (q: any) =>
+      .withIndex("by_noteId_email", (q) =>
         q.eq("noteId", args.noteId).eq("email", email)
       )
       .unique();
@@ -109,7 +111,7 @@ export const acceptPendingInvites = mutation({
 
     const invites = await ctx.db
       .query("noteInvites")
-      .withIndex("by_email", (q: any) => q.eq("email", email))
+      .withIndex("by_email", (q) => q.eq("email", email))
       .collect();
 
     let accepted = 0;
@@ -131,7 +133,7 @@ export const acceptPendingInvites = mutation({
 
       const existing = await ctx.db
         .query("noteCollaborators")
-        .withIndex("by_noteId_userId", (q: any) =>
+        .withIndex("by_noteId_userId", (q) =>
           q.eq("noteId", invite.noteId).eq("userId", identity.tokenIdentifier)
         )
         .unique();
@@ -167,7 +169,7 @@ export const removeCollaborator = mutation({
 
     const existing = await ctx.db
       .query("noteCollaborators")
-      .withIndex("by_noteId_userId", (q: any) =>
+      .withIndex("by_noteId_userId", (q) =>
         q.eq("noteId", args.noteId).eq("userId", args.collaboratorUserId)
       )
       .unique();
@@ -191,7 +193,7 @@ export const updateCollaboratorRole = mutation({
 
     const existing = await ctx.db
       .query("noteCollaborators")
-      .withIndex("by_noteId_userId", (q: any) =>
+      .withIndex("by_noteId_userId", (q) =>
         q.eq("noteId", args.noteId).eq("userId", args.collaboratorUserId)
       )
       .unique();
@@ -212,7 +214,7 @@ export const revokeInvite = mutation({
     const email = normalizeEmail(args.email);
     const existing = await ctx.db
       .query("noteInvites")
-      .withIndex("by_noteId_email", (q: any) =>
+      .withIndex("by_noteId_email", (q) =>
         q.eq("noteId", args.noteId).eq("email", email)
       )
       .unique();
@@ -233,7 +235,7 @@ export const getNoteAccess = query({
     }
     const collab = await ctx.db
       .query("noteCollaborators")
-      .withIndex("by_noteId_userId", (q: any) =>
+      .withIndex("by_noteId_userId", (q) =>
         q.eq("noteId", args.noteId).eq("userId", identity.tokenIdentifier)
       )
       .unique();
@@ -255,7 +257,7 @@ export const listPeopleWithAccess = query({
     const collab = !isOwner
       ? await ctx.db
           .query("noteCollaborators")
-          .withIndex("by_noteId_userId", (q: any) =>
+          .withIndex("by_noteId_userId", (q) =>
             q.eq("noteId", args.noteId).eq("userId", identity.tokenIdentifier)
           )
           .unique()
@@ -265,21 +267,21 @@ export const listPeopleWithAccess = query({
 
     const ownerUser = await ctx.db
       .query("users")
-      .withIndex("by_tokenIdentifier", (q: any) =>
+      .withIndex("by_tokenIdentifier", (q) =>
         q.eq("tokenIdentifier", note.userId)
       )
       .unique();
 
     const collaborators = await ctx.db
       .query("noteCollaborators")
-      .withIndex("by_noteId", (q: any) => q.eq("noteId", args.noteId))
+      .withIndex("by_noteId", (q) => q.eq("noteId", args.noteId))
       .collect();
 
     const collaboratorUsers = await Promise.all(
-      collaborators.map(async (c: any) => {
+      collaborators.map(async (c) => {
         const u = await ctx.db
           .query("users")
-          .withIndex("by_tokenIdentifier", (q: any) =>
+          .withIndex("by_tokenIdentifier", (q) =>
             q.eq("tokenIdentifier", c.userId)
           )
           .unique();
@@ -297,8 +299,8 @@ export const listPeopleWithAccess = query({
     const invites = isOwner
       ? await ctx.db
           .query("noteInvites")
-          .withIndex("by_noteId", (q: any) => q.eq("noteId", args.noteId))
-          .filter((q: any) => q.eq(q.field("acceptedAt"), undefined))
+          .withIndex("by_noteId", (q) => q.eq("noteId", args.noteId))
+          .filter((q) => q.eq(q.field("acceptedAt"), undefined))
           .collect()
       : [];
 
@@ -312,7 +314,7 @@ export const listPeopleWithAccess = query({
         image: ownerUser?.image,
       },
       collaborators: collaboratorUsers,
-      invites: invites.map((i: any) => ({
+      invites: invites.map((i) => ({
         email: i.email,
         role: i.role,
         createdAt: i.createdAt,

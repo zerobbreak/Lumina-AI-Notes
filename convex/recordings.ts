@@ -1,14 +1,16 @@
 import { mutation, query } from "./_generated/server";
+import type { QueryCtx, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 
 const AUDIO_LIMIT_MINUTES = 300;
 
-// Helper function to get user's usage
-async function getUserUsage(ctx: any, tokenIdentifier: string) {
+// Helper function to get user's usage. Read-only: callers that actually
+// record new usage (mutations) persist the reset via their own patch below.
+async function getUserUsage(ctx: QueryCtx | MutationCtx, tokenIdentifier: string) {
   const user = await ctx.db
     .query("users")
-    .withIndex("by_tokenIdentifier", (q: any) =>
+    .withIndex("by_tokenIdentifier", (q) =>
       q.eq("tokenIdentifier", tokenIdentifier),
     )
     .unique();
@@ -44,8 +46,6 @@ async function getUserUsage(ctx: any, tokenIdentifier: string) {
       notesCreated: 0,
       lastResetDate: now,
     };
-    // Update the user's usage in the database
-    await ctx.db.patch(user._id, { monthlyUsage: usage });
   }
 
   return { usage, userId: user._id };
@@ -53,7 +53,7 @@ async function getUserUsage(ctx: any, tokenIdentifier: string) {
 
 // Helper function to check and update audio usage
 async function checkAndUpdateAudioUsage(
-  ctx: any,
+  ctx: MutationCtx,
   tokenIdentifier: string,
   durationMinutes: number,
 ): Promise<{ allowed: boolean; error?: string; remaining?: number }> {

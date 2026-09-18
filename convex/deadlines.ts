@@ -1,12 +1,14 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import type { UserIdentity } from "convex/server";
 
 const DEFAULT_REMINDER_OFFSETS_MINUTES = [24 * 60, 2 * 60, 30, 0] as const;
 
-function requireIdentity(identity: Awaited<ReturnType<any>>) {
+function requireIdentity(identity: UserIdentity | null) {
   if (!identity) throw new Error("Unauthorized");
-  return identity as { tokenIdentifier: string };
+  return identity;
 }
 
 function buildReminderTimes(dueAt: number, now: number) {
@@ -14,15 +16,15 @@ function buildReminderTimes(dueAt: number, now: number) {
   return [...new Set(times)].filter((t) => t >= now);
 }
 
-async function deleteRemindersForDeadline(ctx: any, deadlineId: Id<"deadlines">) {
+async function deleteRemindersForDeadline(ctx: MutationCtx, deadlineId: Id<"deadlines">) {
   const reminders = await ctx.db
     .query("deadlineReminders")
-    .withIndex("by_deadlineId", (q: any) => q.eq("deadlineId", deadlineId))
+    .withIndex("by_deadlineId", (q) => q.eq("deadlineId", deadlineId))
     .collect();
   for (const r of reminders) await ctx.db.delete(r._id);
 }
 
-async function createRemindersForDeadline(ctx: any, args: { userId: string; deadlineId: Id<"deadlines">; dueAt: number }) {
+async function createRemindersForDeadline(ctx: MutationCtx, args: { userId: string; deadlineId: Id<"deadlines">; dueAt: number }) {
   const now = Date.now();
   const remindTimes = buildReminderTimes(args.dueAt, now);
   for (const remindAt of remindTimes) {
@@ -163,16 +165,16 @@ export const getUpcoming = query({
 
     const items = await ctx.db
       .query("deadlines")
-      .withIndex("by_userId_dueAt", (q: any) =>
+      .withIndex("by_userId_dueAt", (q) =>
         q.eq("userId", uid).gte("dueAt", now).lte("dueAt", end),
       )
       .collect();
 
     const filtered = args.includeCompleted
       ? items
-      : items.filter((d: any) => d.completedAt == null);
+      : items.filter((d) => d.completedAt == null);
 
-    filtered.sort((a: any, b: any) => a.dueAt - b.dueAt);
+    filtered.sort((a, b) => a.dueAt - b.dueAt);
     return filtered.slice(0, limit);
   },
 });
@@ -189,7 +191,7 @@ export const sendDueRemindersInternal = internalMutation({
 
     const due = await ctx.db
       .query("deadlineReminders")
-      .withIndex("by_remindAt", (q: any) => q.gte("remindAt", now).lte("remindAt", end))
+      .withIndex("by_remindAt", (q) => q.gte("remindAt", now).lte("remindAt", end))
       .collect();
 
     let sent = 0;

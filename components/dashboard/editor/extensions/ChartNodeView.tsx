@@ -98,8 +98,14 @@ export function ChartNodeView({ node, updateAttributes }: NodeViewProps) {
   /** Theme-derived hex for each row (no custom `color`); updated outside render so refs are safe */
   const [derivedHexByIndex, setDerivedHexByIndex] = useState<string[]>([]);
 
+  // Deferred via queueMicrotask: this effect also fires on mount, and Tiptap's
+  // ReactNodeViewRenderer flushSyncs a node view's initial mount — calling
+  // updateAttributes synchronously here would dispatch a nested transaction
+  // while React is still inside that flushSync (see FlowCanvas's onChange).
   useEffect(() => {
-    updateAttributes({ chartType, data, title, showLegend });
+    queueMicrotask(() => {
+      updateAttributes({ chartType, data, title, showLegend });
+    });
   }, [chartType, data, title, showLegend, updateAttributes]);
 
   const seriesColor = useCallback(
