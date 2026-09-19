@@ -72,6 +72,7 @@ export function parseDiagramEdge(
 export function normalizeDiagramEdges(
   edgeStrings: string[],
   nodeCount: number,
+  originalToCompactIndex?: ReadonlyMap<number, number>,
 ): DiagramEdge[] {
   const seenPair = new Set<string>();
   const out: DiagramEdge[] = [];
@@ -80,8 +81,16 @@ export function normalizeDiagramEdges(
   for (const raw of edgeStrings) {
     const p = parseDiagramEdge(raw);
     if (!p) continue;
-    const { source, target, label } = p;
+    const source = originalToCompactIndex
+      ? originalToCompactIndex.get(p.source)
+      : p.source;
+    const target = originalToCompactIndex
+      ? originalToCompactIndex.get(p.target)
+      : p.target;
+    const { label } = p;
     if (
+      source === undefined ||
+      target === undefined ||
       source < 0 ||
       target < 0 ||
       source >= nodeCount ||
@@ -468,12 +477,26 @@ export const buildDiagramData = (
   if (nodeInputs.length === 0) return undefined;
 
   const entries = nodeInputs
-    .map(readNodeInput)
+    .map((input, originalIndex) => ({
+      ...readNodeInput(input),
+      originalIndex,
+    }))
     .filter((e) => e.label.length > 0);
   if (entries.length === 0) return undefined;
 
   const n = entries.length;
-  const normalizedEdges = normalizeDiagramEdges(edgeStrings, n);
+  // Edges are indexed against the model's original diagramNodes array. If a
+  // blank placeholder is discarded, compact both endpoints through the same
+  // mapping instead of silently attaching them to different concepts.
+  const originalToCompactIndex = new Map<number, number>();
+  entries.forEach((entry, compactIndex) => {
+    originalToCompactIndex.set(entry.originalIndex, compactIndex);
+  });
+  const normalizedEdges = normalizeDiagramEdges(
+    edgeStrings,
+    n,
+    originalToCompactIndex,
+  );
   const useGraph = normalizedEdges.length > 0;
   const depths = useGraph ? depthsFromRootBFS(n, normalizedEdges) : null;
   const layoutEdges =
