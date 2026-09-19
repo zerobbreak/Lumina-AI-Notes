@@ -219,11 +219,32 @@ describe("buildDiagramData", () => {
     ]);
   });
 
-  it("indexes edges against post-filter positions", () => {
+  it("drops edges that referenced a removed blank node", () => {
     const data = buildDiagramData(["Root", "", "Leaf"], ["0-1"])!;
     expect(data.nodes).toHaveLength(2);
-    expect(data.edges).toHaveLength(1);
+    expect(data.edges).toHaveLength(0);
     expect(data.nodes[1].data.label).toBe("Leaf");
+  });
+
+  it("remaps edges around removed blank nodes without changing relationships", () => {
+    const data = buildDiagramData(
+      ["Root", { label: "", kind: "topic" }, "Branch", "Leaf"],
+      ["0-2", "2-3: leads to"],
+    )!;
+
+    expect(data.nodes.map((n) => n.data.label)).toEqual([
+      "Root",
+      "Branch",
+      "Leaf",
+    ]);
+    expect(data.edges).toEqual([
+      expect.objectContaining({ source: "0", target: "1" }),
+      expect.objectContaining({
+        source: "1",
+        target: "2",
+        label: "leads to",
+      }),
+    ]);
   });
 });
 
