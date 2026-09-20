@@ -23,6 +23,7 @@ export async function applyHierarchicalLayout(
   options: LayoutOptions = {}
 ): Promise<Node[]> {
   const { direction = "TB", nodeSpacing = 150, rankSpacing = 100 } = options;
+  const nodeIds = new Set(nodes.map((node) => node.id));
 
   const elkGraph: ElkNode = {
     id: "root",
@@ -39,11 +40,17 @@ export async function applyHierarchicalLayout(
       );
       return { id: node.id, width, height };
     }),
-    edges: edges.map((edge) => ({
-      id: edge.id,
-      sources: [edge.source],
-      targets: [edge.target],
-    })),
+    // React Flow can temporarily retain an edge while its endpoint is being
+    // deleted. ELK rejects that entire graph, so only send complete edges.
+    edges: edges
+      .filter(
+        (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target),
+      )
+      .map((edge) => ({
+        id: edge.id,
+        sources: [edge.source],
+        targets: [edge.target],
+      })),
   };
 
   const layout = await elk.layout(elkGraph);
@@ -60,6 +67,25 @@ export async function applyHierarchicalLayout(
         y: positioned?.y ?? node.position.y,
       },
     };
+  });
+}
+
+/**
+ * Apply only calculated positions to the latest React Flow state. Layout engines
+ * may finish after users add, delete, or edit nodes; replacing state with their
+ * original input snapshot would otherwise persist those stale nodes.
+ */
+export function mergeLayoutPositions(
+  currentNodes: Node[],
+  layoutedNodes: Node[],
+): Node[] {
+  const positions = new Map(
+    layoutedNodes.map((node) => [node.id, node.position]),
+  );
+
+  return currentNodes.map((node) => {
+    const position = positions.get(node.id);
+    return position ? { ...node, position } : node;
   });
 }
 

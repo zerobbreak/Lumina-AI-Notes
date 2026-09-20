@@ -33,6 +33,7 @@ import {
   applyHierarchicalLayout,
   applyRadialLayout,
   applyForceLayout,
+  mergeLayoutPositions,
 } from "./layouts";
 import { exportToPNG, exportToPDF, exportToSVG } from "./export";
 import { NodeType, LayoutType } from "@/types";
@@ -99,6 +100,7 @@ function FlowCanvasInner({
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const lastAppliedPropsRef = useRef<string>("");
+  const layoutRequestRef = useRef(0);
   const { fitView, getNodes, getEdges } = useReactFlow();
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
 
@@ -133,6 +135,9 @@ function FlowCanvasInner({
 
     const prevSnap = lastAppliedPropsRef.current;
     lastAppliedPropsRef.current = incoming;
+    // A parent update may represent a different note or newer persisted edits.
+    // Never let an older asynchronous layout reposition that replacement state.
+    layoutRequestRef.current += 1;
 
     let cancelled = false;
     let fitTimeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -259,31 +264,42 @@ function FlowCanvasInner({
   // Apply layout
   const handleApplyLayout = useCallback(
     async (layout: LayoutType) => {
+      const requestId = ++layoutRequestRef.current;
       const currentNodes = getNodes();
       const currentEdges = getEdges();
 
-      let layoutedNodes: Node[];
+      try {
+        let layoutedNodes: Node[];
 
-      switch (layout) {
-        case "hierarchical":
-          layoutedNodes = await applyHierarchicalLayout(
-            currentNodes,
-            currentEdges
-          );
-          break;
-        case "radial":
-          layoutedNodes = applyRadialLayout(currentNodes, currentEdges);
-          break;
-        case "force":
-          layoutedNodes = applyForceLayout(currentNodes, currentEdges);
-          break;
-        default:
-          layoutedNodes = currentNodes;
+        switch (layout) {
+          case "hierarchical":
+            layoutedNodes = await applyHierarchicalLayout(
+              currentNodes,
+              currentEdges
+            );
+            break;
+          case "radial":
+            layoutedNodes = applyRadialLayout(currentNodes, currentEdges);
+            break;
+          case "force":
+            layoutedNodes = applyForceLayout(currentNodes, currentEdges);
+            break;
+          default:
+            layoutedNodes = currentNodes;
+        }
+
+        if (requestId !== layoutRequestRef.current) return;
+
+        setNodes((latestNodes) =>
+          mergeLayoutPositions(latestNodes, layoutedNodes)
+        );
+        setTimeout(() => fitView({ duration: 300 }), 50);
+        toast.success(`${layout} layout applied`);
+      } catch (error) {
+        if (requestId !== layoutRequestRef.current) return;
+        console.error("Layout failed:", error);
+        toast.error(`Couldn't apply ${layout} layout`);
       }
-
-      setNodes(layoutedNodes);
-      setTimeout(() => fitView({ duration: 300 }), 50);
-      toast.success(`${layout} layout applied`);
     },
     [getNodes, getEdges, setNodes, fitView]
   );
