@@ -3,7 +3,7 @@
  * node/edge labels into ReactFlow-compatible data structures.
  */
 
-const EDGE_PAIR_RE = /^(\d+)-(\d+)(?::([^\n]*))?$/;
+const EDGE_PAIR_RE = /^(\d+)\s*-\s*(\d+)(?:\s*:\s*([^\n]*))?$/;
 const MAX_LABEL_LENGTH = 80;
 const MAX_EDGE_LABEL_LENGTH = 40;
 

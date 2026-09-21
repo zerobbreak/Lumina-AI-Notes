@@ -246,6 +246,14 @@ describe("parseDiagramEdge", () => {
     });
   });
 
+  it("accepts model-generated whitespace around edge delimiters", () => {
+    expect(parseDiagramEdge("0 - 1 : causes")).toEqual({
+      source: 0,
+      target: 1,
+      label: "causes",
+    });
+  });
+
   it("drops an empty label", () => {
     expect(parseDiagramEdge("0-1:")).toEqual({ source: 0, target: 1 });
     expect(parseDiagramEdge("0-1:    ")).toEqual({ source: 0, target: 1 });
