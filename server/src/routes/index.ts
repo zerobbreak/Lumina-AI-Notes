@@ -5,6 +5,7 @@ import { loadUser } from "../middleware/user.js";
 import { createAuthRouter } from "./auth.js";
 import { createCoursesRouter } from "./courses.js";
 import { createFilesRouter } from "./files.js";
+import { createNotesRouter } from "./notes.js";
 import { createUploadsRouter } from "./uploads.js";
 import { createUsersRouter } from "./users.js";
 
@@ -22,6 +23,7 @@ export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken }
   router.use("/files", createFilesRouter(db, storage));
   router.use("/users", createUsersRouter(db));
   router.use("/courses", createCoursesRouter(db, storage));
+  router.use("/notes", createNotesRouter(db));
 
   return router;
 }

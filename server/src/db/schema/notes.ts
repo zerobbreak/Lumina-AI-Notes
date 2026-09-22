@@ -59,6 +59,12 @@ export const notes = pgTable(
     /** True once auto-tagging has run, so it only fires once. */
     autoTagAttempted: boolean().notNull().default(false),
     wordCount: integer(),
+    /**
+     * Bumped by every content save. Saves send the version they started from,
+     * so two people autosaving a shared note get a conflict instead of one
+     * silently overwriting the other. Opening, pinning etc. don't bump it.
+     */
+    version: integer().notNull().default(0),
 
     // Quick capture
     /** "text" | "voice" */
