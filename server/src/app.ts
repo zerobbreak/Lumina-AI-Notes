@@ -8,6 +8,7 @@ import type { Env } from "./env.js";
 import { errorHandler, notFound } from "./middleware/errors.js";
 import { createApiRouter } from "./routes/index.js";
 import { healthRouter } from "./routes/health.js";
+import { createPublicRouter } from "./routes/public.js";
 import type { Storage } from "./storage/s3.js";
 
 /** Everything routes need, built once in index.ts (or faked in tests). */
@@ -62,6 +63,8 @@ export function createApp(deps: AppDeps) {
 
   app.use("/health", healthRouter);
 
+  // No sign-in needed; must come before the authenticated router.
+  app.use("/api/v1/public", createPublicRouter(deps.db));
   app.use("/api/v1", createApiRouter(deps));
 
   app.use(notFound);

@@ -49,6 +49,14 @@ const createBody = z
 /** Autosave fields. Saving any of them needs the version the edit started from. */
 const CONTENT_FIELDS = ["content", "outlineData", "outlineMetadata", "wordCount"] as const;
 
+/** Only the owner can change these: tags, and how the note is filed or shared. */
+const OWNER_FIELDS = ["tagIds", "isArchived", "isPinned", "isShared"] as const;
+
+const moveBody = z
+  .object({ courseId: rowId, moduleId: rowId })
+  .partial()
+  .refine((b) => b.courseId || b.moduleId, { message: "Send a courseId or moduleId to move to" });
+
 const updateBody = z
   .object({
     ...noteFields,
@@ -60,6 +68,10 @@ const updateBody = z
       collapsedNodes: z.array(z.string().max(200)).max(10_000),
     }),
     version: z.number().int().min(0),
+    // Owner only. Convex toggled these; explicit values are safe to retry.
+    isArchived: z.boolean(),
+    isPinned: z.boolean(),
+    isShared: z.boolean(),
   })
   .partial()
   .refine((b) => b.version !== undefined || !CONTENT_FIELDS.some((f) => b[f] !== undefined), {
@@ -205,24 +217,32 @@ export function createNotesRouter(db: Db) {
     res.json(await toResponse(note));
   });
 
-  // updateNote / renameNote
+  // updateNote / renameNote / toggleArchiveNote / togglePinNote / toggleShareNote
   router.patch("/:id", async (req, res) => {
     const caller = currentUser(res);
-    const { version, tagIds, ...patch } = parse(updateBody, req.body);
+    const body = parse(updateBody, req.body);
+    const { version, tagIds, ...patch } = body;
     const { note, role } = await requireNote(db, req.params.id, caller.id, "edit");
-    if (tagIds !== undefined && role !== "owner") {
-      throw new HttpError(403, "Only the note's owner can tag it", "forbidden");
+    const ownerOnly = OWNER_FIELDS.filter((f) => body[f] !== undefined);
+    if (ownerOnly.length > 0 && role !== "owner") {
+      throw new HttpError(403, `Only the note's owner can change ${ownerOnly.join(", ")}`, "forbidden");
     }
     await checkRefs(note.userId, { ...patch, tagIds });
 
     const isContentSave = CONTENT_FIELDS.some((f) => patch[f] !== undefined);
+    // Pinning, archiving or sharing isn't using the note, so it doesn't count as opening it.
+    const isEdit =
+      tagIds !== undefined ||
+      Object.keys(patch).some((f) => !OWNER_FIELDS.includes(f as (typeof OWNER_FIELDS)[number]));
     const updated = await db.transaction(async (tx) => {
       const [row] = await tx
         .update(notes)
         .set({
           ...patch,
           // Edits count as use, for stale-note cleanup.
-          lastAccessedAt: new Date(),
+          ...(isEdit && { lastAccessedAt: new Date() }),
+          // Explicit, so a tags-only or empty patch still has something to set.
+          updatedAt: new Date(),
           ...(isContentSave && { version: sql`${notes.version} + 1` }),
         })
         .where(and(eq(notes.id, note.id), isContentSave ? eq(notes.version, version!) : undefined))
@@ -247,6 +267,20 @@ export function createNotesRouter(db: Db) {
       return;
     }
     res.json(await toResponse(updated));
+  });
+
+  // moveNoteToFolder: files the note in a course or module as a top-level page.
+  router.post("/:id/move", async (req, res) => {
+    const caller = currentUser(res);
+    const body = parse(moveBody, req.body);
+    const { note } = await requireNote(db, req.params.id, caller.id, "own");
+    const { courseId, moduleId } = resolveFolder(caller.courses ?? [], body.courseId, body.moduleId);
+    const [moved] = await db
+      .update(notes)
+      .set({ noteType: "page", courseId, moduleId: moduleId ?? null, parentNoteId: null })
+      .where(eq(notes.id, note.id))
+      .returning(noteColumns);
+    res.json(await toResponse(moved));
   });
 
   // deleteNote. Collaborators, invites and tags go with it; sub-pages become top-level notes.

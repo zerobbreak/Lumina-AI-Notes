@@ -177,6 +177,13 @@ describe("PATCH /api/v1/notes/:id", () => {
     expect(res.body).toMatchObject({ title: "Meiosis", style: "outline", version: 0 });
   });
 
+  it("accepts an empty patch", async () => {
+    const note = await createNote(ALICE);
+    const res = await as(ALICE).patch(`/api/v1/notes/${note.id}`).send({});
+    expect(res.status).toBe(200);
+    expect(res.body.title).toBe("Mitosis");
+  });
+
   it("requires the version for content saves and bumps it", async () => {
     const note = await createNote(ALICE);
     const missing = await as(ALICE).patch(`/api/v1/notes/${note.id}`).send({ content: "<p>hi</p>" });
@@ -239,6 +246,91 @@ describe("PATCH /api/v1/notes/:id", () => {
 
     await share(note.id, BOB, "editor");
     expect((await as(BOB).patch(`/api/v1/notes/${note.id}`).send({ tagIds: [exam] })).status).toBe(403);
+  });
+});
+
+describe("archive, pin and share", () => {
+  it("sets explicit values, so repeating a request is harmless", async () => {
+    const note = await createNote(ALICE);
+    for (let i = 0; i < 2; i++) {
+      const res = await as(ALICE)
+        .patch(`/api/v1/notes/${note.id}`)
+        .send({ isArchived: true, isPinned: true, isShared: true });
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ isArchived: true, isPinned: true, isShared: true });
+    }
+    const res = await as(ALICE).patch(`/api/v1/notes/${note.id}`).send({ isArchived: false });
+    expect(res.body).toMatchObject({ isArchived: false, isPinned: true });
+  });
+
+  it("doesn't count as opening or editing the note", async () => {
+    const note = await createNote(ALICE);
+    await db.update(notes).set({ lastAccessedAt: new Date(0) }).where(eq(notes.id, note.id));
+    const res = await as(ALICE).patch(`/api/v1/notes/${note.id}`).send({ isPinned: true });
+    expect(res.body).toMatchObject({ lastAccessedAt: 0, version: 0 });
+  });
+
+  it("is owner only", async () => {
+    const note = await createNote(ALICE);
+    await share(note.id, BOB, "editor");
+    const res = await as(BOB).patch(`/api/v1/notes/${note.id}`).send({ isShared: true });
+    expect(res.status).toBe(403);
+    expect(res.body.error.message).toBe("Only the note's owner can change isShared");
+  });
+});
+
+describe("POST /api/v1/notes/:id/move", () => {
+  it("files a quick note or sub-page in a folder as a top-level page", async () => {
+    const { courseId, moduleId } = await aliceWithCourse();
+    const parent = await createNote(ALICE);
+    const child = await createNote(ALICE, { parentNoteId: parent.id });
+
+    const res = await as(ALICE).post(`/api/v1/notes/${child.id}/move`).send({ courseId, moduleId });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ noteType: "page", courseId, moduleId, parentNoteId: null });
+
+    // Moving to just the course takes it out of the module.
+    const back = await as(ALICE).post(`/api/v1/notes/${child.id}/move`).send({ courseId });
+    expect(back.body).toMatchObject({ courseId, moduleId: null });
+  });
+
+  it("checks the folder and the caller", async () => {
+    const { courseId } = await aliceWithCourse();
+    const note = await createNote(ALICE);
+    await share(note.id, BOB, "editor");
+    expect((await as(ALICE).post(`/api/v1/notes/${note.id}/move`).send({})).status).toBe(400);
+    expect((await as(ALICE).post(`/api/v1/notes/${note.id}/move`).send({ courseId: "nope" })).status).toBe(400);
+    expect((await as(BOB).post(`/api/v1/notes/${note.id}/move`).send({ courseId })).status).toBe(403);
+  });
+});
+
+describe("GET /api/v1/public/notes/:id", () => {
+  it("serves a shared note to anyone, with only what the share page shows", async () => {
+    const note = await createNote(ALICE, { content: "<p>Hello</p>", courseId: undefined });
+    await as(ALICE).patch(`/api/v1/notes/${note.id}`).send({ isShared: true });
+
+    const res = await request(app).get(`/api/v1/public/notes/${note.id}`);
+    expect(res.status).toBe(200);
+    expect(res.headers["cache-control"]).toBe("no-store");
+    expect(Object.keys(res.body).sort()).toEqual(
+      ["content", "createdAt", "id", "outlineData", "outlineMetadata", "style", "title", "updatedAt"].sort(),
+    );
+    expect(res.body).toMatchObject({ title: "Mitosis", content: "<p>Hello</p>" });
+  });
+
+  it("404s once unshared, and for notes that were never shared or don't exist", async () => {
+    const note = await createNote(ALICE);
+    expect((await request(app).get(`/api/v1/public/notes/${note.id}`)).status).toBe(404);
+
+    await as(ALICE).patch(`/api/v1/notes/${note.id}`).send({ isShared: true });
+    await as(ALICE).patch(`/api/v1/notes/${note.id}`).send({ isShared: false });
+    expect((await request(app).get(`/api/v1/public/notes/${note.id}`)).status).toBe(404);
+    expect((await request(app).get("/api/v1/public/notes/nope")).status).toBe(404);
+  });
+
+  it("doesn't open up the rest of the API", async () => {
+    expect((await request(app).get("/api/v1/public/../notes/recent")).status).toBe(401);
+    expect((await request(app).get("/api/v1/notes/recent")).status).toBe(401);
   });
 });
 
