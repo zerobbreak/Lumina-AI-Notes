@@ -17,14 +17,13 @@ declare global {
   }
 }
 
-/** Starting values Convex's createOrUpdateUser gave every new user. */
+/**
+ * Starting values Convex's createOrUpdateUser gave every new user, minus the
+ * gamification fields (streaks, badges, goals), which are being removed.
+ */
 export const NEW_USER_DEFAULTS = {
   onboardingComplete: false,
-  currentStreak: 0,
-  longestStreak: 0,
-  badges: [] as string[],
-  dailyGoalMinutes: 30,
-  dailyGoalCards: 20,
+  courses: [],
   tourCompleted: false,
   tourStep: 0,
 } satisfies Partial<typeof users.$inferInsert>;

@@ -5,6 +5,7 @@ import type { Db } from "../db/client.js";
 import { users } from "../db/schema/index.js";
 import { currentSession } from "../middleware/auth.js";
 import { currentUser } from "../middleware/user.js";
+import { toUserResponse } from "./users.js";
 
 /**
  * Session endpoints. Both run behind `authenticate` + `loadUser`, so reaching
@@ -26,7 +27,7 @@ export function createAuthRouter(db: Db, profiles: ClerkProfiles) {
         authorizedParty: session.authorizedParty,
         expiresAt: session.expiresAt,
       },
-      user: currentUser(res),
+      user: toUserResponse(currentUser(res)),
     });
   });
 
@@ -39,7 +40,7 @@ export function createAuthRouter(db: Db, profiles: ClerkProfiles) {
     const user = currentUser(res);
     const profile = await profiles.get(user.clerkUserId);
     const [updated] = await db.update(users).set(profile).where(eq(users.id, user.id)).returning();
-    res.json(updated);
+    res.json(toUserResponse(updated));
   });
 
   return router;

@@ -64,14 +64,13 @@ describe("GET /api/v1/auth/session", () => {
     const res = await session(bearer("user_new"));
     expect(res.body.user).toMatchObject({
       onboardingComplete: false,
-      currentStreak: 0,
-      longestStreak: 0,
-      badges: [],
-      dailyGoalMinutes: 30,
-      dailyGoalCards: 20,
       tourCompleted: false,
       tourStep: 0,
+      courses: [],
     });
+    // Gamification is being removed, so none of it is sent.
+    expect(res.body.user).not.toHaveProperty("currentStreak");
+    expect(res.body.user).not.toHaveProperty("badges");
   });
 
   it("tolerates a few seconds of clock skew", async () => {

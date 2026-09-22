@@ -5,6 +5,7 @@ import { loadUser } from "../middleware/user.js";
 import { createAuthRouter } from "./auth.js";
 import { createFilesRouter } from "./files.js";
 import { createUploadsRouter } from "./uploads.js";
+import { createUsersRouter } from "./users.js";
 
 /**
  * Everything under /api/v1 needs a verified Clerk session token, resolved to
@@ -18,6 +19,7 @@ export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken }
   router.use("/auth", createAuthRouter(db, clerkProfiles));
   router.use("/uploads", createUploadsRouter(storage, env.MAX_UPLOAD_BYTES));
   router.use("/files", createFilesRouter(db, storage));
+  router.use("/users", createUsersRouter(db));
 
   return router;
 }
