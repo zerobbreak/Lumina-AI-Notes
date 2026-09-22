@@ -53,7 +53,12 @@ describe("list shape", () => {
       embedding: Array(768).fill(0),
     });
     const [item] = (await as(ALICE).get("/api/v1/notes/recent")).body;
-    expect(item).toMatchObject({ title: "Cells", preview: "Cell & biology The cell is the basic unit.", hasOutline: true });
+    expect(item).toMatchObject({
+      title: "Cells",
+      preview: "Cell & biology The cell is the basic unit.",
+      hasOutline: true,
+      linkedDocumentIds: [],
+    });
     for (const hidden of ["content", "outlineData", "contentHead", "embedding", "searchTitle", "searchContent"]) {
       expect(item).not.toHaveProperty(hidden);
     }
@@ -129,9 +134,10 @@ describe("GET /api/v1/notes (filters)", () => {
     await note(ALICE, "Week 1", { courseId: "c1", moduleId: "m1" }, 2);
     await note(ALICE, "Sub-page", { courseId: "c1", parentNoteId: intro.id }, 1);
     await note(ALICE, "Other course", { courseId: "c2" });
-    await note(BOB, "Bob's c1", { courseId: "c1" });
+    const shared = await note(BOB, "Bob's c1", { courseId: "c1" }, 1.5);
+    await db.insert(noteCollaborators).values({ noteId: shared.id, userId: ids[ALICE], role: "viewer" });
 
-    expect(titles(await as(ALICE).get("/api/v1/notes?courseId=c1"))).toEqual(["Intro", "Week 1"]);
+    expect(titles(await as(ALICE).get("/api/v1/notes?courseId=c1"))).toEqual(["Intro", "Week 1", "Bob's c1"]);
     expect(titles(await as(ALICE).get("/api/v1/notes?moduleId=m1"))).toEqual(["Week 1"]);
   });
 

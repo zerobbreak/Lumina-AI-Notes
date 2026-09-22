@@ -17,6 +17,7 @@ import { autoTagNote, shouldScheduleAutoTag } from "../tags/autoTag.js";
 import { HttpError } from "../middleware/errors.js";
 import { currentUser, type User } from "../middleware/user.js";
 import { noteColumns, requireNote } from "../notes/access.js";
+import { linkedDocumentIdsOf } from "../notes/linkedFiles.js";
 import { NOTE_STYLES, noteStyle } from "./users.js";
 import { parse } from "./validation.js";
 
@@ -117,7 +118,11 @@ export function createNotesRouter(db: Db) {
   }
 
   async function toResponse(note: NoteRow, tagIds?: string[]) {
-    return { ...note, tagIds: tagIds ?? (await tagIdsOf(note.id)) };
+    const [resolvedTagIds, linkedDocumentIds] = await Promise.all([
+      tagIds ?? tagIdsOf(note.id),
+      linkedDocumentIdsOf(db, note.id),
+    ]);
+    return { ...note, tagIds: resolvedTagIds, linkedDocumentIds };
   }
 
   /** Every id the client points at must belong to the note's owner. */

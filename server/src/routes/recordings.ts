@@ -6,6 +6,7 @@ import type { Db } from "../db/client.js";
 import { notes, recordings } from "../db/schema/index.js";
 import { HttpError } from "../middleware/errors.js";
 import { currentUser } from "../middleware/user.js";
+import { updateStudyStreak } from "../gamification/streaks.js";
 import { AUDIO_LIMIT_MINUTES, checkAndUpdateAudioUsage, getUserUsage } from "../recordings/usage.js";
 import { isOwnedKey, type Storage } from "../storage/s3.js";
 import { parse } from "./validation.js";
@@ -22,6 +23,7 @@ const saveBody = z.object({
   title,
   transcript: z.string().max(2_000_000),
   duration,
+  tzOffsetMinutes: z.number().int().optional(),
 });
 
 const draftBody = saveBody;
@@ -31,6 +33,7 @@ const uploadedBody = z.object({
   storageKey: z.string().min(1).max(1024),
   duration,
   sessionId: sessionId.optional(),
+  tzOffsetMinutes: z.number().int().optional(),
 });
 
 const transcriptBody = z.object({
@@ -195,6 +198,10 @@ export function createRecordingsRouter(db: Db, storage: Storage) {
       })
       .returning();
 
+    if (body.tzOffsetMinutes !== undefined) {
+      await updateStudyStreak(db, user.id, { tzOffsetMinutes: body.tzOffsetMinutes });
+    }
+
     res.status(201).json(await toResponse(created));
   });
 
@@ -221,6 +228,10 @@ export function createRecordingsRouter(db: Db, storage: Storage) {
         duration: body.duration ?? null,
       })
       .returning();
+
+    if (body.tzOffsetMinutes !== undefined) {
+      await updateStudyStreak(db, user.id, { tzOffsetMinutes: body.tzOffsetMinutes });
+    }
 
     res.status(201).json(await toResponse(created));
   });

@@ -3,6 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 import type { Db } from "../db/client.js";
 import { quizDecks, quizQuestions, quizResults } from "../db/schema/index.js";
+import { updateStudyStreak } from "../gamification/streaks.js";
 import { HttpError } from "../middleware/errors.js";
 import { currentUser } from "../middleware/user.js";
 import { assertOwnedNote, findOwnedDeck, requireOwnedDeck } from "../quizzes/helpers.js";
@@ -171,7 +172,7 @@ export function createQuizzesRouter(db: Db) {
   // saveResult
   router.post("/decks/:deckId/results", async (req, res) => {
     const user = currentUser(res);
-    const body = parse(saveResultBody, req.body); // tzOffsetMinutes ignored; gamification removed
+    const body = parse(saveResultBody, req.body);
     await requireOwnedDeck(db, req.params.deckId, user.id);
 
     const [result] = await db
@@ -190,6 +191,10 @@ export function createQuizzesRouter(db: Db) {
       .update(quizDecks)
       .set({ lastTakenAt: new Date() })
       .where(eq(quizDecks.id, req.params.deckId));
+
+    if (body.tzOffsetMinutes !== undefined) {
+      await updateStudyStreak(db, user.id, { tzOffsetMinutes: body.tzOffsetMinutes });
+    }
 
     res.status(201).json({ id: result.id });
   });

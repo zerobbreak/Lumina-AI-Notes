@@ -68,7 +68,7 @@ describe("GET /api/v1/auth/session", () => {
       tourStep: 0,
       courses: [],
     });
-    // Gamification is being removed, so none of it is sent.
+    // Gamification lives on /users/me/gamification, not the session user payload.
     expect(res.body.user).not.toHaveProperty("currentStreak");
     expect(res.body.user).not.toHaveProperty("badges");
   });

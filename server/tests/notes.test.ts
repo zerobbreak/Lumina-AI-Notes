@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "../src/db/client.js";
-import { noteCollaborators, notes, noteTags, tags, users } from "../src/db/schema/index.js";
+import { files, noteCollaborators, noteLinkedFiles, notes, noteTags, tags, users } from "../src/db/schema/index.js";
 import { MAX_NOTE_CHARS } from "../src/routes/notes.js";
 import { bearer, buildApp, createTestDb } from "./helpers.js";
 
@@ -69,6 +69,7 @@ describe("POST /api/v1/notes", () => {
       isPinned: false,
       isArchived: false,
       tagIds: [],
+      linkedDocumentIds: [],
     });
     expect(typeof note.lastAccessedAt).toBe("number");
     for (const hidden of ["embedding", "searchTitle", "searchContent"]) {
@@ -166,6 +167,19 @@ describe("GET /api/v1/notes/:id", () => {
     expect((await as(BOB).get(`/api/v1/notes/${note.id}`)).status).toBe(200);
     expect((await as(CAROL).get(`/api/v1/notes/${note.id}`)).status).toBe(404);
     expect((await as(ALICE).get("/api/v1/notes/nope")).status).toBe(404);
+  });
+
+  it("includes linkedDocumentIds from the junction table", async () => {
+    const note = await createNote(ALICE);
+    const aliceId = await userId(ALICE);
+    const [file] = await db
+      .insert(files)
+      .values({ userId: aliceId, name: "syllabus.pdf", type: "pdf" })
+      .returning();
+    await db.insert(noteLinkedFiles).values({ noteId: note.id, fileId: file!.id });
+
+    const res = await as(ALICE).get(`/api/v1/notes/${note.id}`);
+    expect(res.body.linkedDocumentIds).toEqual([file!.id]);
   });
 });
 

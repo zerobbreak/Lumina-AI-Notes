@@ -5,6 +5,7 @@ import type { Db } from "../db/client.js";
 import { notes, noteTags } from "../db/schema/index.js";
 import { currentUser } from "../middleware/user.js";
 import { canView, noteColumns, requireNote } from "../notes/access.js";
+import { linkedDocumentIdsByNoteIds, withLinkedDocumentIds } from "../notes/linkedFiles.js";
 import { noteIdsWithAllTags, tagIdsByNoteIds } from "../notes/tagFilters.js";
 import { matchesSearch } from "../search/fullText.js";
 import { parse } from "./validation.js";
@@ -41,7 +42,7 @@ export function toPreview(html: string | null) {
     .slice(0, PREVIEW_CHARS);
 }
 
-type ListRow = { contentHead: string | null } & Record<string, unknown>;
+type ListRow = { id: string; contentHead: string | null } & Record<string, unknown>;
 const toListItem = ({ contentHead, ...note }: ListRow) => ({ ...note, preview: toPreview(contentHead) });
 
 /**
@@ -89,13 +90,19 @@ const searchNotesQuery = z.object({
 export function createNoteListsRouter(db: Db) {
   const router = Router();
 
-  const list = (where: SQL | undefined, order: SQL[], limit?: number) => {
+  const list = async (where: SQL | undefined, order: SQL[], limit?: number) => {
     const query = db
       .select(listSelection)
       .from(notes)
       .where(where)
       .orderBy(...order);
-    return (limit ? query.limit(limit) : query).then((rows) => rows.map(toListItem));
+    const rows = await (limit ? query.limit(limit) : query);
+    const items = rows.map(toListItem);
+    const linkedByNoteId = await linkedDocumentIdsByNoteIds(
+      db,
+      items.map((item) => item.id as string),
+    );
+    return withLinkedDocumentIds(items, linkedByNoteId);
   };
 
   // getQuickNotes: the sidebar's Quick Notes, including ones shared with the caller.
@@ -177,19 +184,31 @@ export function createNoteListsRouter(db: Db) {
       filtered = filtered.filter((n) => allowed.has(n.id));
     }
 
-    const tagMap = await tagIdsByNoteIds(
-      db,
-      filtered.map((n) => n.id),
+    const noteIds = filtered.map((n) => n.id);
+    const [tagMap, linkedByNoteId] = await Promise.all([
+      tagIdsByNoteIds(db, noteIds),
+      linkedDocumentIdsByNoteIds(db, noteIds),
+    ]);
+    res.json(
+      filtered.map((n) => ({
+        ...n,
+        tagIds: tagMap.get(n.id) ?? [],
+        linkedDocumentIds: linkedByNoteId.get(n.id) ?? [],
+      })),
     );
-    res.json(filtered.map((n) => ({ ...n, tagIds: tagMap.get(n.id) ?? [] })));
   });
 
-  // getNotesByContext (?courseId= / ?moduleId=) and getNotesByTag (?tagId=): top-level
-  // notes only. Course ids belong to one user, so these list the caller's own notes.
+  // getNotesByContext (?courseId= / ?moduleId=) includes shared notes;
+  // getNotesByTag (?tagId= alone) is owner-only, matching Convex.
   router.get("/", async (req, res) => {
     const { courseId, moduleId, tagId } = parse(filterQuery, req.query);
     const user = currentUser(res);
-    const filters = [eq(notes.userId, user.id), isNull(notes.parentNoteId)];
+    const filters: SQL[] = [isNull(notes.parentNoteId)];
+    if (courseId || moduleId) {
+      filters.push(canView(db, user.id));
+    } else {
+      filters.push(eq(notes.userId, user.id));
+    }
     if (moduleId) filters.push(eq(notes.moduleId, moduleId));
     else if (courseId) filters.push(eq(notes.courseId, courseId));
     if (tagId) {

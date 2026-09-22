@@ -11,6 +11,7 @@ import {
   requireOwnedDeck,
 } from "../flashcards/helpers.js";
 import { DEFAULT_EASE_FACTOR, scheduleNextReviewFromRating } from "../flashcards/spacedRepetition.js";
+import { updateStudyStreak } from "../gamification/streaks.js";
 import type { Db } from "../db/client.js";
 import {
   flashcardDecks,
@@ -466,7 +467,7 @@ export function createFlashcardsRouter(db: Db) {
   // scheduleNextReview
   router.post("/cards/:cardId/schedule", async (req, res) => {
     const user = currentUser(res);
-    const { rating } = parse(scheduleBody, req.body); // tzOffsetMinutes ignored; gamification removed
+    const { rating, tzOffsetMinutes } = parse(scheduleBody, req.body);
     const { card, deck } = await requireOwnedCard(db, req.params.cardId, user.id);
 
     const result = scheduleNextReviewFromRating(rating, {
@@ -498,6 +499,10 @@ export function createFlashcardsRouter(db: Db) {
     });
 
     await db.update(flashcardDecks).set({ lastStudiedAt: now }).where(eq(flashcardDecks.id, deck.id));
+
+    if (tzOffsetMinutes !== undefined) {
+      await updateStudyStreak(db, user.id, { tzOffsetMinutes });
+    }
 
     res.json({
       cardId: req.params.cardId,
