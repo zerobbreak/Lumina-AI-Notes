@@ -63,6 +63,11 @@ const envSchema = z.object({
     .int()
     .positive()
     .default(100 * 1024 * 1024),
+
+  // Gemini API key for /api/v1/ai/*. Optional so the rest of the app still
+  // boots without it; a route that needs it fails loudly at call time
+  // instead (same as Convex's own `getGeminiModel` check).
+  GEMINI_API_KEY: z.string().min(1).optional(),
 });
 
 export type Env = Omit<z.infer<typeof envSchema>, "CLERK_AUTHORIZED_PARTIES"> & {

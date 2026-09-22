@@ -1,5 +1,6 @@
 // Drizzle tables translated from convex/schema.ts.
 // Export every table from here: drizzle-kit and the db client both read this file.
+export * from "./ai.js";
 export * from "./users.js";
 export * from "./files.js";
 export * from "./recordings.js";

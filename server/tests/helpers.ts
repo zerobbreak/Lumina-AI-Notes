@@ -116,10 +116,10 @@ export const fakeClerkProfiles = {
 } satisfies ClerkProfiles;
 
 export function buildApp(
-  options: { storage?: Storage; db?: Db; verifyToken?: TokenVerifier } = {},
+  options: { storage?: Storage; db?: Db; verifyToken?: TokenVerifier; env?: typeof testEnv } = {},
 ) {
   return createApp({
-    env: testEnv,
+    env: options.env ?? testEnv,
     db: options.db ?? createDb(testEnv.DATABASE_URL).db,
     storage: options.storage ?? fakeStorage().storage,
     clerkProfiles: fakeClerkProfiles,

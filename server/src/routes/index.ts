@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { AppDeps } from "../app.js";
 import { authenticate } from "../middleware/auth.js";
 import { loadUser } from "../middleware/user.js";
+import { createAiRouter } from "./ai.js";
 import { createAuthRouter } from "./auth.js";
 import { createCoursesRouter } from "./courses.js";
 import { createFilesRouter } from "./files.js";
@@ -28,6 +29,7 @@ export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken }
   // Lists first, so /notes/quick etc. aren't read as a note id.
   router.use("/notes", createNoteListsRouter(db), createNotesRouter(db));
   router.use("/tags", createTagsRouter(db));
+  router.use("/ai", createAiRouter(db, env));
 
   return router;
 }

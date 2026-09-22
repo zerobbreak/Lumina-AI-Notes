@@ -47,6 +47,9 @@ export function createApp(deps: AppDeps) {
   // 10-20% bigger than the note. Their own limits are checked per field.
   // This runs first, so the general parser below sees the body already read.
   app.use("/api/v1/notes", express.json({ limit: "5mb" }));
+  // Transcript/generation AI routes carry a full lecture transcript; the
+  // tighter per-field caps for short text-op routes are enforced by zod.
+  app.use("/api/v1/ai", express.json({ limit: "1mb" }));
   // Files go straight to the bucket via presigned URLs, so JSON stays small.
   app.use(express.json({ limit: "1mb" }));
 
