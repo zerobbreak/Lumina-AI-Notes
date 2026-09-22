@@ -279,15 +279,16 @@ describe("edge labels", () => {
     expect(data.edges[0].label).toBeUndefined();
   });
 
-  it("preserves the label when orientation swaps source and target", () => {
-    // 2-0 is stored backwards; layout re-points it from the shallower node.
+  it("preserves semantic direction when layout swaps a child-to-root edge", () => {
+    // Layout uses a root-to-child copy, but the returned edge must still say
+    // that the child explains the root.
     const data = buildDiagramData(
       ["Root", "Branch", "Leaf"],
       ["0-1", "2-0: explains"],
     )!;
-    const swapped = data.edges.find((e) => e.label === "explains")!;
-    expect(swapped.source).toBe("0");
-    expect(swapped.target).toBe("2");
+    const directional = data.edges.find((e) => e.label === "explains")!;
+    expect(directional.source).toBe("2");
+    expect(directional.target).toBe("0");
   });
 });
 

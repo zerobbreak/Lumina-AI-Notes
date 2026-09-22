@@ -516,6 +516,10 @@ export const buildDiagramData = (
 
   return {
     nodes: applyLayeredLayout(nodes, layoutEdges, ranks),
-    edges: layoutEdges,
+    // Edge direction expresses the relationship supplied by the model. The
+    // shallow-to-deep orientation above is only a layout aid; persisting it
+    // would invert directional labels such as "causes" when the model emits a
+    // child-to-root relationship.
+    edges: normalizedEdges,
   };
 };
