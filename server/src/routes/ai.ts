@@ -13,6 +13,7 @@ import { aiRateLimit } from "../middleware/ai-rate-limit.js";
 import { currentUser } from "../middleware/user.js";
 import type { Db } from "../db/client.js";
 import { isOwnedKey, type Storage } from "../storage/s3.js";
+import { registerBit2Routes } from "../ai/registerBit2Routes.js";
 import { parse } from "./validation.js";
 
 /** Cap inline "previous notes" passed to Gemini (per request). Matches convex/ai.ts. */
@@ -1170,6 +1171,9 @@ Focus on accuracy above all else.`,
       failure(userFriendlyError);
     }
   });
+
+  /** Bit 2: embeddings, document processing, semantic search, ingest flows. */
+  registerBit2Routes(router, { db, env, storage, model });
 
   return router;
 }

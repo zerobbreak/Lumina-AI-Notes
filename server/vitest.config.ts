@@ -7,6 +7,6 @@ export default defineConfig({
     include: ["tests/**/*.test.ts"],
     // Each DB test file boots PGlite and runs the migrations, which can take
     // well over the 10s default when files start in parallel.
-    hookTimeout: 60_000,
+    hookTimeout: 120_000,
   },
 });

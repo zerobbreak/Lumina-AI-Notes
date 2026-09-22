@@ -2,7 +2,18 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
 import type { Db } from "../db/client.js";
-import { noteCollaborators, notes, noteTags, recordings, tags, users, type Course } from "../db/schema/index.js";
+import {
+  files,
+  noteCollaborators,
+  noteLinkedFiles,
+  notes,
+  noteTags,
+  recordings,
+  tags,
+  users,
+  type Course,
+} from "../db/schema/index.js";
+import { autoTagNote, shouldScheduleAutoTag } from "../tags/autoTag.js";
 import { HttpError } from "../middleware/errors.js";
 import { currentUser, type User } from "../middleware/user.js";
 import { noteColumns, requireNote } from "../notes/access.js";
@@ -230,6 +241,17 @@ export function createNotesRouter(db: Db) {
     await checkRefs(note.userId, { ...patch, tagIds });
 
     const isContentSave = CONTENT_FIELDS.some((f) => patch[f] !== undefined);
+    const existingTagRows = await db
+      .select({ tagId: noteTags.tagId })
+      .from(noteTags)
+      .where(eq(noteTags.noteId, note.id));
+    const scheduleAutoTag = shouldScheduleAutoTag({
+      content: patch.content,
+      wordCount: patch.wordCount ?? note.wordCount ?? 0,
+      tagIds,
+      existingTagCount: existingTagRows.length,
+      autoTagAttempted: note.autoTagAttempted,
+    });
     // Pinning, archiving or sharing isn't using the note, so it doesn't count as opening it.
     const isEdit =
       tagIds !== undefined ||
@@ -239,6 +261,7 @@ export function createNotesRouter(db: Db) {
         .update(notes)
         .set({
           ...patch,
+          ...(scheduleAutoTag && { autoTagAttempted: true }),
           // Edits count as use, for stale-note cleanup.
           ...(isEdit && { lastAccessedAt: new Date() }),
           // Explicit, so a tags-only or empty patch still has something to set.
@@ -266,6 +289,57 @@ export function createNotesRouter(db: Db) {
       });
       return;
     }
+    if (scheduleAutoTag && process.env.GEMINI_API_KEY) {
+      void autoTagNote(db, note.id, process.env.GEMINI_API_KEY);
+    }
+    res.json(await toResponse(updated));
+  });
+
+  // linkDocuments
+  router.post("/:id/linked-files", async (req, res) => {
+    const { fileIds } = parse(z.object({ fileIds: z.array(rowId).min(1).max(50) }), req.body);
+    const { note } = await requireNote(db, req.params.id, currentUser(res).id, "own");
+    const uniqueIds = [...new Set(fileIds)];
+    const filesFound = await db
+      .select({ id: files.id })
+      .from(files)
+      .where(and(eq(files.userId, note.userId), inArray(files.id, uniqueIds)));
+    if (filesFound.length !== uniqueIds.length) {
+      throw new HttpError(400, "Unknown file id", "invalid_request");
+    }
+    const existing = await db
+      .select({ fileId: noteLinkedFiles.fileId })
+      .from(noteLinkedFiles)
+      .where(eq(noteLinkedFiles.noteId, note.id));
+    const merged = [...new Set([...existing.map((r) => r.fileId), ...uniqueIds])];
+    await db.delete(noteLinkedFiles).where(eq(noteLinkedFiles.noteId, note.id));
+    if (merged.length > 0) {
+      await db.insert(noteLinkedFiles).values(merged.map((fileId) => ({ noteId: note.id, fileId })));
+    }
+    res.json(merged);
+  });
+
+  // unlinkDocument
+  router.delete("/:id/linked-files/:fileId", async (req, res) => {
+    const { note } = await requireNote(db, req.params.id, currentUser(res).id, "own");
+    await db
+      .delete(noteLinkedFiles)
+      .where(and(eq(noteLinkedFiles.noteId, note.id), eq(noteLinkedFiles.fileId, req.params.fileId)));
+    const remaining = await db
+      .select({ fileId: noteLinkedFiles.fileId })
+      .from(noteLinkedFiles)
+      .where(eq(noteLinkedFiles.noteId, note.id));
+    res.json(remaining.map((r) => r.fileId));
+  });
+
+  // unassignNoteFromFolder
+  router.post("/:id/unassign", async (req, res) => {
+    const { note } = await requireNote(db, req.params.id, currentUser(res).id, "own");
+    const [updated] = await db
+      .update(notes)
+      .set({ noteType: "quick", courseId: null, moduleId: null, parentNoteId: null })
+      .where(eq(notes.id, note.id))
+      .returning(noteColumns);
     res.json(await toResponse(updated));
   });
 

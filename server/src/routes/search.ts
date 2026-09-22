@@ -1,15 +1,14 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { GoogleGenerativeAI, TaskType } from "@google/generative-ai";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
 import type { Db } from "../db/client.js";
-import {
-  flashcardDecks,
-  files,
-  notes,
-} from "../db/schema/index.js";
+import { flashcardDecks, files, notes } from "../db/schema/index.js";
 import { currentUser } from "../middleware/user.js";
+import { embedTextForVectorSearch } from "../ai/embedding.js";
 import { noteIdsWithAllTags } from "../notes/tagFilters.js";
 import { matchesSearch } from "../search/fullText.js";
+import { searchFilesByEmbedding, searchNotesByEmbedding } from "../search/vectorSearch.js";
 import {
   buildKeywordSnippet,
   countKeywordHits,
@@ -72,7 +71,7 @@ export type KeywordMatch = {
 };
 
 /** Port of convex/search.ts */
-export function createSearchRouter(db: Db, storage: Storage) {
+export function createSearchRouter(db: Db, storage: Storage, geminiApiKey?: string) {
   const router = Router();
 
   async function fileUrl(file: { storageKey: string | null; name: string; url: string | null }) {
@@ -260,18 +259,57 @@ export function createSearchRouter(db: Db, storage: Storage) {
     res.json({ matches: scored.slice(0, limit).map((s) => s.match) });
   });
 
-  // semanticSearch — stub; real semantic search lives in ai.ts actions.
+  // semanticSearch — vector hits across notes and files (synthesis via POST /ai/semantic-search).
   router.get("/semantic", async (req, res) => {
     const args = parse(semanticQuery, req.query);
-    if (!args.query) {
-      res.json({ results: [], limited: false, maxResults: args.limit ?? 10 });
+    const maxResults = args.limit ?? 10;
+    if (!args.query || !geminiApiKey) {
+      res.json({ results: [], limited: false, maxResults });
       return;
     }
 
+    const user = currentUser(res);
+    const genAI = new GoogleGenerativeAI(geminiApiKey);
+    const queryEmbedding = await embedTextForVectorSearch(genAI, args.query, TaskType.RETRIEVAL_QUERY);
+    if (!queryEmbedding) {
+      res.json({ results: [], limited: false, maxResults });
+      return;
+    }
+
+    const [noteHits, fileHits] = await Promise.all([
+      searchNotesByEmbedding(db, user.id, queryEmbedding, maxResults),
+      searchFilesByEmbedding(db, user.id, queryEmbedding, maxResults),
+    ]);
+
+    const noteRows = noteHits.length
+      ? await db.select({ id: notes.id, title: notes.title }).from(notes).where(inArray(notes.id, noteHits.map((h) => h.id)))
+      : [];
+    const fileRows = fileHits.length
+      ? await db.select({ id: files.id, name: files.name }).from(files).where(inArray(files.id, fileHits.map((h) => h.id)))
+      : [];
+
+    const results: SearchResult[] = [
+      ...noteRows.map((n) => ({
+        type: "note" as const,
+        id: n.id,
+        title: n.title,
+        subtitle: "Note",
+        url: `/dashboard?noteId=${n.id}`,
+      })),
+      ...fileRows.map((f) => ({
+        type: "file" as const,
+        id: f.id,
+        title: f.name,
+        subtitle: "Document",
+        url: `/dashboard?fileId=${f.id}`,
+      })),
+    ];
+
     res.json({
-      results: [],
-      limited: false,
-      maxResults: args.limit ?? 10,
+      results: results.slice(0, maxResults),
+      limited: results.length > maxResults,
+      maxResults,
+      totalFound: noteHits.length + fileHits.length,
     });
   });
 

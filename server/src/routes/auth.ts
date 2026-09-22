@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { Router } from "express";
 import type { ClerkProfiles } from "../auth/clerk-profiles.js";
+import { acceptPendingInvites } from "../collaboration/acceptInvites.js";
 import type { Db } from "../db/client.js";
 import { users } from "../db/schema/index.js";
 import { currentSession } from "../middleware/auth.js";
@@ -41,6 +42,11 @@ export function createAuthRouter(db: Db, profiles: ClerkProfiles) {
     const profile = await profiles.get(user.clerkUserId);
     const [updated] = await db.update(users).set(profile).where(eq(users.id, user.id)).returning();
     res.json(toUserResponse(updated));
+  });
+
+  /** Port of Convex acceptPendingInvites — call on dashboard load after sign-in. */
+  router.post("/accept-invites", async (_req, res) => {
+    res.json(await acceptPendingInvites(db, currentUser(res)));
   });
 
   return router;

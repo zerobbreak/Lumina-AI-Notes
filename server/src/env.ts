@@ -68,6 +68,7 @@ const envSchema = z.object({
   // boots without it; a route that needs it fails loudly at call time
   // instead (same as Convex's own `getGeminiModel` check).
   GEMINI_API_KEY: z.string().min(1).optional(),
+  ELEVENLABS_API_KEY: z.string().min(1).optional(),
 });
 
 export type Env = Omit<z.infer<typeof envSchema>, "CLERK_AUTHORIZED_PARTIES"> & {

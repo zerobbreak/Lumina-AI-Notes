@@ -1,4 +1,4 @@
-import { and, desc, eq, getTableColumns } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, inArray } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
 import type { Db } from "../db/client.js";
@@ -6,6 +6,8 @@ import { documents, files } from "../db/schema/index.js";
 import { HttpError } from "../middleware/errors.js";
 import { currentUser } from "../middleware/user.js";
 import { isOwnedKey, type Storage } from "../storage/s3.js";
+import { runProcessDocument } from "../ai/processDocument.js";
+import { recomputeFileQueuePositions } from "../files/processing.js";
 import { parse } from "./validation.js";
 
 type FileRow = typeof files.$inferSelect;
@@ -38,7 +40,7 @@ const listQuery = z.object({
 const renameBody = z.object({ name: z.string().trim().min(1).max(255) });
 
 /** Port of convex/files.ts (the client-facing half). */
-export function createFilesRouter(db: Db, storage: Storage) {
+export function createFilesRouter(db: Db, storage: Storage, geminiApiKey?: string) {
   const router = Router();
 
   /** Uploaded files get a fresh signed link; links keep their own URL. */
@@ -58,6 +60,11 @@ export function createFilesRouter(db: Db, storage: Storage) {
     }
     return file;
   }
+
+  const queueProcess = (fileId: string, userId: string) => {
+    if (!geminiApiKey) return;
+    void runProcessDocument(db, storage, fileId, userId, geminiApiKey);
+  };
 
   // uploadFile
   router.post("/", async (req, res) => {
@@ -99,6 +106,9 @@ export function createFilesRouter(db: Db, storage: Storage) {
       })
       .returning(fileColumns);
 
+    if (isPdf) {
+      queueProcess(file.id, user.id);
+    }
     res.status(201).json(await withUrl(file));
   });
 
@@ -123,8 +133,26 @@ export function createFilesRouter(db: Db, storage: Storage) {
     res.json(await Promise.all(rows.map(withUrl)));
   });
 
+  // getDocumentsByIds
+  router.post("/by-ids", async (req, res) => {
+    const user = currentUser(res);
+    const { ids } = parse(z.object({ ids: z.array(z.string().min(1).max(200)).min(1).max(50) }), req.body);
+    const unique = [...new Set(ids)];
+    const rows = await db
+      .select({
+        ...listColumns,
+        summary: files.summary,
+        keyTopics: files.keyTopics,
+        processingStatus: files.processingStatus,
+      })
+      .from(files)
+      .where(and(eq(files.userId, user.id), inArray(files.id, unique)));
+    res.json(await Promise.all(rows.map(withUrl)));
+  });
+
   // getPendingFiles
   router.get("/pending", async (_req, res) => {
+    await recomputeFileQueuePositions(db);
     const user = currentUser(res);
     const rows = await db
       .select(listColumns)
@@ -132,6 +160,9 @@ export function createFilesRouter(db: Db, storage: Storage) {
       .where(and(eq(files.userId, user.id), eq(files.processingStatus, "pending")))
       .orderBy(files.createdAt)
       .limit(10);
+    for (const row of rows) {
+      queueProcess(row.id, user.id);
+    }
     res.json(rows);
   });
 
@@ -182,6 +213,7 @@ export function createFilesRouter(db: Db, storage: Storage) {
       .update(files)
       .set({ processingStatus: "pending", progressPercent: 0, errorMessage: null, queuePosition: null })
       .where(eq(files.id, req.params.id));
+    queueProcess(req.params.id, user.id);
     res.status(204).end();
   });
 

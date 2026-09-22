@@ -3,6 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 import {
   assertOwnedNote,
+  findOwnedCard,
   findOwnedDeck,
   getEndOfDay,
   getStartOfDay,

@@ -3,7 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
 import type { Db } from "../db/client.js";
-import { recordings } from "../db/schema/index.js";
+import { notes, recordings } from "../db/schema/index.js";
 import { HttpError } from "../middleware/errors.js";
 import { currentUser } from "../middleware/user.js";
 import { AUDIO_LIMIT_MINUTES, checkAndUpdateAudioUsage, getUserUsage } from "../recordings/usage.js";
@@ -223,6 +223,39 @@ export function createRecordingsRouter(db: Db, storage: Storage) {
       .returning();
 
     res.status(201).json(await toResponse(created));
+  });
+
+  // getPriorNoteContentForRecording
+  router.get("/:id/prior-note-content", async (req, res) => {
+    const user = currentUser(res);
+    const recording = await findOwned(req.params.id, user.id);
+
+    const matches = await db
+      .select({ title: notes.title, content: notes.content, outlineData: notes.outlineData, createdAt: notes.createdAt })
+      .from(notes)
+      .where(and(eq(notes.userId, user.id), eq(notes.sourceRecordingId, recording.id)))
+      .orderBy(desc(notes.createdAt));
+
+    if (matches.length === 0) {
+      res.json(null);
+      return;
+    }
+
+    const MAX_CHARS = 120_000;
+    for (const note of matches) {
+      const chunks: string[] = [];
+      if (note.content?.trim()) chunks.push(note.content.trim());
+      if (note.outlineData?.trim()) chunks.push(`[Outline structure]\n${note.outlineData.trim()}`);
+      const raw = chunks.join("\n\n");
+      if (raw.length === 0) continue;
+      res.json({
+        noteTitle: note.title,
+        content: raw.slice(0, MAX_CHARS),
+        truncated: raw.length > MAX_CHARS,
+      });
+      return;
+    }
+    res.json(null);
   });
 
   // getRecording
