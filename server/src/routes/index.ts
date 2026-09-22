@@ -5,6 +5,7 @@ import { loadUser } from "../middleware/user.js";
 import { createAuthRouter } from "./auth.js";
 import { createCoursesRouter } from "./courses.js";
 import { createFilesRouter } from "./files.js";
+import { createNoteListsRouter } from "./note-lists.js";
 import { createNotesRouter } from "./notes.js";
 import { createUploadsRouter } from "./uploads.js";
 import { createUsersRouter } from "./users.js";
@@ -23,7 +24,8 @@ export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken }
   router.use("/files", createFilesRouter(db, storage));
   router.use("/users", createUsersRouter(db));
   router.use("/courses", createCoursesRouter(db, storage));
-  router.use("/notes", createNotesRouter(db));
+  // Lists first, so /notes/quick etc. aren't read as a note id.
+  router.use("/notes", createNoteListsRouter(db), createNotesRouter(db));
 
   return router;
 }

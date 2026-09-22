@@ -1,4 +1,4 @@
-import { and, eq, getTableColumns } from "drizzle-orm";
+import { and, eq, exists, getTableColumns, or } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { noteCollaborators, notes } from "../db/schema/index.js";
 import { HttpError } from "../middleware/errors.js";
@@ -19,6 +19,19 @@ const allowed: Record<NoteAccess, NoteRole[]> = {
 const { embedding: _embedding, searchTitle: _searchTitle, searchContent: _searchContent, ...noteColumns } =
   getTableColumns(notes);
 export { noteColumns };
+
+/** SQL condition: the user owns the note or collaborates on it. For list queries. */
+export function canView(db: Db, userId: string) {
+  return or(
+    eq(notes.userId, userId),
+    exists(
+      db
+        .select()
+        .from(noteCollaborators)
+        .where(and(eq(noteCollaborators.noteId, notes.id), eq(noteCollaborators.userId, userId))),
+    ),
+  )!;
+}
 
 /**
  * Loads a note with the caller's role on it: owner, or their collaborator
