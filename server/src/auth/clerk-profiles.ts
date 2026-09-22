@@ -1,8 +1,8 @@
-import { createClerkClient } from "@clerk/express";
+import { createClerkClient } from "@clerk/backend";
 
 export type ClerkProfile = { email: string; name: string | null; image: string | null };
 
-/** Looks up the profile fields we copy into `users` on first sign-in. */
+/** Looks up the profile fields we copy into `users`. */
 export type ClerkProfiles = { get(clerkUserId: string): Promise<ClerkProfile> };
 
 export function createClerkProfiles(secretKey: string): ClerkProfiles {

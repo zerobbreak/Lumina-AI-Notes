@@ -3,7 +3,7 @@ import type { RequestHandler, Response } from "express";
 import type { ClerkProfiles } from "../auth/clerk-profiles.js";
 import type { Db } from "../db/client.js";
 import { users } from "../db/schema/index.js";
-import { userIdOf } from "./auth.js";
+import { currentSession } from "./auth.js";
 import { HttpError } from "./errors.js";
 
 export type User = typeof users.$inferSelect;
@@ -17,26 +17,44 @@ declare global {
   }
 }
 
+/** Starting values Convex's createOrUpdateUser gave every new user. */
+export const NEW_USER_DEFAULTS = {
+  onboardingComplete: false,
+  currentStreak: 0,
+  longestStreak: 0,
+  badges: [] as string[],
+  dailyGoalMinutes: 30,
+  dailyGoalCards: 20,
+  tourCompleted: false,
+  tourStep: 0,
+} satisfies Partial<typeof users.$inferInsert>;
+
 /**
- * Resolves the signed-in Clerk user to their `users` row, creating it on first
- * request (Convex did this in users.store). Runs behind `requireUser`.
+ * Finds the caller's `users` row, creating it from their Clerk profile on
+ * first sight. Safe under concurrent first requests (unique clerk_user_id).
  */
+export async function findOrCreateUser(
+  db: Db,
+  profiles: ClerkProfiles,
+  clerkUserId: string,
+): Promise<User> {
+  const [existing] = await db.select().from(users).where(eq(users.clerkUserId, clerkUserId)).limit(1);
+  if (existing) return existing;
+
+  const profile = await profiles.get(clerkUserId);
+  const [created] = await db
+    .insert(users)
+    .values({ clerkUserId, ...profile, ...NEW_USER_DEFAULTS })
+    // Lost a race with another first request: keep the winner's row as-is.
+    .onConflictDoUpdate({ target: users.clerkUserId, set: { clerkUserId } })
+    .returning();
+  return created;
+}
+
+/** Resolves the verified session to a `users` row. Runs behind `authenticate`. */
 export function loadUser(db: Db, profiles: ClerkProfiles): RequestHandler {
-  return async (req, res, next) => {
-    const clerkUserId = userIdOf(req);
-
-    let [user] = await db.select().from(users).where(eq(users.clerkUserId, clerkUserId)).limit(1);
-    if (!user) {
-      const profile = await profiles.get(clerkUserId);
-      // Two first requests can race; the unique clerk_user_id makes this idempotent.
-      [user] = await db
-        .insert(users)
-        .values({ clerkUserId, ...profile })
-        .onConflictDoUpdate({ target: users.clerkUserId, set: { email: profile.email } })
-        .returning();
-    }
-
-    res.locals.user = user;
+  return async (_req, res, next) => {
+    res.locals.user = await findOrCreateUser(db, profiles, currentSession(res).clerkUserId);
     next();
   };
 }

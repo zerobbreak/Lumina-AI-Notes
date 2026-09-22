@@ -1,23 +1,21 @@
 import { Router } from "express";
 import type { AppDeps } from "../app.js";
-import { requireUser } from "../middleware/auth.js";
-import { currentUser, loadUser } from "../middleware/user.js";
+import { authenticate } from "../middleware/auth.js";
+import { loadUser } from "../middleware/user.js";
+import { createAuthRouter } from "./auth.js";
 import { createFilesRouter } from "./files.js";
 import { createUploadsRouter } from "./uploads.js";
 
 /**
- * Everything under /api/v1 requires a signed-in user, resolved to their
- * `users` row. Mount one router per Convex module here as each is ported.
+ * Everything under /api/v1 needs a verified Clerk session token, resolved to
+ * the caller's `users` row. Mount one router per Convex module as it's ported.
  */
-export function createApiRouter({ env, db, storage, clerkProfiles }: AppDeps) {
+export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken }: AppDeps) {
   const router = Router();
 
-  router.use(requireUser, loadUser(db, clerkProfiles));
+  router.use(authenticate(verifyToken), loadUser(db, clerkProfiles));
 
-  router.get("/me", (_req, res) => {
-    res.json(currentUser(res));
-  });
-
+  router.use("/auth", createAuthRouter(db, clerkProfiles));
   router.use("/uploads", createUploadsRouter(storage, env.MAX_UPLOAD_BYTES));
   router.use("/files", createFilesRouter(db, storage));
 

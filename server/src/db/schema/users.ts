@@ -25,7 +25,7 @@ export const users = pgTable(
   {
     id: id(),
     // Convex keyed users by tokenIdentifier ("<issuer>|<clerk user id>").
-    // The API gets the bare Clerk id from getAuth(), so store that instead.
+    // The API gets the bare Clerk id from the token's `sub`, so store that instead.
     clerkUserId: text().notNull().unique(),
     email: text().notNull(),
     name: text(),

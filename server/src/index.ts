@@ -1,5 +1,6 @@
 import { createApp } from "./app.js";
 import { createClerkProfiles } from "./auth/clerk-profiles.js";
+import { createTokenVerifier } from "./auth/verify-token.js";
 import { createDb } from "./db/client.js";
 import { loadEnv } from "./env.js";
 import { createStorage } from "./storage/s3.js";
@@ -14,7 +15,15 @@ const storage = createStorage({
   secretAccessKey: env.S3_SECRET_ACCESS_KEY,
 });
 const clerkProfiles = createClerkProfiles(env.CLERK_SECRET_KEY);
-const app = createApp({ env, db, storage, clerkProfiles });
+const verifyToken = createTokenVerifier({
+  jwtKey: env.CLERK_JWT_KEY,
+  secretKey: env.CLERK_SECRET_KEY,
+  authorizedParties: env.CLERK_AUTHORIZED_PARTIES,
+});
+if (!env.CLERK_JWT_KEY) {
+  console.warn("CLERK_JWT_KEY is not set; verifying tokens via Clerk's JWKS endpoint");
+}
+const app = createApp({ env, db, storage, clerkProfiles, verifyToken });
 
 const server = app.listen(env.PORT, () => {
   console.log(`Lumina API listening on :${env.PORT} (${env.NODE_ENV})`);

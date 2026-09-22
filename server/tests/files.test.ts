@@ -1,15 +1,9 @@
 import { eq } from "drizzle-orm";
-import type { NextFunction, Request, Response } from "express";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "../src/db/client.js";
 import { documents, files, users } from "../src/db/schema/index.js";
-import { buildApp, createTestDb, fakeStorage } from "./helpers.js";
-
-vi.mock("@clerk/express", () => ({
-  clerkMiddleware: () => (_req: Request, _res: Response, next: NextFunction) => next(),
-  getAuth: (req: Request) => ({ userId: req.header("x-test-user") ?? null }),
-}));
+import { bearer, buildApp, createTestDb, fakeStorage } from "./helpers.js";
 
 const ALICE = "user_alice";
 const BOB = "user_bob";
@@ -31,10 +25,10 @@ beforeEach(async () => {
 });
 
 const as = (user: string) => ({
-  get: (path: string) => request(app).get(path).set("x-test-user", user),
-  post: (path: string) => request(app).post(path).set("x-test-user", user),
-  patch: (path: string) => request(app).patch(path).set("x-test-user", user),
-  delete: (path: string) => request(app).delete(path).set("x-test-user", user),
+  get: (path: string) => request(app).get(path).set("Authorization", bearer(user)),
+  post: (path: string) => request(app).post(path).set("Authorization", bearer(user)),
+  patch: (path: string) => request(app).patch(path).set("Authorization", bearer(user)),
+  delete: (path: string) => request(app).delete(path).set("Authorization", bearer(user)),
 });
 
 /** The full client flow: ask for a signed URL, "PUT" the bytes, then record the file. */
@@ -54,25 +48,26 @@ async function uploadPdf(user: string, name = "Lecture 1.pdf", courseId?: string
 
 describe("users", () => {
   it("creates the users row on first request and reuses it after", async () => {
-    const first = await as(ALICE).get("/api/v1/me");
+    const first = await as(ALICE).get("/api/v1/auth/session");
     expect(first.status).toBe(200);
-    expect(first.body).toMatchObject({ clerkUserId: ALICE, email: `${ALICE}@example.test` });
+    expect(first.body.user).toMatchObject({ clerkUserId: ALICE, email: `${ALICE}@example.test` });
 
-    const second = await as(ALICE).get("/api/v1/me");
-    expect(second.body.id).toBe(first.body.id);
+    const second = await as(ALICE).get("/api/v1/auth/session");
+    expect(second.body.user.id).toBe(first.body.user.id);
     expect(await db.select().from(users)).toHaveLength(1);
   });
 
   it("survives concurrent first requests", async () => {
-    const results = await Promise.all([1, 2, 3].map(() => as(BOB).get("/api/v1/me")));
+    const results = await Promise.all([1, 2, 3].map(() => as(BOB).get("/api/v1/auth/session")));
     expect(results.every((r) => r.status === 200)).toBe(true);
-    expect(new Set(results.map((r) => r.body.id)).size).toBe(1);
+    expect(new Set(results.map((r) => r.body.user.id)).size).toBe(1);
+    expect(await db.select().from(users)).toHaveLength(1);
   });
 
   it("sends dates as ms timestamps, like Convex did", async () => {
-    const res = await as(ALICE).get("/api/v1/me");
-    expect(typeof res.body.createdAt).toBe("number");
-    expect(Math.abs(res.body.createdAt - Date.now())).toBeLessThan(60_000);
+    const res = await as(ALICE).get("/api/v1/auth/session");
+    expect(typeof res.body.user.createdAt).toBe("number");
+    expect(Math.abs(res.body.user.createdAt - Date.now())).toBeLessThan(60_000);
   });
 });
 

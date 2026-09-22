@@ -1,15 +1,8 @@
-import type { NextFunction, Request, Response } from "express";
 import request from "supertest";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "../src/db/client.js";
 import { isOwnedKey, newObjectKey } from "../src/storage/s3.js";
-import { buildApp, createTestDb, fakeStorage } from "./helpers.js";
-
-// Stand in for Clerk: the `x-test-user` header is the signed-in user id.
-vi.mock("@clerk/express", () => ({
-  clerkMiddleware: () => (_req: Request, _res: Response, next: NextFunction) => next(),
-  getAuth: (req: Request) => ({ userId: req.header("x-test-user") ?? null }),
-}));
+import { bearer, buildApp, createTestDb, fakeStorage } from "./helpers.js";
 
 const ALICE = "user_alice";
 const BOB = "user_bob";
@@ -33,7 +26,7 @@ describe("POST /api/v1/uploads", () => {
   it("signs an upload under the caller's own prefix", async () => {
     const res = await request(app)
       .post("/api/v1/uploads")
-      .set("x-test-user", ALICE)
+      .set("Authorization", bearer(ALICE))
       .send({ filename: "Lecture 3 (final).pdf", contentType: "application/pdf", size: 1234 });
 
     expect(res.status).toBe(201);
@@ -46,7 +39,7 @@ describe("POST /api/v1/uploads", () => {
   it("rejects files over the size limit", async () => {
     const res = await request(app)
       .post("/api/v1/uploads")
-      .set("x-test-user", ALICE)
+      .set("Authorization", bearer(ALICE))
       .send({ filename: "huge.mp4", contentType: "video/mp4", size: 11 * 1024 * 1024 });
     expect(res.status).toBe(413);
     expect(res.body.error.code).toBe("file_too_large");
@@ -60,7 +53,7 @@ describe("POST /api/v1/uploads", () => {
   ])("rejects unsupported type %s", async (contentType, filename) => {
     const res = await request(app)
       .post("/api/v1/uploads")
-      .set("x-test-user", ALICE)
+      .set("Authorization", bearer(ALICE))
       .send({ filename, contentType, size: 10 });
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe("invalid_request");
@@ -70,7 +63,7 @@ describe("POST /api/v1/uploads", () => {
     for (const size of [undefined, 0, -1, 1.5, "10"]) {
       const res = await request(app)
         .post("/api/v1/uploads")
-        .set("x-test-user", ALICE)
+        .set("Authorization", bearer(ALICE))
         .send({ filename: "a.pdf", contentType: "application/pdf", size });
       expect(res.status).toBe(400);
     }
@@ -88,21 +81,21 @@ describe("reading and deleting uploads", () => {
     const stat = await request(app)
       .get("/api/v1/uploads/stat")
       .query({ key: aliceKey })
-      .set("x-test-user", ALICE);
+      .set("Authorization", bearer(ALICE));
     expect(stat.status).toBe(200);
     expect(stat.body).toEqual({ key: aliceKey, size: 42, contentType: "application/pdf" });
 
     const dl = await request(app)
       .get("/api/v1/uploads/download-url")
       .query({ key: aliceKey })
-      .set("x-test-user", ALICE);
+      .set("Authorization", bearer(ALICE));
     expect(dl.status).toBe(200);
     expect(dl.body.url).toContain("signed-get");
 
     const del = await request(app)
       .delete("/api/v1/uploads")
       .query({ key: aliceKey })
-      .set("x-test-user", ALICE);
+      .set("Authorization", bearer(ALICE));
     expect(del.status).toBe(204);
     expect(fake.objects.has(aliceKey)).toBe(false);
   });
@@ -113,7 +106,7 @@ describe("reading and deleting uploads", () => {
       ["get", "/api/v1/uploads/download-url"],
       ["delete", "/api/v1/uploads"],
     ] as const) {
-      const res = await request(app)[method](path).query({ key: aliceKey }).set("x-test-user", BOB);
+      const res = await request(app)[method](path).query({ key: aliceKey }).set("Authorization", bearer(BOB));
       expect(res.status).toBe(404);
     }
     expect(fake.mock.createDownloadUrl).not.toHaveBeenCalled();
@@ -124,12 +117,12 @@ describe("reading and deleting uploads", () => {
     const res = await request(app)
       .get("/api/v1/uploads/stat")
       .query({ key: `users/${ALICE}/missing/file.pdf` })
-      .set("x-test-user", ALICE);
+      .set("Authorization", bearer(ALICE));
     expect(res.status).toBe(404);
   });
 
   it("requires a key", async () => {
-    const res = await request(app).get("/api/v1/uploads/stat").set("x-test-user", ALICE);
+    const res = await request(app).get("/api/v1/uploads/stat").set("Authorization", bearer(ALICE));
     expect(res.status).toBe(400);
   });
 });

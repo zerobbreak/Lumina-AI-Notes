@@ -1,8 +1,8 @@
-import { clerkMiddleware } from "@clerk/express";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import type { ClerkProfiles } from "./auth/clerk-profiles.js";
+import type { TokenVerifier } from "./auth/verify-token.js";
 import type { Db } from "./db/client.js";
 import type { Env } from "./env.js";
 import { errorHandler, notFound } from "./middleware/errors.js";
@@ -11,7 +11,13 @@ import { healthRouter } from "./routes/health.js";
 import type { Storage } from "./storage/s3.js";
 
 /** Everything routes need, built once in index.ts (or faked in tests). */
-export type AppDeps = { env: Env; db: Db; storage: Storage; clerkProfiles: ClerkProfiles };
+export type AppDeps = {
+  env: Env;
+  db: Db;
+  storage: Storage;
+  clerkProfiles: ClerkProfiles;
+  verifyToken: TokenVerifier;
+};
 
 export function createApp(deps: AppDeps) {
   const { env } = deps;
@@ -52,12 +58,6 @@ export function createApp(deps: AppDeps) {
 
   app.use("/health", healthRouter);
 
-  app.use(
-    clerkMiddleware({
-      publishableKey: env.CLERK_PUBLISHABLE_KEY,
-      secretKey: env.CLERK_SECRET_KEY,
-    }),
-  );
   app.use("/api/v1", createApiRouter(deps));
 
   app.use(notFound);

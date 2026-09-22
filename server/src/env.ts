@@ -15,8 +15,26 @@ const envSchema = z.object({
   // On Railway, reference ${{Postgres.DATABASE_URL}} (private network).
   // Locally, use the Postgres service's public URL.
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
-  CLERK_PUBLISHABLE_KEY: z.string().startsWith("pk_"),
   CLERK_SECRET_KEY: z.string().startsWith("sk_"),
+  // PEM public key (Clerk dashboard -> API keys -> Show JWT public key).
+  // Set it to verify tokens without calling Clerk. Newlines may be written as
+  // a literal \n so the key fits on one line in .env or Railway variables.
+  CLERK_JWT_KEY: z
+    .string()
+    .transform((pem) => pem.replace(/\\n/g, "\n").trim())
+    .pipe(z.string().startsWith("-----BEGIN PUBLIC KEY-----"))
+    .optional(),
+  // Origins allowed to have issued a session token (its azp claim).
+  // Defaults to CORS_ORIGINS, minus "null" (Electron gets its token from the website).
+  CLERK_AUTHORIZED_PARTIES: z
+    .string()
+    .transform((value) =>
+      value
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+    )
+    .optional(),
 
   // Railway bucket: `railway bucket credentials --bucket lumina-uploads`
   S3_ENDPOINT: z.url(),
@@ -31,7 +49,9 @@ const envSchema = z.object({
     .default(100 * 1024 * 1024),
 });
 
-export type Env = z.infer<typeof envSchema>;
+export type Env = Omit<z.infer<typeof envSchema>, "CLERK_AUTHORIZED_PARTIES"> & {
+  CLERK_AUTHORIZED_PARTIES: string[];
+};
 
 /**
  * Parses and validates process env. Throws with every problem listed at once,
@@ -45,5 +65,10 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
       .join("\n");
     throw new Error(`Invalid server environment:\n${problems}`);
   }
-  return result.data;
+  const env = result.data;
+  return {
+    ...env,
+    CLERK_AUTHORIZED_PARTIES:
+      env.CLERK_AUTHORIZED_PARTIES ?? env.CORS_ORIGINS.filter((origin) => origin !== "null"),
+  };
 }
