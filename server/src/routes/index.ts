@@ -29,7 +29,7 @@ export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken }
   // Lists first, so /notes/quick etc. aren't read as a note id.
   router.use("/notes", createNoteListsRouter(db), createNotesRouter(db));
   router.use("/tags", createTagsRouter(db));
-  router.use("/ai", createAiRouter(db, env));
+  router.use("/ai", createAiRouter(db, env, storage));
 
   return router;
 }

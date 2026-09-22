@@ -1,3 +1,4 @@
+import type { GenerativeModel } from "@google/generative-ai";
 import { Router } from "express";
 import { z } from "zod";
 import { buildDiagramData, type DiagramNodeInput } from "../ai/diagram.js";
@@ -9,7 +10,9 @@ import { normalizeTranscriptForPrompt } from "../ai/transcript.js";
 import { fetchReferenceUrlsForPrompt, normalizeReferenceUrlList } from "../ai/urlContent.js";
 import type { Env } from "../env.js";
 import { aiRateLimit } from "../middleware/ai-rate-limit.js";
+import { currentUser } from "../middleware/user.js";
 import type { Db } from "../db/client.js";
+import { isOwnedKey, type Storage } from "../storage/s3.js";
 import { parse } from "./validation.js";
 
 /** Cap inline "previous notes" passed to Gemini (per request). Matches convex/ai.ts. */
@@ -24,6 +27,8 @@ const MAX_PREVIOUS_NOTES_CHARS = 100_000;
  */
 const TEXT_OP_CHARS = 100_000;
 const GENERATION_CHARS = 1_000_000;
+/** Base64 image for formula extraction; body-level 10 MB cap is the real ceiling (app.ts). */
+const IMAGE_BASE64_CHARS = 14_000_000;
 
 type NoteSectionDraft = {
   id?: string;
@@ -40,6 +45,229 @@ type StructuredNotesDraft = {
   diagramNodes?: unknown[];
   diagramEdges?: unknown[];
 };
+
+/** Bit 3 (transcription/audio): types, prompts and parsing ported from convex/ai.ts. */
+type CleanupMetadata = {
+  fillerWordsRemoved: number;
+  repetitionsMarked: number;
+  emphasizedConcepts: string[];
+  tangentsDetected: string[];
+  mathExpressionsConverted: number;
+  confidence: number;
+};
+
+type LectureSegment = {
+  title: string;
+  startCharIndex: number;
+  endCharIndex: number;
+  topics?: string[];
+  importance?: "low" | "medium" | "high";
+};
+
+type LectureStructureResult = {
+  segments: LectureSegment[];
+  lectureFormat?: string;
+  estimatedDuration?: string;
+  hasQAndA?: boolean;
+  keyTermsPerSegment?: Record<string, string[]>;
+};
+
+const defaultCleanupMetadata = (): CleanupMetadata => ({
+  fillerWordsRemoved: 0,
+  repetitionsMarked: 0,
+  emphasizedConcepts: [],
+  tangentsDetected: [],
+  mathExpressionsConverted: 0,
+  confidence: 0,
+});
+
+const extractJsonObject = (text: string): string | null => {
+  const stripped = text
+    .replace(/^```json?\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+  const match = stripped.match(/\{[\s\S]*\}/);
+  return match ? match[0] : null;
+};
+
+/**
+ * Payment gateway is disabled product-wide — "TEMPORARY: All features are
+ * free" in convex/ai.ts. Kept as a no-op stub for parity, not real tier logic.
+ */
+async function checkTierAccess(): Promise<{ allowed: true }> {
+  return { allowed: true };
+}
+
+const cleanLectureTranscriptBody = z.object({
+  transcript: z.string().max(GENERATION_CHARS),
+  context: z.string().max(TEXT_OP_CHARS).optional(),
+});
+
+const detectLectureSegmentsBody = z.object({
+  transcript: z.string().max(GENERATION_CHARS),
+});
+
+const extractFormulaBody = z.object({
+  imageBase64: z.string().max(IMAGE_BASE64_CHARS),
+  mimeType: z.string(),
+  courseContext: z.string().max(TEXT_OP_CHARS).optional(),
+});
+
+const transcribeAudioBody = z.object({
+  storageKey: z.string().min(1).max(1024),
+  mimeType: z.string(),
+  courseContext: z.string().max(TEXT_OP_CHARS).optional(),
+});
+
+/** Shared by /clean-lecture-transcript and transcribeAudio's internal cleanup pipeline. */
+async function runCleanLectureTranscript(
+  gemini: GenerativeModel,
+  transcript: string,
+  context: string | undefined,
+): Promise<{ cleanedTranscript: string; metadata: CleanupMetadata }> {
+  const prompt = `You are a lecture transcription cleaning specialist. Your job is to make raw lecture transcripts clean and ready for study materials.
+
+TASK: Clean this lecture transcript intelligently while preserving ALL important meaning.
+
+Raw transcript:
+"""
+${transcript}
+"""
+
+${context ? `Course/Topic: ${context}` : ""}
+
+CLEANING INSTRUCTIONS:
+
+1. **Filler Word Removal** - Remove filler words that add no value:
+   - Remove: "um", "uh", "like", "you know", "basically", "sort of", "kind of", "right?", "okay?", "so like", "actually"
+   - KEEP if it conveys meaning: "It's like a pump" (simile), "kind of similar to" (comparison)
+   - KEEP emphatic uses: "Like, THIS is important"
+
+2. **Mark Repetitions** - Professors repeat key concepts for emphasis:
+   - First mention: Keep as is
+   - Second mention: Append [REPEAT]
+   - Third+ mention: Append [REPEAT X\${count}]
+   - Example: "Mitochondria is the powerhouse. The mitochondria generates ATP [REPEAT]. Mitochondria, remember, is where energy is made [REPEAT X3]"
+
+3. **Mark Emphasis** - When professor clearly emphasizes:
+   - "This is IMPORTANT", "Pay attention", "Will be on exam", "Don't forget"
+   - Mark the emphasized part with ⭐
+   - Example: "⭐ The Krebs cycle is where most ATP is generated"
+
+4. **Convert Spoken Math**:
+   - "x squared" → $$x^2$$
+   - "pi r squared" → $$\\pi r^2$$
+   - "3 point 14159" → $$3.14159$$
+   - "equals, approximately" → $$\\approx$$
+   - Keep full expression together: "the equation is x squared plus 3x plus 2 equals 0" → "the equation is $$x^2 + 3x + 2 = 0$$"
+
+5. **Fix Transcription Errors**:
+   - Common mishears in lectures: "episilon" → "epsilon", "iterated" → "iterated", "sub optimal" → "suboptimal"
+   - Context matters: In a math class, "pi" not "pie"
+   - KEEP technical terms even if unusual: "leucine" not "lucene"
+
+6. **Mark Tangents** - Professors often go off-topic:
+   - Short aside (< 1 minute): Keep inline
+   - Long tangent (> 1 minute): Wrap with [TANGENT START] ... [TANGENT END]
+   - Common tangents: personal stories, historical context, related but not essential material
+
+7. **Preserve Rhetorical Devices**:
+   - Keep rhetorical questions: "How does ATP work? It's the energy currency..."
+   - Keep examples and analogies
+   - Keep transitions: "So what we see here is...", "Before we move on..."
+
+8. **Clean Up Sentence Structure**:
+   - Fix obvious false starts: "The cell is-actually, let me explain the mitochondria first" → "Let me explain the mitochondria first"
+   - Keep interrupted thoughts if they're intentional: "Some students think-and I used to think-that mitochondria only make ATP"
+
+RETURN EXACTLY THIS JSON (no markdown, no extras):
+
+{
+  "cleanedTranscript": "The cleaned transcript with all fixes applied",
+  "metadata": {
+    "fillerWordsRemoved": NUMBER,
+    "repetitionsMarked": NUMBER,
+    "emphasizedConcepts": ["concept1", "concept2"],
+    "tangentsDetected": ["tangent1", "tangent2"],
+    "mathExpressionsConverted": NUMBER,
+    "confidence": 0.85
+  },
+  "summaryOfChanges": "Removed 12 filler words, marked 3 key concept repetitions, converted 5 equations, detected 1 tangent"
+}
+
+IMPORTANT:
+- Only remove words that truly add no value
+- When in doubt, KEEP the word
+- Preserve the professor's voice and style
+- Return ONLY the JSON, no explanation`;
+
+  try {
+    const result = await gemini.generateContent(prompt);
+    const responseText = result.response.text().trim();
+    const jsonText = extractJsonObject(responseText);
+    if (!jsonText) {
+      throw new Error("Failed to parse cleaning response");
+    }
+    const parsed = JSON.parse(jsonText);
+    return {
+      cleanedTranscript: parsed.cleanedTranscript || transcript,
+      metadata: parsed.metadata || defaultCleanupMetadata(),
+    };
+  } catch (error) {
+    console.error("[cleanLectureTranscript] error:", error);
+    return { cleanedTranscript: transcript, metadata: defaultCleanupMetadata() };
+  }
+}
+
+/** Shared by /detect-lecture-segments and transcribeAudio's internal cleanup pipeline. */
+async function runDetectLectureSegments(gemini: GenerativeModel, transcript: string): Promise<LectureStructureResult> {
+  const prompt = `Analyze this lecture transcript and identify its structure and segments.
+
+Transcript (first 15,000 chars):
+"""
+${transcript.substring(0, 15000)}
+"""
+
+Identify major segments where the professor changes topics. Mark transitions like:
+- "Alright, so let's move on to..."
+- "Now we're going to discuss..."
+- "Let me recap and then move on..."
+- "Next topic..."
+- "Before we finish, let me mention..."
+
+Return JSON with segments:
+
+{
+  "segments": [
+    {
+      "title": "Introduction to Mitochondria",
+      "startCharIndex": 0,
+      "endCharIndex": 1200,
+      "topics": ["definition", "location", "structure"],
+      "importance": "high"
+    }
+  ],
+  "lectureFormat": "traditional_lecture",
+  "estimatedDuration": "50 minutes",
+  "hasQAndA": false,
+  "keyTermsPerSegment": {
+    "Introduction to Mitochondria": ["mitochondrion", "organelle", "eukaryote"]
+  }
+}
+
+Return ONLY valid JSON.`;
+
+  try {
+    const result = await gemini.generateContent(prompt);
+    const responseText = result.response.text().trim();
+    const jsonText = extractJsonObject(responseText);
+    if (!jsonText) return { segments: [] };
+    return JSON.parse(jsonText);
+  } catch (error) {
+    console.error("[detectLectureSegments] error:", error);
+    return { segments: [] };
+  }
+}
 
 const refineTextBody = z.object({
   text: z.string().max(TEXT_OP_CHARS),
@@ -96,7 +324,7 @@ const generateStructuredNotesBody = z.object({
  * to the client on Convex either — it awaits the full Gemini stream
  * server-side and returns one JSON blob, same as here.
  */
-export function createAiRouter(db: Db, env: Env) {
+export function createAiRouter(db: Db, env: Env, storage: Storage) {
   const router = Router();
   router.use(aiRateLimit(db));
 
@@ -721,6 +949,227 @@ ${getDepthRequirements(wordCountFn(enrichedTranscript))}
         reviewQuestions: [],
         diagramData: undefined,
       });
+    }
+  });
+
+  /**
+   * "Bit 3" of the AI port: transcription/audio. cleanLectureTranscript and
+   * detectLectureSegments are pure text in/out; extractFormulaFromImage takes
+   * an inline base64 image. transcribeAudio is the one with a real storage
+   * dependency — Convex fetched the blob via ctx.storage.get(storageId); here
+   * the client uploads the audio through the already-ported generic
+   * /api/v1/uploads flow first and passes the resulting storageKey. Convex's
+   * recordings.ts (upload-URL minting, audio-minute quota, recording CRUD) is
+   * a separate, still-unported module — this route intentionally does not
+   * enforce that quota, matching where Convex enforces it today (nowhere
+   * inside transcribeAudio itself).
+   */
+  router.post("/clean-lecture-transcript", async (req, res) => {
+    const { transcript, context } = parse(cleanLectureTranscriptBody, req.body);
+    const gemini = model({ responseMimeType: "application/json" });
+    res.json(await runCleanLectureTranscript(gemini, transcript, context));
+  });
+
+  router.post("/detect-lecture-segments", async (req, res) => {
+    const { transcript } = parse(detectLectureSegmentsBody, req.body);
+    const gemini = model({ responseMimeType: "application/json" });
+    res.json(await runDetectLectureSegments(gemini, transcript));
+  });
+
+  router.post("/extract-formula-from-image", async (req, res) => {
+    const { imageBase64, mimeType } = parse(extractFormulaBody, req.body);
+    await checkTierAccess(); // always allowed today; kept for parity with convex/ai.ts
+
+    const gemini = model({ responseMimeType: "application/json" });
+    const prompt = `You are an expert at recognizing mathematical formulas and equations from images.
+Analyze this image and extract any mathematical formulas, equations, or expressions.
+
+Convert all recognized formulas to valid LaTeX notation that can be rendered with KaTeX.
+
+Return a JSON response with this exact structure:
+{
+  "latex": "The LaTeX representation of the formula(s)",
+  "description": "A brief description of what the formula represents",
+  "confidence": "high" | "medium" | "low",
+  "multipleFormulas": false,
+  "formulas": [] // If multiple formulas, list each separately with its own latex and description
+}
+
+Rules:
+- Use standard LaTeX notation (\\frac, \\sqrt, \\sum, \\int, etc.)
+- For display math, use $$ delimiters
+- For inline math, use $ delimiters
+- If the image contains multiple formulas, set multipleFormulas to true and list each in the formulas array
+- If the formula is handwritten and hard to read, mention this in the description
+- Set confidence based on image quality and clarity:
+  - "high": Clear, printed formulas
+  - "medium": Somewhat clear handwriting or partially visible formulas
+  - "low": Unclear image or uncertain recognition
+- If no formula is found, set latex to empty string and explain in description
+
+Return ONLY valid JSON.`;
+
+    try {
+      const result = await gemini.generateContent([
+        prompt,
+        { inlineData: { mimeType, data: imageBase64 } },
+      ]);
+      const responseText = result.response.text().trim();
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        res.json({ success: false, error: "Failed to parse formula recognition response" });
+        return;
+      }
+
+      const data = JSON.parse(jsonMatch[0]) as {
+        latex: string;
+        description: string;
+        confidence: "high" | "medium" | "low";
+        multipleFormulas?: boolean;
+        formulas?: Array<{ latex: string; description: string }>;
+      };
+
+      if (!data.latex && !data.multipleFormulas) {
+        res.json({ success: false, error: data.description || "No formula detected in the image" });
+        return;
+      }
+
+      let finalLatex = data.latex;
+      if (data.multipleFormulas && data.formulas && data.formulas.length > 0) {
+        finalLatex = data.formulas.map((f) => f.latex).join("\n\n");
+      }
+
+      res.json({ success: true, latex: finalLatex, description: data.description, confidence: data.confidence });
+    } catch (error) {
+      console.error("extractFormulaFromImage error:", error);
+      res.json({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to extract formula from image",
+      });
+    }
+  });
+
+  router.post("/transcribe-audio", async (req, res) => {
+    const { storageKey, mimeType, courseContext } = parse(transcribeAudioBody, req.body);
+    const failure = (error: string) =>
+      res.json({ transcript: "", duration: null, speakers: null, keyTopics: [], success: false, error });
+
+    const apiKey = env.GEMINI_API_KEY;
+    if (!apiKey) {
+      failure("GEMINI_API_KEY environment variable not set");
+      return;
+    }
+
+    const userId = currentUser(res).clerkUserId;
+    if (!isOwnedKey(userId, storageKey)) {
+      failure("Audio file not found in storage. It may have been deleted.");
+      return;
+    }
+
+    try {
+      const stat = await storage.stat(storageKey);
+      if (!stat) {
+        failure("Audio file not found in storage. It may have been deleted.");
+        return;
+      }
+
+      const MAX_FILE_SIZE = 50 * 1024 * 1024;
+      if (stat.size > MAX_FILE_SIZE) {
+        failure(`Audio file is too large (${(stat.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 50MB.`);
+        return;
+      }
+
+      const bytes = await storage.getBytes(storageKey);
+      const audioBase64 = Buffer.from(bytes).toString("base64");
+      const gemini = model();
+
+      const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> =>
+        Promise.race([
+          promise,
+          new Promise<T>((_, reject) =>
+            setTimeout(() => reject(new Error(`Request timed out after ${timeoutMs / 1000}s`)), timeoutMs),
+          ),
+        ]);
+
+      const generateTranscription = async () => {
+        const result = await withTimeout(
+          gemini.generateContent([
+            { inlineData: { mimeType, data: audioBase64 } },
+            {
+              text: `Transcribe this audio file completely and accurately.
+Return the transcription as plain text.
+If you detect timestamps or speaker changes, include them.
+Focus on accuracy above all else.`,
+            },
+          ]),
+          90_000,
+        );
+        return result.response.text().trim();
+      };
+
+      let responseText = "";
+      let lastError: Error | null = null;
+      const maxRetries = 3;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          responseText = await generateTranscription();
+          break;
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+          console.warn(`[transcribeAudio] Attempt ${attempt} failed:`, lastError.message);
+          if (attempt < maxRetries) {
+            const delay = 2 ** (attempt - 1) * 1000;
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          }
+        }
+      }
+
+      if (!responseText && lastError) {
+        throw lastError;
+      }
+
+      let cleanedTranscript = responseText;
+      let cleanupMetadata = defaultCleanupMetadata();
+      let structureResult: LectureStructureResult = { segments: [] };
+
+      try {
+        const jsonModel = model({ responseMimeType: "application/json" });
+        const cleanupResult = await runCleanLectureTranscript(jsonModel, responseText, courseContext);
+        cleanedTranscript = cleanupResult.cleanedTranscript || cleanedTranscript;
+        cleanupMetadata = cleanupResult.metadata || cleanupMetadata;
+
+        const detectedStructure = await runDetectLectureSegments(jsonModel, cleanedTranscript);
+        structureResult = detectedStructure?.segments ? detectedStructure : structureResult;
+      } catch (cleanupError) {
+        console.error("[transcribeAudio] Cleanup pipeline error:", cleanupError);
+      }
+
+      res.json({
+        transcript: cleanedTranscript,
+        duration: null,
+        speakers: null,
+        keyTopics: cleanupMetadata.emphasizedConcepts || [],
+        processingMetadata: { cleaned: cleanupMetadata, structure: structureResult },
+        success: true,
+      });
+    } catch (error) {
+      console.error("[transcribeAudio] Full error:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      let userFriendlyError = "Transcription failed";
+      if (errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("quota")) {
+        userFriendlyError = "API quota exceeded. Please try again later.";
+      } else if (errorMessage.includes("RATE_LIMIT") || errorMessage.includes("429")) {
+        userFriendlyError = "Too many requests. Please wait a moment and try again.";
+      } else if (errorMessage.includes("INVALID_ARGUMENT")) {
+        userFriendlyError = "Invalid audio format. Please try MP3, WAV, or M4A formats.";
+      } else if (errorMessage.includes("couldn't be completed") || errorMessage.includes("completed")) {
+        userFriendlyError = "The AI service is temporarily unavailable. Please try again in a few minutes.";
+      } else if (errorMessage.includes("deadline") || errorMessage.includes("timeout")) {
+        userFriendlyError = "Request timed out. The audio file may be too long. Try a shorter recording.";
+      }
+
+      failure(userFriendlyError);
     }
   });
 

@@ -2,9 +2,35 @@ import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "../src/db/client.js";
 import { aiRateLimitWindows, users } from "../src/db/schema/index.js";
-import { bearer, buildApp, createTestDb, testEnv } from "./helpers.js";
+import { bearer, buildApp, createTestDb, fakeStorage, testEnv } from "./helpers.js";
 
 const ALICE = "user_alice";
+
+/** A tiny valid mono 16-bit PCM WAV (silence), just long enough for Gemini to accept as audio. */
+function silentWav(seconds = 0.3, sampleRate = 8000): Buffer {
+  const numSamples = Math.floor(seconds * sampleRate);
+  const dataSize = numSamples * 2;
+  const buf = Buffer.alloc(44 + dataSize);
+  buf.write("RIFF", 0);
+  buf.writeUInt32LE(36 + dataSize, 4);
+  buf.write("WAVE", 8);
+  buf.write("fmt ", 12);
+  buf.writeUInt32LE(16, 16);
+  buf.writeUInt16LE(1, 20); // PCM
+  buf.writeUInt16LE(1, 22); // mono
+  buf.writeUInt32LE(sampleRate, 24);
+  buf.writeUInt32LE(sampleRate * 2, 28); // byte rate
+  buf.writeUInt16LE(2, 32); // block align
+  buf.writeUInt16LE(16, 34); // bits per sample
+  buf.write("data", 36);
+  buf.writeUInt32LE(dataSize, 40);
+  // Samples default to zero (silence) from Buffer.alloc.
+  return buf;
+}
+
+/** A trivial 1x1 transparent PNG, just to exercise the image-in pipeline. */
+const TINY_PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
 let db: Db;
 let closeDb: () => Promise<void>;
@@ -76,6 +102,92 @@ describe("POST /api/v1/ai/*", () => {
   });
 });
 
+describe("POST /api/v1/ai/* (bit 3: transcription/audio)", () => {
+  it("requires a signed-in user on every bit-3 route", async () => {
+    const routes = [
+      "/api/v1/ai/clean-lecture-transcript",
+      "/api/v1/ai/detect-lecture-segments",
+      "/api/v1/ai/extract-formula-from-image",
+      "/api/v1/ai/transcribe-audio",
+    ];
+    for (const route of routes) {
+      const res = await request(app).post(route).send({});
+      expect(res.status).toBe(401);
+    }
+  });
+
+  it("rejects a transcript over the 1MB generation cap on clean/detect", async () => {
+    const clean = await as(ALICE)
+      .post("/api/v1/ai/clean-lecture-transcript")
+      .send({ transcript: "x".repeat(1_000_001) });
+    expect(clean.status).toBe(400);
+
+    const detect = await as(ALICE)
+      .post("/api/v1/ai/detect-lecture-segments")
+      .send({ transcript: "x".repeat(1_000_001) });
+    expect(detect.status).toBe(400);
+  });
+
+  it("errors clearly when GEMINI_API_KEY isn't configured (clean/detect/formula)", async () => {
+    const clean = await as(ALICE).post("/api/v1/ai/clean-lecture-transcript").send({ transcript: "hi" });
+    expect(clean.status).toBe(500);
+
+    const detect = await as(ALICE).post("/api/v1/ai/detect-lecture-segments").send({ transcript: "hi" });
+    expect(detect.status).toBe(500);
+
+    const formula = await as(ALICE)
+      .post("/api/v1/ai/extract-formula-from-image")
+      .send({ imageBase64: TINY_PNG_BASE64, mimeType: "image/png" });
+    expect(formula.status).toBe(500);
+  });
+
+  it("transcribeAudio never throws: missing key comes back as a structured success:false, not a 500", async () => {
+    const res = await as(ALICE)
+      .post("/api/v1/ai/transcribe-audio")
+      .send({ storageKey: `users/${ALICE}/does-not-matter/audio.wav`, mimeType: "audio/wav" });
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toMatch(/GEMINI_API_KEY/);
+  });
+
+  // A GEMINI_API_KEY (fake, never actually called) is needed for these: the
+  // route checks it before storage, matching Convex's own check order.
+  const withFakeKey = { ...testEnv, GEMINI_API_KEY: "fake-key-for-storage-tests" };
+
+  it("transcribeAudio rejects a storageKey owned by another user as not-found, not a 403", async () => {
+    app = buildApp({ db, env: withFakeKey });
+    const res = await as(ALICE)
+      .post("/api/v1/ai/transcribe-audio")
+      .send({ storageKey: "users/user_mallory/some-file/audio.wav", mimeType: "audio/wav" });
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toMatch(/not found/i);
+  });
+
+  it("transcribeAudio reports a missing bucket object as not-found", async () => {
+    const { storage } = fakeStorage(); // empty: stat() returns null for any key
+    app = buildApp({ db, storage, env: withFakeKey });
+    const res = await as(ALICE)
+      .post("/api/v1/ai/transcribe-audio")
+      .send({ storageKey: `users/${ALICE}/missing/audio.wav`, mimeType: "audio/wav" });
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toMatch(/not found/i);
+  });
+
+  it("transcribeAudio rejects a file over the 50MB size cap before fetching bytes", async () => {
+    const { storage, objects, mock } = fakeStorage();
+    const key = `users/${ALICE}/big/audio.wav`;
+    objects.set(key, { size: 51 * 1024 * 1024, contentType: "audio/wav" });
+    app = buildApp({ db, storage, env: withFakeKey });
+    const res = await as(ALICE).post("/api/v1/ai/transcribe-audio").send({ storageKey: key, mimeType: "audio/wav" });
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toMatch(/too large/i);
+    expect(mock.getBytes).not.toHaveBeenCalled();
+  });
+});
+
 // Real Gemini calls: skipped unless a live key is available, so the suite
 // stays fast/offline by default and doesn't burn quota in CI.
 describe.skipIf(!process.env.GEMINI_API_KEY)("POST /api/v1/ai/* (live Gemini)", () => {
@@ -107,5 +219,51 @@ describe.skipIf(!process.env.GEMINI_API_KEY)("POST /api/v1/ai/* (live Gemini)", 
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.sections)).toBe(true);
     expect(res.body.sections.length).toBeGreaterThan(0);
+  }, 60_000);
+
+  it("cleans a lecture transcript", async () => {
+    const res = await as(ALICE)
+      .post("/api/v1/ai/clean-lecture-transcript")
+      .send({ transcript: "So, um, today we're gonna talk about, like, photosynthesis, you know." });
+    expect(res.status).toBe(200);
+    expect(typeof res.body.cleanedTranscript).toBe("string");
+    expect(res.body.cleanedTranscript.length).toBeGreaterThan(0);
+    expect(res.body.metadata).toBeDefined();
+  }, 20_000);
+
+  it("detects lecture segments", async () => {
+    const res = await as(ALICE).post("/api/v1/ai/detect-lecture-segments").send({
+      transcript:
+        "Today we'll cover two topics. First, let's discuss photosynthesis. Now, let's move on to cellular respiration.",
+    });
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.segments)).toBe(true);
+  }, 20_000);
+
+  it("extracts a formula from an image (or reports none found, without erroring)", async () => {
+    const res = await as(ALICE)
+      .post("/api/v1/ai/extract-formula-from-image")
+      .send({ imageBase64: TINY_PNG_BASE64, mimeType: "image/png" });
+    expect(res.status).toBe(200);
+    expect(typeof res.body.success).toBe("boolean");
+  }, 20_000);
+
+  it("runs transcribeAudio end-to-end against a real (silent) audio file", async () => {
+    const { storage, objects, mock } = fakeStorage();
+    const key = `users/${ALICE}/live/audio.wav`;
+    const wav = silentWav();
+    objects.set(key, { size: wav.length, contentType: "audio/wav" });
+    mock.getBytes.mockResolvedValue(wav);
+    const liveApp = buildApp({ db, storage, env: { ...testEnv, GEMINI_API_KEY: process.env.GEMINI_API_KEY } });
+
+    const res = await request(liveApp)
+      .post("/api/v1/ai/transcribe-audio")
+      .set("Authorization", bearer(ALICE))
+      .send({ storageKey: key, mimeType: "audio/wav" });
+
+    expect(res.status).toBe(200);
+    expect(typeof res.body.success).toBe("boolean");
+    expect(typeof res.body.transcript).toBe("string");
+    expect(mock.getBytes).toHaveBeenCalledWith(key);
   }, 60_000);
 });
