@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { AppDeps } from "../app.js";
 import { requireUser } from "../middleware/auth.js";
 import { currentUser, loadUser } from "../middleware/user.js";
+import { createFilesRouter } from "./files.js";
 import { createUploadsRouter } from "./uploads.js";
 
 /**
@@ -18,6 +19,7 @@ export function createApiRouter({ env, db, storage, clerkProfiles }: AppDeps) {
   });
 
   router.use("/uploads", createUploadsRouter(storage, env.MAX_UPLOAD_BYTES));
+  router.use("/files", createFilesRouter(db, storage));
 
   return router;
 }
