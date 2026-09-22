@@ -1,0 +1,48 @@
+{
+  "name": "lumina-notes-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node dist/db/migrate.js",
+    "db:migrate:dev": "tsx --env-file-if-exists=.env src/db/migrate.ts",
+    "db:studio": "drizzle-kit studio",
+    "storage:check": "tsx scripts/storage-check.ts",
+    "storage:cors": "tsx scripts/storage-cors.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1137.0",
+    "@aws-sdk/s3-request-presigner": "^3.1137.0",
+    "@clerk/express": "^2.1.69",
+    "cors": "^2.8.6",
+    "drizzle-orm": "^0.45.3",
+    "express": "^5.2.1",
+    "helmet": "^8.3.0",
+    "pg": "^8.23.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite-pgvector": "^0.0.9",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.19.43",
+    "@types/pg": "^8.23.1",
+    "@types/supertest": "^7.2.1",
+    "drizzle-kit": "^0.31.11",
+    "supertest": "^7.2.2",
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "^4.0.16"
+  }
+}

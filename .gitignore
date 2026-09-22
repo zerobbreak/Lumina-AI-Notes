@@ -43,3 +43,7 @@ next-env.d.ts
 /design
 .agents
 .cursor
+# express api (server/)
+/server/node_modules
+/server/dist
+!/server/.env.example
