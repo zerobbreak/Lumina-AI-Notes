@@ -5,6 +5,8 @@ import type { Db } from "../db/client.js";
 import { notes, noteTags } from "../db/schema/index.js";
 import { currentUser } from "../middleware/user.js";
 import { canView, noteColumns, requireNote } from "../notes/access.js";
+import { noteIdsWithAllTags, tagIdsByNoteIds } from "../notes/tagFilters.js";
+import { matchesSearch } from "../search/fullText.js";
 import { parse } from "./validation.js";
 
 // Lists skip the note body, which can be megabytes. Cards get a short
@@ -67,6 +69,22 @@ const filterQuery = z
   .partial()
   .refine((q) => q.courseId || q.moduleId || q.tagId, { message: "Filter by courseId, moduleId or tagId" });
 
+const rowId = z.string().min(1).max(200);
+
+const tagIdsQuery = z.preprocess((val) => {
+  if (val === undefined || val === null || val === "") return undefined;
+  if (Array.isArray(val)) return val;
+  if (typeof val === "string") return val.split(",").map((s) => s.trim()).filter(Boolean);
+  return val;
+}, z.array(rowId).optional());
+
+const searchNotesQuery = z.object({
+  query: z.string().trim().optional(),
+  noteType: z.string().max(50).optional(),
+  courseId: rowId.optional(),
+  tagIds: tagIdsQuery,
+});
+
 /** Port of the list queries in convex/notes.ts. Mounted before the single-note routes. */
 export function createNoteListsRouter(db: Db) {
   const router = Router();
@@ -125,6 +143,45 @@ export function createNoteListsRouter(db: Db) {
       return;
     }
     res.json({ target: "note", noteId: latest.id });
+  });
+
+  // searchNotes: full notes for the caller's library, with optional title search and filters.
+  router.get("/search", async (req, res) => {
+    const user = currentUser(res);
+    const args = parse(searchNotesQuery, req.query);
+
+    const rows = args.query
+      ? await db
+          .select(noteColumns)
+          .from(notes)
+          .where(and(eq(notes.userId, user.id), matchesSearch(notes.searchTitle, args.query)))
+          .orderBy(
+            desc(sql`ts_rank(${notes.searchTitle}, websearch_to_tsquery('english', ${args.query}))`),
+          )
+      : await db
+          .select(noteColumns)
+          .from(notes)
+          .where(eq(notes.userId, user.id))
+          .orderBy(desc(notes.createdAt))
+          .limit(200);
+
+    let filtered = rows.filter((n) => {
+      if (n.isArchived) return false;
+      if (args.noteType && n.noteType !== args.noteType) return false;
+      if (args.courseId && n.courseId !== args.courseId) return false;
+      return true;
+    });
+
+    if (args.tagIds?.length) {
+      const allowed = await noteIdsWithAllTags(db, user.id, args.tagIds);
+      filtered = filtered.filter((n) => allowed.has(n.id));
+    }
+
+    const tagMap = await tagIdsByNoteIds(
+      db,
+      filtered.map((n) => n.id),
+    );
+    res.json(filtered.map((n) => ({ ...n, tagIds: tagMap.get(n.id) ?? [] })));
   });
 
   // getNotesByContext (?courseId= / ?moduleId=) and getNotesByTag (?tagId=): top-level

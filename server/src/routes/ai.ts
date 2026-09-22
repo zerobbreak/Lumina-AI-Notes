@@ -958,11 +958,9 @@ ${getDepthRequirements(wordCountFn(enrichedTranscript))}
    * an inline base64 image. transcribeAudio is the one with a real storage
    * dependency — Convex fetched the blob via ctx.storage.get(storageId); here
    * the client uploads the audio through the already-ported generic
-   * /api/v1/uploads flow first and passes the resulting storageKey. Convex's
-   * recordings.ts (upload-URL minting, audio-minute quota, recording CRUD) is
-   * a separate, still-unported module — this route intentionally does not
-   * enforce that quota, matching where Convex enforces it today (nowhere
-   * inside transcribeAudio itself).
+   * /api/v1/uploads flow first and passes the resulting storageKey. Audio-minute
+   * quota is enforced on /api/v1/recordings, not here — matching Convex, which
+   * also does not check limits inside transcribeAudio itself.
    */
   router.post("/clean-lecture-transcript", async (req, res) => {
     const { transcript, context } = parse(cleanLectureTranscriptBody, req.body);

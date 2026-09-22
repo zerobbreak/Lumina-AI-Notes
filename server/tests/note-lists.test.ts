@@ -170,6 +170,57 @@ describe("GET /api/v1/notes/:id/children", () => {
   });
 });
 
+describe("GET /api/v1/notes/search", () => {
+  it("returns the caller's newest notes, excluding archived, with tagIds", async () => {
+    await note(ALICE, "Live", {}, 1);
+    await note(ALICE, "Newer", {}, 0.5);
+    await note(ALICE, "Archived", { isArchived: true });
+    const shared = await note(BOB, "Bob's note");
+    await db.insert(noteCollaborators).values({ noteId: shared.id, userId: ids[ALICE], role: "viewer" });
+
+    const [examTag] = await db.insert(tags).values({ userId: ids[ALICE], name: "exam", color: "red" }).returning();
+    const tagged = await note(ALICE, "Tagged", {}, 2);
+    await db.insert(noteTags).values({ noteId: tagged.id, tagId: examTag.id });
+
+    const res = await as(ALICE).get("/api/v1/notes/search");
+    expect(res.body.map((n: { title: string }) => n.title)).toEqual(["Newer", "Live", "Tagged"]);
+    expect(res.body[0]).toHaveProperty("content");
+    expect(res.body[0]).toHaveProperty("tagIds");
+    expect(res.body[0]).not.toHaveProperty("preview");
+    expect(res.body.find((n: { title: string }) => n.title === "Tagged").tagIds).toEqual([examTag.id]);
+  });
+
+  it("searches titles and filters by noteType, courseId, and tag intersection", async () => {
+    const [examTag] = await db.insert(tags).values({ userId: ids[ALICE], name: "exam", color: "red" }).returning();
+    const [labTag] = await db.insert(tags).values({ userId: ids[ALICE], name: "lab", color: "blue" }).returning();
+
+    const mitosis = await note(ALICE, "Mitosis lecture", { noteType: "page", courseId: "bio" }, 3);
+    await note(ALICE, "Shopping list", { noteType: "quick" }, 2);
+    const labNote = await note(ALICE, "Lab prep", { noteType: "page", courseId: "bio" }, 1);
+    await db.insert(noteTags).values([
+      { noteId: mitosis.id, tagId: examTag.id },
+      { noteId: mitosis.id, tagId: labTag.id },
+      { noteId: labNote.id, tagId: labTag.id },
+    ]);
+
+    expect(
+      (await as(ALICE).get("/api/v1/notes/search?query=mitosis")).body.map((n: { title: string }) => n.title),
+    ).toEqual(["Mitosis lecture"]);
+
+    expect(
+      (await as(ALICE).get("/api/v1/notes/search?noteType=page&courseId=bio")).body.map(
+        (n: { title: string }) => n.title,
+      ),
+    ).toEqual(["Lab prep", "Mitosis lecture"]);
+
+    expect(
+      (await as(ALICE).get(`/api/v1/notes/search?tagIds=${examTag.id},${labTag.id}`)).body.map(
+        (n: { title: string }) => n.title,
+      ),
+    ).toEqual(["Mitosis lecture"]);
+  });
+});
+
 describe("GET /api/v1/notes/resume-target", () => {
   it("opens the most recently opened note", async () => {
     const opened = await note(ALICE, "Opened", { lastAccessedAt: new Date(Date.now() - HOUR) }, 48);
