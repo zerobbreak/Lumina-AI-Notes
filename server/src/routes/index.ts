@@ -7,6 +7,7 @@ import { createCoursesRouter } from "./courses.js";
 import { createFilesRouter } from "./files.js";
 import { createNoteListsRouter } from "./note-lists.js";
 import { createNotesRouter } from "./notes.js";
+import { createTagsRouter } from "./tags.js";
 import { createUploadsRouter } from "./uploads.js";
 import { createUsersRouter } from "./users.js";
 
@@ -26,6 +27,7 @@ export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken }
   router.use("/courses", createCoursesRouter(db, storage));
   // Lists first, so /notes/quick etc. aren't read as a note id.
   router.use("/notes", createNoteListsRouter(db), createNotesRouter(db));
+  router.use("/tags", createTagsRouter(db));
 
   return router;
 }
