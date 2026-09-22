@@ -42,6 +42,10 @@ export function createApp(deps: AppDeps) {
       maxAge: 600,
     }),
   );
+  // Notes send their whole HTML on every save, and JSON escaping makes that
+  // 10-20% bigger than the note. Their own limits are checked per field.
+  // This runs first, so the general parser below sees the body already read.
+  app.use("/api/v1/notes", express.json({ limit: "5mb" }));
   // Files go straight to the bucket via presigned URLs, so JSON stays small.
   app.use(express.json({ limit: "1mb" }));
 

@@ -13,10 +13,17 @@ type NoteRow = { [K in keyof typeof noteColumns]: (typeof notes.$inferSelect)[K]
 
 const rowId = z.string().min(1).max(200);
 
+/**
+ * Largest content or outline a note can hold, in characters. Convex capped
+ * whole documents at 1 MiB, so no imported note is near this.
+ */
+export const MAX_NOTE_CHARS = 2_000_000;
+const TOO_LARGE = "This note is too large to save";
+
 /** Fields both create and update accept. */
 const noteFields = {
   title: z.string().trim().max(500),
-  content: z.string(),
+  content: z.string().max(MAX_NOTE_CHARS, TOO_LARGE),
   style: noteStyle,
   tagIds: z.array(rowId).max(50),
   wordCount: z.number().int().min(0),
@@ -46,7 +53,7 @@ const updateBody = z
   .object({
     ...noteFields,
     // Outline mode keeps its tree as a JSON string the client parses.
-    outlineData: z.string(),
+    outlineData: z.string().max(MAX_NOTE_CHARS, TOO_LARGE),
     outlineMetadata: z.object({
       totalItems: z.number().int().min(0),
       completedTasks: z.number().int().min(0),

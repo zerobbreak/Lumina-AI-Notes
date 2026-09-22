@@ -22,7 +22,12 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     return;
   }
 
-  // body-parser attaches a status to malformed or oversized payloads.
+  if (err?.type === "entity.too.large") {
+    res.status(413).json({ error: { code: "payload_too_large", message: "Request is too large" } });
+    return;
+  }
+
+  // body-parser attaches a status to malformed payloads.
   const status = typeof err?.status === "number" ? err.status : 500;
   if (status >= 500) {
     console.error(err);

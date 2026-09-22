@@ -3,6 +3,7 @@ import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "../src/db/client.js";
 import { noteCollaborators, notes, noteTags, tags, users } from "../src/db/schema/index.js";
+import { MAX_NOTE_CHARS } from "../src/routes/notes.js";
 import { bearer, buildApp, createTestDb } from "./helpers.js";
 
 const ALICE = "user_alice";
@@ -238,6 +239,40 @@ describe("PATCH /api/v1/notes/:id", () => {
 
     await share(note.id, BOB, "editor");
     expect((await as(BOB).patch(`/api/v1/notes/${note.id}`).send({ tagIds: [exam] })).status).toBe(403);
+  });
+});
+
+describe("note size limits", () => {
+  it("saves a note bigger than the 1 MB limit other routes have", async () => {
+    const note = await createNote(ALICE);
+    // Quotes are escaped in JSON, so this is ~1.8 MB on the wire.
+    const content = '<p class="x">'.repeat(115_000);
+    const res = await as(ALICE).patch(`/api/v1/notes/${note.id}`).send({ content, version: 0 });
+    expect(res.status).toBe(200);
+    expect(res.body.content).toHaveLength(content.length);
+  });
+
+  it("refuses content over the per-note cap with a clear message", async () => {
+    const note = await createNote(ALICE);
+    const res = await as(ALICE)
+      .patch(`/api/v1/notes/${note.id}`)
+      .send({ content: "a".repeat(MAX_NOTE_CHARS + 1), version: 0 });
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toBe("This note is too large to save");
+  });
+
+  it("returns 413 for bodies over the notes limit", async () => {
+    const note = await createNote(ALICE);
+    const res = await as(ALICE)
+      .patch(`/api/v1/notes/${note.id}`)
+      .send({ content: "a".repeat(6_000_000), version: 0 });
+    expect(res.status).toBe(413);
+    expect(res.body.error.code).toBe("payload_too_large");
+  });
+
+  it("keeps the 1 MB limit everywhere else", async () => {
+    const res = await as(ALICE).patch("/api/v1/users/me/preferences").send({ major: "a".repeat(1_100_000) });
+    expect(res.status).toBe(413);
   });
 });
 
