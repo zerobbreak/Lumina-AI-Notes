@@ -3,6 +3,7 @@ import type { AppDeps } from "../app.js";
 import { authenticate } from "../middleware/auth.js";
 import { loadUser } from "../middleware/user.js";
 import { createAuthRouter } from "./auth.js";
+import { createCoursesRouter } from "./courses.js";
 import { createFilesRouter } from "./files.js";
 import { createUploadsRouter } from "./uploads.js";
 import { createUsersRouter } from "./users.js";
@@ -20,6 +21,7 @@ export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken }
   router.use("/uploads", createUploadsRouter(storage, env.MAX_UPLOAD_BYTES));
   router.use("/files", createFilesRouter(db, storage));
   router.use("/users", createUsersRouter(db));
+  router.use("/courses", createCoursesRouter(db, storage));
 
   return router;
 }
