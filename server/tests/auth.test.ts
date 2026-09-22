@@ -214,6 +214,8 @@ describe("configuration", () => {
   it("accepts CLERK_JWT_KEY with escaped newlines and rejects non-PEM values", () => {
     expect(testEnv.CLERK_JWT_KEY).toMatch(/^-----BEGIN PUBLIC KEY-----\n[\s\S]+\n-----END PUBLIC KEY-----$/);
     expect(() => loadEnv({ ...baseEnv(), CLERK_JWT_KEY: "not a key" })).toThrow(/CLERK_JWT_KEY/);
+    // What an unquoted multi-line PEM in .env turns into: only its first line.
+    expect(() => loadEnv({ ...baseEnv(), CLERK_JWT_KEY: "-----BEGIN PUBLIC KEY-----" })).toThrow(/CLERK_JWT_KEY/);
   });
 });
 

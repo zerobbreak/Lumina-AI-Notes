@@ -1,4 +1,15 @@
+import { createPublicKey } from "node:crypto";
 import { z } from "zod";
+
+function isPublicKey(pem: string) {
+  if (!pem.startsWith("-----BEGIN PUBLIC KEY-----")) return false;
+  try {
+    createPublicKey(pem);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -19,10 +30,15 @@ const envSchema = z.object({
   // PEM public key (Clerk dashboard -> API keys -> Show JWT public key).
   // Set it to verify tokens without calling Clerk. Newlines may be written as
   // a literal \n so the key fits on one line in .env or Railway variables.
+  // Must be one line in .env: Node's env-file parser keeps only the first line
+  // of an unquoted multi-line value, which left just the BEGIN marker and made
+  // every real token fail with token-invalid-signature.
   CLERK_JWT_KEY: z
     .string()
     .transform((pem) => pem.replace(/\\n/g, "\n").trim())
-    .pipe(z.string().startsWith("-----BEGIN PUBLIC KEY-----"))
+    .refine(isPublicKey, {
+      message: "Not a valid PEM public key. In .env, write it on one line with \\n for newlines",
+    })
     .optional(),
   // Origins allowed to have issued a session token (its azp claim).
   // Defaults to CORS_ORIGINS, minus "null" (Electron gets its token from the website).
