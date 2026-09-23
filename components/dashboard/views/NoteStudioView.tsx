@@ -137,6 +137,7 @@ export default function NoteStudioView() {
     createSession,
     sendMessage,
     deleteSession,
+    deleteAllSessions,
     generateAssistantReply,
     pinNotesToSession,
     unpinNoteFromSession,
@@ -147,6 +148,14 @@ export default function NoteStudioView() {
     useChatStudioData(activeSessionId);
 
   const [isThinking, setIsThinking] = useState(false);
+  // "Delete all" takes a second click to confirm; the first arms it briefly.
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+
+  useEffect(() => {
+    if (!confirmDeleteAll) return;
+    const timer = setTimeout(() => setConfirmDeleteAll(false), 3000);
+    return () => clearTimeout(timer);
+  }, [confirmDeleteAll]);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -199,6 +208,18 @@ export default function NoteStudioView() {
     setActiveSessionId(newSessionId);
     setInput("");
     setSelectedNotes([]);
+  };
+
+  const handleDeleteAllSessions = async () => {
+    if (!confirmDeleteAll) {
+      setConfirmDeleteAll(true);
+      return;
+    }
+    setConfirmDeleteAll(false);
+    setActiveSessionId(null);
+    setInput("");
+    setSelectedNotes([]);
+    await deleteAllSessions();
   };
 
   const handleSend = async () => {
@@ -362,6 +383,22 @@ export default function NoteStudioView() {
             </div>
           ))}
         </div>
+        {sessions.length > 0 && (
+          <div className="p-2 border-t">
+            <Button
+              onClick={() => void handleDeleteAllSessions()}
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "w-full gap-2 justify-start text-muted-foreground hover:text-destructive",
+                confirmDeleteAll && "text-destructive",
+              )}
+            >
+              <Trash2 className="w-4 h-4" />
+              {confirmDeleteAll ? "Click again to delete all" : "Delete all chats"}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Main Chat Area */}

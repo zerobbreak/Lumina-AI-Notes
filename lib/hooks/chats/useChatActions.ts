@@ -5,6 +5,7 @@ import { useCallback } from "react";
 import type { Id } from "@/types/data-model";
 import type { ChatSessionModel } from "@/lib/api/adapters/chat";
 import { chatsApi } from "@/lib/api/domains/chats.api";
+import { ApiError } from "@/lib/api/errors";
 import type { ChatModeDto } from "@/types/api/chats";
 import { useApiToken } from "@/lib/api/use-api-token";
 import { invalidateChats, refreshChats } from "@/lib/invalidation";
@@ -62,12 +63,28 @@ export function useChatActions() {
       try {
         const token = await getApiToken();
         await chatsApi.deleteSession(token, args.sessionId);
+      } catch (error) {
+        // Already gone (a double click, or deleted in another tab): that's the
+        // outcome we wanted, so don't surface it.
+        if (!(error instanceof ApiError && error.status === 404)) throw error;
       } finally {
         await refreshChats(queryClient);
       }
     },
     [getApiToken, queryClient],
   );
+
+  const deleteAllSessions = useCallback(async () => {
+    // Clear the list straight away, as deleteSession does for one chat.
+    await queryClient.cancelQueries({ queryKey: chatKeys.sessions() });
+    queryClient.setQueryData<ChatSessionModel[]>(chatKeys.sessions(), []);
+    try {
+      const token = await getApiToken();
+      await chatsApi.deleteAllSessions(token);
+    } finally {
+      await refreshChats(queryClient);
+    }
+  }, [getApiToken, queryClient]);
 
   const pinNotesToSession = useCallback(
     async (args: { sessionId: Id<"chatSessions">; noteIds: Id<"notes">[] }) => {
@@ -117,6 +134,7 @@ export function useChatActions() {
     createSession,
     sendMessage,
     deleteSession,
+    deleteAllSessions,
     pinNotesToSession,
     unpinNoteFromSession,
     setSessionMode,

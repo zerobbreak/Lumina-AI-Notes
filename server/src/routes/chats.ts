@@ -245,6 +245,19 @@ export function createChatsRouter(db: Db, geminiApiKey?: string) {
     }
   });
 
+  router.delete("/sessions", async (_req, res) => {
+    const user = currentUser(res);
+    const deleted = await db.transaction(async (tx) => {
+      const owned = tx
+        .select({ id: chatSessions.id })
+        .from(chatSessions)
+        .where(eq(chatSessions.userId, user.id));
+      await tx.delete(chatMessages).where(inArray(chatMessages.sessionId, owned));
+      return tx.delete(chatSessions).where(eq(chatSessions.userId, user.id)).returning({ id: chatSessions.id });
+    });
+    res.json({ deleted: deleted.length });
+  });
+
   router.delete("/sessions/:id", async (req, res) => {
     const user = currentUser(res);
     await requireSessionOwner(db, req.params.id, user.id);

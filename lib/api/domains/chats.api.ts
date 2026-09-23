@@ -97,6 +97,10 @@ export const chatsApi = {
     );
   },
 
+  deleteAllSessions(token: string) {
+    return apiFetch<{ deleted: number }>(apiPath`/chats/sessions`, { method: "DELETE", token });
+  },
+
   deleteSession(token: string, sessionId: string) {
     return apiFetch<{ deleted: boolean }>(
       apiPath`/chats/sessions/${sessionId}`,

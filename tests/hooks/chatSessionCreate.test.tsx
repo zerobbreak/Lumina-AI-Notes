@@ -46,9 +46,18 @@ beforeEach(() => {
         serverSessions = [id, ...serverSessions];
         return json({ id }, 201);
       }
+      if (init.method === "DELETE" && path === "/chats/sessions") {
+        await deleteGate;
+        const deleted = serverSessions.length;
+        serverSessions = [];
+        return json({ deleted });
+      }
       if (init.method === "DELETE") {
         await deleteGate;
         const id = path.split("/").pop()!;
+        if (!serverSessions.includes(id)) {
+          return json({ error: { message: "Chat session not found", code: "not_found" } }, 404);
+        }
         serverSessions = serverSessions.filter((s) => s !== id);
         return json({ ok: true });
       }
@@ -129,5 +138,43 @@ describe("chat session actions", () => {
       await pending;
     });
     expect(serverSessions).toEqual([]);
+  });
+
+  it("deleting a chat that's already gone doesn't throw", async () => {
+    const { result } = renderHook(useStudio, { wrapper });
+    await waitFor(() => expect(result.current.sessions.data).toHaveLength(1));
+
+    await act(async () => {
+      await Promise.all([
+        result.current.actions.deleteSession({ sessionId: "s0" as never }),
+        result.current.actions.deleteSession({ sessionId: "s0" as never }),
+      ]);
+    });
+
+    expect(cachedIds()).toEqual([]);
+  });
+
+  it("deleteAllSessions empties the list before the server answers", async () => {
+    serverSessions = ["s0", "sx"];
+    const { result } = renderHook(useStudio, { wrapper });
+    await waitFor(() => expect(result.current.sessions.data).toHaveLength(2));
+
+    let releaseDelete = () => {};
+    deleteGate = new Promise((resolve) => {
+      releaseDelete = resolve;
+    });
+    let pending: Promise<void> | undefined;
+    act(() => {
+      pending = result.current.actions.deleteAllSessions();
+    });
+    await waitFor(() => expect(cachedIds()).toEqual([]));
+    expect(serverSessions).toHaveLength(2);
+
+    releaseDelete();
+    await act(async () => {
+      await pending;
+    });
+    expect(serverSessions).toEqual([]);
+    expect(cachedIds()).toEqual([]);
   });
 });

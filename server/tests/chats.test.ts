@@ -100,6 +100,24 @@ describe("chats", () => {
     expect(await db.select().from(chatMessages).where(eq(chatMessages.sessionId, sessionId))).toHaveLength(0);
   });
 
+  it("deletes all of a user's sessions and messages, and no one else's", async () => {
+    const first = await createSession(ALICE);
+    const second = await createSession(ALICE);
+    const bobs = await createSession(BOB);
+    await as(ALICE).post(`/api/v1/chats/sessions/${first}/messages`).send({ role: "user", content: "Hi" });
+    await as(BOB).post(`/api/v1/chats/sessions/${bobs}/messages`).send({ role: "user", content: "Hey" });
+
+    const res = await as(ALICE).delete("/api/v1/chats/sessions");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ deleted: 2 });
+    expect((await as(ALICE).get("/api/v1/chats/sessions")).body).toEqual([]);
+    expect(await db.select().from(chatMessages).where(eq(chatMessages.sessionId, first))).toHaveLength(0);
+    expect(await db.select().from(chatSessions).where(eq(chatSessions.id, second))).toHaveLength(0);
+    expect((await as(BOB).get("/api/v1/chats/sessions")).body).toHaveLength(1);
+    expect(await db.select().from(chatMessages).where(eq(chatMessages.sessionId, bobs))).toHaveLength(1);
+  });
+
   it("blocks access to another user's session", async () => {
     const sessionId = await createSession(ALICE);
     expect((await as(BOB).get(`/api/v1/chats/sessions/${sessionId}`)).body).toBeNull();
