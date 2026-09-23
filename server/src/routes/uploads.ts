@@ -1,13 +1,20 @@
+import { lt, sql } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
+import type { Db } from "../db/client.js";
+import { uploadDailyUsage } from "../db/schema/index.js";
 import { HttpError } from "../middleware/errors.js";
 import { currentUser } from "../middleware/user.js";
 import { isOwnedKey, newObjectKey, type Storage } from "../storage/s3.js";
 import { parse } from "./validation.js";
 
-/** PDFs, images, audio/video recordings, plain text and Office documents. */
+/**
+ * PDFs, images, audio/video recordings, plain text and Office documents. Not
+ * SVG: it's an image type that can carry script, which would run when a
+ * download link is opened.
+ */
 const ALLOWED_CONTENT_TYPE =
-  /^(?:(?:image|audio|video)\/[\w.+-]+|application\/pdf|text\/(?:plain|markdown)|application\/vnd\.openxmlformats-officedocument\.[\w.]+)$/;
+  /^(?:image\/(?!svg)[\w.+-]+|(?:audio|video)\/[\w.+-]+|application\/pdf|text\/(?:plain|markdown)|application\/vnd\.openxmlformats-officedocument\.[\w.]+)$/;
 
 const createUploadBody = z.object({
   filename: z.string().trim().min(1).max(255),
@@ -24,8 +31,36 @@ const keyQuery = z.object({ key: z.string().min(1).max(1024) });
  *   3. GET  /uploads/stat     -> confirm it landed (size/type) before saving a row
  * Later, the files/recordings routes store the key and call these helpers directly.
  */
-export function createUploadsRouter(storage: Storage, maxUploadBytes: number) {
+export function createUploadsRouter(
+  db: Db,
+  storage: Storage,
+  { maxUploadBytes, maxBytesPerDay }: { maxUploadBytes: number; maxBytesPerDay: number },
+) {
   const router = Router();
+
+  /**
+   * Reserves `size` bytes of today's allowance, or returns false. One
+   * conditional upsert, so parallel requests can't both squeeze under the cap.
+   */
+  async function reserveBytes(userId: string, size: number) {
+    // The first upload of the day inserts without the check below.
+    if (size > maxBytesPerDay) return false;
+    const day = new Date().toISOString().slice(0, 10);
+    const [row] = await db
+      .insert(uploadDailyUsage)
+      .values({ userId, day, bytes: size })
+      .onConflictDoUpdate({
+        target: [uploadDailyUsage.userId, uploadDailyUsage.day],
+        set: { bytes: sql`${uploadDailyUsage.bytes} + ${size}` },
+        setWhere: sql`${uploadDailyUsage.bytes} + ${size} <= ${maxBytesPerDay}`,
+      })
+      .returning({ bytes: uploadDailyUsage.bytes });
+    // Best-effort sweep of past days.
+    db.delete(uploadDailyUsage)
+      .where(lt(uploadDailyUsage.day, day))
+      .catch(() => {});
+    return Boolean(row);
+  }
 
   router.post("/", async (req, res) => {
     // Keys are prefixed with the Clerk id, which is stable across a data re-import.
@@ -36,6 +71,13 @@ export function createUploadsRouter(storage: Storage, maxUploadBytes: number) {
         413,
         `File is larger than the ${Math.round(maxUploadBytes / 1024 / 1024)} MB limit`,
         "file_too_large",
+      );
+    }
+    if (!(await reserveBytes(currentUser(res).id, body.size))) {
+      throw new HttpError(
+        429,
+        `You've reached today's upload limit of ${Math.round(maxBytesPerDay / 1024 / 1024)} MB. It resets at midnight UTC.`,
+        "upload_quota_exceeded",
       );
     }
     const key = newObjectKey(userId, body.filename);

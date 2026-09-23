@@ -1,8 +1,8 @@
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "../src/db/client.js";
-import { isOwnedKey, newObjectKey } from "../src/storage/s3.js";
-import { bearer, buildApp, createTestDb, fakeStorage } from "./helpers.js";
+import { createStorage, isOwnedKey, newObjectKey } from "../src/storage/s3.js";
+import { bearer, buildApp, createTestDb, fakeStorage, testEnv } from "./helpers.js";
 
 const ALICE = "user_alice";
 const BOB = "user_bob";
@@ -50,6 +50,8 @@ describe("POST /api/v1/uploads", () => {
     ["application/x-msdownload", "setup.exe"],
     ["text/html", "page.html"],
     ["image/svg+xml; charset=utf-8", "x.svg"],
+    ["image/svg+xml", "diagram.svg"],
+    ["IMAGE/SVG+XML", "diagram.svg"],
   ])("rejects unsupported type %s", async (contentType, filename) => {
     const res = await request(app)
       .post("/api/v1/uploads")
@@ -147,5 +149,59 @@ describe("object keys", () => {
     expect(isOwnedKey(ALICE, `users/${ALICE}_evil/x/a.pdf`)).toBe(false);
     expect(isOwnedKey(ALICE, `users/${ALICE}/../${BOB}/a.pdf`)).toBe(false);
     expect(isOwnedKey(ALICE, `users/${BOB}/x/a.pdf`)).toBe(false);
+  });
+});
+
+describe("download links", () => {
+  // Signing is local: no request reaches the (made-up) endpoint.
+  const storage = createStorage({
+    endpoint: "https://storage.example.test",
+    region: "auto",
+    bucket: "test-bucket",
+    accessKeyId: "test",
+    secretAccessKey: "test",
+  });
+  const dispositionOf = (url: string) => new URL(url).searchParams.get("response-content-disposition");
+
+  it("shows ordinary files inline", async () => {
+    expect(dispositionOf(await storage.createDownloadUrl(`users/${ALICE}/x/notes.pdf`, "notes.pdf"))).toMatch(
+      /^inline;/,
+    );
+  });
+
+  it.each([
+    [`users/${ALICE}/x/diagram.svg`, "diagram.svg"],
+    [`users/${ALICE}/x/file`, "page.HTML"],
+    [`users/${ALICE}/x/old.svg`, undefined],
+  ])("forces a download for %s (%s), which could run script inline", async (key, filename) => {
+    expect(dispositionOf(await storage.createDownloadUrl(key, filename))).toMatch(/^attachment/);
+  });
+});
+
+describe("daily upload allowance", () => {
+  const sign = (user: string, size: number) =>
+    request(app)
+      .post("/api/v1/uploads")
+      .set("Authorization", bearer(user))
+      .send({ filename: "notes.pdf", contentType: "application/pdf", size });
+
+  beforeEach(() => {
+    app = buildApp({ storage: fake.storage, db, env: { ...testEnv, UPLOAD_BYTES_PER_DAY: 3000 } });
+  });
+
+  it("stops signing uploads once the day's bytes are used, per user", async () => {
+    expect((await sign(`${ALICE}_quota`, 2000)).status).toBe(201);
+    const refused = await sign(`${ALICE}_quota`, 1001);
+    expect(refused.status).toBe(429);
+    expect(refused.body.error.code).toBe("upload_quota_exceeded");
+    // What's left can still be used, and other users are unaffected.
+    expect((await sign(`${ALICE}_quota`, 1000)).status).toBe(201);
+    expect((await sign(`${BOB}_quota`, 3000)).status).toBe(201);
+  });
+
+  it("can't be overshot by parallel requests", async () => {
+    const results = await Promise.all(Array.from({ length: 6 }, () => sign(`${ALICE}_parallel`, 1000)));
+    expect(results.filter((r) => r.status === 201)).toHaveLength(3);
+    expect(results.filter((r) => r.status === 429)).toHaveLength(3);
   });
 });

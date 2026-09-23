@@ -1,9 +1,11 @@
 import {
   bigint,
+  date,
   doublePrecision,
   index,
   integer,
   pgTable,
+  primaryKey,
   text,
   vector,
 } from "drizzle-orm/pg-core";
@@ -81,4 +83,22 @@ export const documents = pgTable(
     index().on(t.courseId),
     index("documents_embedding_idx").using("hnsw", t.embedding.op("vector_cosine_ops")),
   ],
+);
+
+/**
+ * Bytes a user has been granted upload URLs for, per UTC day. Uploads go
+ * straight to the bucket, so this is counted when a URL is signed: it bounds
+ * how fast one account can fill storage, whether or not the bytes are kept.
+ */
+export const uploadDailyUsage = pgTable(
+  "upload_daily_usage",
+  {
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** UTC calendar day, "YYYY-MM-DD". */
+    day: date({ mode: "string" }).notNull(),
+    bytes: bigint({ mode: "number" }).notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.day] }), index().on(t.day)],
 );

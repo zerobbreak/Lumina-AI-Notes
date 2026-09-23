@@ -64,6 +64,13 @@ const envSchema = z.object({
     .positive()
     .default(100 * 1024 * 1024),
 
+  // How many bytes one user may upload per UTC day, across all uploads.
+  UPLOAD_BYTES_PER_DAY: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(2 * 1024 * 1024 * 1024),
+
   // Gemini API key for /api/v1/ai/*. Optional so the rest of the app still
   // boots without it; a route that needs it fails loudly at call time
   // instead (same as Convex's own `getGeminiModel` check).

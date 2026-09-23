@@ -77,12 +77,17 @@ export function createStorage(config: StorageConfig) {
 
     /** `filename` makes browsers download with that name instead of the key. */
     async createDownloadUrl(key: string, filename?: string): Promise<string> {
+      // Anything that could run script when opened (older SVG uploads, say)
+      // is always downloaded, never rendered on the bucket's origin.
+      const disposition = isActiveContent(key) || (filename && isActiveContent(filename)) ? "attachment" : "inline";
       const command = new GetObjectCommand({
         Bucket,
         Key: key,
         ResponseContentDisposition: filename
-          ? `inline; filename*=UTF-8''${encodeURIComponent(filename)}`
-          : undefined,
+          ? `${disposition}; filename*=UTF-8''${encodeURIComponent(filename)}`
+          : disposition === "attachment"
+            ? "attachment"
+            : undefined,
       });
       return getSignedUrl(client, command, { expiresIn: DOWNLOAD_URL_TTL_SECONDS });
     },
@@ -125,6 +130,13 @@ export function createStorage(config: StorageConfig) {
 }
 
 export type Storage = ReturnType<typeof createStorage>;
+
+/** File types a browser would execute script from if shown inline. */
+const ACTIVE_CONTENT = /\.(?:svgz?|html?|xhtml|xht|xml|mht|mhtml)$/i;
+
+export function isActiveContent(name: string): boolean {
+  return ACTIVE_CONTENT.test(name.trim());
+}
 
 /** Every object a user uploads lives under this prefix; ownership checks rely on it. */
 export function userPrefix(userId: string): string {

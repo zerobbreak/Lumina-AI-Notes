@@ -36,6 +36,13 @@
       "when": 1790161144120,
       "tag": "0004_ai_spend_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790162052022,
+      "tag": "0005_upload_daily_usage",
+      "breakpoints": true
     }
   ]
 }

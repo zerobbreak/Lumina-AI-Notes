@@ -35,7 +35,10 @@ export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken }
 
   router.use("/analytics", createAnalyticsRouter(db));
   router.use("/auth", createAuthRouter(db, clerkProfiles));
-  router.use("/uploads", createUploadsRouter(storage, env.MAX_UPLOAD_BYTES));
+  router.use("/uploads", createUploadsRouter(db, storage, {
+      maxUploadBytes: env.MAX_UPLOAD_BYTES,
+      maxBytesPerDay: env.UPLOAD_BYTES_PER_DAY,
+    }));
   router.use("/files", createFilesRouter(db, storage, env.GEMINI_API_KEY));
   router.use("/flashcards", createFlashcardsRouter(db));
   router.use("/knowledge-graph", createKnowledgeGraphRouter(db));
