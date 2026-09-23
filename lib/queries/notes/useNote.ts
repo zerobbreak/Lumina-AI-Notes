@@ -2,20 +2,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { toOpenNote } from "@/lib/api/adapters/note";
-import { notesApi } from "@/lib/api/domains/notes.api";
-import { useApiToken } from "@/lib/api/use-api-token";
-import { noteKeys } from "@/lib/query-keys/notes";
+import { useNoteDetailQueryOptions } from "@/lib/queries/notes/useNoteDetail";
 
+/** The open note's placement (course, module, parent) for the sidebar and palette. */
 export function useNote(noteId: string | null | undefined) {
-  const { getApiToken, isReady } = useApiToken();
-
   return useQuery({
-    queryKey: noteId ? noteKeys.detail(noteId) : noteKeys.all,
-    queryFn: async () => {
-      if (!noteId) throw new Error("Missing noteId");
-      const token = await getApiToken();
-      return toOpenNote(await notesApi.getById(token, noteId));
-    },
-    enabled: isReady && Boolean(noteId),
+    ...useNoteDetailQueryOptions(noteId),
+    select: (note) => (note ? toOpenNote(note) : note),
   });
 }

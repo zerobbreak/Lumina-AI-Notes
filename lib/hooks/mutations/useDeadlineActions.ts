@@ -4,7 +4,7 @@ import { useCallback } from "react";
 import { useCreateDeadline } from "@/lib/mutations/deadlines/useCreateDeadline";
 
 export function useDeadlineActions() {
-  const createDeadlineMutation = useCreateDeadline();
+  const { mutateAsync: createDeadlineAsync } = useCreateDeadline();
 
   const createDeadline = useCallback(
     async (args: {
@@ -15,9 +15,9 @@ export function useDeadlineActions() {
       moduleId?: string;
       notes?: string;
     }) => {
-      await createDeadlineMutation.mutateAsync(args);
+      await createDeadlineAsync(args);
     },
-    [createDeadlineMutation],
+    [createDeadlineAsync],
   );
 
   return { createDeadline };

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNoteEditorData } from "@/lib/hooks/notes/useNoteEditorData";
 import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
 import { useNotePresence } from "@/lib/hooks/presence/useNotePresence";
+import { useNoteAutosave } from "@/lib/hooks/notes/useNoteAutosave";
 import type { Doc, Id } from "@/types/data-model";
 import type { NoteBootstrap } from "@/components/dashboard/DashboardContext";
 import { useRouter } from "next/navigation";
@@ -66,6 +67,7 @@ import { TagPicker } from "@/components/dashboard/tags/TagPicker";
 import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
 
 import { toast } from "sonner";
+import { VersionConflictError } from "@/lib/api/errors";
 import "./editor.css";
 
 // Heartbeat interval for presence tracking (120 seconds - reduced for DB usage)
@@ -228,60 +230,55 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     }
   }, [noteQuery, noteId, noteBootstrap, setNoteBootstrap]);
 
-  // Debounce Save Effect
+  // A failed save used to vanish silently, leaving edits that were never
+  // stored and disappeared on refresh. Say so, so the user can act.
+  const reportSaveFailure = useCallback((error: unknown) => {
+    setIsSaving(false);
+    console.error("[NoteView] autosave failed:", error);
+    toast.error(
+      error instanceof VersionConflictError
+        ? "This note was changed elsewhere, so your latest edit wasn't saved"
+        : "Couldn't save your changes",
+      { description: "Keep this page open and try editing again, or copy your changes first." },
+    );
+  }, []);
+
+  // Autosave. Builds the payload for the note's style; useNoteAutosave decides
+  // when to send it (debounced, only when changed, one save at a time).
+  const noteStyleRef = useRef(displayNote?.style);
   useEffect(() => {
-    if (debouncedContent === null) return;
-    if (noteQuery === null) return;
-    if (noteQuery === undefined && noteBootstrap?.noteId !== noteId) return;
+    noteStyleRef.current = displayNote?.style;
+  }, [displayNote?.style]);
 
-    const handler = setTimeout(() => {
-      if (displayNote?.style === "outline") {
-        // Extract outline structure and metadata
-        const structure = extractOutlineStructure(debouncedContent);
-        const metadata = calculateOutlineMetadata(structure);
-        const outlineData = serializeOutline(structure);
-
-        updateNote({
-          noteId,
-          content: debouncedContent,
-          outlineData,
-          outlineMetadata: metadata,
-        }).then(() => {
-          setIsSaving(false);
-        });
-      } else {
-        // Standard content save
-        // Calculate word count for stats
-        const contentStr =
-          typeof debouncedContent === "string" ? debouncedContent : "";
-        const plainText = contentStr
-          .replace(/<[^>]*>/g, " ")
-          .replace(/\s+/g, " ")
-          .trim();
-        const count =
-          plainText.length > 0
-            ? plainText.split(/\s+/).filter((word) => word.length > 0).length
-            : 0;
-
-        updateNote({
-          noteId,
-          content: debouncedContent,
-          wordCount: count,
-        }).then(() => {
-          setIsSaving(false);
+  const saveContent = useCallback(
+    (targetNoteId: string, html: string) => {
+      const id = targetNoteId as Id<"notes">;
+      if (noteStyleRef.current === "outline") {
+        const structure = extractOutlineStructure(html);
+        return updateNote({
+          noteId: id,
+          content: html,
+          outlineData: serializeOutline(structure),
+          outlineMetadata: calculateOutlineMetadata(structure),
         });
       }
-    }, 1000);
+      const plainText = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+      const count = plainText.length > 0 ? plainText.split(/\s+/).filter((word) => word.length > 0).length : 0;
+      return updateNote({ noteId: id, content: html, wordCount: count });
+    },
+    [updateNote],
+  );
 
-    return () => clearTimeout(handler);
-  }, [
-    debouncedContent,
-    noteQuery,
+  const markSaved = useCallback(() => setIsSaving(false), []);
+
+  useNoteAutosave({
     noteId,
-    noteBootstrap?.noteId,
-    updateNote,
-    displayNote?.style,
-  ]);
+    content: debouncedContent,
+    canSave: noteQuery !== null && (noteQuery !== undefined || noteBootstrap?.noteId === noteId),
+    save: saveContent,
+    onSaved: markSaved,
+    onError: reportSaveFailure,
+  });
 
   // Mark the note as opened so it's eligible to be resumed later and stays
   // exempt from the stale-note cleanup while the user is reading it.
@@ -397,7 +394,9 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       const htmlContent = await convertMarkdownIfNeeded(contentSource.content || "");
       scheduleEditorUpdate(() => {
         if (editor && !editor.isDestroyed) {
-          editor.commands.setContent(htmlContent);
+          // Loading what's saved isn't an edit: without this, TipTap v3 fires
+          // onUpdate and every note open saved (and re-versioned) the note.
+          editor.commands.setContent(htmlContent, { emitUpdate: false });
           setLoadedNoteId(noteId);
         }
       });

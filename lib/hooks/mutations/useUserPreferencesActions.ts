@@ -5,13 +5,13 @@ import { useUpdatePreferences } from "@/lib/mutations/users/useUpdatePreferences
 import type { UpdatePreferencesInput } from "@/types/api/user";
 
 export function useUserPreferencesActions() {
-  const updatePreferencesMutation = useUpdatePreferences();
+  const { mutateAsync: updatePreferencesAsync } = useUpdatePreferences();
 
   const updatePreferences = useCallback(
     async (args: UpdatePreferencesInput) => {
-      await updatePreferencesMutation.mutateAsync(args);
+      await updatePreferencesAsync(args);
     },
-    [updatePreferencesMutation],
+    [updatePreferencesAsync],
   );
 
   return { updatePreferences };

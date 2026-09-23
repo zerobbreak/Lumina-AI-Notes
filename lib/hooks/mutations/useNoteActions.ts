@@ -15,41 +15,41 @@ import { useCreateNote } from "@/lib/mutations/notes/useCreateNote";
 import type { CreateNoteInput } from "@/lib/mutations/notes/useCreateNote";
 
 export function useNoteActions() {
-  const deleteNoteMutation = useDeleteNote();
-  const renameNoteMutation = useRenameNote();
-  const toggleArchiveMutation = useToggleArchiveNote();
-  const togglePinMutation = useTogglePinNote();
-  const toggleShareMutation = useToggleShareNote();
-  const moveNoteMutation = useMoveNoteToFolder();
-  const updateNoteMutation = useUpdateNote();
-  const touchNoteMutation = useTouchNote();
+  const { mutateAsync: deleteNoteAsync } = useDeleteNote();
+  const { mutateAsync: renameNoteAsync } = useRenameNote();
+  const { mutateAsync: toggleArchiveAsync } = useToggleArchiveNote();
+  const { mutateAsync: togglePinAsync } = useTogglePinNote();
+  const { mutateAsync: toggleShareAsync } = useToggleShareNote();
+  const { mutateAsync: moveNoteAsync } = useMoveNoteToFolder();
+  const { mutateAsync: updateNoteAsync } = useUpdateNote();
+  const { mutateAsync: touchNoteAsync } = useTouchNote();
 
   const deleteNote = useCallback(
     async (args: { noteId: Id<"notes"> }) => {
-      await deleteNoteMutation.mutateAsync(args.noteId);
+      await deleteNoteAsync(args.noteId);
     },
-    [deleteNoteMutation],
+    [deleteNoteAsync],
   );
 
   const renameNote = useCallback(
     async (args: { noteId: Id<"notes">; title: string }) => {
-      await renameNoteMutation.mutateAsync(args);
+      await renameNoteAsync(args);
     },
-    [renameNoteMutation],
+    [renameNoteAsync],
   );
 
   const toggleArchiveNote = useCallback(
     async (args: { noteId: Id<"notes"> }) => {
-      await toggleArchiveMutation.mutateAsync(args.noteId);
+      await toggleArchiveAsync(args.noteId);
     },
-    [toggleArchiveMutation],
+    [toggleArchiveAsync],
   );
 
   const togglePinNote = useCallback(
     async (args: { noteId: Id<"notes"> }) => {
-      await togglePinMutation.mutateAsync(args.noteId);
+      await togglePinAsync(args.noteId);
     },
-    [togglePinMutation],
+    [togglePinAsync],
   );
 
   const moveNoteToFolder = useCallback(
@@ -58,31 +58,31 @@ export function useNoteActions() {
       courseId?: string;
       moduleId?: string;
     }) => {
-      await moveNoteMutation.mutateAsync(args);
+      await moveNoteAsync(args);
     },
-    [moveNoteMutation],
+    [moveNoteAsync],
   );
 
   const updateNote = useCallback(
     async (args: UpdateNoteInput) => {
-      await updateNoteMutation.mutateAsync(args);
+      await updateNoteAsync(args);
     },
-    [updateNoteMutation],
+    [updateNoteAsync],
   );
 
   const touchNote = useCallback(
     async (args: { noteId: Id<"notes"> }) => {
-      await touchNoteMutation.mutateAsync(args.noteId);
+      await touchNoteAsync(args.noteId);
     },
-    [touchNoteMutation],
+    [touchNoteAsync],
   );
 
   const toggleShareNote = useCallback(
     async (args: { noteId: Id<"notes"> }): Promise<boolean> => {
-      const dto = await toggleShareMutation.mutateAsync(args.noteId);
+      const dto = await toggleShareAsync(args.noteId);
       return dto.isShared;
     },
-    [toggleShareMutation],
+    [toggleShareAsync],
   );
 
   return {
@@ -98,12 +98,12 @@ export function useNoteActions() {
 }
 
 export function useCreateNoteAction() {
-  const createNoteMutation = useCreateNote();
+  const { mutateAsync: createNoteAsync } = useCreateNote();
 
   return useCallback(
     async (args: CreateNoteInput) => {
-      return (await createNoteMutation.mutateAsync(args)) as Id<"notes">;
+      return (await createNoteAsync(args)) as Id<"notes">;
     },
-    [createNoteMutation],
+    [createNoteAsync],
   );
 }

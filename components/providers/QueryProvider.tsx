@@ -1,8 +1,9 @@
 "use client";
 
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useClerk } from "@clerk/nextjs";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactNode, useEffect, useRef, useState } from "react";
+import { registerSessionHandlers } from "@/lib/api/session";
 import { createQueryClient } from "@/lib/query-client";
 
 /**
@@ -13,7 +14,22 @@ import { createQueryClient } from "@/lib/query-client";
  * before anything can read the old one.
  */
 export function QueryProvider({ children }: { children: ReactNode }) {
-  const { isLoaded, userId } = useAuth();
+  const { isLoaded, userId, getToken } = useAuth();
+  const { signOut } = useClerk();
+
+  // Lets apiFetch recover from a rejected token: fetch a new one past Clerk's
+  // cache, and if even that is refused, sign out to the sign-in page (once).
+  useEffect(() => {
+    let signingOut = false;
+    return registerSessionHandlers({
+      freshToken: () => getToken({ skipCache: true }),
+      onSessionLost: () => {
+        if (signingOut) return;
+        signingOut = true;
+        void signOut({ redirectUrl: "/sign-in" });
+      },
+    });
+  }, [getToken, signOut]);
   // undefined while Clerk is still loading; null when signed out.
   const owner = isLoaded ? (userId ?? null) : undefined;
 

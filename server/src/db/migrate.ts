@@ -13,13 +13,21 @@ if (!connectionString) {
   process.exit(1);
 }
 
-const pool = new pg.Pool({ connectionString, max: 1 });
+// Every service built from server/ runs this before deploying (one shared
+// railway.json), so the API and worker can race. A session advisory lock makes
+// the second wait, then find nothing left to apply.
+const MIGRATION_LOCK = 7_310_424_117;
+
+const client = new pg.Client({ connectionString });
 try {
-  await migrate(drizzle(pool), { migrationsFolder });
+  await client.connect();
+  await client.query("SELECT pg_advisory_lock($1)", [MIGRATION_LOCK]);
+  await migrate(drizzle(client), { migrationsFolder });
   console.log("Migrations applied");
 } catch (err) {
   console.error("Migration failed:", err);
   process.exitCode = 1;
 } finally {
-  await pool.end();
+  // Ending the session releases the lock too.
+  await client.end().catch(() => {});
 }

@@ -52,18 +52,40 @@ const BANDS = 11;
  *
  * The backend meters audio-minute usage from this value, so an import must
  * report its real duration rather than defaulting to zero. Resolves to 0 only
- * when the browser cannot decode the file at all.
+ * when the browser cannot decode the file at all (or gives up after a timeout).
  */
 function readAudioDuration(file: File): Promise<number> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
-    const audio = new Audio(url);
+    const audio = new Audio();
+    audio.preload = "metadata";
+    let settled = false;
     const done = (value: number) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      audio.removeAttribute("src");
+      audio.load();
       URL.revokeObjectURL(url);
-      resolve(Number.isFinite(value) ? value : 0);
+      resolve(Number.isFinite(value) && value > 0 ? value : 0);
     };
-    audio.onloadedmetadata = () => done(audio.duration);
+    const timeout = setTimeout(() => done(0), 10_000);
+
+    audio.onloadedmetadata = () => {
+      if (Number.isFinite(audio.duration)) {
+        done(audio.duration);
+        return;
+      }
+      // Chrome reports Infinity for WebM/Opus files without a duration header
+      // (e.g. MediaRecorder output). Seeking past the end forces it to scan the
+      // file, after which `duration` holds the real length.
+      audio.ondurationchange = () => {
+        if (Number.isFinite(audio.duration)) done(audio.duration);
+      };
+      audio.currentTime = Number.MAX_SAFE_INTEGER;
+    };
     audio.onerror = () => done(0);
+    audio.src = url;
   });
 }
 
@@ -164,7 +186,7 @@ export function TranscriptionPill() {
     setChunks([sessionToLoad.transcript]);
     setSourceRecordingId(sessionToLoad.recordingId);
     setNotes(null);
-    setElapsed(0);
+    setElapsed(Math.round(sessionToLoad.duration ?? 0));
     clearLoadedSession();
   }, [sessionToLoad, stopMeter, resetTranscript, clearLoadedSession]);
 
@@ -419,6 +441,10 @@ export function TranscriptionPill() {
       setIsThinking(true);
       try {
         const duration = await readAudioDuration(file);
+        // The pill's clock doubles as the session length: generating later
+        // upserts the draft with `elapsed`, which would otherwise overwrite the
+        // imported duration with 0.
+        setElapsed(Math.round(duration));
         const storageId = await uploadToStorage(file);
 
         await saveUploadedRecording({

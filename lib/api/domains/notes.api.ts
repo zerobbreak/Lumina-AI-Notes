@@ -1,6 +1,6 @@
-import { apiFetch, apiUrl } from "@/lib/api/client";
+import { apiFetch, apiResponse, toApiError } from "@/lib/api/client";
 import { apiPath } from "@/lib/api/path";
-import { ApiError, VersionConflictError } from "@/lib/api/errors";
+import { VersionConflictError } from "@/lib/api/errors";
 import type { NoteDetailDto, NoteListItemDto, UpdateNoteBody } from "@/types/api/notes";
 
 
@@ -63,17 +63,11 @@ export const notesApi = {
   },
 
   async update(token: string, noteId: string, body: UpdateNoteBody) {
-    const res = await fetch(apiUrl(apiPath`/notes/${noteId}`), {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(body),
-    });
+    // apiResponse rather than apiFetch: a 409 carries the current note to merge with.
+    const res = await apiResponse(apiPath`/notes/${noteId}`, { method: "PATCH", token, body });
 
     if (res.status === 409) {
-      const payload = (await res.json()) as {
+      const payload = (await res.clone().json().catch(() => ({}))) as {
         error?: { message?: string };
         note?: NoteDetailDto;
       };
@@ -86,25 +80,7 @@ export const notesApi = {
     }
 
     if (!res.ok) {
-      let message = res.statusText;
-      let code: string | undefined;
-      try {
-        const payload = (await res.json()) as {
-          message?: string;
-          error?: string | { message?: string; code?: string };
-          code?: string;
-        };
-        if (payload.error && typeof payload.error === "object") {
-          message = payload.error.message ?? message;
-          code = payload.error.code;
-        } else {
-          message = payload.message ?? (typeof payload.error === "string" ? payload.error : message);
-          code = payload.code;
-        }
-      } catch {
-        // Non-JSON error body
-      }
-      throw new ApiError(message, res.status, code);
+      throw await toApiError(res);
     }
 
     return (await res.json()) as NoteDetailDto;

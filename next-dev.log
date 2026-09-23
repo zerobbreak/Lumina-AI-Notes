@@ -1,0 +1,130 @@
+
+> lumina-notes-ai@0.1.0 dev
+> next dev
+
+[1m[38;2;173;127;168m▲ Next.js 16.1.6[39m[22m (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.149:3000
+- Environments: .env.local
+
+[32m[1m✓[22m[39m Starting...
+[37m[1m○[22m[39m Compiling proxy ...
+[32m[1m✓[22m[39m Ready in 18.9s
+[37m[1m○[22m[39m Compiling / ...
+[32m[1m✓[22m[39m Finished filesystem cache database compaction in 23.9s
+[33m[1m⚠[22m[39m metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+ GET / [32m200[39m in 34.9s[2m (compile: 32.9s, proxy.ts: 672ms, render: 1384ms)[22m
+[37m[1m○[22m[39m Compiling /sign-in/[[...sign-in]] ...
+ GET /sign-in [32m200[39m in 7.5s[2m (compile: 7.0s, proxy.ts: 43ms, render: 483ms)[22m
+[32m[1m✓[22m[39m Finished writing to filesystem cache in 13.2s
+ GET / [32m200[39m in 2.2s[2m (compile: 98ms, proxy.ts: 570ms, render: 1498ms)[22m
+ POST / [32m200[39m in 309ms[2m (compile: 30ms, proxy.ts: 33ms, render: 246ms)[22m
+[32m[1m✓[22m[39m Finished filesystem cache database compaction in 22.6s
+[32m[1m✓[22m[39m Finished writing to filesystem cache in 22.2s
+[32m[1m✓[22m[39m Finished filesystem cache database compaction in 10.2s
+[37m[1m○[22m[39m Compiling /dashboard ...
+ GET / [32m200[39m in 20.0s[2m (compile: 12.7s, proxy.ts: 3.5s, render: 3.7s)[22m
+ POST / [32m200[39m in 15.3s[2m (compile: 7.9s, proxy.ts: 3.8s, render: 3.6s)[22m
+[32m[1m✓[22m[39m Finished writing to filesystem cache in 41s
+[32m[1m✓[22m[39m Finished filesystem cache database compaction in 39.8s
+[32m[1m✓[22m[39m Finished writing to filesystem cache in 25.9s
+[32m[1m✓[22m[39m Finished filesystem cache database compaction in 21.8s
+ GET /dashboard [32m200[39m in 2.7s[2m (compile: 1338ms, proxy.ts: 1024ms, render: 388ms)[22m
+ POST /dashboard [32m200[39m in 2.7s[2m (compile: 2.3s, proxy.ts: 53ms, render: 421ms)[22m
+[37m[1m○[22m[39m Compiling /onboarding ...
+ GET /onboarding [32m200[39m in 11.4s[2m (compile: 11.2s, proxy.ts: 67ms, render: 102ms)[22m
+ GET /dashboard [32m200[39m in 2.3s[2m (compile: 1768ms, proxy.ts: 147ms, render: 364ms)[22m
+ POST /dashboard [32m200[39m in 1132ms[2m (compile: 1051ms, proxy.ts: 37ms, render: 45ms)[22m
+ GET /onboarding [32m200[39m in 176ms[2m (compile: 41ms, proxy.ts: 79ms, render: 56ms)[22m
+[33m[1m⚠[22m[39m metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+[32m[1m✓[22m[39m Compiled in 7.6s
+ GET /onboarding [32m200[39m in 1731ms[2m (compile: 801ms, proxy.ts: 279ms, render: 650ms)[22m
+ GET /onboarding [32m200[39m in 1053ms[2m (compile: 57ms, proxy.ts: 74ms, render: 922ms)[22m
+ POST /onboarding [32m200[39m in 132ms[2m (compile: 17ms, proxy.ts: 26ms, render: 89ms)[22m
+[32m[1m✓[22m[39m Finished writing to filesystem cache in 17.9s
+[32m[1m✓[22m[39m Finished filesystem cache database compaction in 19.8s
+[32m[1m✓[22m[39m Finished writing to filesystem cache in 18.4s
+[32m[1m✓[22m[39m Finished filesystem cache database compaction in 14.6s
+[33m[1m⚠[22m[39m metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+[32m[1m✓[22m[39m Compiled in 8.4s
+ GET /onboarding [32m200[39m in 8.9s[2m (compile: 5.0s, proxy.ts: 834ms, render: 3.1s)[22m
+ GET /onboarding [32m200[39m in 2.5s[2m (compile: 245ms, proxy.ts: 393ms, render: 1834ms)[22m
+ GET /onboarding [32m200[39m in 458ms[2m (compile: 73ms, proxy.ts: 164ms, render: 221ms)[22m
+ GET /onboarding [32m200[39m in 2.4s[2m (compile: 320ms, proxy.ts: 438ms, render: 1658ms)[22m
+ POST /onboarding [32m200[39m in 238ms[2m (compile: 26ms, proxy.ts: 48ms, render: 164ms)[22m
+[32m[1m✓[22m[39m Finished writing to filesystem cache in 17.4s
+[32m[1m✓[22m[39m Compiled in 3s
+[32m[1m✓[22m[39m Compiled in 652ms
+[32m[1m✓[22m[39m Compiled in 482ms
+[32m[1m✓[22m[39m Compiled in 744ms
+[33m[1m⚠[22m[39m metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+ GET /dashboard [32m200[39m in 5.5s[2m (compile: 3.5s, proxy.ts: 1417ms, render: 610ms)[22m
+ POST /dashboard [32m200[39m in 2.3s[2m (compile: 1467ms, proxy.ts: 66ms, render: 791ms)[22m
+ GET /onboarding [32m200[39m in 2.4s[2m (compile: 1157ms, proxy.ts: 42ms, render: 1166ms)[22m
+[33m[1m⚠[22m[39m metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+ GET / [32m200[39m in 2.6s[2m (compile: 1067ms, proxy.ts: 233ms, render: 1277ms)[22m
+ POST / [32m200[39m in 153ms[2m (compile: 24ms, proxy.ts: 40ms, render: 89ms)[22m
+ GET /dashboard [32m200[39m in 1240ms[2m (compile: 1151ms, proxy.ts: 13ms, render: 76ms)[22m
+ GET /onboarding [32m200[39m in 1552ms[2m (compile: 1479ms, proxy.ts: 34ms, render: 39ms)[22m
+ GET /dashboard?view=home [32m200[39m in 1557ms[2m (compile: 1308ms, proxy.ts: 31ms, render: 218ms)[22m
+ GET /dashboard?tour=1 [32m200[39m in 1215ms[2m (compile: 1095ms, proxy.ts: 28ms, render: 92ms)[22m
+ GET /dashboard [32m200[39m in 1177ms[2m (compile: 1088ms, proxy.ts: 20ms, render: 69ms)[22m
+ GET /dashboard?view=home [32m200[39m in 1161ms[2m (compile: 1055ms, proxy.ts: 53ms, render: 53ms)[22m
+ GET /dashboard?view=home [32m200[39m in 1214ms[2m (compile: 1138ms, proxy.ts: 20ms, render: 55ms)[22m
+ GET /dashboard?noteId=a76ea114-dc43-48a7-8c4b-1feaba456d1d [32m200[39m in 5.1s[2m (compile: 4.0s, proxy.ts: 506ms, render: 583ms)[22m
+[32m[1m✓[22m[39m Finished filesystem cache database compaction in 15.4s
+[32m[1m✓[22m[39m Finished filesystem cache database compaction in 14.7s
+[32m[1m✓[22m[39m Finished filesystem cache database compaction in 20.6s
+[32m[1m✓[22m[39m Compiled in 12.9s
+[32m[1m✓[22m[39m Finished writing to filesystem cache in 17.3s
+[33m[1m⚠[22m[39m metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+ GET /dashboard?noteId=a76ea114-dc43-48a7-8c4b-1feaba456d1d [32m200[39m in 11.7s[2m (compile: 5.2s, proxy.ts: 1144ms, render: 5.3s)[22m
+ POST /dashboard?noteId=a76ea114-dc43-48a7-8c4b-1feaba456d1d [32m200[39m in 2.6s[2m (compile: 2.4s, proxy.ts: 206ms, render: 56ms)[22m
+[32m[1m✓[22m[39m Compiled in 5.6s
+[32m[1m✓[22m[39m Compiled in 14.8s
+[32m[1m✓[22m[39m Finished filesystem cache database compaction in 19.8s
+[32m[1m✓[22m[39m Compiled in 13s
+[33m[1m⚠[22m[39m metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+ GET /dashboard?noteId=a76ea114-dc43-48a7-8c4b-1feaba456d1d [32m200[39m in 17.6s[2m (compile: 12.2s, proxy.ts: 4.2s, render: 1154ms)[22m
+[32m[1m✓[22m[39m Finished writing to filesystem cache in 79s
+[32m[1m✓[22m[39m Compiled in 5.1s
+[32m[1m✓[22m[39m Finished filesystem cache database compaction in 26.9s
+[32m[1m✓[22m[39m Finished writing to filesystem cache in 28.2s
+[37m[1m○[22m[39m Compiling /dashboard ...
+[33m[1m⚠[22m[39m metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+ GET /dashboard?noteId=a76ea114-dc43-48a7-8c4b-1feaba456d1d [32m200[39m in 44s[2m (compile: 36.6s, proxy.ts: 2.6s, render: 4.8s)[22m
+[37m[1m○[22m[39m Compiling /dashboard ...
+[33m[1m⚠[22m[39m metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+[32m[1m✓[22m[39m Finished filesystem cache database compaction in 108s
+ GET /dashboard?noteId=a76ea114-dc43-48a7-8c4b-1feaba456d1d [32m200[39m in 25.8s[2m (compile: 21.9s, proxy.ts: 2.1s, render: 1871ms)[22m
+[32m[1m✓[22m[39m Finished writing to filesystem cache in 117s
+[32m[1m✓[22m[39m Finished filesystem cache database compaction in 24.0s
+[32m[1m✓[22m[39m Finished writing to filesystem cache in 75s
+ GET /dashboard?noteId=a76ea114-dc43-48a7-8c4b-1feaba456d1d [32m200[39m in 10.6s[2m (compile: 4.6s, proxy.ts: 1219ms, render: 4.8s)[22m
+ POST /dashboard?noteId=a76ea114-dc43-48a7-8c4b-1feaba456d1d [32m200[39m in 2.8s[2m (compile: 2.5s, proxy.ts: 83ms, render: 200ms)[22m
+ GET /dashboard?noteId=a76ea114-dc43-48a7-8c4b-1feaba456d1d [32m200[39m in 2.6s[2m (compile: 2.2s, proxy.ts: 92ms, render: 344ms)[22m
+ POST /dashboard?noteId=a76ea114-dc43-48a7-8c4b-1feaba456d1d [32m200[39m in 2.1s[2m (compile: 1842ms, proxy.ts: 29ms, render: 196ms)[22m
+[32m[1m✓[22m[39m Compiled in 6.3s
+[32m[1m✓[22m[39m Finished writing to filesystem cache in 13.1s
+[32m[1m✓[22m[39m Compiled in 1259ms
+[32m[1m✓[22m[39m Compiled in 1115ms
+[32m[1m✓[22m[39m Finished filesystem cache database compaction in 18.3s
+[32m[1m✓[22m[39m Finished writing to filesystem cache in 12.7s
+[32m[1m✓[22m[39m Compiled in 1031ms
+[32m[1m✓[22m[39m Compiled in 1098ms
+[33m[1m⚠[22m[39m metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+ GET /dashboard?noteId=a76ea114-dc43-48a7-8c4b-1feaba456d1d [32m200[39m in 11.7s[2m (compile: 4.3s, proxy.ts: 2.2s, render: 5.2s)[22m
+ POST /dashboard?noteId=a76ea114-dc43-48a7-8c4b-1feaba456d1d [32m200[39m in 2.2s[2m (compile: 1878ms, proxy.ts: 97ms, render: 255ms)[22m
+[32m[1m✓[22m[39m Compiled in 2s
+[33m[1m⚠[22m[39m metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+ GET /dashboard?noteId=a76ea114-dc43-48a7-8c4b-1feaba456d1d [32m200[39m in 9.8s[2m (compile: 4.2s, proxy.ts: 582ms, render: 5.0s)[22m
+ POST /dashboard?noteId=a76ea114-dc43-48a7-8c4b-1feaba456d1d [32m200[39m in 3.2s[2m (compile: 2.8s, proxy.ts: 94ms, render: 333ms)[22m
+ GET /dashboard?noteId=a76ea114-dc43-48a7-8c4b-1feaba456d1d [32m200[39m in 2.9s[2m (compile: 2.6s, proxy.ts: 86ms, render: 286ms)[22m
+ POST /dashboard?noteId=a76ea114-dc43-48a7-8c4b-1feaba456d1d [32m200[39m in 2.3s[2m (compile: 2.1s, proxy.ts: 61ms, render: 139ms)[22m
+[32m[1m✓[22m[39m Finished filesystem cache database compaction in 19.0s
+ GET /dashboard?view=studio [32m200[39m in 8.1s[2m (compile: 4.5s, proxy.ts: 3.2s, render: 429ms)[22m
+ GET /dashboard?view=calendar [32m200[39m in 4.3s[2m (compile: 3.4s, proxy.ts: 271ms, render: 648ms)[22m
+[32m[1m✓[22m[39m Finished filesystem cache database compaction in 21.9s
+ GET /dashboard?view=flashcards [32m200[39m in 2.6s[2m (compile: 2.3s, proxy.ts: 159ms, render: 126ms)[22m
+[32m[1m✓[22m[39m Compiled in 6s
+[32m[1m✓[22m[39m Finished writing to filesystem cache in 10.2s

@@ -51,6 +51,8 @@ export interface LoadedSession {
   title: string;
   /** Flattened plain-text transcript, ready to generate from. */
   transcript: string;
+  /** Saved length in seconds, shown on the pill's clock. */
+  duration?: number | null;
 }
 
 export { MAX_REFERENCE_URLS };

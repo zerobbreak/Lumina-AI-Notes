@@ -104,13 +104,13 @@ export function noteListItemToChildNote(note: NoteListItemDto): ChildNoteModel {
   };
 }
 
-export function toOpenNote(dto: NoteDetailDto): OpenNoteModel {
+export function toOpenNote(note: NoteEditorModel): OpenNoteModel {
   return {
-    _id: dto.id as Id<"notes">,
-    title: dto.title,
-    courseId: dto.courseId ?? undefined,
-    moduleId: dto.moduleId ?? undefined,
-    parentNoteId: dto.parentNoteId ?? undefined,
+    _id: note._id,
+    title: note.title,
+    courseId: note.courseId,
+    moduleId: note.moduleId,
+    parentNoteId: note.parentNoteId,
   };
 }
 

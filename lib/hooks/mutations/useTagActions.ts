@@ -7,29 +7,29 @@ import { useDeleteTag } from "@/lib/mutations/tags/useDeleteTag";
 import { useUpdateTag } from "@/lib/mutations/tags/useUpdateTag";
 
 export function useTagActions() {
-  const createTagMutation = useCreateTag();
-  const updateTagMutation = useUpdateTag();
-  const deleteTagMutation = useDeleteTag();
+  const { mutateAsync: createTagAsync } = useCreateTag();
+  const { mutateAsync: updateTagAsync } = useUpdateTag();
+  const { mutateAsync: deleteTagAsync } = useDeleteTag();
 
   const createTag = useCallback(
     async (args: { name: string; color: string }) => {
-      await createTagMutation.mutateAsync(args);
+      await createTagAsync(args);
     },
-    [createTagMutation],
+    [createTagAsync],
   );
 
   const updateTag = useCallback(
     async (args: { tagId: Id<"tags">; name?: string; color?: string }) => {
-      await updateTagMutation.mutateAsync(args);
+      await updateTagAsync(args);
     },
-    [updateTagMutation],
+    [updateTagAsync],
   );
 
   const deleteTag = useCallback(
     async (args: { tagId: Id<"tags"> }) => {
-      await deleteTagMutation.mutateAsync(args.tagId);
+      await deleteTagAsync(args.tagId);
     },
-    [deleteTagMutation],
+    [deleteTagAsync],
   );
 
   return { createTag, updateTag, deleteTag };

@@ -7,29 +7,29 @@ import { useRenameFile } from "@/lib/mutations/files/useRenameFile";
 import { useRetryFileProcessing } from "@/lib/mutations/files/useRetryFileProcessing";
 
 export function useFileActions() {
-  const deleteFileMutation = useDeleteFile();
-  const renameFileMutation = useRenameFile();
-  const retryProcessingMutation = useRetryFileProcessing();
+  const { mutateAsync: deleteFileAsync } = useDeleteFile();
+  const { mutateAsync: renameFileAsync } = useRenameFile();
+  const { mutateAsync: retryProcessingAsync } = useRetryFileProcessing();
 
   const deleteFile = useCallback(
     async (args: { fileId: Id<"files"> }) => {
-      await deleteFileMutation.mutateAsync(args.fileId);
+      await deleteFileAsync(args.fileId);
     },
-    [deleteFileMutation],
+    [deleteFileAsync],
   );
 
   const renameFile = useCallback(
     async (args: { fileId: Id<"files">; name: string }) => {
-      await renameFileMutation.mutateAsync(args);
+      await renameFileAsync(args);
     },
-    [renameFileMutation],
+    [renameFileAsync],
   );
 
   const retryProcessing = useCallback(
     async (args: { fileId: Id<"files"> }) => {
-      await retryProcessingMutation.mutateAsync(args.fileId);
+      await retryProcessingAsync(args.fileId);
     },
-    [retryProcessingMutation],
+    [retryProcessingAsync],
   );
 
   return { deleteFile, renameFile, retryProcessing };

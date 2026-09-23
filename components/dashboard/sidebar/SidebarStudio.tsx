@@ -90,6 +90,7 @@ export function SidebarStudio() {
                     recordingId: r._id,
                     title: r.title,
                     transcript,
+                    duration: r.duration,
                   });
                   toast.success("Session loaded into the capture pill");
                 }}

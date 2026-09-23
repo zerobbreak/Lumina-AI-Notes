@@ -1,40 +1,34 @@
+import { createServer } from "node:http";
 import { createWorkerContext } from "./workers/bootstrap.js";
-import {
-  listWorkerJobNames,
-  runWorkerJob,
-  workerJobs,
-  type WorkerJobName,
-} from "./workers/registry.js";
+import { listWorkerJobNames, workerJobs } from "./workers/registry.js";
+import { createScheduler, parseDisabledJobs } from "./workers/scheduler.js";
 
 const { ctx, pool } = createWorkerContext();
-const timers: NodeJS.Timeout[] = [];
-
-async function runJob(name: WorkerJobName) {
-  const started = Date.now();
-  try {
-    const result = await runWorkerJob(name, ctx);
-    console.log(`[worker] ${name} ok (${Date.now() - started}ms)`, result);
-  } catch (err) {
-    console.error(`[worker] ${name} failed:`, err);
-  }
-}
-
-function scheduleJob(name: WorkerJobName) {
-  const job = workerJobs[name];
-  void runJob(name);
-  const timer = setInterval(() => void runJob(name), job.intervalMs);
-  timers.push(timer);
-}
+const scheduler = createScheduler(workerJobs, ctx, {
+  disabled: parseDisabledJobs(process.env.WORKER_DISABLED_JOBS, listWorkerJobNames()),
+});
 
 console.log("[worker] scheduler started");
-for (const name of listWorkerJobNames()) {
-  scheduleJob(name);
-  console.log(`[worker] scheduled ${name} every ${Math.round(workerJobs[name].intervalMs / 60_000)}m`);
-}
+void scheduler.start();
+
+// Railway's healthcheck (railway.json) hits /health on PORT. It also shows
+// when each job last ran and how it went; nothing here is secret.
+const port = Number(process.env.PORT);
+const server = port
+  ? createServer((req, res) => {
+      if (req.url === "/health") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ status: "ok", role: "worker", jobs: scheduler.status }));
+        return;
+      }
+      res.writeHead(404).end();
+    }).listen(port, () => console.log(`[worker] health on :${port}`))
+  : null;
 
 function shutdown(signal: string) {
   console.log(`${signal} received, stopping worker`);
-  for (const timer of timers) clearInterval(timer);
+  scheduler.stop();
+  server?.close();
   pool
     .end()
     .then(() => process.exit(0))

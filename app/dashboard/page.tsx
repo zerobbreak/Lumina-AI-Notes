@@ -61,6 +61,9 @@ function DashboardContent() {
     return (
       <Suspense fallback={<DashboardLoading />}>
         <NoteView
+          // A fresh editor per note: nothing typed in one note (pending
+          // autosave, editor state) can carry over into the next.
+          key={noteId}
           noteId={noteId as Id<"notes">}
           onBack={() => router.push("/dashboard?view=home")}
         />

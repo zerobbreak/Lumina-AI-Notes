@@ -3,11 +3,17 @@ import { act, render } from "@testing-library/react";
 import { useEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { freshToken, sessionLost } from "@/lib/api/session";
 
 /** What Clerk's useAuth reports; tests change it to simulate sign-in/out. */
 let auth: { isLoaded: boolean; userId: string | null } = { isLoaded: true, userId: "user_a" };
 
-vi.mock("@clerk/nextjs", () => ({ useAuth: () => auth }));
+const getToken = vi.fn(async () => "fresh");
+const signOut = vi.fn(async () => {});
+vi.mock("@clerk/nextjs", () => ({
+  useAuth: () => ({ ...auth, getToken }),
+  useClerk: () => ({ signOut }),
+}));
 
 /** The client the tree is currently using, captured after each render. */
 const seen: { client?: QueryClient } = {};
@@ -84,5 +90,17 @@ describe("QueryProvider", () => {
     rerender();
     expect(seen.client!.getQueryData(NOTES)).toEqual(["A's note"]);
     expect(first).toBeDefined();
+  });
+
+  it("wires apiFetch's session recovery to Clerk", async () => {
+    renderProvider();
+    await expect(freshToken()).resolves.toBe("fresh");
+    expect(getToken).toHaveBeenCalledWith({ skipCache: true });
+
+    // Several failing requests at once must only sign out once.
+    sessionLost();
+    sessionLost();
+    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(signOut).toHaveBeenCalledWith({ redirectUrl: "/sign-in" });
   });
 });

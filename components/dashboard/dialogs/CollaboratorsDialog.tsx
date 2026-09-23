@@ -7,6 +7,7 @@ import { useCollaborationData } from "@/lib/hooks/collaboration/useCollaboration
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -103,6 +104,7 @@ export function CollaboratorsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* Notion style modal: flat surface, tight padding, clean gray text, simple borders */}
       <DialogContent className="sm:max-w-[480px] w-[calc(100vw-2rem)] p-0 bg-[#202020] border-[#373737] text-[#EBEBEB] shadow-[0_4px_24px_rgba(0,0,0,0.6)] rounded-[8px] overflow-hidden gap-0 flex flex-col font-sans">
+        <DialogTitle className="sr-only">Share note</DialogTitle>
         
         {/* Top Header Section */}
         <div className="flex items-center justify-between px-3 py-2 border-b border-[#373737]">

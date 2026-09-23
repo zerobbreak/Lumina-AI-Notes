@@ -9,53 +9,53 @@ import { useRenameCourse } from "@/lib/mutations/courses/useRenameCourse";
 import { useRenameModule } from "@/lib/mutations/courses/useRenameModule";
 
 export function useCourseActions() {
-  const createCourseMutation = useCreateCourse();
-  const renameCourseMutation = useRenameCourse();
-  const deleteCourseMutation = useDeleteCourse();
-  const addModuleMutation = useAddModule();
-  const renameModuleMutation = useRenameModule();
-  const deleteModuleMutation = useDeleteModule();
+  const { mutateAsync: createCourseAsync } = useCreateCourse();
+  const { mutateAsync: renameCourseAsync } = useRenameCourse();
+  const { mutateAsync: deleteCourseAsync } = useDeleteCourse();
+  const { mutateAsync: addModuleAsync } = useAddModule();
+  const { mutateAsync: renameModuleAsync } = useRenameModule();
+  const { mutateAsync: deleteModuleAsync } = useDeleteModule();
 
   const createCourse = useCallback(
     async (args: { name: string; code: string }) => {
-      await createCourseMutation.mutateAsync(args);
+      await createCourseAsync(args);
     },
-    [createCourseMutation],
+    [createCourseAsync],
   );
 
   const renameCourse = useCallback(
     async (args: { courseId: string; name: string }) => {
-      await renameCourseMutation.mutateAsync(args);
+      await renameCourseAsync(args);
     },
-    [renameCourseMutation],
+    [renameCourseAsync],
   );
 
   const deleteCourse = useCallback(
     async (args: { courseId: string }) => {
-      await deleteCourseMutation.mutateAsync(args.courseId);
+      await deleteCourseAsync(args.courseId);
     },
-    [deleteCourseMutation],
+    [deleteCourseAsync],
   );
 
   const addModuleToCourse = useCallback(
     async (args: { courseId: string; title: string }) => {
-      await addModuleMutation.mutateAsync(args);
+      await addModuleAsync(args);
     },
-    [addModuleMutation],
+    [addModuleAsync],
   );
 
   const renameModule = useCallback(
     async (args: { courseId: string; moduleId: string; title: string }) => {
-      await renameModuleMutation.mutateAsync(args);
+      await renameModuleAsync(args);
     },
-    [renameModuleMutation],
+    [renameModuleAsync],
   );
 
   const deleteModule = useCallback(
     async (args: { courseId: string; moduleId: string }) => {
-      await deleteModuleMutation.mutateAsync(args);
+      await deleteModuleAsync(args);
     },
-    [deleteModuleMutation],
+    [deleteModuleAsync],
   );
 
   return {
