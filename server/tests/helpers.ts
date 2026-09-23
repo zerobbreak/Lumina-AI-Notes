@@ -116,6 +116,7 @@ export const fakeClerkProfiles = {
     name: clerkUserId,
     image: null as string | null,
   })),
+  delete: vi.fn(async (_clerkUserId: string) => {}),
 } satisfies ClerkProfiles;
 
 /** Records what routes enqueued instead of talking to Redis. */

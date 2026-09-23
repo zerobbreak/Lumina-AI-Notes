@@ -29,12 +29,16 @@ import {
   Save,
   Loader2,
   Camera,
+  Target,
+  Database,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { InAppNotificationsPanel } from "@/components/dashboard/settings/InAppNotificationsPanel";
+import { StudyGoalsTab } from "@/components/dashboard/settings/StudyGoalsTab";
+import { AccountDataTab } from "@/components/dashboard/settings/AccountDataTab";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -144,10 +148,38 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   };
 
   const menuItems = [
-    { id: "profile", label: "Profile", icon: User },
-    { id: "security", label: "Security", icon: Shield },
-    { id: "notifications", label: "Notifications", icon: Bell },
+    {
+      id: "profile",
+      label: "Profile",
+      icon: User,
+      description: "Your name, photo and study preferences.",
+    },
+    {
+      id: "security",
+      label: "Security",
+      icon: Shield,
+      description: "Password, sign-in methods and active sessions.",
+    },
+    {
+      id: "notifications",
+      label: "Notifications",
+      icon: Bell,
+      description: "Deadline reminders and other in-app alerts.",
+    },
+    {
+      id: "study",
+      label: "Goals & Usage",
+      icon: Target,
+      description: "Your daily study targets and how much of your limits you've used.",
+    },
+    {
+      id: "account",
+      label: "Account & Data",
+      icon: Database,
+      description: "Export everything you've made, or delete your account.",
+    },
   ];
+  const activeItem = menuItems.find((item) => item.id === activeTab) ?? menuItems[0];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -231,12 +263,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           {/* Header */}
           <div className="flex items-center justify-between p-8 border-b border-border/60">
             <div>
-              <h2 className="text-2xl font-bold text-foreground mb-1 capitalize">
-                {activeTab} & Settings
+              <h2 className="text-2xl font-bold text-foreground mb-1">
+                {activeItem.label}
               </h2>
-              <p className="text-muted-foreground text-sm">
-                Manage your {activeTab} settings and preferences.
-              </p>
+              <p className="text-muted-foreground text-sm">{activeItem.description}</p>
             </div>
             {activeTab === "profile" && (
               <Button
@@ -477,32 +507,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     </p>
                     <InAppNotificationsPanel />
                   </div>
-
-                  <div className="space-y-3 pt-2 border-t border-border/60">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
-                      Email preferences
-                    </p>
-                    <div className="space-y-4">
-                      {[
-                        "Email digest of new notes",
-                        "Changes to shared documents",
-                        "Product updates and beta features",
-                        "Security alerts",
-                      ].map((label, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center justify-between py-3 border-b border-border/60 last:border-0"
-                        >
-                          <span className="text-sm text-foreground/80">{label}</span>
-                          <div className="h-5 w-9 rounded-full bg-primary relative cursor-pointer opacity-80 hover:opacity-100">
-                            <div className="absolute right-1 top-1 h-3 w-3 rounded-full bg-primary-foreground" />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 </div>
               )}
+
+              {activeTab === "study" && <StudyGoalsTab />}
+
+              {activeTab === "account" && <AccountDataTab />}
 
             </div>
           </ScrollArea>

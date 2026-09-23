@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { AppDeps } from "../app.js";
 import { authenticate } from "../middleware/auth.js";
 import { loadUser } from "../middleware/user.js";
+import { createAccountRouter } from "./account.js";
 import { createAiRouter } from "./ai.js";
 import { createAnalyticsRouter } from "./analytics.js";
 import { createAuthRouter } from "./auth.js";
@@ -48,6 +49,7 @@ export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken, 
   router.use("/recordings", createRecordingsRouter(db, storage, queue));
   router.use("/search", createSearchRouter(db, storage, env.GEMINI_API_KEY));
   router.use("/users", createUsersRouter(db));
+  router.use("/users", createAccountRouter(db, storage, clerkProfiles));
   router.use("/calendar", createCalendarRouter(db));
   router.use("/chats", createChatsRouter(db, env.GEMINI_API_KEY));
   router.use("/courses", createCoursesRouter(db, storage));
