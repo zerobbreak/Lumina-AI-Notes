@@ -33,8 +33,11 @@ export function dispatchAppCommand(id: AppCommandId) {
 
 /** Calls the handler for every command dispatched while mounted. */
 export function useAppCommands(handler: (id: AppCommandId) => void) {
+  // Latest handler, without re-subscribing every render.
   const handlerRef = useRef(handler);
-  handlerRef.current = handler;
+  useEffect(() => {
+    handlerRef.current = handler;
+  });
 
   useEffect(() => {
     const listener = (e: Event) => handlerRef.current((e as CustomEvent<AppCommandId>).detail);

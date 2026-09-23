@@ -7,6 +7,7 @@ import {
   SlashCommand,
   renderItems,
 } from "@/components/dashboard/editor/extensions/SlashCommand";
+import type { SlashRegistryItem } from "@/components/dashboard/editor/slashCommandRegistry";
 
 describe("slash command menu", () => {
   let editor: Editor | undefined;
@@ -29,7 +30,8 @@ describe("slash command menu", () => {
     editor.commands.insertContent("/");
     // The suggestion view awaits items() before calling onStart.
     await new Promise((r) => setTimeout(r, 0));
-    return { changes, ids: (editor.slashCommandProps?.items ?? []).map((i) => i.id) };
+    const items = (editor.slashCommandProps?.items ?? []) as SlashRegistryItem[];
+    return { changes, ids: items.map((i) => i.id) };
   }
 
   it("opens when / is typed in an editor made editable after mount", async () => {
