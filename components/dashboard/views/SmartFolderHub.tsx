@@ -221,18 +221,18 @@ export default function SmartFolderHub() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
-          className="relative rounded-3xl p-7 lg:p-8 overflow-hidden border border-border/60 bg-card/40 shadow-sm dark:border-white/5 dark:bg-white/[0.02]"
+          className="relative rounded-3xl p-7 lg:p-8 overflow-hidden border border-border/60 bg-card/40 shadow-sm dark:bg-foreground/[0.02]"
           data-tour="dashboard-overview"
         >
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl dark:bg-cyan-500/12" />
-            <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-indigo-500/10 blur-3xl dark:bg-indigo-500/12" />
+            <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl dark:bg-primary/12" />
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
             <div className="noise-overlay absolute inset-0" />
           </div>
           <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="flex items-start gap-4 min-w-0">
-              <div className="hidden sm:flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-cyan-500/20 to-indigo-500/20 border border-border/60 text-lg font-bold text-foreground dark:border-white/10">
+              <div className="hidden sm:flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-cyan-500/20 to-primary-alt/20 border border-border/60 text-lg font-bold text-foreground dark:border-border">
                 {(userData.name?.trim()?.[0] || "S").toUpperCase()}
               </div>
               <div className="space-y-2 min-w-0">
@@ -256,7 +256,7 @@ export default function SmartFolderHub() {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 shrink-0">
-              <div className="group rounded-2xl border border-border bg-card text-card-foreground px-5 py-4 min-w-[200px] shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:ring-0 dark:backdrop-blur-md">
+              <div className="group rounded-2xl border border-border bg-card text-card-foreground px-5 py-4 min-w-[200px] shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md dark:bg-inset dark:shadow-none dark:ring-0 dark:backdrop-blur-md">
                 <div className="flex items-center gap-2">
                   <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400">
                     <Layers className="w-3.5 h-3.5 shrink-0" aria-hidden />
@@ -272,13 +272,13 @@ export default function SmartFolderHub() {
                   variant="ghost"
                   size="sm"
                   onClick={() => router.push("/dashboard?view=flashcards")}
-                  className="mt-3 -ml-2 h-8 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent dark:hover:bg-white/5"
+                  className="mt-3 -ml-2 h-8 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent dark:hover:bg-foreground/5"
                 >
                   Start reviewing
                   <ArrowRight className="w-3 h-3 ml-1" aria-hidden />
                 </Button>
               </div>
-              <div className="group rounded-2xl border border-border bg-card text-card-foreground px-5 py-4 min-w-[200px] shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:ring-0 dark:backdrop-blur-md">
+              <div className="group rounded-2xl border border-border bg-card text-card-foreground px-5 py-4 min-w-[200px] shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md dark:bg-inset dark:shadow-none dark:ring-0 dark:backdrop-blur-md">
                 <div className="flex items-center gap-2">
                   <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-700 dark:text-cyan-400">
                     <Clock className="w-3.5 h-3.5 shrink-0" aria-hidden />
@@ -328,7 +328,7 @@ export default function SmartFolderHub() {
             >
               <Suspense
                 fallback={
-                  <div className="rounded-2xl border border-border bg-card p-6 text-center shadow-sm dark:border-white/10 dark:bg-black/40">
+                  <div className="rounded-2xl border border-border bg-card p-6 text-center shadow-sm dark:bg-inset">
                     <Loader2
                       className="w-6 h-6 animate-spin mx-auto text-muted-foreground"
                       aria-hidden
@@ -358,7 +358,7 @@ export default function SmartFolderHub() {
               variant="outline"
               size="sm"
               onClick={handleCreateCourse}
-              className="border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10 dark:hover:text-cyan-400 dark:hover:border-cyan-500/30 transition-colors"
+              className="border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground dark:bg-foreground/5 dark:hover:bg-foreground/10 dark:hover:text-cyan-400 dark:hover:border-cyan-500/30 transition-colors"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add Course
@@ -394,11 +394,11 @@ export default function SmartFolderHub() {
                     }
                   }}
                   whileHover={{ scale: 1.02 }}
-                  className="group relative rounded-xl border border-border bg-card text-card-foreground shadow-sm hover:shadow-md dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:backdrop-blur-md hover:bg-accent/40 dark:hover:bg-white/10 hover:border-border/80 dark:hover:border-white/20 cursor-pointer transition-all duration-300 p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  className="group relative rounded-xl border border-border bg-card text-card-foreground shadow-sm hover:shadow-md dark:bg-inset dark:shadow-none dark:backdrop-blur-md hover:bg-accent/40 dark:hover:bg-foreground/10 hover:border-border/80 dark:hover:border-foreground/20 cursor-pointer transition-all duration-300 p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   {/* Icon in top-left */}
                   <div className="flex items-start justify-between mb-4">
-                    <div className="w-10 h-10 rounded-lg bg-cyan-100 dark:bg-white/5 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-lg bg-cyan-100 dark:bg-foreground/5 flex items-center justify-center">
                       <Icon className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
                     </div>
 
@@ -461,7 +461,7 @@ export default function SmartFolderHub() {
               }}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="rounded-xl border border-dashed border-border bg-card/50 hover:bg-cyan-50/90 dark:border-white/10 hover:border-cyan-600/40 dark:hover:border-cyan-500/30 dark:hover:bg-cyan-500/5 cursor-pointer transition-all duration-300 flex flex-col items-center justify-center gap-3 p-8 min-h-[180px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="rounded-xl border border-dashed border-border bg-card/50 hover:bg-cyan-50/90 hover:border-cyan-600/40 dark:hover:border-cyan-500/30 dark:hover:bg-cyan-500/5 cursor-pointer transition-all duration-300 flex flex-col items-center justify-center gap-3 p-8 min-h-[180px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <div className="w-16 h-16 rounded-full bg-cyan-100 dark:bg-cyan-500/10 flex items-center justify-center">
                 <Plus className="w-8 h-8 text-cyan-600 dark:text-cyan-400" />

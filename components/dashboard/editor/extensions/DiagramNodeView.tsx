@@ -22,7 +22,7 @@ export const DiagramNodeView = (props: NodeViewProps) => {
 
   return (
     <NodeViewWrapper className="my-8">
-      <div className="relative border rounded-lg overflow-hidden shadow-xs border-slate-200 dark:border-slate-800">
+      <div className="relative border rounded-lg overflow-hidden shadow-xs border-border">
         <div className="absolute top-2 right-2 z-10 bg-black/50 text-white text-xs px-2 py-1 rounded pointer-events-none">
           Diagram
         </div>

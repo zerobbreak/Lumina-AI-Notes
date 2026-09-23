@@ -91,13 +91,13 @@ export function GenerateFlashcardsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#0a0a12] border-white/10 text-white sm:max-w-md">
+      <DialogContent className="bg-background border-border text-foreground sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-indigo-400" />
+            <Sparkles className="w-5 h-5 text-primary" />
             Generate Flashcards
           </DialogTitle>
-          <DialogDescription className="text-gray-400">
+          <DialogDescription className="text-muted-foreground">
             AI will create flashcards from your note content to help you study.
           </DialogDescription>
         </DialogHeader>
@@ -105,28 +105,28 @@ export function GenerateFlashcardsDialog({
         <div className="space-y-4 py-4">
           {/* Note Selection */}
           <div className="space-y-2">
-            <Label htmlFor="note" className="text-gray-300">
+            <Label htmlFor="note" className="text-foreground/80">
               Select Note
             </Label>
             <Select value={selectedNoteId} onValueChange={handleNoteChange}>
-              <SelectTrigger className="bg-white/5 border-white/10 text-white">
+              <SelectTrigger className="bg-foreground/5 border-border text-foreground">
                 <SelectValue placeholder="Choose a note..." />
               </SelectTrigger>
-              <SelectContent className="bg-[#0a0a12] border-white/10">
+              <SelectContent className="bg-background border-border">
                 {notes?.map((note) => (
                   <SelectItem
                     key={note._id}
                     value={note._id}
-                    className="text-white focus:bg-indigo-600 focus:text-white cursor-pointer transition-colors my-1 group data-[state=checked]:bg-indigo-900/50 data-[state=checked]:text-indigo-200"
+                    className="text-foreground focus:bg-primary focus:text-primary-foreground cursor-pointer transition-colors my-1 group data-[state=checked]:bg-primary/20 data-[state=checked]:text-primary"
                   >
                     <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-indigo-400 group-focus:text-white opacity-70 group-focus:opacity-100 transition-all" />
+                      <FileText className="w-4 h-4 text-primary group-focus:text-foreground opacity-70 group-focus:opacity-100 transition-all" />
                       <span className="truncate">{note.title}</span>
                     </div>
                   </SelectItem>
                 ))}
                 {(!notes || notes.length === 0) && (
-                  <div className="px-2 py-4 text-center text-gray-500 text-sm">
+                  <div className="px-2 py-4 text-center text-muted-foreground/80 text-sm">
                     No notes found. Create a note first!
                   </div>
                 )}
@@ -136,7 +136,7 @@ export function GenerateFlashcardsDialog({
 
           {/* Deck Title */}
           <div className="space-y-2">
-            <Label htmlFor="title" className="text-gray-300">
+            <Label htmlFor="title" className="text-foreground/80">
               Deck Title
             </Label>
             <input
@@ -145,25 +145,25 @@ export function GenerateFlashcardsDialog({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter deck title..."
-              className="w-full px-3 py-2 rounded-md bg-white/5 border border-white/10 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all hover:bg-white/10"
+              className="w-full px-3 py-2 rounded-md bg-foreground/5 border border-border text-foreground placeholder:text-muted-foreground/80 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all hover:bg-foreground/10"
             />
           </div>
 
           {/* Card Count */}
           <div className="space-y-2">
-            <Label htmlFor="count" className="text-gray-300">
+            <Label htmlFor="count" className="text-foreground/80">
               Number of Cards
             </Label>
             <Select value={cardCount} onValueChange={setCardCount}>
-              <SelectTrigger className="bg-white/5 border-white/10 text-white">
+              <SelectTrigger className="bg-foreground/5 border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-[#0a0a12] border-white/10">
+              <SelectContent className="bg-background border-border">
                 {[5, 10, 15, 20].map((count) => (
                   <SelectItem
                     key={count}
                     value={count.toString()}
-                    className="text-white focus:bg-indigo-600 focus:text-white cursor-pointer transition-colors"
+                    className="text-foreground focus:bg-primary focus:text-primary-foreground cursor-pointer transition-colors"
                   >
                     {count} cards
                   </SelectItem>
@@ -185,14 +185,14 @@ export function GenerateFlashcardsDialog({
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={isGenerating}
-            className="border-white/10 text-gray-300 hover:bg-white/5"
+            className="border-border text-foreground/80 hover:bg-foreground/5"
           >
             Cancel
           </Button>
           <Button
             onClick={handleGenerate}
             disabled={isGenerating || !selectedNoteId}
-            className="bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 gap-2"
+            className="bg-linear-to-r from-primary to-primary-alt hover:from-primary/90 hover:to-primary-alt/90 gap-2"
           >
             {isGenerating ? (
               <>

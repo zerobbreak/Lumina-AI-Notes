@@ -152,7 +152,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-[1050px]! w-[95vw] h-[85vh] p-0 flex gap-0 bg-[#060606] border-white/10 text-white overflow-hidden shadow-2xl rounded-2xl data-[state=open]:slide-in-from-bottom-2 sm:rounded-2xl"
+        className="max-w-[1050px]! w-[95vw] h-[85vh] p-0 flex gap-0 bg-background border-border text-foreground overflow-hidden shadow-2xl rounded-2xl data-[state=open]:slide-in-from-bottom-2 sm:rounded-2xl"
         showCloseButton={false}
       >
         {/* Accessibility: Hidden title and description for screen readers */}
@@ -164,7 +164,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         {/* Close Button Custom */}
         <button
           onClick={() => onOpenChange(false)}
-          className="absolute right-4 top-4 z-50 p-2 text-gray-400 hover:text-white transition-colors"
+          className="absolute right-4 top-4 z-50 p-2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <svg
             width="15"
@@ -183,10 +183,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           </svg>
         </button>
         {/* Sidebar */}
-        <div className="w-64 flex flex-col border-r border-white/10 bg-[#060606] p-6 shrink-0">
+        <div className="w-64 flex flex-col border-r border-border bg-background p-6 shrink-0">
           <div className="flex items-center gap-2 mb-8 px-2">
             <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
-              <span className="font-bold text-white text-sm">L</span>
+              <span className="font-bold text-foreground text-sm">L</span>
             </div>
             <span className="font-bold text-lg tracking-tight">Lumina</span>
           </div>
@@ -200,13 +200,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
                   activeTab === item.id
                     ? "bg-blue-600/10 text-blue-500"
-                    : "text-gray-400 hover:text-white hover:bg-white/5",
+                    : "text-muted-foreground hover:text-foreground hover:bg-foreground/5",
                 )}
               >
                 <item.icon
                   className={cn(
                     "w-4 h-4",
-                    activeTab === item.id ? "text-blue-500" : "text-gray-500",
+                    activeTab === item.id ? "text-blue-500" : "text-muted-foreground/80",
                   )}
                 />
                 {item.label}
@@ -219,7 +219,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               onOpenChange(false);
               signOut();
             }}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all mt-auto"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-all mt-auto"
           >
             <LogOut className="w-4 h-4" />
             Logout
@@ -227,14 +227,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col min-w-0 bg-[#09090b]">
+        <div className="flex-1 flex flex-col min-w-0 bg-background">
           {/* Header */}
-          <div className="flex items-center justify-between p-8 border-b border-white/5">
+          <div className="flex items-center justify-between p-8 border-b border-border/60">
             <div>
-              <h2 className="text-2xl font-bold text-white mb-1 capitalize">
+              <h2 className="text-2xl font-bold text-foreground mb-1 capitalize">
                 {activeTab} & Settings
               </h2>
-              <p className="text-gray-400 text-sm">
+              <p className="text-muted-foreground text-sm">
                 Manage your {activeTab} settings and preferences.
               </p>
             </div>
@@ -268,23 +268,23 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               {/* Profile Tab */}
               {activeTab === "profile" && (
                 <>
-                  <div className="p-6 rounded-2xl bg-[#0F0F11] border border-white/5 flex items-center gap-6">
+                  <div className="p-6 rounded-2xl bg-background border border-border/60 flex items-center gap-6">
                     <div className="relative group cursor-pointer">
                       <Image
                         src={user?.imageUrl || "https://github.com/shadcn.png"}
                         alt="Profile"
                         width={96}
                         height={96}
-                        className="w-24 h-24 rounded-full object-cover border-4 border-[#0F0F11] shadow-xl"
+                        className="w-24 h-24 rounded-full object-cover border-4 border-background shadow-xl"
                       />
                       <label
                         htmlFor="avatar-upload"
                         className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                       >
                         {avatarLoading ? (
-                          <Loader2 className="w-6 h-6 text-white animate-spin" />
+                          <Loader2 className="w-6 h-6 text-foreground animate-spin" />
                         ) : (
-                          <Camera className="w-6 h-6 text-white" />
+                          <Camera className="w-6 h-6 text-foreground" />
                         )}
                       </label>
                       <input
@@ -297,77 +297,77 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-white mb-1">
+                      <h3 className="text-lg font-semibold text-foreground mb-1">
                         Profile Picture
                       </h3>
-                      <p className="text-sm text-gray-500 mb-4">
+                      <p className="text-sm text-muted-foreground/80 mb-4">
                         JPG, GIF or PNG. Recommended size 400x400px.
                       </p>
                       <label htmlFor="avatar-upload">
-                        <div className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white h-10 px-4 py-2 text-gray-300 cursor-pointer">
+                        <div className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-border bg-foreground/5 hover:bg-foreground/10 hover:text-foreground h-10 px-4 py-2 text-foreground/80 cursor-pointer">
                           {avatarLoading ? "Uploading..." : "Change Avatar"}
                         </div>
                       </label>
                     </div>
                   </div>
 
-                  <div className="p-6 rounded-2xl bg-[#0F0F11] border border-white/5 space-y-6">
+                  <div className="p-6 rounded-2xl bg-background border border-border/60 space-y-6">
                     <div className="flex items-center gap-2 mb-2">
                       <User className="w-5 h-5 text-blue-500" />
-                      <h3 className="text-lg font-semibold text-white">
+                      <h3 className="text-lg font-semibold text-foreground">
                         Personal Information
                       </h3>
                     </div>
 
                     <div className="grid grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <Label className="text-gray-400 text-xs uppercase font-bold tracking-wider">
+                        <Label className="text-muted-foreground text-xs uppercase font-bold tracking-wider">
                           Full Name
                         </Label>
                         <Input
                           value={fullName}
                           onChange={(e) => setFullName(e.target.value)}
-                          className="bg-black/20 border-white/10 text-white focus:border-blue-500/50 h-11"
+                          className="bg-inset border-border text-foreground focus:border-blue-500/50 h-11"
                           placeholder="Enter your full name"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-gray-400 text-xs uppercase font-bold tracking-wider">
+                        <Label className="text-muted-foreground text-xs uppercase font-bold tracking-wider">
                           University Email
                         </Label>
                         <Input
                           value={user?.primaryEmailAddress?.emailAddress || ""}
                           readOnly
-                          className="bg-black/20 border-white/10 text-gray-400 h-11 cursor-not-allowed"
+                          className="bg-inset border-border text-muted-foreground h-11 cursor-not-allowed"
                         />
                       </div>
                     </div>
                   </div>
 
                   {/* Preferences Section */}
-                  <div className="p-6 rounded-2xl bg-[#0F0F11] border border-white/5 space-y-6">
+                  <div className="p-6 rounded-2xl bg-background border border-border/60 space-y-6">
                     <div className="flex items-center gap-2 mb-2">
                       <Sparkles className="w-5 h-5 text-blue-500" />
-                      <h3 className="text-lg font-semibold text-white">
+                      <h3 className="text-lg font-semibold text-foreground">
                         Study Preferences
                       </h3>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <Label className="text-gray-400 text-xs uppercase font-bold tracking-wider">
+                        <Label className="text-muted-foreground text-xs uppercase font-bold tracking-wider">
                           Major / Course of Study
                         </Label>
                         <Select value={major} onValueChange={setMajor}>
-                          <SelectTrigger className="w-full bg-black/20 border-white/10 text-white h-11">
+                          <SelectTrigger className="w-full bg-inset border-border text-foreground h-11">
                             <SelectValue placeholder="Select your major" />
                           </SelectTrigger>
-                          <SelectContent className="bg-[#18181b] border-white/10 text-white">
+                          <SelectContent className="bg-popover border-border text-foreground">
                             {MAJORS.map((m) => (
                               <SelectItem
                                 key={m.id}
                                 value={m.id}
-                                className="text-gray-300 focus:bg-white/10 focus:text-white"
+                                className="text-foreground/80 focus:bg-foreground/10 focus:text-foreground"
                               >
                                 {m.label}
                               </SelectItem>
@@ -377,29 +377,29 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-gray-400 text-xs uppercase font-bold tracking-wider">
+                        <Label className="text-muted-foreground text-xs uppercase font-bold tracking-wider">
                           Default Note Style
                         </Label>
                         <Select value={noteStyle} onValueChange={setNoteStyle}>
-                          <SelectTrigger className="w-full bg-black/20 border-white/10 text-white h-11">
+                          <SelectTrigger className="w-full bg-inset border-border text-foreground h-11">
                             <SelectValue placeholder="Select preferred style" />
                           </SelectTrigger>
-                          <SelectContent className="bg-[#18181b] border-white/10 text-white">
+                          <SelectContent className="bg-popover border-border text-foreground">
                             <SelectItem
                               value="standard"
-                              className="text-gray-300 focus:bg-white/10 focus:text-white"
+                              className="text-foreground/80 focus:bg-foreground/10 focus:text-foreground"
                             >
                               Standard
                             </SelectItem>
                             <SelectItem
                               value="outline"
-                              className="text-gray-300 focus:bg-white/10 focus:text-white"
+                              className="text-foreground/80 focus:bg-foreground/10 focus:text-foreground"
                             >
                               Outline Method
                             </SelectItem>
                             <SelectItem
                               value="mindmap"
-                              className="text-gray-300 focus:bg-white/10 focus:text-white"
+                              className="text-foreground/80 focus:bg-foreground/10 focus:text-foreground"
                             >
                               Mind Map
                             </SelectItem>
@@ -409,7 +409,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     </div>
 
                     <div className="space-y-3">
-                      <Label className="text-gray-400 text-xs uppercase font-bold tracking-wider">
+                      <Label className="text-muted-foreground text-xs uppercase font-bold tracking-wider">
                         App Theme
                       </Label>
                       <div className="flex flex-wrap gap-3">
@@ -420,8 +420,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                             className={cn(
                               "h-10 px-4 rounded-lg border flex items-center gap-2 transition-all duration-200",
                               theme === t.id
-                                ? "bg-white/10 border-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.2)]"
-                                : "bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:text-white",
+                                ? "bg-foreground/10 border-blue-500 text-foreground shadow-[0_0_15px_rgba(59,130,246,0.2)]"
+                                : "bg-inset border-border text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
                             )}
                           >
                             <div
@@ -440,21 +440,21 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
               {/* Security Tab */}
               {activeTab === "security" && (
-                <div className="p-6 rounded-2xl bg-[#0F0F11] border border-white/5 space-y-6">
+                <div className="p-6 rounded-2xl bg-background border border-border/60 space-y-6">
                   <div className="flex items-center gap-2 mb-2">
                     <Shield className="w-5 h-5 text-blue-500" />
-                    <h3 className="text-lg font-semibold text-white">
+                    <h3 className="text-lg font-semibold text-foreground">
                       Security & Authentication
                     </h3>
                   </div>
-                  <p className="text-sm text-gray-400">
+                  <p className="text-sm text-muted-foreground">
                     Manage your password and authentication methods securely via
                     your Clerk profile.
                   </p>
                   <Button
                     onClick={() => openUserProfile?.()}
                     variant="outline"
-                    className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+                    className="bg-foreground/5 border-border text-foreground hover:bg-foreground/10"
                   >
                     Manage Security Settings
                   </Button>
@@ -463,23 +463,23 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
               {/* Notifications Tab */}
               {activeTab === "notifications" && (
-                <div className="p-6 rounded-2xl bg-[#0F0F11] border border-white/5 space-y-6">
+                <div className="p-6 rounded-2xl bg-background border border-border/60 space-y-6">
                   <div className="flex items-center gap-2 mb-2">
                     <Bell className="w-5 h-5 text-blue-500" />
-                    <h3 className="text-lg font-semibold text-white">
+                    <h3 className="text-lg font-semibold text-foreground">
                       Notifications
                     </h3>
                   </div>
 
                   <div className="space-y-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
                       In-app
                     </p>
                     <InAppNotificationsPanel />
                   </div>
 
-                  <div className="space-y-3 pt-2 border-t border-white/5">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  <div className="space-y-3 pt-2 border-t border-border/60">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
                       Email preferences
                     </p>
                     <div className="space-y-4">
@@ -491,11 +491,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       ].map((label, i) => (
                         <div
                           key={i}
-                          className="flex items-center justify-between py-3 border-b border-white/5 last:border-0"
+                          className="flex items-center justify-between py-3 border-b border-border/60 last:border-0"
                         >
-                          <span className="text-sm text-gray-300">{label}</span>
-                          <div className="h-5 w-9 rounded-full bg-blue-600 relative cursor-pointer opacity-80 hover:opacity-100">
-                            <div className="absolute right-1 top-1 h-3 w-3 rounded-full bg-white" />
+                          <span className="text-sm text-foreground/80">{label}</span>
+                          <div className="h-5 w-9 rounded-full bg-primary relative cursor-pointer opacity-80 hover:opacity-100">
+                            <div className="absolute right-1 top-1 h-3 w-3 rounded-full bg-primary-foreground" />
                           </div>
                         </div>
                       ))}

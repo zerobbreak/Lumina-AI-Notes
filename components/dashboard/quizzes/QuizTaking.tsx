@@ -51,8 +51,8 @@ export function QuizTaking({ deckId }: QuizTakingProps) {
 
   if (!deck || !questions) {
     return (
-      <div className="h-full flex items-center justify-center bg-linear-to-br from-[#050505] to-[#0a0a12]">
-        <div className="flex items-center gap-2 text-gray-500 animate-pulse">
+      <div className="h-full flex items-center justify-center bg-linear-to-br from-background to-background">
+        <div className="flex items-center gap-2 text-muted-foreground/80 animate-pulse">
           <Loader2 className="w-5 h-5 animate-spin" />
           <span>Loading quiz...</span>
         </div>
@@ -140,27 +140,27 @@ export function QuizTaking({ deckId }: QuizTakingProps) {
   };
 
   return (
-    <div className="h-full flex flex-col bg-linear-to-br from-[#050505] to-[#0a0a12]">
+    <div className="h-full flex flex-col bg-linear-to-br from-background to-background">
       {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-white/5">
+      <div className="flex items-center justify-between p-6 border-b border-border/60">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => router.push("/dashboard?view=quizzes")}
-            className="text-gray-400 hover:text-white"
+            className="text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-white">{deck.title}</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="text-2xl font-bold text-foreground">{deck.title}</h1>
+            <p className="text-sm text-muted-foreground/80">
               Question {currentQuestionIndex + 1} of {questions.length}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="text-sm text-gray-400">
+          <div className="text-sm text-muted-foreground">
             Answered: {userAnswers.filter((a) => a !== -1).length} /{" "}
             {questions.length}
           </div>
@@ -168,9 +168,9 @@ export function QuizTaking({ deckId }: QuizTakingProps) {
       </div>
 
       {/* Progress Bar */}
-      <div className="w-full h-1 bg-white/5">
+      <div className="w-full h-1 bg-foreground/5">
         <div
-          className="h-full bg-linear-to-r from-purple-600 to-pink-600 transition-all duration-300"
+          className="h-full bg-linear-to-r from-primary to-primary-alt transition-all duration-300"
           style={{
             width: `${((currentQuestionIndex + 1) / questions.length) * 100}%`,
           }}
@@ -181,8 +181,8 @@ export function QuizTaking({ deckId }: QuizTakingProps) {
       <ScrollArea className="flex-1 p-6">
         <div className="max-w-3xl mx-auto space-y-6">
           {/* Question */}
-          <div className="p-6 rounded-xl bg-white/5 border border-white/10">
-            <h2 className="text-xl font-semibold text-white mb-6">
+          <div className="p-6 rounded-xl bg-foreground/5 border border-border">
+            <h2 className="text-xl font-semibold text-foreground mb-6">
               {currentQuestion.question}
             </h2>
 
@@ -194,20 +194,20 @@ export function QuizTaking({ deckId }: QuizTakingProps) {
                   onClick={() => handleAnswerSelect(index)}
                   className={`w-full p-4 rounded-lg text-left transition-all duration-200 ${
                     selectedAnswer === index
-                      ? "bg-purple-600 border-purple-500 text-white"
-                      : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20"
+                      ? "bg-primary border-primary text-primary-foreground"
+                      : "bg-foreground/5 border-border text-foreground/80 hover:bg-foreground/10 hover:border-foreground/20"
                   } border-2`}
                 >
                   <div className="flex items-center gap-3">
                     <div
                       className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
                         selectedAnswer === index
-                          ? "border-white bg-white"
-                          : "border-gray-500"
+                          ? "border-foreground bg-foreground"
+                          : "border-muted-foreground"
                       }`}
                     >
                       {selectedAnswer === index && (
-                        <div className="w-3 h-3 rounded-full bg-purple-600" />
+                        <div className="w-3 h-3 rounded-full bg-primary" />
                       )}
                     </div>
                     <span className="flex-1">{option}</span>
@@ -225,10 +225,10 @@ export function QuizTaking({ deckId }: QuizTakingProps) {
                 onClick={() => setCurrentQuestionIndex(index)}
                 className={`w-10 h-10 rounded-lg font-medium transition-all ${
                   index === currentQuestionIndex
-                    ? "bg-purple-600 text-white"
+                    ? "bg-primary text-primary-foreground"
                     : userAnswers[index] !== -1
                       ? "bg-green-600/20 text-green-400 border border-green-500/30"
-                      : "bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10"
+                      : "bg-foreground/5 text-muted-foreground border border-border hover:bg-foreground/10"
                 }`}
               >
                 {index + 1}
@@ -239,7 +239,7 @@ export function QuizTaking({ deckId }: QuizTakingProps) {
       </ScrollArea>
 
       {/* Navigation Footer */}
-      <div className="flex items-center justify-between p-6 border-t border-white/5 bg-black/20 backdrop-blur-md">
+      <div className="flex items-center justify-between p-6 border-t border-border/60 bg-inset backdrop-blur-md">
         <Button
           variant="outline"
           onClick={handlePrevious}
@@ -272,7 +272,7 @@ export function QuizTaking({ deckId }: QuizTakingProps) {
           <Button
             onClick={handleNext}
             disabled={selectedAnswer === null}
-            className="gap-2 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
+            className="gap-2 bg-linear-to-r from-primary to-primary-alt hover:from-primary/90 hover:to-primary-alt/90"
           >
             Next
             <ArrowRight className="w-4 h-4" />

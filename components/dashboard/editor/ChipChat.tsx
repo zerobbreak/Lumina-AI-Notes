@@ -80,9 +80,9 @@ export function ChipChat({ fileId, fileName, onCopyToNote }: ChipChatProps) {
   return (
     <div className="w-80 max-h-96 flex flex-col">
       {/* Header */}
-      <div className="flex items-center gap-2 pb-2 border-b border-white/10">
-        <FileText className="w-4 h-4 text-indigo-400" />
-        <h4 className="text-xs font-semibold text-gray-400 uppercase truncate flex-1">
+      <div className="flex items-center gap-2 pb-2 border-b border-border">
+        <FileText className="w-4 h-4 text-primary" />
+        <h4 className="text-xs font-semibold text-muted-foreground uppercase truncate flex-1">
           Asking {fileName}
         </h4>
       </div>
@@ -90,7 +90,7 @@ export function ChipChat({ fileId, fileName, onCopyToNote }: ChipChatProps) {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto py-2 space-y-3 min-h-[60px] max-h-60">
         {messages.length === 0 && !isLoading && (
-          <p className="text-xs text-gray-500 text-center py-4">
+          <p className="text-xs text-muted-foreground/80 text-center py-4">
             Ask a question about this document
           </p>
         )}
@@ -99,14 +99,14 @@ export function ChipChat({ fileId, fileName, onCopyToNote }: ChipChatProps) {
           <div key={index} className="space-y-1">
             <div
               className={`text-xs font-medium ${
-                message.role === "user" ? "text-indigo-300" : "text-gray-400"
+                message.role === "user" ? "text-primary" : "text-muted-foreground"
               }`}
             >
               {message.role === "user" ? "You" : "Lumina"}
             </div>
             <div
               className={`text-sm ${
-                message.role === "user" ? "text-white" : "text-gray-300"
+                message.role === "user" ? "text-foreground" : "text-foreground/80"
               }`}
             >
               {message.content}
@@ -114,7 +114,7 @@ export function ChipChat({ fileId, fileName, onCopyToNote }: ChipChatProps) {
             {message.role === "assistant" && onCopyToNote && (
               <button
                 onClick={() => handleCopy(message.content)}
-                className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors mt-1"
+                className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors mt-1"
               >
                 <Copy className="w-3 h-3" />
                 Copy to Note
@@ -124,7 +124,7 @@ export function ChipChat({ fileId, fileName, onCopyToNote }: ChipChatProps) {
         ))}
 
         {isLoading && (
-          <div className="flex items-center gap-2 text-gray-400">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span className="text-sm">Thinking...</span>
           </div>
@@ -132,7 +132,7 @@ export function ChipChat({ fileId, fileName, onCopyToNote }: ChipChatProps) {
       </div>
 
       {/* Input */}
-      <div className="pt-2 border-t border-white/10">
+      <div className="pt-2 border-t border-border">
         <div className="flex items-center gap-2">
           <input
             ref={inputRef}
@@ -142,14 +142,14 @@ export function ChipChat({ fileId, fileName, onCopyToNote }: ChipChatProps) {
             onKeyDown={handleKeyDown}
             placeholder="Ask a question..."
             disabled={isLoading}
-            className="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+            className="flex-1 bg-foreground/5 border border-border rounded px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground/80 focus:outline-none focus:border-primary disabled:opacity-50"
           />
           <button
             onClick={handleSend}
             disabled={isLoading || !input.trim()}
-            className="p-1.5 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-600 disabled:cursor-not-allowed rounded transition-colors"
+            className="p-1.5 bg-primary hover:bg-primary/90 disabled:bg-muted-foreground/40 disabled:cursor-not-allowed rounded transition-colors"
           >
-            <Send className="w-4 h-4 text-white" />
+            <Send className="w-4 h-4 text-foreground" />
           </button>
         </div>
       </div>

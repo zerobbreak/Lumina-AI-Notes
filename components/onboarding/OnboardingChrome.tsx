@@ -36,10 +36,10 @@ export function OnboardingProgress({
                     "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40",
                   active &&
                     !done &&
-                    "bg-indigo-500 text-white shadow-[0_0_20px_rgba(99,102,241,0.45)]",
+                    "bg-primary text-primary-foreground shadow-[0_0_20px_hsl(var(--primary)/0.45)]",
                   !done &&
                     !active &&
-                    "bg-white/[0.06] text-zinc-500 ring-1 ring-white/10",
+                    "bg-foreground/[0.06] text-muted-foreground/80 ring-1 ring-foreground/10",
                 )}
               >
                 {done ? "✓" : n}
@@ -47,7 +47,7 @@ export function OnboardingProgress({
               <span
                 className={cn(
                   "hidden sm:block text-[10px] font-medium uppercase tracking-widest truncate max-w-full text-center",
-                  active ? "text-zinc-200" : "text-zinc-600",
+                  active ? "text-foreground/90" : "text-muted-foreground/60",
                 )}
               >
                 {label}
@@ -56,15 +56,15 @@ export function OnboardingProgress({
           );
         })}
       </div>
-      <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden ring-1 ring-white/[0.06]">
+      <div className="h-1 rounded-full bg-foreground/[0.06] overflow-hidden ring-1 ring-foreground/[0.06]">
         <motion.div
-          className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 shadow-[0_0_12px_rgba(139,92,246,0.4)]"
+          className="h-full rounded-full bg-gradient-to-r from-primary via-primary-alt to-fuchsia-500 shadow-[0_0_12px_hsl(var(--chart-2)/0.4)]"
           initial={{ width: 0 }}
           animate={{ width: `${(step / total) * 100}%` }}
           transition={{ type: "spring", stiffness: 120, damping: 22 }}
         />
       </div>
-      <p className="mt-3 text-center text-xs text-zinc-500">
+      <p className="mt-3 text-center text-xs text-muted-foreground/80">
         Step {step} of {total}
       </p>
     </div>
@@ -75,15 +75,15 @@ export function OnboardingBackdrop() {
   return (
     <>
       <div
-        className="pointer-events-none fixed inset-0 bg-zinc-950"
+        className="pointer-events-none fixed inset-0 bg-background"
         aria-hidden
       />
       <div
-        className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,rgba(99,102,241,0.22),transparent_50%)]"
+        className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,hsl(var(--primary)/0.22),transparent_50%)]"
         aria-hidden
       />
       <div
-        className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_80%_50%_at_100%_100%,rgba(168,85,247,0.12),transparent_45%)]"
+        className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_80%_50%_at_100%_100%,hsl(var(--chart-2)/0.12),transparent_45%)]"
         aria-hidden
       />
       <div

@@ -34,7 +34,7 @@ function pillClasses(tone: ReturnType<typeof kindToTone>) {
     return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20";
   if (tone === "amber")
     return "bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20";
-  return "bg-muted/30 text-muted-foreground border-border dark:bg-white/5";
+  return "bg-muted/30 text-muted-foreground border-border dark:bg-foreground/5";
 }
 
 function kindLabel(kind: DeadlineKind) {
@@ -76,20 +76,20 @@ export function AcademicPipeline({ className }: { className?: string }) {
   return (
     <section
       className={cn(
-        "rounded-2xl border border-border bg-card p-5 shadow-sm ring-1 ring-black/5 dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:ring-0",
+        "rounded-2xl border border-border bg-card p-5 shadow-sm ring-1 ring-black/5 dark:bg-inset dark:shadow-none dark:ring-0",
         className,
       )}
     >
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
-          <CalendarClock className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" aria-hidden />
+          <CalendarClock className="w-4 h-4 text-primary shrink-0" aria-hidden />
           Academic pipeline
         </h3>
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent dark:hover:bg-white/5"
+          className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent dark:hover:bg-foreground/5"
           onClick={() => setIsAddOpen(true)}
         >
           Add

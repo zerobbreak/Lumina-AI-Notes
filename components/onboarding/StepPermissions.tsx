@@ -35,34 +35,34 @@ export function StepPermissions({ onPermissionGranted }: StepPermissionsProps) {
         animate={{ scale: 1, opacity: 1 }}
         className="relative"
       >
-        <div className="absolute inset-0 rounded-full bg-indigo-500/25 blur-2xl scale-150" />
+        <div className="absolute inset-0 rounded-full bg-primary/25 blur-2xl scale-150" />
         <div
           className={`relative flex h-24 w-24 items-center justify-center rounded-full ring-1 transition-colors duration-300 ${
             granted
               ? "bg-emerald-500/15 ring-emerald-500/40"
-              : "bg-indigo-500/15 ring-indigo-400/30"
+              : "bg-primary/15 ring-primary/30"
           }`}
         >
           {granted ? (
             <CheckCircle2 className="h-11 w-11 text-emerald-400" strokeWidth={1.5} />
           ) : (
-            <Mic className="h-11 w-11 text-indigo-300" strokeWidth={1.5} />
+            <Mic className="h-11 w-11 text-primary" strokeWidth={1.5} />
           )}
         </div>
       </motion.div>
 
       <div className="space-y-2 max-w-sm mx-auto">
-        <p className="text-sm text-zinc-400 leading-relaxed">
+        <p className="text-sm text-muted-foreground leading-relaxed">
           Used when you record or transcribe lectures. You can change this anytime
           in your browser settings.
         </p>
       </div>
 
-      <div className="w-full max-w-sm rounded-xl border border-white/8 bg-zinc-900/50 p-4 flex gap-3 text-left">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-800 ring-1 ring-white/6">
-          <Shield className="h-4 w-4 text-zinc-400" />
+      <div className="w-full max-w-sm rounded-xl border border-foreground/8 bg-muted/50 p-4 flex gap-3 text-left">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted ring-1 ring-foreground/6">
+          <Shield className="h-4 w-4 text-muted-foreground" />
         </div>
-        <p className="text-xs text-zinc-400 leading-relaxed">
+        <p className="text-xs text-muted-foreground leading-relaxed">
           Audio is processed for your workspace. We don&apos;t use your recordings
           to train public models without your consent.
         </p>
@@ -71,7 +71,7 @@ export function StepPermissions({ onPermissionGranted }: StepPermissionsProps) {
       <Button
         type="button"
         size="lg"
-        className="w-full max-w-sm h-12 rounded-xl bg-linear-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white border border-white/10 shadow-lg shadow-indigo-500/20"
+        className="w-full max-w-sm h-12 rounded-xl bg-linear-to-r from-primary to-primary-alt hover:from-primary/90 hover:to-primary-alt/90 text-primary-foreground border border-border shadow-lg shadow-primary/20"
         onClick={requestMicrophone}
         disabled={granted}
       >

@@ -51,20 +51,20 @@ export function FlashcardCard({
         <div
           className={cn(
             "absolute inset-0 backface-hidden rounded-2xl",
-            "bg-linear-to-br from-indigo-600/20 to-purple-600/20",
-            "border border-white/10 backdrop-blur-xl",
+            "bg-linear-to-br from-primary/20 to-primary-alt/20",
+            "border border-border backdrop-blur-xl",
             "flex flex-col items-center justify-center p-8",
-            "shadow-2xl shadow-indigo-500/10"
+            "shadow-2xl shadow-primary/10"
           )}
           style={{ backfaceVisibility: "hidden" }}
         >
-          <span className="text-xs text-indigo-400 uppercase tracking-wider mb-4 font-semibold">
+          <span className="text-xs text-primary uppercase tracking-wider mb-4 font-semibold">
             Question
           </span>
-          <p className="text-xl md:text-2xl text-white text-center font-medium leading-relaxed">
+          <p className="text-xl md:text-2xl text-foreground text-center font-medium leading-relaxed">
             {front}
           </p>
-          <span className="absolute bottom-4 text-xs text-gray-500">
+          <span className="absolute bottom-4 text-xs text-muted-foreground/80">
             Click to reveal answer
           </span>
         </div>
@@ -74,7 +74,7 @@ export function FlashcardCard({
           className={cn(
             "absolute inset-0 backface-hidden rounded-2xl",
             "bg-linear-to-br from-cyan-600/20 to-emerald-600/20",
-            "border border-white/10 backdrop-blur-xl",
+            "border border-border backdrop-blur-xl",
             "flex flex-col items-center justify-center p-8",
             "shadow-2xl shadow-cyan-500/10"
           )}
@@ -83,10 +83,10 @@ export function FlashcardCard({
           <span className="text-xs text-cyan-400 uppercase tracking-wider mb-4 font-semibold">
             Answer
           </span>
-          <p className="text-xl md:text-2xl text-white text-center font-medium leading-relaxed">
+          <p className="text-xl md:text-2xl text-foreground text-center font-medium leading-relaxed">
             {back}
           </p>
-          <span className="absolute bottom-4 text-xs text-gray-500">
+          <span className="absolute bottom-4 text-xs text-muted-foreground/80">
             Click to flip back
           </span>
         </div>

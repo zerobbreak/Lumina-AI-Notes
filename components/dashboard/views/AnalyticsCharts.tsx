@@ -24,7 +24,7 @@ interface AnalyticsChartsProps {
 }
 
 const panelClass =
-  "rounded-2xl border border-border bg-card text-card-foreground shadow-sm ring-1 ring-black/5 dark:border-white/10 dark:bg-black/40 dark:shadow-none dark:ring-0 p-4";
+  "rounded-2xl border border-border bg-card text-card-foreground shadow-sm ring-1 ring-black/5 dark:bg-inset dark:shadow-none dark:ring-0 p-4";
 
 function InsightCard({
   title,
@@ -46,11 +46,11 @@ function InsightCard({
         ? "border-amber-500/20 bg-amber-500/6"
         : tone === "bad"
           ? "border-red-500/20 bg-red-500/6"
-          : "border-border bg-muted/10 dark:bg-white/4";
+          : "border-border bg-muted/10 dark:bg-foreground/4";
   return (
     <div
       className={cn(
-        "rounded-2xl border p-4 shadow-sm ring-1 ring-black/5 dark:border-white/10 dark:shadow-none dark:ring-0",
+        "rounded-2xl border p-4 shadow-sm ring-1 ring-black/5 dark:border-border dark:shadow-none dark:ring-0",
         toneClasses,
       )}
     >
@@ -66,7 +66,7 @@ function InsightCard({
             <p className="mt-1 text-[11px] text-muted-foreground">{subtitle}</p>
           ) : null}
         </div>
-        <div className="mt-0.5 h-9 w-9 rounded-xl border border-border bg-background/40 dark:bg-white/5 dark:border-white/10 flex items-center justify-center text-muted-foreground">
+        <div className="mt-0.5 h-9 w-9 rounded-xl border border-border bg-background/40 dark:bg-foreground/5 flex items-center justify-center text-muted-foreground">
           {icon}
         </div>
       </div>
@@ -82,25 +82,14 @@ export default function AnalyticsCharts({ showAnalytics }: AnalyticsChartsProps)
 
   const isDark = resolvedTheme === "dark";
 
-  const tooltipContentStyle = useMemo(
-    () =>
-      isDark
-        ? {
-            background: "#0b0b12",
-            border: "1px solid rgba(255,255,255,0.1)",
-            fontSize: "12px",
-            color: "#e2e8f0",
-          }
-        : {
-            background: "#ffffff",
-            border: "1px solid rgba(15, 23, 42, 0.12)",
-            fontSize: "12px",
-            color: "#0f172a",
-          },
-    [isDark],
-  );
+  const tooltipContentStyle = {
+    background: "hsl(var(--popover))",
+    border: "1px solid hsl(var(--border))",
+    fontSize: "12px",
+    color: "hsl(var(--popover-foreground))",
+  };
 
-  const axisStroke = isDark ? "#64748b" : "#64748b";
+  const axisStroke = "hsl(var(--muted-foreground))";
 
   useEffect(() => {
     if (!showAnalytics) return;
@@ -205,17 +194,17 @@ export default function AnalyticsCharts({ showAnalytics }: AnalyticsChartsProps)
             <AreaChart data={last7Days} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
               <defs>
                 <linearGradient id="prodStroke" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.9} />
-                  <stop offset="60%" stopColor="#6366f1" stopOpacity={0.9} />
-                  <stop offset="100%" stopColor="#a78bfa" stopOpacity={0.9} />
+                  <stop offset="0%" stopColor="hsl(var(--chart-5))" stopOpacity={0.9} />
+                  <stop offset="60%" stopColor="hsl(var(--primary))" stopOpacity={0.9} />
+                  <stop offset="100%" stopColor="hsl(var(--chart-2))" stopOpacity={0.9} />
                 </linearGradient>
                 <linearGradient id="prodFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#6366f1" stopOpacity={isDark ? 0.25 : 0.18} />
-                  <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+                  <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={isDark ? 0.25 : 0.18} />
+                  <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                 </linearGradient>
               </defs>
 
-              <CartesianGrid stroke={isDark ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.06)"} vertical={false} />
+              <CartesianGrid stroke="hsl(var(--foreground) / 0.06)" vertical={false} />
               <XAxis
                 dataKey="date"
                 tickFormatter={(v) =>
@@ -293,7 +282,7 @@ export default function AnalyticsCharts({ showAnalytics }: AnalyticsChartsProps)
               ? `Top: ${weakTopics[0]?.topic ?? "—"}`
               : "No weak topics yet"
           }
-          icon={<Target className="h-4 w-4 text-indigo-600" aria-hidden />}
+          icon={<Target className="h-4 w-4 text-primary" aria-hidden />}
           tone={weakTopics && weakTopics.length > 0 ? "warn" : "muted"}
         />
       </div>
@@ -315,7 +304,7 @@ export default function AnalyticsCharts({ showAnalytics }: AnalyticsChartsProps)
               const intensity =
                 count === 0
                   ? isDark
-                    ? "bg-white/5"
+                    ? "bg-foreground/5"
                     : "bg-muted border border-border/80"
                   : count < 3
                     ? "bg-emerald-500/25 dark:bg-emerald-500/20"
@@ -394,7 +383,7 @@ export default function AnalyticsCharts({ showAnalytics }: AnalyticsChartsProps)
                   <Line
                     type="monotone"
                     dataKey="scorePercent"
-                    stroke="#6366f1"
+                    stroke="hsl(var(--primary))"
                     strokeWidth={2}
                     dot={false}
                   />
@@ -447,7 +436,7 @@ export default function AnalyticsCharts({ showAnalytics }: AnalyticsChartsProps)
                   `/dashboard?view=flashcards&deckId=${primaryDeckId}`,
                 )
               }
-              className="text-xs h-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-accent dark:hover:bg-white/5"
+              className="text-xs h-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-accent dark:hover:bg-foreground/5"
             >
               Review weak cards
             </Button>

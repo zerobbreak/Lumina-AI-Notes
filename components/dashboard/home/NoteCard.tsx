@@ -84,14 +84,14 @@ export function NoteCard({
       type="button"
       onClick={() => onOpen(note._id)}
       className={cn(
-        "group relative w-full text-left rounded-2xl border border-border bg-card text-card-foreground shadow-sm ring-1 ring-black/5 dark:border-white/10 dark:bg-[#121212]/60 dark:shadow-none dark:ring-0",
-        "px-5 py-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:bg-accent/35 dark:hover:bg-white/8",
+        "group relative w-full text-left rounded-2xl border border-border bg-card text-card-foreground shadow-sm ring-1 ring-black/5 dark:bg-background/60 dark:shadow-none dark:ring-0",
+        "px-5 py-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:bg-accent/35 dark:hover:bg-foreground/8",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         className,
       )}
     >
       <div className="absolute inset-0 rounded-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-        <div className="absolute inset-0 rounded-2xl bg-linear-to-br from-cyan-500/8 via-transparent to-indigo-500/8 dark:from-cyan-400/10 dark:to-indigo-400/10" />
+        <div className="absolute inset-0 rounded-2xl bg-linear-to-br from-cyan-500/8 via-transparent to-primary-alt/8 dark:from-cyan-400/10 dark:to-primary-alt/10" />
       </div>
 
       <div className="relative flex items-start justify-between gap-4">
@@ -110,11 +110,11 @@ export function NoteCard({
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {primaryTag ? (
-              <span className="inline-flex items-center rounded-full border border-border bg-muted/30 px-2.5 py-1 text-[10px] font-medium text-muted-foreground dark:bg-white/5">
+              <span className="inline-flex items-center rounded-full border border-border bg-muted/30 px-2.5 py-1 text-[10px] font-medium text-muted-foreground dark:bg-foreground/5">
                 {primaryTag}
               </span>
             ) : (
-              <span className="inline-flex items-center rounded-full border border-border bg-muted/20 px-2.5 py-1 text-[10px] font-medium text-muted-foreground/80 dark:bg-white/5">
+              <span className="inline-flex items-center rounded-full border border-border bg-muted/20 px-2.5 py-1 text-[10px] font-medium text-muted-foreground/80 dark:bg-foreground/5">
                 General
               </span>
             )}
@@ -126,7 +126,7 @@ export function NoteCard({
                   "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium border",
                   c.tone === "primary"
                     ? "border-cyan-500/25 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300"
-                    : "border-border bg-muted/20 text-muted-foreground dark:bg-white/5",
+                    : "border-border bg-muted/20 text-muted-foreground dark:bg-foreground/5",
                 )}
               >
                 {c.tone === "primary" ? (

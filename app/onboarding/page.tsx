@@ -164,10 +164,10 @@ export default function OnboardingPage() {
 
   if (authLoading || userData === undefined) {
     return (
-      <div className="relative min-h-screen flex items-center justify-center text-zinc-400">
+      <div className="relative min-h-screen flex items-center justify-center text-muted-foreground">
         <OnboardingBackdrop />
         <div className="relative z-10 flex flex-col items-center gap-3">
-          <div className="h-10 w-10 rounded-full border-2 border-indigo-500/30 border-t-indigo-400 animate-spin" />
+          <div className="h-10 w-10 rounded-full border-2 border-primary/30 border-t-indigo-400 animate-spin" />
           <p className="text-sm tracking-wide">Loading workspace…</p>
         </div>
       </div>
@@ -176,10 +176,10 @@ export default function OnboardingPage() {
 
   if (userData && userData.onboardingComplete) {
     return (
-      <div className="relative min-h-screen flex items-center justify-center text-zinc-400">
+      <div className="relative min-h-screen flex items-center justify-center text-muted-foreground">
         <OnboardingBackdrop />
         <div className="relative z-10 flex items-center gap-2 text-sm">
-          <Sparkles className="w-4 h-4 text-indigo-400" />
+          <Sparkles className="w-4 h-4 text-primary" />
           Redirecting…
         </div>
       </div>
@@ -187,25 +187,25 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="relative min-h-screen text-zinc-100 flex flex-col">
+    <div className="relative min-h-screen text-foreground flex flex-col">
       <OnboardingBackdrop />
 
       <header className="relative z-10 shrink-0 px-6 pt-8 pb-2 md:px-10">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-500/25">
-              <Sparkles className="h-4 w-4 text-white" strokeWidth={2.2} />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-br from-primary to-primary-alt shadow-lg shadow-primary/25">
+              <Sparkles className="h-4 w-4 text-foreground" strokeWidth={2.2} />
             </div>
             <div>
-              <p className="text-sm font-semibold tracking-tight text-white">
+              <p className="text-sm font-semibold tracking-tight text-foreground">
                 Lumina
               </p>
-              <p className="text-[11px] text-zinc-500 uppercase tracking-[0.2em]">
+              <p className="text-[11px] text-muted-foreground/80 uppercase tracking-[0.2em]">
                 Setup
               </p>
             </div>
           </div>
-          <p className="hidden sm:block text-xs text-zinc-500">
+          <p className="hidden sm:block text-xs text-muted-foreground/80">
             ~2 minutes · You can add more later
           </p>
         </div>
@@ -221,9 +221,9 @@ export default function OnboardingPage() {
           {/* Form column */}
           <div className="lg:col-span-5 flex flex-col min-h-0">
             <div
-              className="flex flex-col flex-1 rounded-[1.75rem] border border-white/8 bg-zinc-900/40 backdrop-blur-xl shadow-[0_24px_80px_-20px_rgba(0,0,0,0.65)] ring-1 ring-white/4 overflow-hidden"
+              className="flex flex-col flex-1 rounded-[1.75rem] border border-foreground/8 bg-card/40 backdrop-blur-xl shadow-[0_24px_80px_-20px_rgba(0,0,0,0.65)] ring-1 ring-foreground/4 overflow-hidden"
             >
-              <div className="px-6 pt-6 md:px-8 md:pt-8 pb-2 border-b border-white/6">
+              <div className="px-6 pt-6 md:px-8 md:pt-8 pb-2 border-b border-border">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={step}
@@ -232,13 +232,13 @@ export default function OnboardingPage() {
                     exit={{ opacity: 0, y: -8 }}
                     transition={{ duration: 0.22 }}
                   >
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-indigo-300/90 mb-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/90 mb-1">
                       {step === 1 && "Welcome"}
                       {step === 2 && "Your focus"}
                       {step === 3 && "Materials"}
                       {step === 4 && "Permissions"}
                     </p>
-                    <h1 className="text-xl md:text-2xl font-semibold text-white tracking-tight">
+                    <h1 className="text-xl md:text-2xl font-semibold text-foreground tracking-tight">
                       {step === 1 && "Start your workspace"}
                       {step === 2 && "What do you study?"}
                       {step === 3 && "Add syllabus PDFs"}
@@ -266,16 +266,16 @@ export default function OnboardingPage() {
                           transition={{ delay: 0.05, type: "spring", damping: 18 }}
                           className="relative"
                         >
-                          <div className="absolute inset-0 rounded-3xl bg-indigo-500/20 blur-2xl scale-150" />
-                          <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-linear-to-br from-indigo-500 to-violet-600 shadow-xl shadow-indigo-500/30 ring-1 ring-white/20">
+                          <div className="absolute inset-0 rounded-3xl bg-primary/20 blur-2xl scale-150" />
+                          <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-linear-to-br from-primary to-primary-alt shadow-xl shadow-primary/30 ring-1 ring-foreground/20">
                             <Sparkles
-                              className="h-9 w-9 text-white"
+                              className="h-9 w-9 text-foreground"
                               strokeWidth={1.5}
                             />
                           </div>
                         </motion.div>
                         <div className="space-y-3 max-w-sm">
-                          <p className="text-zinc-300 text-[15px] leading-relaxed">
+                          <p className="text-foreground/80 text-[15px] leading-relaxed">
                             Notes, courses, and AI assistance in one place—so
                             you spend less time switching tools and more time
                             learning.
@@ -310,13 +310,13 @@ export default function OnboardingPage() {
                 </AnimatePresence>
               </div>
 
-              <div className="mt-auto flex items-center justify-between gap-3 px-6 py-5 md:px-8 border-t border-white/6 bg-black/20">
+              <div className="mt-auto flex items-center justify-between gap-3 px-6 py-5 md:px-8 border-t border-border bg-inset">
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={() => setStep(Math.max(1, step - 1))}
                   disabled={step === 1}
-                  className="text-zinc-400 hover:text-white hover:bg-white/6 rounded-xl px-4"
+                  className="text-muted-foreground hover:text-foreground hover:bg-foreground/6 rounded-xl px-4"
                 >
                   <ChevronLeft className="mr-1 h-4 w-4" />
                   Back
@@ -329,7 +329,7 @@ export default function OnboardingPage() {
                     (step === 2 && !formData.major) ||
                     (step === 4 && !formData.permissionsGranted)
                   }
-                  className="rounded-xl bg-linear-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white px-7 shadow-lg shadow-indigo-500/25 border border-white/10"
+                  className="rounded-xl bg-linear-to-r from-primary to-primary-alt hover:from-primary/90 hover:to-primary-alt/90 text-primary-foreground px-7 shadow-lg shadow-primary/25 border border-border"
                 >
                   {step === totalSteps ? "Finish & open Lumina" : "Continue"}
                   {step !== totalSteps && (
@@ -346,15 +346,15 @@ export default function OnboardingPage() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, ease: "easeOut" }}
-              className="flex flex-1 flex-col rounded-[1.75rem] border border-white/8 bg-zinc-950/50 backdrop-blur-md overflow-hidden shadow-[0_32px_100px_-24px_rgba(0,0,0,0.75)] ring-1 ring-inset ring-white/4"
+              className="flex flex-1 flex-col rounded-[1.75rem] border border-foreground/8 bg-inset/50 backdrop-blur-md overflow-hidden shadow-[0_32px_100px_-24px_rgba(0,0,0,0.75)] ring-1 ring-inset ring-foreground/4"
             >
-              <div className="flex items-center gap-2 px-5 py-4 border-b border-white/6 bg-black/30">
+              <div className="flex items-center gap-2 px-5 py-4 border-b border-border bg-inset">
                 <div className="flex gap-1.5">
                   <span className="h-3 w-3 rounded-full bg-red-500/35 ring-1 ring-red-500/40" />
                   <span className="h-3 w-3 rounded-full bg-amber-500/35 ring-1 ring-amber-500/40" />
                   <span className="h-3 w-3 rounded-full bg-emerald-500/35 ring-1 ring-emerald-500/40" />
                 </div>
-                <span className="ml-3 text-[11px] text-zinc-500 font-medium tracking-wide">
+                <span className="ml-3 text-[11px] text-muted-foreground/80 font-medium tracking-wide">
                   Preview
                 </span>
               </div>
@@ -367,58 +367,58 @@ export default function OnboardingPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -12 }}
                     transition={{ duration: 0.28 }}
-                    className="rounded-2xl border border-indigo-500/20 bg-linear-to-br from-indigo-500/10 via-violet-500/5 to-transparent p-6 flex gap-4"
+                    className="rounded-2xl border border-primary/20 bg-linear-to-br from-primary/10 via-primary-alt/5 to-transparent p-6 flex gap-4"
                   >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 ring-1 ring-indigo-400/25">
-                      <HintIcon className="h-5 w-5 text-indigo-300" />
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/15 ring-1 ring-primary/25">
+                      <HintIcon className="h-5 w-5 text-primary" />
                     </div>
                     <div className="min-w-0 space-y-1.5">
-                      <h3 className="text-base font-semibold text-white leading-snug">
+                      <h3 className="text-base font-semibold text-foreground leading-snug">
                         {hint.title}
                       </h3>
-                      <p className="text-sm text-zinc-400 leading-relaxed">
+                      <p className="text-sm text-muted-foreground leading-relaxed">
                         {hint.body}
                       </p>
                     </div>
                   </motion.div>
                 </AnimatePresence>
 
-                <div className="rounded-2xl border border-white/6 bg-zinc-900/40 p-6 flex flex-col gap-5 flex-1 min-h-0">
+                <div className="rounded-2xl border border-border bg-card/40 p-6 flex flex-col gap-5 flex-1 min-h-0">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                      <h3 className="text-2xl font-semibold text-white tracking-tight">
+                      <h3 className="text-2xl font-semibold text-foreground tracking-tight">
                         {formatMajorLabel(formData.major)}
                       </h3>
-                      <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-white/6 px-3 py-1 text-xs text-zinc-300 ring-1 ring-white/8">
+                      <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-foreground/6 px-3 py-1 text-xs text-foreground/80 ring-1 ring-foreground/8">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
                         Fall 2025
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-zinc-500 uppercase tracking-wider">
+                      <p className="text-xs text-muted-foreground/80 uppercase tracking-wider">
                         This week
                       </p>
-                      <p className="text-2xl font-semibold tabular-nums text-white">
+                      <p className="text-2xl font-semibold tabular-nums text-foreground">
                         {formData.files.length > 0
                           ? `${formData.files.length} PDF${formData.files.length > 1 ? "s" : ""}`
                           : "—"}
                       </p>
-                      <p className="text-[11px] text-zinc-500 mt-0.5">
+                      <p className="text-[11px] text-muted-foreground/80 mt-0.5">
                         {step >= 3 ? "Syllabus files" : "Course files"}
                       </p>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <div className="flex justify-between text-xs text-zinc-500">
+                    <div className="flex justify-between text-xs text-muted-foreground/80">
                       <span>Workspace readiness</span>
-                      <span className="tabular-nums text-zinc-400">
+                      <span className="tabular-nums text-muted-foreground">
                         {Math.round((step / totalSteps) * 100)}%
                       </span>
                     </div>
-                    <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
+                    <div className="h-2 rounded-full bg-muted overflow-hidden">
                       <motion.div
-                        className="h-full rounded-full bg-linear-to-r from-indigo-500 to-violet-400"
+                        className="h-full rounded-full bg-linear-to-r from-primary to-primary-alt"
                         initial={false}
                         animate={{ width: `${(step / totalSteps) * 100}%` }}
                         transition={{
@@ -431,26 +431,26 @@ export default function OnboardingPage() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 flex-1 min-h-[140px]">
-                    <div className="rounded-xl border border-white/6 bg-black/25 p-4 flex flex-col justify-between">
+                    <div className="rounded-xl border border-border bg-inset p-4 flex flex-col justify-between">
                       <div className="flex items-center gap-2">
                         <div className="h-8 w-8 rounded-lg bg-orange-500/15 flex items-center justify-center text-lg">
                           📝
                         </div>
                         <div className="space-y-1.5 flex-1 min-w-0">
-                          <div className="h-2 w-16 bg-white/15 rounded-full" />
-                          <div className="h-1.5 w-10 bg-white/10 rounded-full" />
+                          <div className="h-2 w-16 bg-foreground/15 rounded-full" />
+                          <div className="h-1.5 w-10 bg-foreground/10 rounded-full" />
                         </div>
                       </div>
                       <div className="space-y-1.5 mt-4">
-                        <div className="h-1.5 w-full bg-white/8 rounded-full" />
-                        <div className="h-1.5 w-[88%] bg-white/6 rounded-full" />
-                        <div className="h-1.5 w-[72%] bg-white/6 rounded-full" />
+                        <div className="h-1.5 w-full bg-foreground/8 rounded-full" />
+                        <div className="h-1.5 w-[88%] bg-foreground/6 rounded-full" />
+                        <div className="h-1.5 w-[72%] bg-foreground/6 rounded-full" />
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-white/6 bg-black/25 p-4 flex flex-col">
+                    <div className="rounded-xl border border-border bg-inset p-4 flex flex-col">
                       <div className="flex justify-between items-center mb-3">
-                        <span className="text-xs text-zinc-500">Activity</span>
+                        <span className="text-xs text-muted-foreground/80">Activity</span>
                         <span className="text-[11px] font-medium text-emerald-400/90">
                           +12%
                         </span>
@@ -459,10 +459,10 @@ export default function OnboardingPage() {
                         {[40, 70, 45, 90, 60, 80, 50].map((h, i) => (
                           <div
                             key={i}
-                            className="flex-1 rounded-t-sm bg-indigo-500/15 relative overflow-hidden"
+                            className="flex-1 rounded-t-sm bg-primary/15 relative overflow-hidden"
                           >
                             <motion.div
-                              className="absolute bottom-0 left-0 right-0 rounded-t-sm bg-linear-to-br from-indigo-600 to-violet-500"
+                              className="absolute bottom-0 left-0 right-0 rounded-t-sm bg-linear-to-br from-primary to-primary-alt"
                               initial={{ height: 0 }}
                               animate={{ height: `${h}%` }}
                               transition={{

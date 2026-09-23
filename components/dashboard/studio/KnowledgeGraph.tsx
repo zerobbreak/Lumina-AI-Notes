@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { applyForceLayout } from "@/components/diagram/layouts";
 
 /** Index 0 is the neutral/orphan color; real clusters start at 1. */
-const CLUSTER_COLORS = ["#9a99a3", "#6366f1", "#a649df", "#0ea5e9", "#f59e0b", "#22c55e"];
+const CLUSTER_COLORS = ["hsl(var(--muted-foreground))", "hsl(var(--primary))", "#a649df", "#0ea5e9", "#f59e0b", "#22c55e"];
 
 interface GraphNodeData {
   title: string;
@@ -50,12 +50,14 @@ function GraphNodeView({ data }: NodeProps) {
           width: size,
           height: size,
           borderRadius: 9999,
-          background: d.orphan ? "var(--muted)" : `${d.clusterColor}26`,
+          background: d.orphan
+            ? "hsl(var(--muted))"
+            : `color-mix(in srgb, ${d.clusterColor} 15%, transparent)`,
           border: `2px ${d.orphan ? "dashed" : "solid"} ${
-            d.orphan ? "var(--muted-foreground)" : d.clusterColor
+            d.orphan ? "hsl(var(--muted-foreground))" : d.clusterColor
           }`,
           boxShadow: d.selected
-            ? `0 0 0 3px var(--card), 0 0 0 5px ${d.clusterColor}`
+            ? `0 0 0 3px hsl(var(--card)), 0 0 0 5px ${d.clusterColor}`
             : "none",
         }}
       />
@@ -141,8 +143,8 @@ export function KnowledgeGraph({ onOpenNote, onDiscussInChat }: KnowledgeGraphPr
       type: "straight",
       style:
         e.type === "wikilink"
-          ? { stroke: "#6366f1", strokeWidth: 2 }
-          : { stroke: "#9a99a3", strokeWidth: 1.5, strokeDasharray: "5 5" },
+          ? { stroke: "hsl(var(--primary))", strokeWidth: 2 }
+          : { stroke: "hsl(var(--muted-foreground))", strokeWidth: 1.5, strokeDasharray: "5 5" },
     }));
   }, [graph]);
 

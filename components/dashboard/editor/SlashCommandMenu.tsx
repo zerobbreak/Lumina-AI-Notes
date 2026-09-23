@@ -149,14 +149,14 @@ export const SlashCommandMenu = ({
         "slash-command-menu",
         "scrollbar-hide",
         "max-h-[min(22rem,50vh)] w-[min(20rem,calc(100vw-1.5rem))] overflow-y-auto overflow-x-hidden",
-        "rounded-xl border border-white/[0.08] bg-zinc-900/95 p-1.5 shadow-[0_16px_48px_-12px_rgba(0,0,0,0.65)] backdrop-blur-md",
-        "ring-1 ring-white/[0.04]",
+        "rounded-xl border border-border bg-popover/95 p-1.5 shadow-[0_16px_48px_-12px_rgba(0,0,0,0.65)] backdrop-blur-md",
+        "ring-1 ring-foreground/[0.04]",
       )}
     >
       {itemCount === 0 && (
-        <div className="px-2.5 py-6 text-center text-[12px] text-zinc-500">
+        <div className="px-2.5 py-6 text-center text-[12px] text-muted-foreground/80">
           No commands match that text. Try keywords like{" "}
-          <span className="text-zinc-400">
+          <span className="text-muted-foreground">
             heading, list, code, image, math, chart
           </span>
           .
@@ -165,7 +165,7 @@ export const SlashCommandMenu = ({
       {grouped.map((group) => (
         <Fragment key={group.label}>
           <div
-            className="px-2.5 pb-1.5 pt-2 first:pt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500"
+            className="px-2.5 pb-1.5 pt-2 first:pt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80"
             role="presentation"
           >
             {group.label}
@@ -191,15 +191,15 @@ export const SlashCommandMenu = ({
                   className={cn(
                     "group relative flex w-full min-w-0 items-start gap-2.5 rounded-lg px-2 py-2 text-left",
                     "outline-none transition-colors duration-150",
-                    "focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900",
+                    "focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900",
                     !selected &&
-                      "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200",
+                      "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground/90",
                   )}
                 >
                   {selected && (
                     <motion.span
                       layoutId="slash-command-selection"
-                      className="pointer-events-none absolute inset-0 rounded-lg bg-gradient-to-r from-indigo-500/15 to-white/[0.06] ring-1 ring-white/[0.07]"
+                      className="pointer-events-none absolute inset-0 rounded-lg bg-gradient-to-r from-primary/15 to-foreground/[0.06] ring-1 ring-foreground/[0.07]"
                       transition={{
                         type: "spring",
                         stiffness: 420,
@@ -209,10 +209,10 @@ export const SlashCommandMenu = ({
                   )}
                   <span
                     className={cn(
-                      "relative z-[1] flex size-9 shrink-0 items-center justify-center rounded-lg border border-white/[0.06] bg-zinc-800/80 text-zinc-300 shadow-inner shadow-black/20",
+                      "relative z-[1] flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/80 text-foreground/80 shadow-inner shadow-black/20",
                       "transition-colors duration-150",
                       selected &&
-                        "border-indigo-400/25 bg-indigo-500/10 text-indigo-200",
+                        "border-primary/25 bg-primary/10 text-primary",
                     )}
                   >
                     {icon}
@@ -221,7 +221,7 @@ export const SlashCommandMenu = ({
                     <span
                       className={cn(
                         "block text-[13px] font-medium leading-tight tracking-tight",
-                        selected ? "text-zinc-50" : "text-zinc-200",
+                        selected ? "text-foreground" : "text-foreground/90",
                       )}
                     >
                       {item.title}
@@ -229,7 +229,7 @@ export const SlashCommandMenu = ({
                     <span
                       className={cn(
                         "mt-0.5 block text-[11px] leading-snug",
-                        selected ? "text-zinc-400" : "text-zinc-500",
+                        selected ? "text-muted-foreground" : "text-muted-foreground/80",
                       )}
                     >
                       {item.description}
@@ -238,7 +238,7 @@ export const SlashCommandMenu = ({
                       <span
                         className={cn(
                           "mt-1 block text-[10px] leading-snug tracking-wide",
-                          selected ? "text-zinc-500" : "text-zinc-600",
+                          selected ? "text-muted-foreground/80" : "text-muted-foreground/60",
                         )}
                         title={`Search: ${item.keywords.join(", ")}`}
                       >

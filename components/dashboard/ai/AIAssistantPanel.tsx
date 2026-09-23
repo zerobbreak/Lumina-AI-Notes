@@ -186,24 +186,24 @@ export function AIAssistantPanel({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="absolute bottom-16 right-0 w-[380px] max-h-[600px] h-[70vh] bg-[#0A0A0A] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50"
+            className="absolute bottom-16 right-0 w-[380px] max-h-[600px] h-[70vh] bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border/60">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-linear-to-r from-purple-600 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                  <Sparkles className="w-5 h-5 text-white" />
+                <div className="w-10 h-10 rounded-xl bg-linear-to-r from-primary to-primary-alt flex items-center justify-center shadow-lg shadow-primary/20">
+                  <Sparkles className="w-5 h-5 text-foreground" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-white">Lumina AI</h3>
-                  <p className="text-xs text-gray-400">
+                  <h3 className="font-semibold text-foreground">Lumina AI</h3>
+                  <p className="text-xs text-muted-foreground">
                     Context-aware assistant
                   </p>
                 </div>
               </div>
               <button
                 onClick={onClose}
-                className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-white/5 rounded-lg"
+                className="text-muted-foreground hover:text-foreground transition-colors p-2 hover:bg-foreground/5 rounded-lg"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -211,12 +211,12 @@ export function AIAssistantPanel({
 
             {/* Context Indicator */}
             {context && (
-              <div className="px-6 py-3 bg-purple-500/5 border-b border-white/5">
-                <div className="flex items-center gap-2 text-xs text-purple-300">
+              <div className="px-6 py-3 bg-primary/5 border-b border-border/60">
+                <div className="flex items-center gap-2 text-xs text-primary">
                   <Info className="w-3.5 h-3.5" />
                   <span>
                     Using context from:{" "}
-                    <span className="font-medium text-purple-200">
+                    <span className="font-medium text-primary">
                       {contextTitle || "Current page"}
                     </span>
                   </span>
@@ -231,13 +231,13 @@ export function AIAssistantPanel({
                 <div className="h-full flex flex-col">
                   {/* Welcome */}
                   <div className="text-center mb-8">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-linear-to-br from-purple-600 to-violet-600 flex items-center justify-center shadow-xl shadow-purple-500/30">
-                      <Sparkles className="w-8 h-8 text-white" />
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-linear-to-br from-primary to-primary-alt flex items-center justify-center shadow-xl shadow-primary/30">
+                      <Sparkles className="w-8 h-8 text-foreground" />
                     </div>
-                    <h4 className="text-lg font-medium text-white mb-2">
+                    <h4 className="text-lg font-medium text-foreground mb-2">
                       How can I help?
                     </h4>
-                    <p className="text-sm text-gray-400 max-w-xs mx-auto">
+                    <p className="text-sm text-muted-foreground max-w-xs mx-auto">
                       {context
                         ? "I've analyzed your content. Choose an action or ask your own question."
                         : contextTitle
@@ -253,12 +253,12 @@ export function AIAssistantPanel({
                         key={item.label}
                         onClick={() => handleStarterPrompt(item.prompt)}
                         disabled={!context && !contextTitle} // Only disable if truly no context (e.g. dashboard home)
-                        className="group p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-purple-500/30 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="group p-4 rounded-xl bg-foreground/5 border border-border/60 hover:bg-foreground/10 hover:border-primary/30 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center mb-3 group-hover:bg-purple-500/20 transition-colors">
-                          <item.icon className="w-4 h-4 text-purple-400" />
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors">
+                          <item.icon className="w-4 h-4 text-primary" />
                         </div>
-                        <span className="text-sm font-medium text-white">
+                        <span className="text-sm font-medium text-foreground">
                           {item.label}
                         </span>
                       </button>
@@ -266,12 +266,12 @@ export function AIAssistantPanel({
                   </div>
 
                   {!context && !contextTitle && (
-                    <p className="text-xs text-center text-gray-500 mt-6">
+                    <p className="text-xs text-center text-muted-foreground/80 mt-6">
                       Open a note to enable context-aware prompts
                     </p>
                   )}
                   {!context && contextTitle && (
-                    <p className="text-xs text-center text-gray-500 mt-6">
+                    <p className="text-xs text-center text-muted-foreground/80 mt-6">
                       Type some notes to get specific summaries and questions.
                     </p>
                   )}
@@ -290,15 +290,15 @@ export function AIAssistantPanel({
                     >
                       {message.role === "ai" && (
                         <div className="w-8 h-8 rounded-lg bg-linear-to-r from-cyan-500 to-blue-500 flex items-center justify-center shrink-0">
-                          <Bot className="w-4 h-4 text-white" />
+                          <Bot className="w-4 h-4 text-foreground" />
                         </div>
                       )}
                       <div className="flex flex-col gap-1 max-w-[85%]">
                         <div
                           className={`px-4 py-3 rounded-2xl text-sm ${
                             message.role === "user"
-                              ? "bg-purple-600 text-white rounded-br-md"
-                              : "bg-white/5 text-gray-200 border border-white/5 rounded-bl-md"
+                              ? "bg-primary text-primary-foreground rounded-br-md"
+                              : "bg-foreground/5 text-foreground/90 border border-border/60 rounded-bl-md"
                           }`}
                         >
                           <div className="whitespace-pre-wrap prose prose-invert prose-sm max-w-none">
@@ -315,7 +315,7 @@ export function AIAssistantPanel({
                           <div className="flex items-center gap-1 px-2 mt-1">
                             <button
                               onClick={() => handleCopy(message.content, index)}
-                              className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-white/5"
+                              className="flex items-center gap-1 text-[10px] text-muted-foreground/80 hover:text-foreground/80 transition-colors px-2 py-1 rounded hover:bg-foreground/5"
                               title="Copy to clipboard"
                             >
                               {copiedIndex === index ? (
@@ -334,7 +334,7 @@ export function AIAssistantPanel({
                             {onInsertToNote && (
                               <button
                                 onClick={() => handleInsertToNote(message.content)}
-                                className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-purple-400 transition-colors px-2 py-1 rounded hover:bg-purple-500/10"
+                                className="flex items-center gap-1 text-[10px] text-muted-foreground/80 hover:text-primary transition-colors px-2 py-1 rounded hover:bg-primary/10"
                                 title="Insert into current note"
                               >
                                 <PenLine className="w-3 h-3" />
@@ -343,7 +343,7 @@ export function AIAssistantPanel({
                             )}
                             
                             {message.contextUsed && (
-                              <span className="text-[10px] text-gray-600 ml-auto">
+                              <span className="text-[10px] text-muted-foreground/60 ml-auto">
                                 Used: {message.contextUsed}
                               </span>
                             )}
@@ -357,10 +357,10 @@ export function AIAssistantPanel({
                   {isLoading && (
                     <div className="flex gap-3 items-start">
                       <div className="w-8 h-8 rounded-lg bg-linear-to-r from-cyan-500 to-blue-500 flex items-center justify-center shrink-0">
-                        <Bot className="w-4 h-4 text-white" />
+                        <Bot className="w-4 h-4 text-foreground" />
                       </div>
-                      <div className="px-4 py-3 rounded-2xl rounded-bl-md bg-white/5 border border-white/5">
-                        <div className="flex items-center gap-2 text-gray-400">
+                      <div className="px-4 py-3 rounded-2xl rounded-bl-md bg-foreground/5 border border-border/60">
+                        <div className="flex items-center gap-2 text-muted-foreground">
                           <Loader2 className="w-4 h-4 animate-spin" />
                           <span className="text-sm">Thinking...</span>
                         </div>
@@ -376,7 +376,7 @@ export function AIAssistantPanel({
             {/* Input Area */}
             <form
               onSubmit={handleFormSubmit}
-              className="p-4 border-t border-white/5 bg-black/20"
+              className="p-4 border-t border-border/60 bg-inset"
             >
               <div className="flex items-center gap-2">
                 <Input
@@ -384,13 +384,13 @@ export function AIAssistantPanel({
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   placeholder="Ask Lumina anything..."
-                  className="flex-1 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus-visible:ring-purple-500"
+                  className="flex-1 bg-foreground/5 border-border text-foreground placeholder:text-muted-foreground/80 focus-visible:ring-primary"
                   disabled={isLoading}
                 />
                 <Button
                   type="submit"
                   disabled={!inputValue.trim() || isLoading}
-                  className="bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50"
                 >
                   {isLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />

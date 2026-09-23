@@ -37,7 +37,7 @@ export function StepCourses({ value, onChange }: StepCoursesProps) {
 
   return (
     <div className="flex flex-col gap-6 flex-1 min-h-0">
-      <p className="text-sm text-zinc-400 leading-relaxed">
+      <p className="text-sm text-muted-foreground leading-relaxed">
         Optional but powerful: each PDF becomes a course shell with your file
         attached. Skip for now if you prefer to add materials later.
       </p>
@@ -54,10 +54,10 @@ export function StepCourses({ value, onChange }: StepCoursesProps) {
         onClick={() => inputRef.current?.click()}
         className={cn(
           "relative rounded-2xl border-2 border-dashed transition-all duration-200 min-h-[200px] flex flex-col items-center justify-center text-center px-6 py-12 cursor-pointer",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950",
           isDragging
-            ? "border-indigo-400/60 bg-indigo-500/10 scale-[1.01]"
-            : "border-white/[0.1] bg-white/[0.02] hover:border-indigo-500/35 hover:bg-white/[0.04]",
+            ? "border-primary/60 bg-primary/10 scale-[1.01]"
+            : "border-foreground/[0.1] bg-foreground/[0.02] hover:border-primary/35 hover:bg-foreground/[0.04]",
         )}
         onDragOver={(e) => {
           e.preventDefault();
@@ -82,22 +82,22 @@ export function StepCourses({ value, onChange }: StepCoursesProps) {
           <div
             className={cn(
               "flex h-14 w-14 items-center justify-center rounded-2xl transition-colors",
-              isDragging ? "bg-indigo-500/25" : "bg-indigo-500/15 ring-1 ring-indigo-400/20",
+              isDragging ? "bg-primary/25" : "bg-primary/15 ring-1 ring-primary/20",
             )}
           >
             <UploadCloud
               className={cn(
                 "h-7 w-7",
-                isDragging ? "text-indigo-200" : "text-indigo-400",
+                isDragging ? "text-primary" : "text-primary",
               )}
               strokeWidth={1.5}
             />
           </div>
           <div>
-            <p className="text-base font-medium text-white">
+            <p className="text-base font-medium text-foreground">
               Drop PDFs here or tap to browse
             </p>
-            <p className="text-sm text-zinc-500 mt-1">Syllabus · readings · schedules</p>
+            <p className="text-sm text-muted-foreground/80 mt-1">Syllabus · readings · schedules</p>
           </div>
         </div>
       </div>
@@ -110,7 +110,7 @@ export function StepCourses({ value, onChange }: StepCoursesProps) {
             exit={{ opacity: 0, height: 0 }}
             className="space-y-2 overflow-hidden"
           >
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/80">
               Added ({value.length})
             </p>
             <ul className="space-y-2 max-h-[200px] overflow-y-auto pr-1 [scrollbar-gutter:stable]">
@@ -119,17 +119,17 @@ export function StepCourses({ value, onChange }: StepCoursesProps) {
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
                   key={`${file.name}-${idx}`}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2.5"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-border bg-inset px-3 py-2.5"
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500/10 text-red-400/90 ring-1 ring-red-500/20">
                       <FileText className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm text-zinc-200 truncate font-medium">
+                      <p className="text-sm text-foreground/90 truncate font-medium">
                         {file.name}
                       </p>
-                      <p className="text-xs text-zinc-500 tabular-nums">
+                      <p className="text-xs text-muted-foreground/80 tabular-nums">
                         {(file.size / 1024 / 1024).toFixed(2)} MB
                       </p>
                     </div>
@@ -137,7 +137,7 @@ export function StepCourses({ value, onChange }: StepCoursesProps) {
                   <button
                     type="button"
                     onClick={() => removeFile(idx)}
-                    className="shrink-0 rounded-lg p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    className="shrink-0 rounded-lg p-2 text-muted-foreground/80 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                     aria-label={`Remove ${file.name}`}
                   >
                     <X className="h-4 w-4" />

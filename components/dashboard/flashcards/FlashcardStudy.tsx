@@ -159,8 +159,8 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
 
   if (!deck || !flashcards) {
     return (
-      <div className="h-full flex items-center justify-center bg-black/40">
-        <div className="flex items-center gap-2 text-gray-500 animate-pulse">
+      <div className="h-full flex items-center justify-center bg-inset">
+        <div className="flex items-center gap-2 text-muted-foreground/80 animate-pulse">
           <Layers className="w-5 h-5" />
           <span>Loading flashcards...</span>
         </div>
@@ -170,8 +170,8 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
 
   if (totalCards === 0) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-black/40 gap-4">
-        <p className="text-gray-400">This deck has no flashcards.</p>
+      <div className="h-full flex flex-col items-center justify-center bg-inset gap-4">
+        <p className="text-muted-foreground">This deck has no flashcards.</p>
         <Button variant="outline" onClick={handleBack}>
           Back to Flashcards
         </Button>
@@ -185,19 +185,19 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
   const hardCount = hardCards.size;
 
   return (
-    <div className="h-full flex flex-col bg-linear-to-br from-[#050505] to-[#0a0a12] overflow-hidden">
+    <div className="h-full flex flex-col bg-linear-to-br from-background to-background overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-white/5">
+      <div className="flex items-center justify-between p-4 border-b border-border/60">
         <Button
           variant="ghost"
           size="sm"
           onClick={handleBack}
-          className="text-gray-400 hover:text-white gap-2"
+          className="text-muted-foreground hover:text-foreground gap-2"
         >
           <ChevronLeft className="w-4 h-4" />
           Back
         </Button>
-        <h1 className="text-lg font-semibold text-white truncate max-w-md">
+        <h1 className="text-lg font-semibold text-foreground truncate max-w-md">
           {deck.title}
         </h1>
         <div className="flex items-center gap-2">
@@ -205,7 +205,7 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
             variant="ghost"
             size="sm"
             onClick={handleShuffle}
-            className="text-gray-400 hover:text-white gap-2"
+            className="text-muted-foreground hover:text-foreground gap-2"
             title="Shuffle cards"
           >
             <Shuffle className="w-4 h-4" />
@@ -214,7 +214,7 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
             variant="ghost"
             size="sm"
             onClick={handleReset}
-            className="text-gray-400 hover:text-white gap-2"
+            className="text-muted-foreground hover:text-foreground gap-2"
           >
             <RotateCcw className="w-4 h-4" />
             Reset
@@ -224,7 +224,7 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
 
       {/* Progress Bar */}
       <div className="px-4 py-2">
-        <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+        <div className="flex items-center justify-between text-xs text-muted-foreground/80 mb-1">
           <span>
             Card {currentIndex + 1} of {totalCards}
           </span>
@@ -234,9 +234,9 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
             <span className="text-red-400">Hard {hardCount}</span>
           </div>
         </div>
-        <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+        <div className="h-1 bg-foreground/5 rounded-full overflow-hidden">
           <div
-            className="h-full bg-linear-to-r from-indigo-500 to-cyan-500 transition-all duration-300"
+            className="h-full bg-linear-to-r from-primary to-cyan-500 transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -255,7 +255,7 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
       </div>
 
       {/* Controls */}
-      <div className="p-6 border-t border-white/5">
+      <div className="p-6 border-t border-border/60">
         <div className="flex items-center justify-center gap-4 mb-4">
           <Button
             variant="outline"
@@ -301,11 +301,11 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
             size="icon"
             onClick={handlePrevious}
             disabled={currentIndex === 0}
-            className="text-gray-400 hover:text-white disabled:opacity-30"
+            className="text-muted-foreground hover:text-foreground disabled:opacity-30"
           >
             <ChevronLeft className="w-6 h-6" />
           </Button>
-          <span className="text-sm text-gray-500 min-w-[100px] text-center">
+          <span className="text-sm text-muted-foreground/80 min-w-[100px] text-center">
             Use ← → or space to flip, 1/2/3 to rate
           </span>
           <Button
@@ -313,7 +313,7 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
             size="icon"
             onClick={handleNext}
             disabled={currentIndex === totalCards - 1}
-            className="text-gray-400 hover:text-white disabled:opacity-30"
+            className="text-muted-foreground hover:text-foreground disabled:opacity-30"
           >
             <ChevronRight className="w-6 h-6" />
           </Button>

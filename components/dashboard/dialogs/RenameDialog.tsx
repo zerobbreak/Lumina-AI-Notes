@@ -61,16 +61,16 @@ export function RenameDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] bg-[#0A0A0A] border-white/10 text-white shadow-2xl">
+      <DialogContent className="sm:max-w-[425px] bg-background border-border text-foreground shadow-2xl">
         <DialogHeader>
           <DialogTitle>Rename {title}</DialogTitle>
-          <DialogDescription className="text-gray-400">
+          <DialogDescription className="text-muted-foreground">
             Enter a new name for this item.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right text-gray-400">
+            <Label htmlFor="name" className="text-right text-muted-foreground">
               Name
             </Label>
             <Input
@@ -78,7 +78,7 @@ export function RenameDialog({
               value={value}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="col-span-3 bg-white/5 border-white/10 text-white focus:border-indigo-500 transition-colors"
+              className="col-span-3 bg-foreground/5 border-border text-foreground focus:border-primary transition-colors"
               autoFocus
             />
           </div>
@@ -87,14 +87,14 @@ export function RenameDialog({
           <Button
             variant="ghost"
             onClick={() => onOpenChange(false)}
-            className="text-gray-400 hover:text-white"
+            className="text-muted-foreground hover:text-foreground"
           >
             Cancel
           </Button>
           <Button
             onClick={handleConfirm}
             disabled={isSaving || !value}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             {isSaving ? "Saving..." : "Rename"}
           </Button>

@@ -411,12 +411,12 @@ export function CommandPalette({ open, onOpenChange, initialQuery = "" }: Comman
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="p-0 gap-0 max-w-[600px] bg-[#0a0a0a] border border-white/10 shadow-2xl overflow-hidden rounded-xl">
+      <DialogContent className="p-0 gap-0 max-w-[600px] bg-background border border-border shadow-2xl overflow-hidden rounded-xl">
         <DialogTitle className="sr-only">Command Palette</DialogTitle>
-        <div className="flex items-center px-4 py-3 border-b border-white/5">
-          <Search className="w-5 h-5 text-gray-500 mr-3 shrink-0" />
+        <div className="flex items-center px-4 py-3 border-b border-border/60">
+          <Search className="w-5 h-5 text-muted-foreground/80 mr-3 shrink-0" />
           <input
-            className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-gray-600 text-[15px] h-6"
+            className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/60 text-[15px] h-6"
             placeholder={
               isCommandMode
                 ? "Type a command…"
@@ -429,21 +429,21 @@ export function CommandPalette({ open, onOpenChange, initialQuery = "" }: Comman
             }}
             autoFocus
           />
-          <div className="text-[10px] bg-white/5 border border-white/5 px-1.5 py-0.5 rounded text-gray-500 font-mono ml-2">
+          <div className="text-[10px] bg-foreground/5 border border-border/60 px-1.5 py-0.5 rounded text-muted-foreground/80 font-mono ml-2">
             {formatShortcut(shortcutFor(isCommandMode ? "command-palette" : "quick-open") ?? "mod+p")}
           </div>
         </div>
 
         <div className="max-h-[400px] overflow-y-auto">
           {!hasQuery && !hasResults && (
-            <div className="text-center py-10 text-gray-600 text-sm">
-              <Sparkles className="w-8 h-8 mx-auto mb-3 text-gray-700" />
+            <div className="text-center py-10 text-muted-foreground/60 text-sm">
+              <Sparkles className="w-8 h-8 mx-auto mb-3 text-muted-foreground/40" />
               <p>Start typing to search, or type &gt; for commands</p>
             </div>
           )}
 
           {hasQuery && !hasResults && (
-            <div className="text-center py-10 text-gray-600 text-sm">
+            <div className="text-center py-10 text-muted-foreground/60 text-sm">
               No results found for &quot;{debouncedQuery}&quot;
             </div>
           )}
@@ -453,7 +453,7 @@ export function CommandPalette({ open, onOpenChange, initialQuery = "" }: Comman
               {GROUPS.map(({ category, label }) =>
                 groupedResults[category].length > 0 ? (
                   <div key={category} className="mb-4 last:mb-0">
-                    <div className="px-4 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+                    <div className="px-4 py-2 text-[10px] font-semibold text-muted-foreground/80 uppercase tracking-wider">
                       {label}
                     </div>
                     {groupedResults[category].map((cmd) => {
@@ -474,7 +474,7 @@ export function CommandPalette({ open, onOpenChange, initialQuery = "" }: Comman
           )}
         </div>
 
-        <div className="px-4 py-2 border-t border-white/5 bg-white/2 flex items-center justify-between text-[10px] text-gray-600">
+        <div className="px-4 py-2 border-t border-border/60 bg-foreground/2 flex items-center justify-between text-[10px] text-muted-foreground/60">
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1">
               <ArrowUp className="w-3 h-3" />
@@ -510,8 +510,8 @@ function CommandItem({
       className={cn(
         "flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors",
         isSelected
-          ? "bg-indigo-500/20 text-white border-l-2 border-indigo-400"
-          : "hover:bg-white/5 text-gray-300"
+          ? "bg-primary/20 text-foreground border-l-2 border-primary"
+          : "hover:bg-foreground/5 text-foreground/80"
       )}
       style={{ scrollMargin: "8px" }}
       data-palette-index={index}
@@ -520,7 +520,7 @@ function CommandItem({
         className={cn(
           "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
           command.category === "actions" && "bg-emerald-500/10 text-emerald-400",
-          command.category === "navigation" && "bg-indigo-500/10 text-indigo-400",
+          command.category === "navigation" && "bg-primary/10 text-primary",
           command.category === "search" && "bg-cyan-500/10 text-cyan-400"
         )}
       >
@@ -529,18 +529,18 @@ function CommandItem({
       <div className="flex-1 min-w-0">
         <h4 className="text-[13px] font-medium truncate">{command.title}</h4>
         {command.subtitle && (
-          <p className="text-[11px] text-gray-500 truncate">
+          <p className="text-[11px] text-muted-foreground/80 truncate">
             {command.subtitle}
           </p>
         )}
       </div>
       {command.shortcut && (
-        <kbd className="shrink-0 rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-gray-400">
+        <kbd className="shrink-0 rounded border border-border bg-foreground/5 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
           {formatShortcut(command.shortcut)}
         </kbd>
       )}
       {isSelected && (
-        <CornerDownLeft className="w-3.5 h-3.5 text-indigo-400" />
+        <CornerDownLeft className="w-3.5 h-3.5 text-primary" />
       )}
     </div>
   );

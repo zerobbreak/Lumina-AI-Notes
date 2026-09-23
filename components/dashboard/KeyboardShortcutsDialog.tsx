@@ -37,7 +37,7 @@ export function KeyboardShortcutsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl bg-[#0a0a0a] border border-white/10 shadow-2xl">
+      <DialogContent className="max-w-2xl bg-background border border-border shadow-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Keyboard className="w-5 h-5" />
@@ -48,26 +48,26 @@ export function KeyboardShortcutsDialog({
         <div className="max-h-[500px] overflow-y-auto py-4 space-y-6">
           {groupedShortcuts.map(([category, items]) => (
             <div key={category}>
-              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                 {category}
               </h3>
               <div className="space-y-2">
                 {items.map((shortcut) => (
                   <div
                     key={shortcut.title}
-                    className="flex items-center justify-between gap-4 py-2 px-3 rounded-lg hover:bg-white/5 transition-colors"
+                    className="flex items-center justify-between gap-4 py-2 px-3 rounded-lg hover:bg-foreground/5 transition-colors"
                   >
-                    <span className="text-sm text-gray-300">
+                    <span className="text-sm text-foreground/80">
                       {shortcut.title}
                       {shortcut.note && (
-                        <span className="ml-2 text-xs text-gray-500">({shortcut.note})</span>
+                        <span className="ml-2 text-xs text-muted-foreground/80">({shortcut.note})</span>
                       )}
                     </span>
-                    <span className="flex shrink-0 items-center gap-1.5 text-xs text-gray-600">
+                    <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground/60">
                       {shortcut.keys.map((keys, i) => (
                         <Fragment key={keys}>
                           {i > 0 && "or"}
-                          <kbd className="px-2.5 py-1 text-xs font-semibold text-gray-400 bg-white/5 border border-white/10 rounded-md font-mono">
+                          <kbd className="px-2.5 py-1 text-xs font-semibold text-muted-foreground bg-foreground/5 border border-border rounded-md font-mono">
                             {formatShortcut(keys)}
                           </kbd>
                         </Fragment>
@@ -80,7 +80,7 @@ export function KeyboardShortcutsDialog({
           ))}
         </div>
 
-        <div className="pt-4 border-t border-white/10 text-xs text-gray-500 text-center">
+        <div className="pt-4 border-t border-border text-xs text-muted-foreground/80 text-center">
           Press {formatShortcut("Esc")} to close
         </div>
       </DialogContent>

@@ -42,23 +42,23 @@ export function FlashcardsView() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-linear-to-br from-[#050505] to-[#0a0a12]">
+    <div className="h-full flex flex-col bg-linear-to-br from-background to-background">
       {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-white/5">
+      <div className="flex items-center justify-between p-6 border-b border-border/60">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-linear-to-br from-indigo-500/20 to-purple-500/20 border border-white/10">
-            <Layers className="w-6 h-6 text-indigo-400" />
+          <div className="p-2 rounded-xl bg-linear-to-br from-primary/20 to-primary-alt/20 border border-border">
+            <Layers className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Flashcards</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="text-2xl font-bold text-foreground">Flashcards</h1>
+            <p className="text-sm text-muted-foreground/80">
               Study and memorize your notes
             </p>
           </div>
         </div>
         <Button
           onClick={() => setIsGenerateOpen(true)}
-          className="gap-2 bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500"
+          className="gap-2 bg-linear-to-r from-primary to-primary-alt hover:from-primary/90 hover:to-primary-alt/90"
         >
           <Sparkles className="w-4 h-4" />
           Generate from Notes
@@ -69,20 +69,20 @@ export function FlashcardsView() {
       <ScrollArea className="flex-1 p-6">
         {decks === undefined ? (
           <div className="flex items-center justify-center h-40">
-            <div className="flex items-center gap-2 text-gray-500 animate-pulse">
+            <div className="flex items-center gap-2 text-muted-foreground/80 animate-pulse">
               <Layers className="w-5 h-5" />
               <span>Loading decks...</span>
             </div>
           </div>
         ) : decks.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-60 text-center">
-            <div className="p-4 rounded-full bg-white/5 mb-4">
-              <Layers className="w-12 h-12 text-gray-600" />
+            <div className="p-4 rounded-full bg-foreground/5 mb-4">
+              <Layers className="w-12 h-12 text-muted-foreground/60" />
             </div>
-            <h3 className="text-lg font-medium text-gray-300 mb-2">
+            <h3 className="text-lg font-medium text-foreground/80 mb-2">
               No flashcard decks yet
             </h3>
-            <p className="text-sm text-gray-500 max-w-sm mb-4">
+            <p className="text-sm text-muted-foreground/80 max-w-sm mb-4">
               Generate flashcards from your notes to start studying and
               memorizing key concepts.
             </p>
@@ -101,27 +101,27 @@ export function FlashcardsView() {
               <div
                 key={deck._id}
                 onClick={() => handleStudyDeck(deck._id)}
-                className="group relative p-5 rounded-xl bg-white/5 border border-white/10 hover:border-indigo-500/50 hover:bg-white/10 cursor-pointer transition-all duration-200"
+                className="group relative p-5 rounded-xl bg-foreground/5 border border-border hover:border-primary/50 hover:bg-foreground/10 cursor-pointer transition-all duration-200"
               >
                 <div className="flex items-start justify-between mb-3">
-                  <div className="p-2 rounded-lg bg-indigo-500/20">
-                    <BookOpen className="w-5 h-5 text-indigo-400" />
+                  <div className="p-2 rounded-lg bg-primary/20">
+                    <BookOpen className="w-5 h-5 text-primary" />
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={(e) => handleDeleteDeck(deck._id, e)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-gray-500 hover:text-red-400 hover:bg-red-500/10"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-muted-foreground/80 hover:text-red-400 hover:bg-red-500/10"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
 
-                <h3 className="font-semibold text-white mb-1 truncate">
+                <h3 className="font-semibold text-foreground mb-1 truncate">
                   {deck.title}
                 </h3>
 
-                <div className="flex items-center gap-4 text-xs text-gray-500">
+                <div className="flex items-center gap-4 text-xs text-muted-foreground/80">
                   <span className="flex items-center gap-1">
                     <Layers className="w-3 h-3" />
                     {deck.cardCount} cards
@@ -134,7 +134,7 @@ export function FlashcardsView() {
                   )}
                 </div>
 
-                <div className="absolute inset-0 rounded-xl bg-linear-to-r from-indigo-500/0 to-purple-500/0 group-hover:from-indigo-500/5 group-hover:to-purple-500/5 transition-all pointer-events-none" />
+                <div className="absolute inset-0 rounded-xl bg-linear-to-r from-primary/0 to-primary-alt/0 group-hover:from-primary/5 group-hover:to-primary-alt/5 transition-all pointer-events-none" />
               </div>
             ))}
           </div>

@@ -81,15 +81,15 @@ export function TagManagerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md bg-[#111] border border-white/10 text-white">
+      <DialogContent className="max-w-md bg-background border border-border text-foreground">
         <DialogHeader>
           <DialogTitle>Manage Tags</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
           {/* Create New Tag */}
-          <div className="space-y-3 p-3 bg-white/5 rounded-lg border border-white/5">
-            <Label className="text-xs text-gray-400 uppercase tracking-widest font-semibold">
+          <div className="space-y-3 p-3 bg-foreground/5 rounded-lg border border-border/60">
+            <Label className="text-xs text-muted-foreground uppercase tracking-widest font-semibold">
               New Tag
             </Label>
             <div className="flex gap-2">
@@ -97,13 +97,13 @@ export function TagManagerDialog({
                 value={newTagName}
                 onChange={(e) => setNewTagName(e.target.value)}
                 placeholder="Tag name (e.g., Important)"
-                className="bg-black/20 border-white/10 text-white placeholder:text-gray-600 focus-visible:ring-indigo-500/50"
+                className="bg-inset border-border text-foreground placeholder:text-muted-foreground/60 focus-visible:ring-primary/50"
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
               />
               <Button
                 onClick={handleCreate}
                 disabled={isCreating || !newTagName.trim()}
-                className="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white"
+                className="shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground"
               >
                 <Plus className="w-4 h-4" />
               </Button>
@@ -115,8 +115,8 @@ export function TagManagerDialog({
                   key={color.value}
                   className={`w-5 h-5 rounded-full transition-all border border-transparent ${
                     selectedColor === color.value
-                      ? "ring-2 ring-white scale-110"
-                      : "opacity-70 hover:opacity-100 hover:border-white/20"
+                      ? "ring-2 ring-foreground scale-110"
+                      : "opacity-70 hover:opacity-100 hover:border-foreground/20"
                   }`}
                   style={{ backgroundColor: color.value }}
                   onClick={() => setSelectedColor(color.value)}
@@ -129,26 +129,26 @@ export function TagManagerDialog({
 
           {/* Existing Tags */}
           <div className="space-y-3">
-            <Label className="text-xs text-gray-400 uppercase tracking-widest font-semibold">
+            <Label className="text-xs text-muted-foreground uppercase tracking-widest font-semibold">
               Your Tags
             </Label>
             <div className="space-y-2 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
               {tags?.map((tag) => (
                 <div
                   key={tag._id}
-                  className="flex items-center justify-between p-2 rounded-md bg-white/5 hover:bg-white/8 transition-colors border border-white/5 group"
+                  className="flex items-center justify-between p-2 rounded-md bg-foreground/5 hover:bg-foreground/8 transition-colors border border-border/60 group"
                 >
                   <div className="flex items-center gap-3">
                     <div
                       className="w-3 h-3 rounded-full shadow-sm"
                       style={{ backgroundColor: tag.color }}
                     />
-                    <span className="text-sm text-gray-200">{tag.name}</span>
+                    <span className="text-sm text-foreground/90">{tag.name}</span>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-gray-500 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
+                    className="h-7 w-7 text-muted-foreground/80 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
                     onClick={() => handleDelete(tag._id)}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -156,7 +156,7 @@ export function TagManagerDialog({
                 </div>
               ))}
               {tags?.length === 0 && (
-                <div className="flex flex-col items-center justify-center p-6 text-gray-500 border border-dashed border-white/10 rounded-lg">
+                <div className="flex flex-col items-center justify-center p-6 text-muted-foreground/80 border border-dashed border-border rounded-lg">
                   <TagIcon className="w-8 h-8 opacity-20 mb-2" />
                   <p className="text-sm text-center">
                     No tags yet.
@@ -172,7 +172,7 @@ export function TagManagerDialog({
         <DialogFooter>
           <Button
             variant="ghost"
-            className="hover:bg-white/10 text-gray-400 hover:text-white"
+            className="hover:bg-foreground/10 text-muted-foreground hover:text-foreground"
             onClick={() => onOpenChange(false)}
           >
             Done

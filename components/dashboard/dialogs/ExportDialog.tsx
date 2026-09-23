@@ -102,13 +102,13 @@ export function ExportDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md bg-[#111] border border-white/10">
+      <DialogContent className="sm:max-w-md bg-background border border-border">
         <DialogHeader>
-          <DialogTitle className="text-white flex items-center gap-2">
+          <DialogTitle className="text-foreground flex items-center gap-2">
             <Download className="w-5 h-5 text-cyan-400" />
             Export as PDF
           </DialogTitle>
-          <DialogDescription className="text-gray-400">
+          <DialogDescription className="text-muted-foreground">
             Choose how you want to export your note
           </DialogDescription>
         </DialogHeader>
@@ -116,7 +116,7 @@ export function ExportDialog({
         <div className="space-y-4 py-4">
           {/* Method Selection */}
           <div className="space-y-3">
-            <Label className="text-gray-300">Export Method</Label>
+            <Label className="text-foreground/80">Export Method</Label>
             <div className="space-y-2">
               {exportMethods.map((method) => (
                 <button
@@ -127,14 +127,14 @@ export function ExportDialog({
                   className={`w-full flex items-start gap-3 p-3 rounded-lg border transition-all text-left ${
                     selectedMethod === method.value
                       ? "border-cyan-500/50 bg-cyan-500/10"
-                      : "border-white/10 bg-white/5 hover:bg-white/10"
+                      : "border-border bg-foreground/5 hover:bg-foreground/10"
                   } ${status === "exporting" ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   <div
                     className={`p-2 rounded-lg ${
                       selectedMethod === method.value
                         ? "bg-cyan-500/20 text-cyan-400"
-                        : "bg-white/10 text-gray-400"
+                        : "bg-foreground/10 text-muted-foreground"
                     }`}
                   >
                     {method.icon}
@@ -144,24 +144,24 @@ export function ExportDialog({
                       className={`font-medium ${
                         selectedMethod === method.value
                           ? "text-cyan-400"
-                          : "text-gray-200"
+                          : "text-foreground/90"
                       }`}
                     >
                       {method.label}
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5">
+                    <div className="text-xs text-muted-foreground/80 mt-0.5">
                       {method.description}
                     </div>
                   </div>
                   <div
                     className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                       selectedMethod === method.value
-                        ? "border-cyan-500 bg-cyan-500"
-                        : "border-gray-600"
+                        ? "border-primary bg-primary"
+                        : "border-muted-foreground/60"
                     }`}
                   >
                     {selectedMethod === method.value && (
-                      <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
                     )}
                   </div>
                 </button>
@@ -173,12 +173,12 @@ export function ExportDialog({
           {status === "exporting" && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-400">Exporting...</span>
+                <span className="text-muted-foreground">Exporting...</span>
                 <span className="text-cyan-400">{progress}%</span>
               </div>
-              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-2 bg-foreground/10 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-linear-to-r from-cyan-500 to-indigo-500 transition-all duration-300"
+                  className="h-full bg-linear-to-r from-cyan-500 to-primary-alt transition-all duration-300"
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -211,7 +211,7 @@ export function ExportDialog({
             variant="ghost"
             onClick={handleClose}
             disabled={status === "exporting"}
-            className="text-gray-400 hover:text-white"
+            className="text-muted-foreground hover:text-foreground"
           >
             Cancel
           </Button>

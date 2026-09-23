@@ -285,8 +285,8 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
             className={cn(
               "h-8 px-2 text-xs gap-1.5",
               showAI
-                ? "bg-purple-500/15 text-purple-600 dark:text-purple-300"
-                : "text-purple-600 hover:bg-purple-500/10 dark:text-purple-400",
+                ? "bg-primary/15 text-primary"
+                : "text-primary hover:bg-primary/10",
             )}
             onClick={() => setShowAI(!showAI)}
             title={askShortcut ? `Ask AI (${formatShortcut(askShortcut)})` : "Ask AI"}
@@ -312,7 +312,7 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
             className="absolute left-0 top-full mt-1 w-72 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl"
           >
             {activeAction ? (
-              <div className="flex items-center gap-2 px-3 py-3 text-sm text-purple-600 dark:text-purple-400">
+              <div className="flex items-center gap-2 px-3 py-3 text-sm text-primary">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 {busyLabel}…
               </div>
@@ -344,7 +344,7 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
                     size="sm"
                     variant="ghost"
                     disabled={!question.trim()}
-                    className="h-7 w-7 p-0 text-purple-600 dark:text-purple-400"
+                    className="h-7 w-7 p-0 text-primary"
                     aria-label="Ask"
                   >
                     <ArrowUp className="w-4 h-4" />
@@ -357,7 +357,7 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
                     onClick={() => void runAction(id)}
                     className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left hover:bg-accent"
                   >
-                    <Icon className="w-3.5 h-3.5 shrink-0 text-purple-600 dark:text-purple-400" />
+                    <Icon className="w-3.5 h-3.5 shrink-0 text-primary" />
                     <span className="min-w-0">
                       <span className="block text-xs font-medium">{label}</span>
                       <span className="block text-[11px] text-muted-foreground">{hint}</span>

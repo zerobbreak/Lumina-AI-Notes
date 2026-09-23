@@ -30,7 +30,7 @@ function SegmentedButton({
         "h-8 px-2.5 text-xs rounded-full transition-colors",
         active
           ? "bg-accent text-foreground"
-          : "text-muted-foreground hover:text-foreground hover:bg-accent/70 dark:hover:bg-white/5",
+          : "text-muted-foreground hover:text-foreground hover:bg-accent/70 dark:hover:bg-foreground/5",
       )}
     >
       <span className="mr-1.5 inline-flex items-center">{icon}</span>
@@ -73,7 +73,7 @@ export function NotesRail({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
-              <Bookmark className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" aria-hidden />
+              <Bookmark className="w-4 h-4 text-primary shrink-0" aria-hidden />
               Notes
             </h2>
             <span className="text-[10px] text-muted-foreground/80">
@@ -85,7 +85,7 @@ export function NotesRail({
           </p>
         </div>
 
-        <div className="flex items-center gap-1 rounded-full border border-border bg-muted/15 p-1 dark:bg-white/5">
+        <div className="flex items-center gap-1 rounded-full border border-border bg-muted/15 p-1 dark:bg-foreground/5">
           <SegmentedButton
             active={tab === "recent"}
             icon={<Clock className="h-3.5 w-3.5" aria-hidden />}
@@ -124,7 +124,7 @@ export function NotesRail({
               </div>
             ))
           ) : (
-            <div className="w-full rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground shadow-sm ring-1 ring-black/5 dark:border-white/10 dark:bg-black/40 dark:ring-0">
+            <div className="w-full rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground shadow-sm ring-1 ring-black/5 dark:bg-inset dark:ring-0">
               {tab === "pinned" ? (
                 <div className="space-y-1">
                   <p className="text-foreground font-medium">No pinned notes.</p>

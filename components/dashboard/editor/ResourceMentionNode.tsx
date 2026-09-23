@@ -33,7 +33,7 @@ export function ResourceMentionNode({ node, editor }: NodeViewProps) {
             onClick={(e) => {
               e.stopPropagation();
             }}
-            className="bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded text-sm font-medium inline-flex items-center gap-1 cursor-pointer select-none mx-1 align-middle hover:bg-indigo-500/30 transition-colors"
+            className="bg-primary/20 text-primary px-1.5 py-0.5 rounded text-sm font-medium inline-flex items-center gap-1 cursor-pointer select-none mx-1 align-middle hover:bg-primary/30 transition-colors"
             contentEditable={false}
           >
             <span className="opacity-75">📄</span>

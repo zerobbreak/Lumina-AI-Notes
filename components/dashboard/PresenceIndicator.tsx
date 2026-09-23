@@ -33,8 +33,8 @@ interface Viewer {
 // Generate a consistent color based on user ID
 function getAvatarColor(userId: string): string {
   const colors = [
-    "bg-indigo-500",
-    "bg-purple-500",
+    "bg-primary",
+    "bg-primary",
     "bg-pink-500",
     "bg-rose-500",
     "bg-orange-500",
@@ -83,7 +83,7 @@ export function PresenceIndicator({
         <TooltipTrigger asChild>
           <div
             className={cn(
-              "flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-default",
+              "flex items-center gap-1.5 px-2 py-1 rounded-lg bg-foreground/5 border border-border hover:bg-foreground/10 transition-colors cursor-default",
               className
             )}
           >
@@ -106,12 +106,12 @@ export function PresenceIndicator({
                         alt={viewer.userName}
                         width={24}
                         height={24}
-                        className="w-6 h-6 rounded-full border-2 border-[#0a0a12] object-cover"
+                        className="w-6 h-6 rounded-full border-2 border-background object-cover"
                       />
                     ) : (
                       <div
                         className={cn(
-                          "w-6 h-6 rounded-full border-2 border-[#0a0a12] flex items-center justify-center text-[10px] font-medium text-white",
+                          "w-6 h-6 rounded-full border-2 border-background flex items-center justify-center text-[10px] font-medium text-foreground",
                           getAvatarColor(viewer.userId)
                         )}
                       >
@@ -119,7 +119,7 @@ export function PresenceIndicator({
                       </div>
                     )}
                     {/* Online indicator */}
-                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full border border-[#0a0a12]" />
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full border border-background" />
                   </motion.div>
                 ))}
               </AnimatePresence>
@@ -129,7 +129,7 @@ export function PresenceIndicator({
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="w-6 h-6 rounded-full border-2 border-[#0a0a12] bg-gray-700 flex items-center justify-center text-[10px] font-medium text-white"
+                  className="w-6 h-6 rounded-full border-2 border-background bg-muted flex items-center justify-center text-[10px] font-medium text-foreground"
                 >
                   +{extraCount}
                 </motion.div>
@@ -137,18 +137,18 @@ export function PresenceIndicator({
             </div>
 
             {/* Label */}
-            <span className="text-xs text-gray-400 ml-1">
+            <span className="text-xs text-muted-foreground ml-1">
               {viewers.length === 1 ? "1 viewer" : `${viewers.length} viewing`}
             </span>
           </div>
         </TooltipTrigger>
         <TooltipContent
           side="bottom"
-          className="bg-zinc-900 border-white/10 p-3 max-w-xs"
+          className="bg-popover border-border p-3 max-w-xs"
         >
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm font-medium text-white">
-              <Users className="w-4 h-4 text-indigo-400" />
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <Users className="w-4 h-4 text-primary" />
               Currently viewing
             </div>
             <div className="space-y-1.5">
@@ -168,14 +168,14 @@ export function PresenceIndicator({
                   ) : (
                     <div
                       className={cn(
-                        "w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-medium text-white",
+                        "w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-medium text-foreground",
                         getAvatarColor(viewer.userId)
                       )}
                     >
                       {getInitials(viewer.userName)}
                     </div>
                   )}
-                  <span className="text-gray-300 truncate max-w-[150px]">
+                  <span className="text-foreground/80 truncate max-w-[150px]">
                     {viewer.userName}
                   </span>
                   <span className="flex items-center gap-1 text-[10px] text-emerald-400">
@@ -222,7 +222,7 @@ export function PresenceIndicatorCompact({
             </span>
           </div>
         </TooltipTrigger>
-        <TooltipContent side="bottom" className="bg-zinc-900 border-white/10">
+        <TooltipContent side="bottom" className="bg-popover border-border">
           <span className="text-xs">
             {viewerCount} {viewerCount === 1 ? "person" : "people"} viewing
           </span>

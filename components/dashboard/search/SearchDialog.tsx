@@ -81,12 +81,12 @@ export function SearchDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="p-0 gap-0 max-w-[550px] bg-[#0a0a0a] border border-white/10 shadow-2xl overflow-hidden rounded-xl">
+      <DialogContent className="p-0 gap-0 max-w-[550px] bg-background border border-border shadow-2xl overflow-hidden rounded-xl">
         <DialogTitle className="sr-only">Search</DialogTitle>
-        <div className="flex items-center px-4 py-3 border-b border-white/5 gap-2">
-          <Search className="w-5 h-5 text-gray-500 shrink-0" />
+        <div className="flex items-center px-4 py-3 border-b border-border/60 gap-2">
+          <Search className="w-5 h-5 text-muted-foreground/80 shrink-0" />
           <input
-            className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-gray-600 text-[15px] h-6"
+            className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/60 text-[15px] h-6"
             placeholder="Search notes, files, or flashcards..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -99,9 +99,9 @@ export function SearchDialog({
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  "h-8 px-2 mx-1 border border-white/10 bg-white/5 text-xs hover:bg-white/10",
+                  "h-8 px-2 mx-1 border border-border bg-foreground/5 text-xs hover:bg-foreground/10",
                   selectedTags.length > 0 &&
-                    "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
+                    "text-primary bg-primary/10 border-primary/20",
                 )}
               >
                 <TagIcon className="w-3.5 h-3.5 mr-1.5" />
@@ -111,11 +111,11 @@ export function SearchDialog({
               </Button>
             </PopoverTrigger>
             <PopoverContent
-              className="w-56 p-2 bg-[#111] border border-white/10"
+              className="w-56 p-2 bg-background border border-border"
               align="end"
             >
               <div className="space-y-1">
-                <h4 className="text-[10px] uppercase font-bold text-gray-500 px-2 pb-1">
+                <h4 className="text-[10px] uppercase font-bold text-muted-foreground/80 px-2 pb-1">
                   Filter by Tags
                 </h4>
                 <div className="max-h-[200px] overflow-y-auto custom-scrollbar space-y-0.5">
@@ -126,8 +126,8 @@ export function SearchDialog({
                       className={cn(
                         "w-full flex items-center gap-2 px-2 py-1.5 rounded-sm text-xs text-left transition-colors",
                         selectedTags.includes(tag._id)
-                          ? "bg-white/10 text-white"
-                          : "text-gray-400 hover:bg-white/5 hover:text-gray-200",
+                          ? "bg-foreground/10 text-foreground"
+                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground/90",
                       )}
                     >
                       <div
@@ -141,7 +141,7 @@ export function SearchDialog({
                     </button>
                   ))}
                   {tags?.length === 0 && (
-                    <p className="text-gray-500 text-xs px-2 italic">
+                    <p className="text-muted-foreground/80 text-xs px-2 italic">
                       No tags found
                     </p>
                   )}
@@ -150,7 +150,7 @@ export function SearchDialog({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="w-full h-7 mt-2 text-xs text-gray-400 hover:text-white"
+                    className="w-full h-7 mt-2 text-xs text-muted-foreground hover:text-foreground"
                     onClick={() => setSelectedTags([])}
                   >
                     Clear filters
@@ -164,36 +164,36 @@ export function SearchDialog({
             value={filterType}
             onValueChange={(value) => setFilterType(value as typeof filterType)}
           >
-            <SelectTrigger className="h-8 w-24 border-white/10 bg-white/5 text-xs">
+            <SelectTrigger className="h-8 w-24 border-border bg-foreground/5 text-xs">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-[#0a0a0a] border-white/10">
+            <SelectContent className="bg-background border-border">
               <SelectItem value="all">All</SelectItem>
               <SelectItem value="note">Notes</SelectItem>
               <SelectItem value="file">Files</SelectItem>
               <SelectItem value="deck">Decks</SelectItem>
             </SelectContent>
           </Select>
-          <div className="text-[10px] bg-white/5 border border-white/5 px-1.5 py-0.5 rounded text-gray-500 font-mono shrink-0">
+          <div className="text-[10px] bg-foreground/5 border border-border/60 px-1.5 py-0.5 rounded text-muted-foreground/80 font-mono shrink-0">
             ESC
           </div>
         </div>
 
         <div className="max-h-[350px] overflow-y-auto p-2">
           {!query && (
-            <div className="text-center py-10 text-gray-600 text-sm">
+            <div className="text-center py-10 text-muted-foreground/60 text-sm">
               Type to start searching...
             </div>
           )}
 
           {debouncedQuery && searchLoading && (
-            <div className="text-center py-10 text-gray-600 text-sm animate-pulse">
+            <div className="text-center py-10 text-muted-foreground/60 text-sm animate-pulse">
               Searching...
             </div>
           )}
 
           {results && results.length === 0 && (
-            <div className="text-center py-10 text-gray-600 text-sm">
+            <div className="text-center py-10 text-muted-foreground/60 text-sm">
               No results found.
             </div>
           )}
@@ -204,7 +204,7 @@ export function SearchDialog({
                 <div
                   key={result.id}
                   onClick={() => handleSelect(result.url)}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 rounded-lg cursor-pointer group transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-foreground/5 rounded-lg cursor-pointer group transition-colors"
                 >
                   <div
                     className={cn(
@@ -213,7 +213,7 @@ export function SearchDialog({
                         "bg-amber-500/10 text-amber-500",
                       result.type === "file" && "bg-blue-500/10 text-blue-500",
                       result.type === "deck" &&
-                        "bg-indigo-500/10 text-indigo-500",
+                        "bg-primary/10 text-primary",
                     )}
                   >
                     {result.type === "note" && <FileText className="w-4 h-4" />}
@@ -221,14 +221,14 @@ export function SearchDialog({
                     {result.type === "deck" && <Layers className="w-4 h-4" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-[13px] font-medium text-gray-200 group-hover:text-white truncate">
+                    <h4 className="text-[13px] font-medium text-foreground/90 group-hover:text-foreground truncate">
                       {result.title}
                     </h4>
-                    <p className="text-[11px] text-gray-500 truncate">
+                    <p className="text-[11px] text-muted-foreground/80 truncate">
                       {result.subtitle}
                     </p>
                   </div>
-                  <CornerDownLeft className="w-3.5 h-3.5 text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <CornerDownLeft className="w-3.5 h-3.5 text-muted-foreground/60 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
               ))}
 
@@ -236,7 +236,7 @@ export function SearchDialog({
           )}
         </div>
 
-        <div className="px-4 py-2 border-t border-white/5 bg-white/2 flex items-center justify-between text-[10px] text-gray-600">
+        <div className="px-4 py-2 border-t border-border/60 bg-foreground/2 flex items-center justify-between text-[10px] text-muted-foreground/60">
           <span>Navigate with arrows</span>
           <span>Press Enter to select</span>
         </div>

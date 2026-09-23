@@ -62,7 +62,7 @@ export function EditableTitle({
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
         className={cn(
-          "bg-transparent border-none outline-none ring-0 p-0 m-0 w-full tracking-tight text-white placeholder:text-gray-600",
+          "bg-transparent border-none outline-none ring-0 p-0 m-0 w-full tracking-tight text-foreground placeholder:text-muted-foreground/60",
           className
         )}
         placeholder={placeholder}
@@ -74,10 +74,10 @@ export function EditableTitle({
     <h1
       onClick={readOnly ? undefined : () => setIsEditing(true)}
       className={cn(
-        "cursor-text hover:bg-white/5 rounded px-1 -ml-1 transition-colors truncate",
+        "cursor-text hover:bg-foreground/5 rounded px-1 -ml-1 transition-colors truncate",
         className,
         readOnly && "cursor-default",
-        !value && "text-gray-500 italic"
+        !value && "text-muted-foreground/80 italic"
       )}
     >
       {value || placeholder}

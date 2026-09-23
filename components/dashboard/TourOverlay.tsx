@@ -104,7 +104,7 @@ export function TourOverlay({ steps, open, onComplete, onSkip }: TourOverlayProp
       )}
 
       <div
-        className="absolute w-[320px] bg-[#0b0b12] text-white border border-white/10 rounded-xl p-4 shadow-2xl"
+        className="absolute w-[320px] bg-background text-foreground border border-border rounded-xl p-4 shadow-2xl"
         style={tooltipStyle}
       >
         <div className="flex items-start justify-between gap-2">
@@ -113,20 +113,20 @@ export function TourOverlay({ steps, open, onComplete, onSkip }: TourOverlayProp
           </div>
           <button
             onClick={onSkip}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Close tour"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="mt-2 text-sm font-semibold">{step.title}</div>
-        <div className="mt-1 text-xs text-gray-400">{step.description}</div>
+        <div className="mt-1 text-xs text-muted-foreground">{step.description}</div>
 
         <div className="mt-4 flex items-center justify-between">
           <Button
             variant="ghost"
             size="sm"
-            className="text-gray-400 hover:text-white"
+            className="text-muted-foreground hover:text-foreground"
             onClick={onSkip}
           >
             Skip
@@ -135,7 +135,7 @@ export function TourOverlay({ steps, open, onComplete, onSkip }: TourOverlayProp
             <Button
               variant="ghost"
               size="sm"
-              className="text-gray-400 hover:text-white"
+              className="text-muted-foreground hover:text-foreground"
               onClick={() => setIndex((i) => Math.max(0, i - 1))}
               disabled={index === 0}
             >

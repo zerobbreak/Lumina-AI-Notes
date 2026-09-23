@@ -64,7 +64,7 @@ const ResourceMention = Node.create({
       mergeAttributes(HTMLAttributes, {
         "data-type": "resource-mention",
         class:
-          "bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded text-sm font-medium inline-flex items-center gap-1 cursor-pointer select-none mx-1 align-middle",
+          "bg-primary/20 text-primary px-1.5 py-0.5 rounded text-sm font-medium inline-flex items-center gap-1 cursor-pointer select-none mx-1 align-middle",
       }),
       ["span", { class: "opacity-75" }, "📄"],
       HTMLAttributes.label,
@@ -171,7 +171,7 @@ export default function Editor({
         },
       }),
       Dropcursor.configure({
-        color: "#6366f1",
+        color: "hsl(var(--primary))",
         width: 2,
       }),
       OutlineExtension,

@@ -148,6 +148,10 @@
   --color-popover-foreground: hsl(var(--popover-foreground));
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
+  /* Gradient partner for the accent: each accent's second chart hue. */
+  --color-primary-alt: hsl(var(--chart-2, var(--primary)));
+  /* Sunken surface for inputs, code/math wells and footers. */
+  --color-inset: hsl(var(--inset));
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
   --color-muted: hsl(var(--muted));
@@ -212,6 +216,7 @@
   --sidebar-accent-foreground: 240 5.9% 10%;
   --sidebar-border: 220 13% 91%;
   --sidebar-ring: 217.2 91.2% 59.8%;
+  --inset: 240 5% 95%;
 }
 
 .dark {
@@ -242,6 +247,7 @@
   --sidebar-accent-foreground: 240 5% 84.9%;
   --sidebar-border: 240 3.7% 19%;
   --sidebar-ring: 217.2 91.2% 59.8%;
+  --inset: 0 0% 6%;
 
   /* Holographic Tokens */
   --holo-cyan: 180 100% 50%;
@@ -492,7 +498,7 @@
 .react-flow__node-input,
 .react-flow__node-output {
   background: #ffffff !important;
-  border: 2px solid #6366f1 !important; /* indigo-500 border */
+  border: 2px solid hsl(var(--primary)) !important;
   border-radius: 8px !important;
   padding: 10px 16px !important;
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important;

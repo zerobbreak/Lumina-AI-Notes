@@ -183,15 +183,15 @@ export function FormulaExtractDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[650px] bg-[#0A0A0A] border-white/10 text-white shadow-2xl">
+      <DialogContent className="sm:max-w-[650px] bg-background border-border text-foreground shadow-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
-            <div className="p-2.5 bg-linear-to-br from-purple-500/20 to-pink-500/20 rounded-xl border border-purple-500/20">
-              <Sparkles className="w-5 h-5 text-purple-400" />
+            <div className="p-2.5 bg-linear-to-br from-primary/20 to-primary-alt/20 rounded-xl border border-primary/20">
+              <Sparkles className="w-5 h-5 text-primary" />
             </div>
             <span className="text-xl">Extract Formula from Image</span>
           </DialogTitle>
-          <DialogDescription className="text-gray-400 mt-2">
+          <DialogDescription className="text-muted-foreground mt-2">
             Upload an image containing a mathematical formula. Our AI will convert
             it to LaTeX code automatically.
           </DialogDescription>
@@ -202,14 +202,14 @@ export function FormulaExtractDialog({
           {isExtracting && (
             <div className="flex flex-col items-center justify-center py-12 space-y-4">
               <div className="relative">
-                <div className="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center">
-                  <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+                <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
                 </div>
-                <div className="absolute inset-0 rounded-full border-2 border-purple-500/30 border-t-purple-500 animate-spin" />
+                <div className="absolute inset-0 rounded-full border-2 border-primary/30 border-t-purple-500 animate-spin" />
               </div>
               <div className="text-center">
-                <p className="text-sm font-medium text-gray-300">Extracting formula...</p>
-                <p className="text-xs text-gray-500 mt-1">This may take a few seconds</p>
+                <p className="text-sm font-medium text-foreground/80">Extracting formula...</p>
+                <p className="text-xs text-muted-foreground/80 mt-1">This may take a few seconds</p>
               </div>
             </div>
           )}
@@ -221,10 +221,10 @@ export function FormulaExtractDialog({
               className={cn(
                 "relative border-2 border-dashed rounded-xl p-10 text-center transition-all cursor-pointer group",
                 isDragActive
-                  ? "border-purple-500 bg-purple-500/10 scale-[1.02]"
+                  ? "border-primary bg-primary/10 scale-[1.02]"
                   : imagePreview
-                    ? "border-purple-500/40 bg-purple-500/5"
-                    : "border-white/10 hover:border-purple-500/60 hover:bg-purple-500/5"
+                    ? "border-primary/40 bg-primary/5"
+                    : "border-border hover:border-primary/60 hover:bg-primary/5"
               )}
             >
               <input {...getInputProps()} />
@@ -235,31 +235,31 @@ export function FormulaExtractDialog({
                     <img
                       src={imagePreview}
                       alt="Uploaded formula"
-                      className="max-h-56 mx-auto rounded-xl border-2 border-white/10 shadow-lg"
+                      className="max-h-56 mx-auto rounded-xl border-2 border-border shadow-lg"
                     />
                     <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-300">
+                    <p className="text-sm font-medium text-foreground/80">
                       Image ready for extraction
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-muted-foreground/80 mt-1">
                       Click or drop to replace image
                     </p>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-5">
-                  <div className="w-20 h-20 mx-auto rounded-2xl bg-linear-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Upload className="w-10 h-10 text-purple-400" />
+                  <div className="w-20 h-20 mx-auto rounded-2xl bg-linear-to-br from-primary/10 to-primary-alt/10 border border-primary/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Upload className="w-10 h-10 text-primary" />
                   </div>
                   <div>
-                    <p className="text-base font-medium text-gray-200 mb-1">
+                    <p className="text-base font-medium text-foreground/90 mb-1">
                       {isDragActive
                         ? "Drop the image here"
                         : "Drag and drop an image, or click to select"}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-foreground/80">
                       Supports PNG, JPG, GIF, WebP • Max 10MB
                     </p>
                   </div>
@@ -272,23 +272,23 @@ export function FormulaExtractDialog({
           {extractedLatex && !isExtracting && (
             <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-300">
               {/* Preview */}
-              <div className="bg-linear-to-br from-white/5 to-white/2 rounded-xl p-6 border border-white/10 shadow-lg">
+              <div className="bg-linear-to-br from-foreground/5 to-foreground/2 rounded-xl p-6 border border-border shadow-lg">
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Extracted Formula
                   </span>
                   {getConfidenceBadge()}
                 </div>
-                <div className="bg-black/30 rounded-lg p-6 border border-white/5">
+                <div className="bg-inset rounded-lg p-6 border border-border/60">
                   <div
-                    className="text-center text-white text-2xl overflow-x-auto py-3 min-h-[60px] flex items-center justify-center"
+                    className="text-center text-foreground text-2xl overflow-x-auto py-3 min-h-[60px] flex items-center justify-center"
                     dangerouslySetInnerHTML={{
                       __html: renderLatex(editedLatex),
                     }}
                   />
                 </div>
                 {description && (
-                  <p className="text-xs text-gray-400 mt-4 text-center italic">
+                  <p className="text-xs text-muted-foreground mt-4 text-center italic">
                     {description}
                   </p>
                 )}
@@ -297,14 +297,14 @@ export function FormulaExtractDialog({
               {/* Editable LaTeX */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     LaTeX Code
                   </label>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={handleCopy}
-                    className="h-7 text-xs text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                    className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors"
                   >
                     {copied ? (
                       <>
@@ -322,10 +322,10 @@ export function FormulaExtractDialog({
                 <textarea
                   value={editedLatex}
                   onChange={(e) => setEditedLatex(e.target.value)}
-                  className="w-full h-28 p-4 rounded-lg bg-black/40 border border-white/10 text-gray-200 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/30 transition-all"
+                  className="w-full h-28 p-4 rounded-lg bg-inset border border-border text-foreground/90 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/30 transition-all"
                   placeholder="LaTeX formula..."
                 />
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground/80">
                   Edit the LaTeX code above if needed
                 </p>
               </div>
@@ -334,7 +334,7 @@ export function FormulaExtractDialog({
               <div className="flex items-center justify-center pt-2">
                 <button
                   onClick={resetState}
-                  className="text-sm text-purple-400 hover:text-purple-300 transition-colors font-medium flex items-center gap-2 group"
+                  className="text-sm text-primary hover:text-primary/80 transition-colors font-medium flex items-center gap-2 group"
                 >
                   <ImageIcon className="w-4 h-4 group-hover:rotate-12 transition-transform" />
                   Try another image
@@ -368,7 +368,7 @@ export function FormulaExtractDialog({
           <Button
             variant="ghost"
             onClick={handleClose}
-            className="text-gray-400 hover:text-white hover:bg-white/5"
+            className="text-muted-foreground hover:text-foreground hover:bg-foreground/5"
             disabled={isExtracting}
           >
             Cancel
@@ -378,7 +378,7 @@ export function FormulaExtractDialog({
             <Button
               onClick={handleExtract}
               disabled={!imageBase64 || isExtracting}
-              className="bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg shadow-purple-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-linear-to-r from-primary to-primary-alt hover:from-primary/90 hover:to-primary-alt/90 text-primary-foreground shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Sparkles className="w-4 h-4 mr-2" />
               Extract Formula
@@ -388,7 +388,7 @@ export function FormulaExtractDialog({
           {extractedLatex && !isExtracting && (
             <Button
               onClick={handleInsert}
-              className="bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg shadow-purple-500/20"
+              className="bg-linear-to-r from-primary to-primary-alt hover:from-primary/90 hover:to-primary-alt/90 text-primary-foreground shadow-lg shadow-primary/20"
             >
               <Sparkles className="w-4 h-4 mr-2" />
               Insert Formula

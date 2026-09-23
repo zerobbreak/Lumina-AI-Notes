@@ -70,29 +70,29 @@ export function CreateNoteDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] bg-[#0A0A0A] border-white/10 text-white">
+      <DialogContent className="sm:max-w-[425px] bg-background border-border text-foreground">
         <DialogHeader>
           <DialogTitle>Create New Note</DialogTitle>
-          <DialogDescription className="text-gray-400">
+          <DialogDescription className="text-muted-foreground">
             Start a new note and optionally link it to a course context.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="title" className="text-right text-gray-400">
+            <Label htmlFor="title" className="text-right text-muted-foreground">
               Title
             </Label>
             <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="col-span-3 bg-white/5 border-white/10 text-white focus:border-indigo-500"
+              className="col-span-3 bg-foreground/5 border-border text-foreground focus:border-primary"
               placeholder="Lecture 1: Introduction"
             />
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="course" className="text-right text-gray-400">
+            <Label htmlFor="course" className="text-right text-muted-foreground">
               Course
             </Label>
             <Select
@@ -107,10 +107,10 @@ export function CreateNoteDialog({
                 setSelectedModule("");
               }}
             >
-              <SelectTrigger className="col-span-3 bg-white/5 border-white/10 text-white">
+              <SelectTrigger className="col-span-3 bg-foreground/5 border-border text-foreground">
                 <SelectValue placeholder="Select course (Optional)" />
               </SelectTrigger>
-              <SelectContent className="bg-[#1A1A1A] border-white/10 text-white">
+              <SelectContent className="bg-popover border-border text-foreground">
                 <SelectItem value="none">None</SelectItem>
                 {courses.map((course: Course) => (
                   <SelectItem key={course.id} value={course.id}>
@@ -125,7 +125,7 @@ export function CreateNoteDialog({
             selectedCourse !== "none" &&
             modules.length > 0 && (
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="module" className="text-right text-gray-400">
+                <Label htmlFor="module" className="text-right text-muted-foreground">
                   Module
                 </Label>
                 <Select
@@ -138,10 +138,10 @@ export function CreateNoteDialog({
                     setSelectedModule(val);
                   }}
                 >
-                  <SelectTrigger className="col-span-3 bg-white/5 border-white/10 text-white">
+                  <SelectTrigger className="col-span-3 bg-foreground/5 border-border text-foreground">
                     <SelectValue placeholder="Select module (Optional)" />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#1A1A1A] border-white/10 text-white">
+                  <SelectContent className="bg-popover border-border text-foreground">
                     <SelectItem value="none">None</SelectItem>
                     {modules.map((mod: Module) => (
                       <SelectItem key={mod.id} value={mod.id}>
@@ -157,14 +157,14 @@ export function CreateNoteDialog({
           <Button
             variant="ghost"
             onClick={() => onOpenChange(false)}
-            className="text-gray-400 hover:text-white"
+            className="text-muted-foreground hover:text-foreground"
           >
             Cancel
           </Button>
           <Button
             onClick={handleCreate}
             disabled={isCreating || !title}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             Create Note
           </Button>

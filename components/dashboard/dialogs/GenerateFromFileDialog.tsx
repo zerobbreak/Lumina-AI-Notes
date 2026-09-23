@@ -162,34 +162,34 @@ export function GenerateFromFileDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[480px] bg-[#0A0A0A] border-white/10 text-white shadow-2xl">
+      <DialogContent className="sm:max-w-[480px] bg-background border-border text-foreground shadow-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-indigo-400" />
+            <FileText className="w-5 h-5 text-primary" />
             Generate from File
           </DialogTitle>
-          <DialogDescription className="text-gray-400">
+          <DialogDescription className="text-muted-foreground">
             Choose where to store the generated content and what to create.
           </DialogDescription>
         </DialogHeader>
 
         <div className="py-4 space-y-4">
           {/* File Info */}
-          <div className="flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-lg">
-            <div className="h-10 w-10 bg-indigo-500/10 rounded-lg flex items-center justify-center shrink-0">
-              <FileText className="w-5 h-5 text-indigo-400" />
+          <div className="flex items-center gap-3 p-3 bg-foreground/5 border border-border rounded-lg">
+            <div className="h-10 w-10 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
+              <FileText className="w-5 h-5 text-primary" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white break-all line-clamp-2">
+              <p className="text-sm font-medium text-foreground break-all line-clamp-2">
                 {fileName}
               </p>
-              <p className="text-xs text-gray-500">PDF Document</p>
+              <p className="text-xs text-muted-foreground/80">PDF Document</p>
             </div>
           </div>
 
           {/* Course Selection */}
           <div className="space-y-2">
-            <Label className="text-gray-400">Save to Course (Optional)</Label>
+            <Label className="text-muted-foreground">Save to Course (Optional)</Label>
             <Select
               value={selectedCourse}
               onValueChange={(val) => {
@@ -198,10 +198,10 @@ export function GenerateFromFileDialog({
               }}
               disabled={isProcessing}
             >
-              <SelectTrigger className="bg-white/5 border-white/10 text-white w-full">
+              <SelectTrigger className="bg-foreground/5 border-border text-foreground w-full">
                 <SelectValue placeholder="Select course (Optional)" />
               </SelectTrigger>
-              <SelectContent className="bg-[#1A1A1A] border-white/10 text-white">
+              <SelectContent className="bg-popover border-border text-foreground">
                 <SelectItem value="none">No Course</SelectItem>
                 {courses.map((course: Course) => (
                   <SelectItem key={course.id} value={course.id}>
@@ -217,16 +217,16 @@ export function GenerateFromFileDialog({
             selectedCourse !== "none" &&
             modules.length > 0 && (
               <div className="space-y-2">
-                <Label className="text-gray-400">Module (Optional)</Label>
+                <Label className="text-muted-foreground">Module (Optional)</Label>
                 <Select
                   value={selectedModule}
                   onValueChange={setSelectedModule}
                   disabled={isProcessing}
                 >
-                  <SelectTrigger className="bg-white/5 border-white/10 text-white w-full">
+                  <SelectTrigger className="bg-foreground/5 border-border text-foreground w-full">
                     <SelectValue placeholder="Select module (Optional)" />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#1A1A1A] border-white/10 text-white">
+                  <SelectContent className="bg-popover border-border text-foreground">
                     <SelectItem value="none">No Module</SelectItem>
                     {modules.map((mod: Module) => (
                       <SelectItem key={mod.id} value={mod.id}>
@@ -244,7 +244,7 @@ export function GenerateFromFileDialog({
             variant="ghost"
             onClick={handleClose}
             disabled={isProcessing}
-            className="text-gray-400 hover:text-white"
+            className="text-muted-foreground hover:text-foreground"
           >
             Cancel
           </Button>
@@ -252,7 +252,7 @@ export function GenerateFromFileDialog({
             onClick={handleGenerateFlashcards}
             disabled={isProcessing}
             variant="outline"
-            className="border-purple-500/50 text-purple-400 hover:bg-purple-500/10 hover:text-purple-300"
+            className="border-primary/50 text-primary hover:bg-primary/10 hover:text-primary/80"
           >
             {processingMode === "flashcards" ? (
               <>

@@ -59,7 +59,7 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <div className="flex items-center gap-1 p-1 bg-zinc-800/50 rounded-lg border border-sidebar-border">
+      <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg border border-sidebar-border">
         <Button
           variant="ghost"
           size="icon"
@@ -86,11 +86,11 @@ export function ThemeToggle() {
   }
 
   return (
-    <div className="flex items-center gap-1 p-1 bg-zinc-800/50 rounded-lg border border-sidebar-border">
+    <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg border border-sidebar-border">
       <Button
         variant="ghost"
         size="icon"
-        className={`h-7 w-7 rounded-md ${theme === "light" ? "bg-zinc-200 text-black shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+        className={`h-7 w-7 rounded-md ${theme === "light" ? "bg-foreground/10 text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
         onClick={() => setTheme("light")}
         title="Light Mode"
       >
@@ -100,7 +100,7 @@ export function ThemeToggle() {
       <Button
         variant="ghost"
         size="icon"
-        className={`h-7 w-7 rounded-md ${theme === "system" ? "bg-zinc-800 text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+        className={`h-7 w-7 rounded-md ${theme === "system" ? "bg-foreground/10 text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
         onClick={() => setTheme("system")}
         title="System Preference"
       >
@@ -110,7 +110,7 @@ export function ThemeToggle() {
       <Button
         variant="ghost"
         size="icon"
-        className={`h-7 w-7 rounded-md ${theme === "dark" ? "bg-zinc-800 text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+        className={`h-7 w-7 rounded-md ${theme === "dark" ? "bg-foreground/10 text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
         onClick={() => setTheme("dark")}
         title="Dark Mode"
       >

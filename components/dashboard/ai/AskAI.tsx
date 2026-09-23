@@ -38,8 +38,8 @@ export function AskAI({
 
         <button
           onClick={() => setIsPanelOpen(!isPanelOpen)}
-          className={`group flex items-center justify-center w-14 h-14 rounded-full bg-linear-to-r from-purple-600 to-violet-600 text-white shadow-xl shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-110 transition-all duration-300 ${
-            isPanelOpen ? "ring-2 ring-white/20 rotate-90" : ""
+          className={`group flex items-center justify-center w-14 h-14 rounded-full bg-linear-to-r from-primary to-primary-alt text-primary-foreground shadow-xl shadow-primary/30 hover:shadow-primary/50 hover:scale-110 transition-all duration-300 ${
+            isPanelOpen ? "ring-2 ring-foreground/20 rotate-90" : ""
           }`}
         >
           {isPanelOpen ? (

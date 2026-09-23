@@ -40,8 +40,8 @@ export function TagPicker({
             className={cn(
               "h-8 gap-2 transition-colors",
               selectedTagIds.length > 0
-                ? "text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20"
-                : "text-gray-400 hover:text-white hover:bg-white/10",
+                ? "text-primary bg-primary/10 hover:bg-primary/20"
+                : "text-muted-foreground hover:text-foreground hover:bg-foreground/10",
               className,
             )}
             title="Manage Tags"
@@ -54,23 +54,23 @@ export function TagPicker({
             />
             <span className="hidden sm:inline">Tags</span>
             {selectedTagIds.length > 0 && (
-              <span className="bg-indigo-500/20 text-indigo-300 text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-0.5 border border-indigo-500/20">
+              <span className="bg-primary/20 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-0.5 border border-primary/20">
                 {selectedTagIds.length}
               </span>
             )}
           </Button>
         </PopoverTrigger>
         <PopoverContent
-          className="w-56 p-2 bg-[#111] border border-white/10 text-white"
+          className="w-56 p-2 bg-background border border-border text-foreground"
           align={align}
         >
           <div className="space-y-1">
-            <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-2 pb-1">
+            <h4 className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-widest px-2 pb-1">
               Select Tags
             </h4>
 
             {tags?.length === 0 && (
-              <div className="text-center py-3 text-gray-500 text-xs">
+              <div className="text-center py-3 text-muted-foreground/80 text-xs">
                 No tags available
               </div>
             )}
@@ -85,8 +85,8 @@ export function TagPicker({
                     className={cn(
                       "w-full flex items-center justify-between px-2 py-1.5 rounded-sm text-left transition-colors group text-sm",
                       isSelected
-                        ? "bg-white/10 text-white"
-                        : "text-gray-400 hover:bg-white/5 hover:text-gray-200",
+                        ? "bg-foreground/10 text-foreground"
+                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground/90",
                     )}
                   >
                     <div className="flex items-center gap-2 overflow-hidden">
@@ -104,11 +104,11 @@ export function TagPicker({
               })}
             </div>
 
-            <div className="pt-2 border-t border-white/10 mt-1">
+            <div className="pt-2 border-t border-border mt-1">
               <Button
                 variant="ghost"
                 size="sm"
-                className="w-full justify-start h-8 text-xs text-gray-400 hover:text-white hover:bg-white/5 font-normal"
+                className="w-full justify-start h-8 text-xs text-muted-foreground hover:text-foreground hover:bg-foreground/5 font-normal"
                 onClick={() => {
                   setOpen(false);
                   setIsManagerOpen(true);

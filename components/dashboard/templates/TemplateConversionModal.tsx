@@ -52,7 +52,7 @@ export function TemplateConversionModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl bg-[#0B0B0B] border-white/10 text-white max-h-[80vh] overflow-hidden">
+      <DialogContent className="sm:max-w-2xl bg-background border-border text-foreground max-h-[80vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle>Change Template</DialogTitle>
         </DialogHeader>
@@ -69,11 +69,11 @@ export function TemplateConversionModal({
                   className={`w-full text-left p-3 rounded-lg border transition-all ${
                     isSelected
                       ? "border-cyan-500/40 bg-cyan-500/10"
-                      : "border-white/10 bg-white/5 hover:bg-white/10"
+                      : "border-border bg-foreground/5 hover:bg-foreground/10"
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-white/10 text-gray-300">
+                    <div className="p-2 rounded-lg bg-foreground/10 text-foreground/80">
                       {option.icon}
                     </div>
                     <span className="font-medium">{option.label}</span>
@@ -88,18 +88,18 @@ export function TemplateConversionModal({
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4 overflow-hidden">
-            <div className="text-xs uppercase tracking-widest text-gray-500 mb-3">
+          <div className="rounded-xl border border-border bg-foreground/5 p-4 overflow-hidden">
+            <div className="text-xs uppercase tracking-widest text-muted-foreground/80 mb-3">
               Preview
             </div>
-            <div className="text-sm text-gray-200 whitespace-pre-wrap min-h-[160px] max-h-[60vh] overflow-y-auto pr-1">
+            <div className="text-sm text-foreground/90 whitespace-pre-wrap min-h-[160px] max-h-[60vh] overflow-y-auto pr-1">
               {previewText || "No content to preview"}
             </div>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" className="text-gray-400" onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" className="text-muted-foreground" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button className="bg-cyan-500 hover:bg-cyan-600 text-white" onClick={() => onConfirm(conversion)}>

@@ -14,6 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { readThemeColor, useThemeVersion } from "@/hooks/useThemeVersion";
 
 interface GraphSettings {
   xMin: number;
@@ -110,6 +111,7 @@ export function GraphCalculatorNodeView({ node, updateAttributes }: NodeViewProp
   }, [expressions, settings, updateAttributes]);
 
   // Draw the graph
+  const themeVersion = useThemeVersion();
   const drawGraph = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -122,7 +124,7 @@ export function GraphCalculatorNodeView({ node, updateAttributes }: NodeViewProp
     const { xMin, xMax, yMin, yMax, gridEnabled, axisEnabled } = settings;
 
     // Clear canvas
-    ctx.fillStyle = "#0a0a0a";
+    ctx.fillStyle = readThemeColor(canvas, "--inset");
     ctx.fillRect(0, 0, width, height);
 
     // Helper functions to convert between graph and pixel coordinates
@@ -131,7 +133,7 @@ export function GraphCalculatorNodeView({ node, updateAttributes }: NodeViewProp
 
     // Draw grid
     if (gridEnabled) {
-      ctx.strokeStyle = "#1f1f1f";
+      ctx.strokeStyle = readThemeColor(canvas, "--foreground", 0.08);
       ctx.lineWidth = 1;
 
       // Calculate grid step
@@ -159,7 +161,7 @@ export function GraphCalculatorNodeView({ node, updateAttributes }: NodeViewProp
 
     // Draw axes
     if (axisEnabled) {
-      ctx.strokeStyle = "#404040";
+      ctx.strokeStyle = readThemeColor(canvas, "--foreground", 0.25);
       ctx.lineWidth = 2;
 
       // X axis
@@ -179,7 +181,7 @@ export function GraphCalculatorNodeView({ node, updateAttributes }: NodeViewProp
       }
 
       // Draw axis labels
-      ctx.fillStyle = "#666";
+      ctx.fillStyle = readThemeColor(canvas, "--muted-foreground");
       ctx.font = "10px monospace";
       ctx.fillText(`${xMin}`, 5, toPixelY(0) - 5);
       ctx.fillText(`${xMax}`, width - 25, toPixelY(0) - 5);
@@ -217,7 +219,7 @@ export function GraphCalculatorNodeView({ node, updateAttributes }: NodeViewProp
 
       ctx.stroke();
     });
-  }, [expressions, settings]);
+  }, [expressions, settings, themeVersion]);
 
   // Redraw when anything changes
   useEffect(() => {
@@ -313,29 +315,29 @@ export function GraphCalculatorNodeView({ node, updateAttributes }: NodeViewProp
     <NodeViewWrapper className="my-4">
       <div
         ref={containerRef}
-        className="bg-[#0a0a0a] border border-white/10 rounded-xl overflow-hidden"
+        className="bg-background border border-border rounded-xl overflow-hidden"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-3 py-2 bg-white/5 border-b border-white/10">
-          <span className="text-xs font-medium text-gray-400">Graphing Calculator</span>
+        <div className="flex items-center justify-between px-3 py-2 bg-foreground/5 border-b border-border">
+          <span className="text-xs font-medium text-muted-foreground">Graphing Calculator</span>
           <div className="flex items-center gap-1">
             <button
               onClick={() => handleZoom(true)}
-              className="p-1 hover:bg-white/10 rounded text-gray-500 hover:text-white transition-colors"
+              className="p-1 hover:bg-foreground/10 rounded text-muted-foreground/80 hover:text-foreground transition-colors"
               title="Zoom In"
             >
               <ZoomIn className="w-4 h-4" />
             </button>
             <button
               onClick={() => handleZoom(false)}
-              className="p-1 hover:bg-white/10 rounded text-gray-500 hover:text-white transition-colors"
+              className="p-1 hover:bg-foreground/10 rounded text-muted-foreground/80 hover:text-foreground transition-colors"
               title="Zoom Out"
             >
               <ZoomOut className="w-4 h-4" />
             </button>
             <button
               onClick={resetView}
-              className="p-1 hover:bg-white/10 rounded text-gray-500 hover:text-white transition-colors"
+              className="p-1 hover:bg-foreground/10 rounded text-muted-foreground/80 hover:text-foreground transition-colors"
               title="Reset View"
             >
               <Move className="w-4 h-4" />
@@ -343,8 +345,8 @@ export function GraphCalculatorNodeView({ node, updateAttributes }: NodeViewProp
             <button
               onClick={() => setShowSettings(!showSettings)}
               className={cn(
-                "p-1 hover:bg-white/10 rounded transition-colors",
-                showSettings ? "text-blue-400" : "text-gray-500 hover:text-white"
+                "p-1 hover:bg-foreground/10 rounded transition-colors",
+                showSettings ? "text-blue-400" : "text-muted-foreground/80 hover:text-foreground"
               )}
               title="Settings"
             >
@@ -368,7 +370,7 @@ export function GraphCalculatorNodeView({ node, updateAttributes }: NodeViewProp
         </div>
 
         {/* Expression Inputs */}
-        <div className="p-3 space-y-2 border-t border-white/10">
+        <div className="p-3 space-y-2 border-t border-border">
           {expressions.map((expr, index) => (
             <div key={index} className="flex items-center gap-2">
               <div
@@ -380,12 +382,12 @@ export function GraphCalculatorNodeView({ node, updateAttributes }: NodeViewProp
                 value={expr}
                 onChange={(e) => updateExpression(index, e.target.value)}
                 placeholder="y = x^2"
-                className="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-blue-500/50"
+                className="flex-1 bg-foreground/5 border border-border rounded px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-blue-500/50"
               />
               {expressions.length > 1 && (
                 <button
                   onClick={() => removeExpression(index)}
-                  className="p-1 hover:bg-red-500/20 rounded text-gray-500 hover:text-red-400 transition-colors"
+                  className="p-1 hover:bg-red-500/20 rounded text-muted-foreground/80 hover:text-red-400 transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -403,55 +405,55 @@ export function GraphCalculatorNodeView({ node, updateAttributes }: NodeViewProp
 
         {/* Settings Panel */}
         {showSettings && (
-          <div className="p-3 border-t border-white/10 bg-white/5 space-y-3">
+          <div className="p-3 border-t border-border bg-foreground/5 space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-500 block mb-1">X Min</label>
+                <label className="text-xs text-muted-foreground/80 block mb-1">X Min</label>
                 <input
                   type="number"
                   value={settings.xMin}
                   onChange={(e) =>
                     setSettings((s) => ({ ...s, xMin: parseFloat(e.target.value) || -10 }))
                   }
-                  className="w-full bg-black/50 border border-white/10 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-blue-500/50"
+                  className="w-full bg-inset border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-blue-500/50"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">X Max</label>
+                <label className="text-xs text-muted-foreground/80 block mb-1">X Max</label>
                 <input
                   type="number"
                   value={settings.xMax}
                   onChange={(e) =>
                     setSettings((s) => ({ ...s, xMax: parseFloat(e.target.value) || 10 }))
                   }
-                  className="w-full bg-black/50 border border-white/10 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-blue-500/50"
+                  className="w-full bg-inset border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-blue-500/50"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Y Min</label>
+                <label className="text-xs text-muted-foreground/80 block mb-1">Y Min</label>
                 <input
                   type="number"
                   value={settings.yMin}
                   onChange={(e) =>
                     setSettings((s) => ({ ...s, yMin: parseFloat(e.target.value) || -10 }))
                   }
-                  className="w-full bg-black/50 border border-white/10 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-blue-500/50"
+                  className="w-full bg-inset border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-blue-500/50"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Y Max</label>
+                <label className="text-xs text-muted-foreground/80 block mb-1">Y Max</label>
                 <input
                   type="number"
                   value={settings.yMax}
                   onChange={(e) =>
                     setSettings((s) => ({ ...s, yMax: parseFloat(e.target.value) || 10 }))
                   }
-                  className="w-full bg-black/50 border border-white/10 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-blue-500/50"
+                  className="w-full bg-inset border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-blue-500/50"
                 />
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-xs text-gray-400">
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 <input
                   type="checkbox"
                   checked={settings.gridEnabled}
@@ -460,7 +462,7 @@ export function GraphCalculatorNodeView({ node, updateAttributes }: NodeViewProp
                 />
                 Show Grid
               </label>
-              <label className="flex items-center gap-2 text-xs text-gray-400">
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 <input
                   type="checkbox"
                   checked={settings.axisEnabled}

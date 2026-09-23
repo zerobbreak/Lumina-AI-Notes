@@ -42,7 +42,7 @@ export function MathNodeView({
   // Render LaTeX to HTML
   const renderLatex = useCallback((latexStr: string): string => {
     if (!latexStr || latexStr.trim() === "") {
-      return '<span class="text-gray-500 italic">Empty formula</span>';
+      return '<span class="text-muted-foreground/80 italic">Empty formula</span>';
     }
 
     try {
@@ -137,8 +137,8 @@ export function MathNodeView({
         <div
           className={`${
             isBlockMath
-              ? "my-4 p-4 bg-gray-900/50 border border-purple-500/30 rounded-lg"
-              : "inline-flex items-center p-1 bg-gray-900/50 border border-purple-500/30 rounded"
+              ? "my-4 p-4 bg-inset border border-primary/30 rounded-lg"
+              : "inline-flex items-center p-1 bg-inset border border-primary/30 rounded"
           }`}
         >
           <div
@@ -148,12 +148,12 @@ export function MathNodeView({
             <div
               className={`${
                 isBlockMath
-                  ? "p-3 bg-black/30 rounded-lg text-center min-h-[50px] flex items-center justify-center"
-                  : "px-2 py-1 bg-black/30 rounded"
+                  ? "p-3 bg-inset rounded-lg text-center min-h-[50px] flex items-center justify-center"
+                  : "px-2 py-1 bg-inset rounded"
               }`}
             >
               <span
-                className="katex-preview text-white"
+                className="katex-preview text-foreground"
                 dangerouslySetInnerHTML={{ __html: renderLatex(editValue) }}
               />
             </div>
@@ -170,7 +170,7 @@ export function MathNodeView({
                 onKeyDown={handleKeyDown}
                 onKeyDownCapture={handleKeyDownCapture}
                 placeholder="Enter LaTeX formula..."
-                className="w-full p-2 bg-black/40 border border-white/10 rounded text-gray-200 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/50 min-h-[60px]"
+                className="w-full p-2 bg-inset border border-border rounded text-foreground/90 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 min-h-[60px]"
                 rows={3}
               />
             ) : (
@@ -185,7 +185,7 @@ export function MathNodeView({
                 onKeyDown={handleKeyDown}
                 onKeyDownCapture={handleKeyDownCapture}
                 placeholder="LaTeX..."
-                className="flex-1 min-w-[150px] px-2 py-1 bg-black/40 border border-white/10 rounded text-gray-200 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                className="flex-1 min-w-[150px] px-2 py-1 bg-inset border border-border rounded text-foreground/90 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
             )}
 
@@ -204,13 +204,13 @@ export function MathNodeView({
             >
               <button
                 onClick={handleCancel}
-                className="px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
+                className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-foreground/10 rounded transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
-                className="px-2 py-1 text-xs bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 rounded transition-colors"
+                className="px-2 py-1 text-xs bg-primary/20 text-primary hover:bg-primary/30 rounded transition-colors"
               >
                 Save
               </button>
@@ -231,7 +231,7 @@ export function MathNodeView({
     >
       <span
         className={`katex-content ${isBlockMath ? "block-math-content" : "inline-math-content"} ${
-          selected ? "ring-2 ring-purple-500/50" : ""
+          selected ? "ring-2 ring-primary/50" : ""
         }`}
         dangerouslySetInnerHTML={{ __html: renderLatex(latex) }}
         title={`LaTeX: ${latex}\nDouble-click to edit`}

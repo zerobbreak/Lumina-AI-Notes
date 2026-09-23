@@ -73,7 +73,7 @@ function ActivityCalendarDayButton({
         <span className="flex shrink-0 justify-center gap-0.5" aria-hidden>
           {recN > 0 && (
             <span
-              className="inline-block size-1.5 rounded-full bg-violet-500"
+              className="inline-block size-1.5 rounded-full bg-primary"
               title="Sessions"
             />
           )}
@@ -276,7 +276,7 @@ export default function CalendarView() {
 
           <div className="mt-4 flex items-center gap-4 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary" />
               Session
             </span>
             <span className="flex items-center gap-1.5">
