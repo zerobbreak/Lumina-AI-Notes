@@ -5,7 +5,9 @@ import dynamic from "next/dynamic";
 import { DashboardProvider } from "@/components/dashboard/DashboardContext";
 import { RealtimeProvider } from "@/components/providers/RealtimeProvider";
 import { DragOverlayWrapper } from "@/components/dashboard/DragOverlayWrapper";
-import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
+import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
+import { useAppCommands } from "@/lib/appCommands";
+import { DASHBOARD_NAV } from "@/constants/dashboardNav";
 import { Sparkles } from "lucide-react";
 import { useAcceptPendingInvites } from "@/lib/hooks/auth/useAcceptPendingInvites";
 import { useAppAuth } from "@/lib/hooks/auth/useAppAuth";
@@ -55,7 +57,10 @@ function DashboardLayoutLoading() {
 }
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  // The palette's starting text while it's open, null while closed. A
+  // leading ">" lists only commands, as in VS Code.
+  const [paletteQuery, setPaletteQuery] = useState<string | null>(null);
+  const [paletteOpenCount, setPaletteOpenCount] = useState(0);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [mountHeavyPanels, setMountHeavyPanels] = useState(false);
   const acceptPendingInvites = useAcceptPendingInvites();
@@ -111,22 +116,23 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     acceptPendingInvites().catch(() => {});
   }, [acceptPendingInvites, authLoading, isAuthenticated]);
 
-  // Global keyboard shortcuts
-  useKeyboardShortcut(
-    "cmd+p",
-    useCallback(() => {
-      setIsCommandPaletteOpen(true);
-    }, []),
-    { preventDefault: true },
-  );
-
-  useKeyboardShortcut(
-    "cmd+/",
-    useCallback(() => {
-      setIsShortcutsOpen(true);
-    }, []),
-    { preventDefault: true },
-  );
+  // Global keyboard shortcuts and the commands they (or the palette) trigger.
+  useGlobalShortcuts();
+  const openPalette = useCallback((query: string) => {
+    setPaletteQuery(query);
+    // Remount so pressing the shortcut again starts over in the new mode.
+    setPaletteOpenCount((n) => n + 1);
+  }, []);
+  useAppCommands((id) => {
+    if (id === "command-palette") openPalette(">");
+    else if (id === "quick-open") openPalette("");
+    else if (id === "show-shortcuts") setIsShortcutsOpen(true);
+    else if (id === "toggle-sidebar") toggleLeftSidebar();
+    else if (id.startsWith("go:")) {
+      const item = DASHBOARD_NAV.find((n) => `go:${n.id}` === id);
+      if (item) router.push(item.href);
+    }
+  });
 
   return (
     <>
@@ -208,11 +214,15 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Command Palette - lazy loaded */}
-      {isCommandPaletteOpen && (
+      {paletteQuery !== null && (
         <Suspense fallback={null}>
           <CommandPalette
-            open={isCommandPaletteOpen}
-            onOpenChange={setIsCommandPaletteOpen}
+            key={paletteOpenCount}
+            open
+            initialQuery={paletteQuery}
+            onOpenChange={(open) => {
+              if (!open) setPaletteQuery(null);
+            }}
           />
         </Suspense>
       )}

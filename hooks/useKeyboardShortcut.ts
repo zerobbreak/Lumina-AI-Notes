@@ -16,19 +16,76 @@ interface UseKeyboardShortcutOptions {
    */
   stopPropagation?: boolean;
   /**
-   * Keys that should be ignored (e.g., when input is focused)
+   * Whether the shortcut also fires while typing in an input or the editor.
+   * Defaults to true for combos with Ctrl/Cmd/Alt and false for bare keys,
+   * so "/" still types a slash but Ctrl+P works mid-sentence.
    */
-  ignoreWhen?: (target: EventTarget | null) => boolean;
+  allowInEditable?: boolean;
+}
+
+/** True when focus is somewhere keystrokes type text. */
+export function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.isContentEditable ||
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.tagName === "SELECT"
+  );
+}
+
+function parseShortcut(keys: string) {
+  // "mod+/" splits into ["mod", "/"]; a literal "+" key is written "plus".
+  const parts = keys.toLowerCase().split("+").map((s) => s.trim());
+  const key = parts[parts.length - 1] === "plus" ? "+" : parts[parts.length - 1];
+  return {
+    key,
+    // cmd/meta/mod all mean "the platform's command key": Ctrl on Windows
+    // and Linux, ⌘ on macOS. Either is accepted so one binding works everywhere.
+    mod: parts.some((p) => p === "mod" || p === "cmd" || p === "meta"),
+    ctrl: parts.some((p) => p === "ctrl" || p === "control"),
+    shift: parts.includes("shift"),
+    alt: parts.some((p) => p === "alt" || p === "option"),
+  };
+}
+
+/** Whether a keystroke is the given combo, e.g. "mod+shift+p", "alt+1", "/". */
+export function matchesShortcut(event: KeyboardEvent, keys: string): boolean {
+  const s = parseShortcut(keys);
+
+  const commandDown = event.ctrlKey || event.metaKey;
+  if (s.mod || s.ctrl) {
+    if (s.ctrl ? !event.ctrlKey : !commandDown) return false;
+  } else if (commandDown) {
+    return false;
+  }
+  if (s.shift !== event.shiftKey || s.alt !== event.altKey) return false;
+
+  // event.key changes with Shift and Alt ("1" becomes "!" or "¡"), so fall
+  // back to the physical key for letters and digits.
+  const code = event.code?.toLowerCase() ?? "";
+  return (
+    event.key?.toLowerCase() === s.key ||
+    code === s.key ||
+    code === `key${s.key}` ||
+    code === `digit${s.key}`
+  );
+}
+
+/** Whether the combo can't be ordinary typing: it uses Ctrl/Cmd/Alt or a function key. */
+export function hasCommandModifier(keys: string): boolean {
+  const s = parseShortcut(keys);
+  return s.mod || s.ctrl || s.alt || /^f\d{1,2}$/.test(s.key);
 }
 
 /**
  * Hook to handle keyboard shortcuts
- * @param keys - The key combination (e.g., "ctrl+k", "meta+n")
+ * @param keys - The key combination (e.g., "mod+k", "mod+shift+p"), or several
  * @param handler - The function to call when the shortcut is pressed
  * @param options - Additional options
  */
 export function useKeyboardShortcut(
-  keys: string,
+  keys: string | readonly string[],
   handler: KeyboardHandler,
   options: UseKeyboardShortcutOptions = {}
 ) {
@@ -36,64 +93,30 @@ export function useKeyboardShortcut(
     enabled = true,
     preventDefault = true,
     stopPropagation = false,
-    ignoreWhen = (target) => {
-      if (!target) return false;
-      if (target instanceof HTMLElement) {
-        return (
-          target.isContentEditable ||
-          target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.tagName === "SELECT"
-        );
-      }
-      return false;
-    },
+    allowInEditable,
   } = options;
+  const combos = typeof keys === "string" ? [keys] : keys;
+  const comboKey = combos.join(" ");
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (!enabled) return;
 
-      // Check if we should ignore this event
-      if (ignoreWhen(event.target)) return;
+      const combo = comboKey.split(" ").find((k) => matchesShortcut(event, k));
+      if (!combo) return;
 
-      // Parse the key combination
-      const parts = keys.toLowerCase().split("+").map((s) => s.trim());
-      const key = parts[parts.length - 1];
-      const hasCtrl = parts.includes("ctrl") || parts.includes("control");
-      const hasMeta = parts.includes("meta") || parts.includes("cmd");
-      const hasShift = parts.includes("shift");
-      const hasAlt = parts.includes("alt") || parts.includes("option");
+      const inEditable = isEditableTarget(event.target);
+      if (inEditable && !(allowInEditable ?? hasCommandModifier(combo))) return;
 
-      // Check if modifiers match
-      const ctrlMatch = hasCtrl ? event.ctrlKey : !event.ctrlKey;
-      const metaMatch = hasMeta ? event.metaKey : !event.metaKey;
-      const shiftMatch = hasShift ? event.shiftKey : !event.shiftKey;
-      const altMatch = hasAlt ? event.altKey : !event.altKey;
-
-      // On Mac, cmd key is metaKey. On Windows/Linux, ctrl key is ctrlKey
-      // For cross-platform shortcuts, check for either
-      const modifierMatch =
-        (hasCtrl || hasMeta) && (event.ctrlKey || event.metaKey)
-          ? ctrlMatch || metaMatch
-          : ctrlMatch && metaMatch;
-
-      // Check if the key matches
-      const keyMatch =
-        event.key.toLowerCase() === key.toLowerCase() ||
-        event.code.toLowerCase() === key.toLowerCase();
-
-      if (modifierMatch && shiftMatch && altMatch && keyMatch) {
-        if (preventDefault) {
-          event.preventDefault();
-        }
-        if (stopPropagation) {
-          event.stopPropagation();
-        }
-        handler(event);
+      if (preventDefault) {
+        event.preventDefault();
       }
+      if (stopPropagation) {
+        event.stopPropagation();
+      }
+      handler(event);
     },
-    [keys, handler, enabled, preventDefault, stopPropagation, ignoreWhen]
+    [comboKey, handler, enabled, preventDefault, stopPropagation, allowInEditable]
   );
 
   useEffect(() => {
@@ -115,7 +138,7 @@ export function formatShortcut(keys: string): string {
     .split("+")
     .map((key) => {
       const trimmed = key.trim().toLowerCase();
-      if (trimmed === "meta" || trimmed === "cmd") {
+      if (trimmed === "meta" || trimmed === "cmd" || trimmed === "mod") {
         return isMac ? "⌘" : "Ctrl";
       }
       if (trimmed === "ctrl" || trimmed === "control") {
@@ -127,9 +150,9 @@ export function formatShortcut(keys: string): string {
       if (trimmed === "alt" || trimmed === "option") {
         return isMac ? "⌥" : "Alt";
       }
+      if (trimmed === "plus") return "+";
       // Capitalize first letter for display
       return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
     })
     .join(isMac ? "" : "+");
 }
-

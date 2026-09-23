@@ -1,4 +1,5 @@
 import type { Editor } from "@tiptap/core";
+import { dispatchAppCommand } from "@/lib/appCommands";
 
 export type SlashRange = { from: number; to: number };
 
@@ -9,6 +10,8 @@ export type SlashRegistryItem = {
   description: string;
   /** Lowercase tokens users can type after `/` to find this command */
   keywords: string[];
+  /** Node this inserts; the item is hidden in editors that don't have it. */
+  requires?: string;
   run: (editor: Editor, range: SlashRange) => void;
 };
 
@@ -38,18 +41,25 @@ function haystack(item: SlashRegistryItem): string {
  * Returns slash commands matching the query after `/`.
  * Empty query shows all commands in definition order.
  */
-export function filterSlashItems(query: string | null | undefined): SlashRegistryItem[] {
+export function filterSlashItems(
+  query: string | null | undefined,
+  editor?: Editor,
+): SlashRegistryItem[] {
+  const available = editor
+    ? SLASH_REGISTRY.filter((item) => !item.requires || item.requires in editor.schema.nodes)
+    : SLASH_REGISTRY;
+
   const q = normalize(query ?? "");
   if (!q) {
-    return SLASH_REGISTRY;
+    return available;
   }
 
   const tokens = tokenize(q);
   if (tokens.length === 0) {
-    return SLASH_REGISTRY;
+    return available;
   }
 
-  return SLASH_REGISTRY.filter((item) => {
+  return available.filter((item) => {
     const h = haystack(item);
     if (h.includes(q)) {
       return true;
@@ -176,6 +186,7 @@ const SLASH_REGISTRY: SlashRegistryItem[] = [
       "check",
       "done",
     ],
+    requires: "taskList",
     run: (editor, range) => {
       editor.chain().focus().deleteRange(range).toggleTaskList().run();
     },
@@ -212,11 +223,10 @@ const SLASH_REGISTRY: SlashRegistryItem[] = [
       "embed",
       "media",
     ],
+    requires: "image",
     run: (editor, range) => {
       editor.chain().focus().deleteRange(range).run();
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("open-image-upload"));
-      }
+      dispatchAppCommand("note:insert-image");
     },
   },
   {
@@ -234,6 +244,7 @@ const SLASH_REGISTRY: SlashRegistryItem[] = [
       "sigma",
       "inline",
     ],
+    requires: "inlineMath",
     run: (editor, range) => {
       editor
         .chain()
@@ -257,6 +268,7 @@ const SLASH_REGISTRY: SlashRegistryItem[] = [
       "axes",
       "interactive",
     ],
+    requires: "graphCalculator",
     run: (editor, range) => {
       editor.chain().focus().deleteRange(range).insertGraphCalculator().run();
     },
@@ -275,6 +287,7 @@ const SLASH_REGISTRY: SlashRegistryItem[] = [
       "graph",
       "stats",
     ],
+    requires: "chart",
     run: (editor, range) => {
       editor.chain().focus().deleteRange(range).insertChart().run();
     },

@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import {
   Dialog,
   DialogContent,
@@ -7,81 +8,32 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatShortcut } from "@/hooks/useKeyboardShortcut";
+import { SHORTCUTS, type ShortcutDef } from "@/constants/shortcuts";
 import { Keyboard } from "lucide-react";
-
-interface Shortcut {
-  title: string;
-  keys: string;
-  category: string;
-}
-
-const shortcuts: Shortcut[] = [
-  {
-    title: "Open Command Palette",
-    keys: "cmd+p",
-    category: "General",
-  },
-  {
-    title: "Search",
-    keys: "cmd+k",
-    category: "General",
-  },
-  {
-    title: "Create New Note",
-    keys: "cmd+n",
-    category: "General",
-  },
-  {
-    title: "Show Keyboard Shortcuts",
-    keys: "cmd+/",
-    category: "General",
-  },
-  {
-    title: "Close Dialog",
-    keys: "Esc",
-    category: "General",
-  },
-  {
-    title: "Toggle Left Sidebar",
-    keys: "cmd+b",
-    category: "Navigation",
-  },
-  {
-    title: "Go to Dashboard",
-    keys: "cmd+shift+d",
-    category: "Navigation",
-  },
-  {
-    title: "Go to Flashcards",
-    keys: "cmd+shift+f",
-    category: "Navigation",
-  },
-  {
-    title: "Go to Archive",
-    keys: "cmd+shift+a",
-    category: "Navigation",
-  },
-];
 
 interface KeyboardShortcutsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+// Entries sharing a title (Search on Ctrl+K and on "/") show as one row.
+function groupShortcuts() {
+  const groups = new Map<string, { title: string; keys: string[]; note?: string }[]>();
+  for (const s of SHORTCUTS as readonly ShortcutDef[]) {
+    const rows = groups.get(s.category) ?? [];
+    const row = rows.find((r) => r.title === s.title);
+    if (row) row.keys.push(...s.keys);
+    else rows.push({ title: s.title, keys: [...s.keys], note: s.outsideEditorOnly ? "outside the editor" : undefined });
+    groups.set(s.category, rows);
+  }
+  return [...groups.entries()];
+}
+
 export function KeyboardShortcutsDialog({
   open,
   onOpenChange,
 }: KeyboardShortcutsDialogProps) {
-  const groupedShortcuts = shortcuts.reduce(
-    (acc, shortcut) => {
-      if (!acc[shortcut.category]) {
-        acc[shortcut.category] = [];
-      }
-      acc[shortcut.category].push(shortcut);
-      return acc;
-    },
-    {} as Record<string, Shortcut[]>
-  );
+  const groupedShortcuts = groupShortcuts();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -94,7 +46,7 @@ export function KeyboardShortcutsDialog({
         </DialogHeader>
 
         <div className="max-h-[500px] overflow-y-auto py-4 space-y-6">
-          {Object.entries(groupedShortcuts).map(([category, items]) => (
+          {groupedShortcuts.map(([category, items]) => (
             <div key={category}>
               <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
                 {category}
@@ -103,14 +55,24 @@ export function KeyboardShortcutsDialog({
                 {items.map((shortcut) => (
                   <div
                     key={shortcut.title}
-                    className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-white/5 transition-colors"
+                    className="flex items-center justify-between gap-4 py-2 px-3 rounded-lg hover:bg-white/5 transition-colors"
                   >
                     <span className="text-sm text-gray-300">
                       {shortcut.title}
+                      {shortcut.note && (
+                        <span className="ml-2 text-xs text-gray-500">({shortcut.note})</span>
+                      )}
                     </span>
-                    <kbd className="px-2.5 py-1 text-xs font-semibold text-gray-400 bg-white/5 border border-white/10 rounded-md font-mono">
-                      {formatShortcut(shortcut.keys)}
-                    </kbd>
+                    <span className="flex shrink-0 items-center gap-1.5 text-xs text-gray-600">
+                      {shortcut.keys.map((keys, i) => (
+                        <Fragment key={keys}>
+                          {i > 0 && "or"}
+                          <kbd className="px-2.5 py-1 text-xs font-semibold text-gray-400 bg-white/5 border border-white/10 rounded-md font-mono">
+                            {formatShortcut(keys)}
+                          </kbd>
+                        </Fragment>
+                      ))}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -125,4 +87,3 @@ export function KeyboardShortcutsDialog({
     </Dialog>
   );
 }
-

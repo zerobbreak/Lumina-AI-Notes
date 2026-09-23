@@ -33,10 +33,9 @@ import { Course } from "@/types";
 import { DASHBOARD_NAV, activeDashboardNavId } from "@/constants/dashboardNav";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
-import {
-  useKeyboardShortcut,
-  formatShortcut,
-} from "@/hooks/useKeyboardShortcut";
+import { formatShortcut } from "@/hooks/useKeyboardShortcut";
+import { useAppCommand } from "@/lib/appCommands";
+import { shortcutFor } from "@/constants/shortcuts";
 import { DraggableDocument } from "@/components/documents";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { ThemeCycleButton } from "@/components/shared/ThemeToggle";
@@ -192,19 +191,8 @@ export function Sidebar() {
     }
   }, [createNoteFlow, userData?.major, router, currentNoteId, openNote, openNoteLoading]);
 
-  useKeyboardShortcut(
-    "cmd+k",
-    useCallback(() => setIsSearchOpen((open) => !open), []),
-    { preventDefault: true },
-  );
-
-  useKeyboardShortcut(
-    "/",
-    useCallback(() => setIsSearchOpen((open) => !open), []),
-    { preventDefault: true },
-  );
-
-  useKeyboardShortcut("cmd+n", handleCreateNote, { preventDefault: true });
+  useAppCommand("search", useCallback(() => setIsSearchOpen((open) => !open), []));
+  useAppCommand("new-note", handleCreateNote);
 
   const toggleCourse = (courseId: string) =>
     setExpandedCourses((prev) => ({ ...prev, [courseId]: !prev[courseId] }));
@@ -318,7 +306,7 @@ export function Sidebar() {
             onClick={handleCreateNote}
             disabled={isCreatingNote}
             aria-label="New note"
-            title={`New note · ${formatShortcut("cmd+n")}`}
+            title={`New note · ${formatShortcut(shortcutFor("new-note")!)}`}
           >
             {isCreatingNote ? (
               <Loader2 className="h-[15px] w-[15px] animate-spin" />
@@ -332,7 +320,7 @@ export function Sidebar() {
             className="h-8 w-8 rounded-md text-muted-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
             onClick={() => setIsSearchOpen(true)}
             aria-label="Search"
-            title={`Search · ${formatShortcut("cmd+k")}`}
+            title={`Search · ${formatShortcut(shortcutFor("search")!)}`}
           >
             <Search className="h-[15px] w-[15px]" />
           </Button>
@@ -362,7 +350,7 @@ export function Sidebar() {
               <span>Search</span>
             </span>
             <span className="text-[10px] text-muted-foreground/50 transition-colors group-hover/search:text-muted-foreground/80">
-              {formatShortcut("cmd+k")}
+              {formatShortcut(shortcutFor("search")!)}
             </span>
           </button>
         </>

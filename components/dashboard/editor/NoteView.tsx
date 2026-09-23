@@ -6,6 +6,7 @@ import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
 import { useNotePresence } from "@/lib/hooks/presence/useNotePresence";
 import { useNoteAutosave } from "@/lib/hooks/notes/useNoteAutosave";
 import { useNoteRole } from "@/lib/queries/collaboration/useNoteRole";
+import { useAppCommands } from "@/lib/appCommands";
 import type { Doc, Id } from "@/types/data-model";
 import type { NoteBootstrap } from "@/components/dashboard/DashboardContext";
 import { useRouter } from "next/navigation";
@@ -30,6 +31,8 @@ import {
 } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
+import TaskList from "@tiptap/extension-task-list";
+import TaskItem from "@tiptap/extension-task-item";
 import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
 import { editorLowlight } from "@/lib/editorLowlight";
 import { DiagramExtension } from "./extensions/DiagramExtension";
@@ -308,6 +311,8 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
           render: () => renderItems(bumpSlashUi),
         },
       }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
       DiagramExtension,
       ImageExtension,
       GraphCalculatorExtension,
@@ -485,6 +490,32 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     setIsExportOpen(true);
   };
 
+  // Commands from the palette, shortcuts and the slash menu's Image item.
+  useAppCommands((id) => {
+    switch (id) {
+      case "note:export-pdf":
+        setIsExportOpen(true);
+        break;
+      case "note:flashcards":
+        setIsFlashcardsOpen(true);
+        break;
+      case "note:quiz":
+        setIsQuizOpen(true);
+        break;
+      case "note:collaborate":
+        setIsCollaboratorsOpen(true);
+        break;
+      case "note:insert-image":
+        if (canEdit) setIsImageUploadOpen(true);
+        break;
+      case "note:new-subpage":
+        if (canEdit) void handleCreateSubPage();
+        break;
+      case "note:pin":
+        if (isOwner) void togglePinNote({ noteId });
+        break;
+    }
+  });
 
 
   // Handle inserting AI-generated content into the note (full markdown: fenced code blocks, lists, etc.)
@@ -955,25 +986,6 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             }
           });
         }}
-      />
-
-      {/* Listen for custom event to open image upload */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            window.addEventListener('open-image-upload', () => {
-              // This is a bit of a hack to trigger the state change from outside React
-              // In a real app, we'd use a more robust state management solution
-              const btn = document.querySelector('[data-image-upload-trigger]');
-              if (btn) btn.click();
-            });
-          `,
-        }}
-      />
-      <button
-        data-image-upload-trigger
-        className="hidden"
-        onClick={() => setIsImageUploadOpen(true)}
       />
 
       <CollaboratorsDialog

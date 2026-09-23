@@ -12,8 +12,8 @@ export const SlashCommand = Extension.create({
     return {
       suggestion: {
         char: "/",
-        items: ({ query }: { query: string }) =>
-          filterSlashItems(query) as SlashRegistryItem[],
+        items: ({ query, editor }: { query: string; editor: Editor }) =>
+          filterSlashItems(query, editor),
         command: ({
           editor,
           range,

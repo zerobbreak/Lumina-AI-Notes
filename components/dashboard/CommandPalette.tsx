@@ -27,6 +27,8 @@ import {
   ArrowDown,
 } from "lucide-react";
 import { DASHBOARD_NAV } from "@/constants/dashboardNav";
+import { NOTE_COMMANDS, SHORTCUTS, shortcutFor } from "@/constants/shortcuts";
+import { dispatchAppCommand, type AppCommandId } from "@/lib/appCommands";
 import { useKeyboardShortcut, formatShortcut } from "@/hooks/useKeyboardShortcut";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
@@ -37,24 +39,42 @@ interface Command {
   subtitle?: string;
   icon: React.ComponentType<{ className?: string }>;
   action: () => void;
-  category: "navigation" | "actions" | "search";
-  keywords?: string[];
+  category: "note" | "actions" | "navigation" | "search";
+  keywords?: readonly string[];
+  /** Shown on the right, e.g. "mod+b". */
+  shortcut?: string;
+  /** A note, file or course rather than a command; hidden in ">" mode. */
+  isContent?: boolean;
 }
+
+const GROUPS: { category: Command["category"]; label: string }[] = [
+  { category: "note", label: "This Note" },
+  { category: "actions", label: "Commands" },
+  { category: "navigation", label: "Go To" },
+  { category: "search", label: "Search Results" },
+];
+
+// Commands the palette already offers in its own form, or that just reopen it.
+const NOT_IN_PALETTE = new Set<AppCommandId>(["command-palette", "quick-open", "new-note"]);
 
 interface CommandPaletteProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Starting text; ">" lists only commands, as VS Code's Ctrl+Shift+P does. */
+  initialQuery?: string;
 }
 
-export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
+export function CommandPalette({ open, onOpenChange, initialQuery = "" }: CommandPaletteProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentNoteId = searchParams.get("noteId");
   const { data: openNote, isLoading: openNoteLoading } = useNote(currentNoteId);
 
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const debouncedQuery = useDebounce(query, 150);
+  const debouncedInput = useDebounce(query, 150);
+  const isCommandMode = query.trimStart().startsWith(">");
+  const debouncedQuery = debouncedInput.trimStart().replace(/^>/, "").trim();
 
   const { data: userData } = useCurrentUser();
   const { data: quickNotes } = useQuickNotes();
@@ -62,7 +82,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const { data: files } = useFiles();
   const { data: searchData } = useSearch(
     { query: debouncedQuery },
-    Boolean(debouncedQuery.trim()),
+    Boolean(debouncedQuery) && !isCommandMode,
   );
   const searchResults = searchData?.results ?? [];
 
@@ -118,6 +138,58 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         }
       },
       keywords: ["create", "new", "note", "subpage", "nested"],
+      shortcut: shortcutFor("new-note"),
+    });
+
+    // Close first so a dialog the command opens doesn't fight this one for focus.
+    const run = (id: AppCommandId) => () => {
+      onOpenChange(false);
+      window.setTimeout(() => dispatchAppCommand(id), 0);
+    };
+
+    // Things to do with the open note.
+    if (openNote) {
+      NOTE_COMMANDS.forEach((c) => {
+        if (c.command === "note:new-subpage") return; // "New Sub-page" above
+        cmds.push({
+          id: c.command,
+          title: c.title,
+          subtitle: c.subtitle,
+          icon: c.icon,
+          category: "note",
+          action: run(c.command),
+          keywords: c.keywords,
+        });
+      });
+      const askAi = SHORTCUTS.find((s) => s.command === "editor:ask-ai");
+      if (askAi?.icon) {
+        cmds.push({
+          id: askAi.id,
+          title: askAi.title,
+          subtitle: "Select some text in the note first",
+          icon: askAi.icon,
+          category: "note",
+          action: run("editor:ask-ai"),
+          keywords: askAi.keywords,
+          shortcut: askAi.keys[0],
+        });
+      }
+    }
+
+    // App-wide commands, each with its shortcut.
+    SHORTCUTS.forEach((s) => {
+      if (!s.command || !s.icon || s.category !== "General") return;
+      if (NOT_IN_PALETTE.has(s.command)) return;
+      cmds.push({
+        id: s.id,
+        title: s.title,
+        subtitle: s.subtitle,
+        icon: s.icon,
+        category: "actions",
+        action: run(s.command),
+        keywords: s.keywords,
+        shortcut: s.keys[0],
+      });
     });
 
     // Navigation commands — same source of truth as the sidebar.
@@ -133,6 +205,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           onOpenChange(false);
         },
         keywords: item.keywords,
+        shortcut: shortcutFor(`go:${item.id}`),
       });
     });
 
@@ -143,6 +216,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           id: `course-${course.id}`,
           title: course.name,
           subtitle: `Open ${course.code}`,
+          isContent: true,
           icon: FolderOpen,
           category: "navigation",
           action: () => {
@@ -161,6 +235,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           id: `note-${note._id}`,
           title: note.title,
           subtitle: "Open note",
+          isContent: true,
           icon: FileText,
           category: "navigation",
           action: () => {
@@ -180,6 +255,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             id: `quick-note-${note._id}`,
             title: note.title,
             subtitle: "Open quick note",
+            isContent: true,
             icon: FileText,
             category: "navigation",
             action: () => {
@@ -199,6 +275,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           id: `file-${file._id}`,
           title: file.name,
           subtitle: "View file",
+          isContent: true,
           icon: File,
           category: "navigation",
           action: () => {
@@ -226,21 +303,20 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
   // Filter commands based on query
   const filteredCommands = useMemo(() => {
-    if (!debouncedQuery.trim()) {
-      return commands;
+    const pool = isCommandMode ? commands.filter((cmd) => !cmd.isContent) : commands;
+    if (!debouncedQuery) {
+      return pool;
     }
 
-    const lowerQuery = debouncedQuery.toLowerCase();
-    return commands.filter((cmd) => {
-      const matchesTitle = cmd.title.toLowerCase().includes(lowerQuery);
-      const matchesSubtitle = cmd.subtitle?.toLowerCase().includes(lowerQuery);
-      const matchesKeywords = cmd.keywords?.some((kw) =>
-        kw.toLowerCase().includes(lowerQuery)
-      );
-
-      return matchesTitle || matchesSubtitle || matchesKeywords;
+    // Every word must match somewhere, so "exp pdf" finds "Export as PDF".
+    const words = debouncedQuery.toLowerCase().split(/\s+/);
+    return pool.filter((cmd) => {
+      const haystack = [cmd.title, cmd.subtitle ?? "", ...(cmd.keywords ?? [])]
+        .join(" ")
+        .toLowerCase();
+      return words.every((w) => haystack.includes(w));
     });
-  }, [commands, debouncedQuery]);
+  }, [commands, debouncedQuery, isCommandMode]);
 
   // Add search results to filtered commands
   const allResults = useMemo(() => {
@@ -248,7 +324,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       ...filteredCommands,
     ];
 
-    if (debouncedQuery.trim() && searchResults.length > 0) {
+    if (debouncedQuery && !isCommandMode && searchResults.length > 0) {
       searchResults.forEach((result) => {
         results.push({
           id: `search-${result.id}`,
@@ -271,8 +347,10 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       });
     }
 
-    return results;
-  }, [filteredCommands, searchResults, debouncedQuery, router, onOpenChange]);
+    // In display order, so arrow keys move down the list as drawn.
+    const rank = (c: Command) => GROUPS.findIndex((g) => g.category === c.category);
+    return results.sort((a, b) => rank(a) - rank(b));
+  }, [filteredCommands, searchResults, debouncedQuery, isCommandMode, router, onOpenChange]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -303,6 +381,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   // Group commands by category
   const groupedResults = useMemo(() => {
     const groups: Record<string, typeof allResults> = {
+      note: [],
       actions: [],
       navigation: [],
       search: [],
@@ -318,7 +397,13 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   }, [allResults]);
 
   const hasResults = allResults.length > 0;
-  const hasQuery = debouncedQuery.trim().length > 0;
+  const hasQuery = debouncedQuery.length > 0;
+
+  useEffect(() => {
+    document
+      .querySelector(`[data-palette-index="${selectedIndex}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex]);
   const safeIndex =
     allResults.length === 0
       ? 0
@@ -332,7 +417,11 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           <Search className="w-5 h-5 text-gray-500 mr-3 shrink-0" />
           <input
             className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-gray-600 text-[15px] h-6"
-            placeholder="Type a command or search..."
+            placeholder={
+              isCommandMode
+                ? "Type a command…"
+                : "Search notes and commands… (type > for commands only)"
+            }
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -341,7 +430,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             autoFocus
           />
           <div className="text-[10px] bg-white/5 border border-white/5 px-1.5 py-0.5 rounded text-gray-500 font-mono ml-2">
-            {formatShortcut("cmd+p")}
+            {formatShortcut(shortcutFor(isCommandMode ? "command-palette" : "quick-open") ?? "mod+p")}
           </div>
         </div>
 
@@ -349,7 +438,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           {!hasQuery && !hasResults && (
             <div className="text-center py-10 text-gray-600 text-sm">
               <Sparkles className="w-8 h-8 mx-auto mb-3 text-gray-700" />
-              <p>Start typing to search or use commands</p>
+              <p>Start typing to search, or type &gt; for commands</p>
             </div>
           )}
 
@@ -361,61 +450,25 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
           {hasResults && (
             <div className="py-2">
-              {groupedResults.actions.length > 0 && (
-                <div className="mb-4">
-                  <div className="px-4 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
-                    Actions
+              {GROUPS.map(({ category, label }) =>
+                groupedResults[category].length > 0 ? (
+                  <div key={category} className="mb-4 last:mb-0">
+                    <div className="px-4 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+                      {label}
+                    </div>
+                    {groupedResults[category].map((cmd) => {
+                      const globalIdx = allResults.indexOf(cmd);
+                      return (
+                        <CommandItem
+                          key={cmd.id}
+                          command={cmd}
+                          isSelected={safeIndex === globalIdx}
+                          index={globalIdx}
+                        />
+                      );
+                    })}
                   </div>
-                  {groupedResults.actions.map((cmd, idx) => {
-                    const globalIdx = allResults.indexOf(cmd);
-                    return (
-                      <CommandItem
-                        key={cmd.id}
-                        command={cmd}
-                        isSelected={safeIndex === globalIdx}
-                        index={globalIdx}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-
-              {groupedResults.navigation.length > 0 && (
-                <div className="mb-4">
-                  <div className="px-4 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
-                    Navigation
-                  </div>
-                  {groupedResults.navigation.map((cmd, idx) => {
-                    const globalIdx = allResults.indexOf(cmd);
-                    return (
-                      <CommandItem
-                        key={cmd.id}
-                        command={cmd}
-                        isSelected={safeIndex === globalIdx}
-                        index={globalIdx}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-
-              {groupedResults.search.length > 0 && (
-                <div>
-                  <div className="px-4 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
-                    Search Results
-                  </div>
-                  {groupedResults.search.map((cmd, idx) => {
-                    const globalIdx = allResults.indexOf(cmd);
-                    return (
-                      <CommandItem
-                        key={cmd.id}
-                        command={cmd}
-                        isSelected={safeIndex === globalIdx}
-                        index={globalIdx}
-                      />
-                    );
-                  })}
-                </div>
+                ) : null,
               )}
             </div>
           )}
@@ -461,7 +514,7 @@ function CommandItem({
           : "hover:bg-white/5 text-gray-300"
       )}
       style={{ scrollMargin: "8px" }}
-      data-index={index}
+      data-palette-index={index}
     >
       <div
         className={cn(
@@ -481,6 +534,11 @@ function CommandItem({
           </p>
         )}
       </div>
+      {command.shortcut && (
+        <kbd className="shrink-0 rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-gray-400">
+          {formatShortcut(command.shortcut)}
+        </kbd>
+      )}
       {isSelected && (
         <CornerDownLeft className="w-3.5 h-3.5 text-indigo-400" />
       )}

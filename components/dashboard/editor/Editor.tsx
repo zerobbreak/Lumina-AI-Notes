@@ -21,6 +21,7 @@ import { FloatingMenu } from "@tiptap/react/menus";
 import { SlashCommand, renderItems } from "./extensions/SlashCommand";
 import { SlashCommandLayer } from "./SlashCommandLayer";
 import { CodeBlockLanguageBubbleMenu } from "./CodeBlockLanguageBubbleMenu";
+import { AIBubbleMenu } from "./AIBubbleMenu";
 import { Plus, GripVertical } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ResourceMentionNode } from "./ResourceMentionNode";
@@ -143,6 +144,11 @@ export default function Editor({
     Placeholder.configure({
       placeholder,
     }),
+    SlashCommand.configure({
+      suggestion: {
+        render: () => renderItems(bumpSlashUi),
+      },
+    }),
     BubbleMenu,
     FloatingMenuExtension,
     ResourceMention,
@@ -257,6 +263,7 @@ export default function Editor({
           data-wikilink-ui={wikilinkUiTick}
         >
           <CodeBlockLanguageBubbleMenu editor={editor} />
+          <AIBubbleMenu editor={editor} />
           <SlashCommandLayer editor={editor} />
           <EditorContent editor={editor} />
         </div>
@@ -271,6 +278,7 @@ export default function Editor({
       data-slash-ui={slashUiTick}
     >
       {editor && <CodeBlockLanguageBubbleMenu editor={editor} />}
+      {editor && <AIBubbleMenu editor={editor} />}
       {editor && (
         <FloatingMenu
           editor={editor}

@@ -2,8 +2,12 @@
 
 import { Editor } from "@tiptap/react";
 import { useAiActions } from "@/lib/hooks/ai/useAiActions";
-import { useState, useEffect, useRef, useCallback } from "react";
-import { createPortal } from "react-dom";
+import { useAppCommand } from "@/lib/appCommands";
+import { formatShortcut } from "@/hooks/useKeyboardShortcut";
+import { shortcutFor } from "@/constants/shortcuts";
+import { useState, useEffect, useRef } from "react";
+import { marked } from "marked";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Minimize2,
@@ -15,219 +19,351 @@ import {
   Italic,
   Strikethrough,
   Code,
-  Link as LinkIcon,
   ChevronDown,
+  Lightbulb,
+  ListCollapse,
+  ArrowUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BubbleMenu } from "@tiptap/react/menus";
+import { cn } from "@/lib/utils";
 
 interface AIBubbleMenuProps {
   editor: Editor | null;
 }
 
+type AiAction =
+  | "simplify"
+  | "expand"
+  | "continue"
+  | "explain"
+  | "summarize"
+  | "flashcards"
+  | "ask";
+
+const ACTIONS: {
+  id: Exclude<AiAction, "ask">;
+  label: string;
+  hint: string;
+  busy: string;
+  icon: typeof Wand2;
+}[] = [
+  { id: "explain", label: "Explain", hint: "Adds an explanation below", busy: "Explaining", icon: Lightbulb },
+  { id: "summarize", label: "Summarize", hint: "Adds a short summary below", busy: "Summarizing", icon: ListCollapse },
+  { id: "simplify", label: "Simplify", hint: "Rewrites in plainer words", busy: "Simplifying", icon: Minimize2 },
+  { id: "expand", label: "Expand", hint: "Rewrites with more detail", busy: "Expanding", icon: Maximize2 },
+  { id: "continue", label: "Continue writing", hint: "Writes the next sentences", busy: "Writing", icon: Wand2 },
+  { id: "flashcards", label: "Create flashcards", hint: "Adds Q&A cards below", busy: "Making flashcards", icon: Layers },
+];
+
+const PRESET_QUESTIONS: Partial<Record<AiAction, string>> = {
+  explain: "Explain this clearly, as a tutor would to a student, with an example if it helps.",
+  summarize: "Summarize this in a few short bullet points.",
+};
+
+function escapeHtml(text: string) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+async function markdownToHtml(md: string) {
+  return String(await marked.parse(md.trim()));
+}
+
+/** Position just after the top-level block containing `pos`. */
+function afterBlock(editor: Editor, pos: number) {
+  const $pos = editor.state.doc.resolve(pos);
+  return $pos.depth > 0 ? $pos.after(1) : pos;
+}
+
+function selectedText(editor: Editor) {
+  const { from, to } = editor.state.selection;
+  return { from, to, text: editor.state.doc.textBetween(from, to, " ") };
+}
+
 export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeAction, setActiveAction] = useState<string | null>(null);
+  const [activeAction, setActiveAction] = useState<AiAction | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [showAI, setShowAI] = useState(false);
+  const [question, setQuestion] = useState("");
+  const questionRef = useRef<HTMLInputElement>(null);
 
-  const { simplifyText, expandText, continueText, generateFlashcards } = useAiActions();
+  const { simplifyText, expandText, continueText, generateFlashcards, askAboutContext } =
+    useAiActions();
 
   useEffect(() => {
     setIsMounted(true);
     return () => setIsMounted(false);
   }, []);
 
-  const handleAction = async (
-    action: "simplify" | "expand" | "continue" | "flashcards",
-  ) => {
+  // Close the AI panel once the selection it was opened for is gone.
+  useEffect(() => {
     if (!editor) return;
-    const { from: selectedFrom, to: selectedTo } = editor.state.selection;
-    const selectedText = editor.state.doc.textBetween(
-      selectedFrom,
-      selectedTo,
-      " ",
-    );
-    if (!selectedText.trim() || selectedFrom === selectedTo) return;
+    const onSelection = () => {
+      if (editor.state.selection.empty) setShowAI(false);
+    };
+    editor.on("selectionUpdate", onSelection);
+    return () => {
+      editor.off("selectionUpdate", onSelection);
+    };
+  }, [editor]);
 
-    setIsLoading(true);
+  useEffect(() => {
+    if (showAI) questionRef.current?.focus();
+  }, [showAI]);
+
+  useAppCommand("editor:ask-ai", () => {
+    if (!editor || editor.isDestroyed || !editor.isEditable) return;
+    if (!selectedText(editor).text.trim()) {
+      toast.error("Select some text in the note first, then ask AI about it.");
+      return;
+    }
+    setShowAI(true);
+  });
+
+  const insertBelow = async (to: number, markdown: string) => {
+    if (!editor) return;
+    const html = await markdownToHtml(markdown);
+    editor.chain().focus().insertContentAt(afterBlock(editor, to), html).run();
+  };
+
+  const runAction = async (action: AiAction, askText?: string) => {
+    if (!editor || activeAction) return;
+    const { from, to, text } = selectedText(editor);
+    if (!text.trim() || from === to) {
+      toast.error("Select some text first.");
+      return;
+    }
+
     setActiveAction(action);
-
     try {
-      let result: string;
-
       switch (action) {
         case "simplify":
-          result = await simplifyText({ text: selectedText });
-          editor
-            .chain()
-            .focus()
-            .insertContentAt({ from: selectedFrom, to: selectedTo }, result)
-            .run();
+        case "expand": {
+          const result =
+            action === "simplify"
+              ? await simplifyText({ text })
+              : await expandText({ text });
+          editor.chain().focus().insertContentAt({ from, to }, result).run();
           break;
+        }
 
-        case "expand":
-          result = await expandText({ text: selectedText });
-          editor
-            .chain()
-            .focus()
-            .insertContentAt({ from: selectedFrom, to: selectedTo }, result)
-            .run();
+        case "continue": {
+          const result = await continueText({ text, fullContext: editor.getText() });
+          editor.chain().focus().insertContentAt(to, " " + result).run();
           break;
+        }
 
-        case "continue":
-          result = await continueText({
-            text: selectedText,
-            fullContext: editor.getText(),
+        case "explain":
+        case "summarize":
+        case "ask": {
+          const q = action === "ask" ? askText! : PRESET_QUESTIONS[action]!;
+          const answer = await askAboutContext({
+            question: `${q}\n\nThe text in question:\n"""\n${text}\n"""`,
+            context: editor.getText().slice(0, 8000),
+            contextType: "note",
           });
-          editor.chain().focus().insertContentAt(selectedTo, " " + result).run();
+          const heading = action === "ask" ? `**Q: ${q}**\n\n` : "";
+          await insertBelow(to, `${heading}${answer}`);
+          setQuestion("");
           break;
+        }
 
-        case "flashcards":
-          const cards = await generateFlashcards({ text: selectedText });
-          if (cards.length > 0) {
-            let flashcardHtml = "<h3>📚 Flashcards</h3><ul>";
-            cards.forEach(
-              (card: { front: string; back: string }, i: number) => {
-                flashcardHtml += `<li><strong>Q${i + 1}:</strong> ${card.front}<br/><em>A:</em> ${card.back}</li>`;
-              },
-            );
-            flashcardHtml += "</ul>";
-            editor
-              .chain()
-              .focus()
-              .insertContentAt(selectedTo, "<br/>" + flashcardHtml)
-              .run();
+        case "flashcards": {
+          const cards = await generateFlashcards({ text });
+          if (cards.length === 0) {
+            toast.error("No flashcards could be made from that text.");
+            break;
           }
+          const items = cards
+            .map(
+              (card, i) =>
+                `<li><strong>Q${i + 1}:</strong> ${escapeHtml(card.front)}<br/><em>A:</em> ${escapeHtml(card.back)}</li>`,
+            )
+            .join("");
+          editor
+            .chain()
+            .focus()
+            .insertContentAt(afterBlock(editor, to), `<h3>📚 Flashcards</h3><ul>${items}</ul>`)
+            .run();
           break;
+        }
       }
+      setShowAI(false);
     } catch (error) {
       console.error(`AI ${action} error:`, error);
+      toast.error(
+        error instanceof Error && error.message
+          ? `AI request failed: ${error.message}`
+          : "AI request failed. Please try again.",
+      );
     } finally {
-      setIsLoading(false);
       setActiveAction(null);
-      setShowAI(false);
     }
   };
 
   if (!editor || !isMounted) return null;
 
+  const formatButton = (active: boolean) =>
+    cn(
+      "h-8 w-8 p-0",
+      active
+        ? "bg-accent text-foreground"
+        : "text-muted-foreground hover:text-foreground hover:bg-accent",
+    );
+  const askShortcut = shortcutFor("editor:ask-ai");
+  const busyLabel =
+    activeAction === "ask"
+      ? "Thinking"
+      : ACTIONS.find((a) => a.id === activeAction)?.busy;
+
   return (
     <BubbleMenu
       editor={editor}
-      shouldShow={({ editor: ed }) => !ed.isActive("codeBlock")}
+      pluginKey="aiBubbleMenu"
+      // Replaces TipTap's default check, so it has to repeat it: only for a
+      // real text selection, while the editor or this menu has focus.
+      shouldShow={({ editor: ed, view, state, from, to, element }) => {
+        if (!ed.isEditable || ed.isActive("codeBlock")) return false;
+        if (state.selection.empty || !state.doc.textBetween(from, to).trim()) return false;
+        return view.hasFocus() || element.contains(document.activeElement);
+      }}
       options={{
         placement: "top",
         offset: 8,
       }}
-      className="flex max-w-none items-center gap-0.5 overflow-hidden rounded-lg border border-border bg-background/95 p-1 shadow-md backdrop-blur-sm"
+      className="z-50"
     >
-      {/* Formatting Tools */}
-      <div className="flex items-center gap-0.5 pr-1 border-r border-white/10">
-        <Button
-          size="sm"
-          variant="ghost"
-          className={`h-8 w-8 p-0 ${editor.isActive("bold") ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/5"}`}
-          onClick={() => editor.chain().focus().toggleBold().run()}
-        >
-          <Bold className="w-4 h-4" />
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className={`h-8 w-8 p-0 ${editor.isActive("italic") ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/5"}`}
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-        >
-          <Italic className="w-4 h-4" />
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className={`h-8 w-8 p-0 ${editor.isActive("strike") ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/5"}`}
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-        >
-          <Strikethrough className="w-4 h-4" />
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className={`h-8 w-8 p-0 ${editor.isActive("code") ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/5"}`}
-          onClick={() => editor.chain().focus().toggleCode().run()}
-        >
-          <Code className="w-4 h-4" />
-        </Button>
+      <div className="flex max-w-none items-center gap-0.5 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md">
+        {/* Formatting Tools */}
+        <div className="flex items-center gap-0.5 pr-1 border-r border-border">
+          <Button
+            size="sm"
+            variant="ghost"
+            className={formatButton(editor.isActive("bold"))}
+            onClick={() => editor.chain().focus().toggleBold().run()}
+            title={`Bold (${formatShortcut("mod+b")})`}
+          >
+            <Bold className="w-4 h-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className={formatButton(editor.isActive("italic"))}
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+            title={`Italic (${formatShortcut("mod+i")})`}
+          >
+            <Italic className="w-4 h-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className={formatButton(editor.isActive("strike"))}
+            onClick={() => editor.chain().focus().toggleStrike().run()}
+            title={`Strikethrough (${formatShortcut("mod+shift+s")})`}
+          >
+            <Strikethrough className="w-4 h-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className={formatButton(editor.isActive("code"))}
+            onClick={() => editor.chain().focus().toggleCode().run()}
+            title={`Inline code (${formatShortcut("mod+e")})`}
+          >
+            <Code className="w-4 h-4" />
+          </Button>
+        </div>
+
+        {/* AI Tools Toggle */}
+        <div className="flex items-center gap-0.5 pl-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            className={cn(
+              "h-8 px-2 text-xs gap-1.5",
+              showAI
+                ? "bg-purple-500/15 text-purple-600 dark:text-purple-300"
+                : "text-purple-600 hover:bg-purple-500/10 dark:text-purple-400",
+            )}
+            onClick={() => setShowAI(!showAI)}
+            title={askShortcut ? `Ask AI (${formatShortcut(askShortcut)})` : "Ask AI"}
+            aria-expanded={showAI}
+          >
+            <Wand2 className="w-3.5 h-3.5" />
+            Ask AI
+            <ChevronDown
+              className={`w-3 h-3 transition-transform ${showAI ? "rotate-180" : ""}`}
+            />
+          </Button>
+        </div>
       </div>
 
-      {/* AI Tools Toggle */}
-      <div className="flex items-center gap-0.5 pl-1">
-        <Button
-          size="sm"
-          variant="ghost"
-          className={`h-8 px-2 text-xs gap-1.5 ${showAI ? "bg-purple-500/20 text-purple-300" : "text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"}`}
-          onClick={() => setShowAI(!showAI)}
-        >
-          <Wand2 className="w-3.5 h-3.5" />
-          Ask AI
-          <ChevronDown
-            className={`w-3 h-3 transition-transform ${showAI ? "rotate-180" : ""}`}
-          />
-        </Button>
-      </div>
-
-      {/* AI Actions Dropdown/Overlay */}
+      {/* AI actions, under the toolbar */}
       <AnimatePresence>
         {showAI && (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="absolute top-full left-0 right-0 mt-1 p-1 bg-zinc-900 border border-white/10 rounded-lg shadow-xl flex flex-col gap-0.5"
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.15 }}
+            className="absolute left-0 top-full mt-1 w-72 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl"
           >
-            {isLoading ? (
-              <div className="flex items-center gap-2 px-3 py-2 text-purple-400">
+            {activeAction ? (
+              <div className="flex items-center gap-2 px-3 py-3 text-sm text-purple-600 dark:text-purple-400">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-xs capitalize">
-                  {activeAction}ing...
-                </span>
+                {busyLabel}…
               </div>
             ) : (
               <>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-8 justify-start px-2 text-xs text-zinc-300 hover:text-white hover:bg-white/10"
-                  onClick={() => handleAction("simplify")}
+                <form
+                  className="flex items-center gap-1 border-b border-border p-1 pb-2 mb-1"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (question.trim()) void runAction("ask", question.trim());
+                  }}
                 >
-                  <Minimize2 className="w-3.5 h-3.5 mr-2" />
-                  Simplify
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-8 justify-start px-2 text-xs text-zinc-300 hover:text-white hover:bg-white/10"
-                  onClick={() => handleAction("expand")}
-                >
-                  <Maximize2 className="w-3.5 h-3.5 mr-2" />
-                  Expand
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-8 justify-start px-2 text-xs text-zinc-300 hover:text-white hover:bg-white/10"
-                  onClick={() => handleAction("continue")}
-                >
-                  <Wand2 className="w-3.5 h-3.5 mr-2" />
-                  Continue writing
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-8 justify-start px-2 text-xs text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
-                  onClick={() => handleAction("flashcards")}
-                >
-                  <Layers className="w-3.5 h-3.5 mr-2" />
-                  Create flashcards
-                </Button>
+                  <input
+                    ref={questionRef}
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setShowAI(false);
+                        editor.commands.focus();
+                      }
+                    }}
+                    placeholder="Ask anything about the selection…"
+                    className="h-8 min-w-0 flex-1 rounded-md bg-transparent px-2 text-sm outline-none placeholder:text-muted-foreground"
+                  />
+                  <Button
+                    type="submit"
+                    size="sm"
+                    variant="ghost"
+                    disabled={!question.trim()}
+                    className="h-7 w-7 p-0 text-purple-600 dark:text-purple-400"
+                    aria-label="Ask"
+                  >
+                    <ArrowUp className="w-4 h-4" />
+                  </Button>
+                </form>
+                {ACTIONS.map(({ id, label, hint, icon: Icon }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => void runAction(id)}
+                    className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left hover:bg-accent"
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0 text-purple-600 dark:text-purple-400" />
+                    <span className="min-w-0">
+                      <span className="block text-xs font-medium">{label}</span>
+                      <span className="block text-[11px] text-muted-foreground">{hint}</span>
+                    </span>
+                  </button>
+                ))}
               </>
             )}
           </motion.div>
