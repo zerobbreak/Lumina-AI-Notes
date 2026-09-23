@@ -1,3 +1,4 @@
+import { normalizeAppearance } from "@/lib/appearance/model";
 import type { UserDto } from "@/types/api/user";
 import type { UserData } from "@/types";
 
@@ -14,7 +15,7 @@ export function toUserData(dto: UserDto): UserData {
     semester: dto.semester ?? undefined,
     courses: dto.courses,
     noteStyle: dto.noteStyle ?? undefined,
-    theme: dto.theme ?? undefined,
+    appearance: normalizeAppearance(dto.appearance),
     enabledBlocks: dto.enabledBlocks,
     tourCompleted: dto.tourCompleted,
     tourStep: dto.tourStep,

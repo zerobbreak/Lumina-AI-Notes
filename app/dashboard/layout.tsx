@@ -75,12 +75,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [isLeftHovered, setIsLeftHovered] = useState(false);
 
   // Route guard for onboarding (kept in layout so dashboard page doesn't block on this query).
-  // The accent lives on <html> so portalled dialogs, menus and toasts get it too.
-  const accent = userData?.theme || "indigo";
-  useEffect(() => {
-    document.documentElement.dataset.theme = accent;
-  }, [accent]);
-
   useEffect(() => {
     if (!isAuthenticated) return;
     if (userData === undefined) return;

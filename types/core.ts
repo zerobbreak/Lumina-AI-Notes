@@ -3,6 +3,8 @@
  * These types match the Convex schema definitions
  */
 
+import type { Appearance } from "@/lib/appearance/model";
+
 // Module type - represents a module within a course
 export interface Module {
   id: string;
@@ -82,7 +84,7 @@ export interface UserData {
   semester?: string;
   courses?: Course[];
   noteStyle?: string;
-  theme?: string;
+  appearance: Appearance;
   enabledBlocks?: string[];
   currentStreak?: number;
   longestStreak?: number;

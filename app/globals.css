@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&display=swap');
 @import "tailwindcss";
 @import "katex/dist/katex.min.css";
 
@@ -183,6 +182,12 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+  /* Typefaces follow the look: see [data-ui-font] / [data-reading-font]. */
+  --font-sans: var(--ui-font);
+  --font-mono: var(--mono-font);
+  --font-reading: var(--reading-font);
+  /* max-w-reading: the note column, set by [data-reading-width]. */
+  --container-reading: var(--reading-measure);
 }
 
 :root {
@@ -217,6 +222,17 @@
   --sidebar-border: 220 13% 91%;
   --sidebar-ring: 217.2 91.2% 59.8%;
   --inset: 240 5% 95%;
+
+  /* Look defaults; the appearance attributes on <html> override these. */
+  --ui-font: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --reading-font: var(--font-newsreader), Georgia, "Times New Roman", serif;
+  --mono-font:
+    var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --reading-size: 17px;
+  --reading-line-height: 1.65;
+  --reading-measure: 64rem;
+  --world-texture: none;
+  --world-texture-opacity: 0;
 }
 
 .dark {
@@ -266,8 +282,6 @@
   --obs-muted: #64748b;
   --obs-text: #e2e8f0;
   --obs-text-dim: #94a3b8;
-  --font-display: 'Syne', sans-serif;
-  --font-body: 'DM Sans', sans-serif;
 }
 
 @layer utilities {
@@ -350,14 +364,6 @@
     pointer-events: none;
   }
 
-  .font-display {
-    font-family: var(--font-display);
-  }
-
-  .font-body {
-    font-family: var(--font-body);
-  }
-
   .animate-thinking-fade {
     animation: thinking-fade 1.25s ease-in-out infinite;
   }
@@ -373,6 +379,19 @@
       animation: none;
     }
   }
+}
+
+/* Accent: Red Pen (new-user default) */
+[data-theme="red-pen"] {
+  --primary: 4 74% 49%;
+  --primary-foreground: 0 0% 98%;
+  --ring: 4 74% 49%;
+  --chart-1: 4 74% 49%;
+  --chart-2: 24 80% 50%;
+  --chart-3: 350 65% 45%;
+  --chart-4: 210 45% 45%;
+  --chart-5: 40 85% 50%;
+  --sidebar-primary: 4 74% 49%;
 }
 
 /* Theme: Rose */
@@ -477,6 +496,254 @@
   --chart-4: 200 18% 42%;
   --chart-5: 225 16% 55%;
   --sidebar-primary: 215 25% 55%;
+}
+
+/* ------------------------------------------------------------------ */
+/* Worlds: surface palettes and texture. The accent ([data-theme])     */
+/* owns --primary, --ring and the chart hues; a world owns the rest.   */
+/* lib/appearance/apply.ts sets data-world and the resolved data-mode. */
+/* ------------------------------------------------------------------ */
+
+[data-world] {
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --secondary-foreground: var(--foreground);
+  --accent-foreground: var(--foreground);
+  --destructive-foreground: 0 0% 98%;
+  --input: var(--border);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent-foreground: var(--sidebar-foreground);
+  --sidebar-ring: var(--ring);
+}
+
+/* Paper: warm stock and ink, with a faint grain. */
+[data-world="paper"][data-mode="light"] {
+  --background: 40 33% 96%;
+  --foreground: 30 12% 14%;
+  --card: 40 40% 98.5%;
+  --secondary: 38 22% 91%;
+  --muted: 38 22% 92%;
+  --muted-foreground: 30 8% 36%;
+  --accent: 38 25% 89%;
+  --destructive: 0 72% 46%;
+  --border: 36 18% 83%;
+  --sidebar: 38 28% 93.5%;
+  --sidebar-foreground: 30 10% 22%;
+  --sidebar-accent: 38 22% 88%;
+  --sidebar-border: 36 18% 85%;
+  --inset: 38 25% 92.5%;
+  --world-texture: var(--texture-grain);
+  --world-texture-opacity: 0.045;
+}
+
+/* Paper Night: the same desk under a lamp. */
+[data-world="paper"][data-mode="dark"] {
+  --background: 30 8% 10%;
+  --foreground: 38 20% 88%;
+  --card: 30 8% 12%;
+  --secondary: 30 6% 17%;
+  --muted: 30 6% 16%;
+  --muted-foreground: 35 8% 62%;
+  --accent: 30 6% 19%;
+  --destructive: 0 62% 45%;
+  --border: 30 6% 20%;
+  --sidebar: 30 8% 8.5%;
+  --sidebar-foreground: 38 14% 80%;
+  --sidebar-accent: 30 6% 17%;
+  --sidebar-border: 30 6% 16%;
+  --inset: 30 8% 7%;
+  --world-texture: var(--texture-grain);
+  --world-texture-opacity: 0.06;
+}
+
+/* Observatory: deep navy night sky, a scatter of stars. */
+[data-world="observatory"][data-mode="dark"] {
+  --background: 222 60% 5%;
+  --foreground: 214 32% 91%;
+  --card: 222 47% 8.5%;
+  --secondary: 220 30% 13%;
+  --muted: 220 30% 12%;
+  --muted-foreground: 215 16% 62%;
+  --accent: 220 30% 15%;
+  --destructive: 0 62% 45%;
+  --border: 220 25% 15%;
+  --sidebar: 222 55% 6.5%;
+  --sidebar-foreground: 214 25% 82%;
+  --sidebar-accent: 220 30% 13%;
+  --sidebar-border: 220 25% 12%;
+  --inset: 222 60% 3.5%;
+  --world-texture: var(--texture-stars);
+  --world-texture-opacity: 0.5;
+}
+
+/* Observatory Day: the same instruments in cool daylight. */
+[data-world="observatory"][data-mode="light"] {
+  --background: 214 30% 96%;
+  --foreground: 222 40% 12%;
+  --card: 0 0% 100%;
+  --secondary: 214 25% 91%;
+  --muted: 214 25% 92%;
+  --muted-foreground: 218 14% 36%;
+  --accent: 214 28% 89%;
+  --destructive: 0 72% 46%;
+  --border: 214 20% 84%;
+  --sidebar: 214 30% 93.5%;
+  --sidebar-foreground: 222 25% 22%;
+  --sidebar-accent: 214 25% 88%;
+  --sidebar-border: 214 20% 86%;
+  --inset: 214 28% 93%;
+  --world-texture: var(--texture-grid);
+  --world-texture-opacity: 0.5;
+}
+
+/* Focus: neutral and quiet, no texture. */
+[data-world="focus"][data-mode="light"] {
+  --background: 0 0% 100%;
+  --foreground: 240 6% 10%;
+  --card: 0 0% 100%;
+  --secondary: 240 5% 96%;
+  --muted: 240 5% 96%;
+  --muted-foreground: 240 4% 38%;
+  --accent: 240 5% 95%;
+  --destructive: 0 72% 48%;
+  --border: 240 6% 90%;
+  --sidebar: 240 5% 98%;
+  --sidebar-foreground: 240 6% 20%;
+  --sidebar-accent: 240 5% 94%;
+  --sidebar-border: 240 6% 92%;
+  --inset: 240 5% 96.5%;
+}
+
+[data-world="focus"][data-mode="dark"] {
+  --background: 0 0% 9%;
+  --foreground: 0 0% 91%;
+  --card: 0 0% 10.5%;
+  --secondary: 240 3.7% 15.9%;
+  --muted: 240 3.7% 15.9%;
+  --muted-foreground: 240 5% 64.9%;
+  --accent: 240 3.7% 17%;
+  --destructive: 0 62.8% 42%;
+  --border: 240 3.7% 17%;
+  --sidebar: 0 0% 11%;
+  --sidebar-foreground: 240 5% 84.9%;
+  --sidebar-accent: 240 3.7% 19%;
+  --sidebar-border: 240 3.7% 17%;
+  --inset: 0 0% 6%;
+}
+
+/* Riso: newsprint cream, blue-black ink, halftone. */
+[data-world="riso"][data-mode="light"] {
+  --background: 45 45% 93%;
+  --foreground: 230 45% 18%;
+  --card: 45 50% 96%;
+  --secondary: 45 30% 87%;
+  --muted: 45 30% 88%;
+  --muted-foreground: 230 15% 36%;
+  --accent: 340 60% 90%;
+  --destructive: 0 72% 46%;
+  --border: 45 22% 78%;
+  --sidebar: 45 40% 90%;
+  --sidebar-foreground: 230 35% 22%;
+  --sidebar-accent: 45 30% 85%;
+  --sidebar-border: 45 22% 80%;
+  --inset: 45 35% 89%;
+  --world-texture: var(--texture-halftone);
+  --world-texture-opacity: 0.35;
+}
+
+/* Riso Dark: the ink drum, printed in cream. */
+[data-world="riso"][data-mode="dark"] {
+  --background: 232 30% 11%;
+  --foreground: 45 40% 88%;
+  --card: 232 28% 14%;
+  --secondary: 232 22% 19%;
+  --muted: 232 22% 18%;
+  --muted-foreground: 45 12% 64%;
+  --accent: 232 22% 21%;
+  --destructive: 0 62% 45%;
+  --border: 232 20% 22%;
+  --sidebar: 232 32% 9%;
+  --sidebar-foreground: 45 25% 80%;
+  --sidebar-accent: 232 22% 18%;
+  --sidebar-border: 232 20% 17%;
+  --inset: 232 32% 8%;
+  --world-texture: var(--texture-halftone);
+  --world-texture-opacity: 0.18;
+}
+
+:root {
+  --texture-grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --texture-stars:
+    radial-gradient(1px 1px at 20% 30%, hsl(var(--foreground) / 0.5), transparent),
+    radial-gradient(1px 1px at 70% 80%, hsl(var(--foreground) / 0.35), transparent),
+    radial-gradient(1.5px 1.5px at 85% 15%, hsl(var(--foreground) / 0.4), transparent),
+    radial-gradient(1px 1px at 40% 65%, hsl(var(--foreground) / 0.25), transparent);
+  --texture-grid:
+    linear-gradient(hsl(var(--border) / 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--border) / 0.35) 1px, transparent 1px);
+  --texture-halftone: radial-gradient(hsl(var(--foreground) / 0.12) 0.8px, transparent 1px);
+}
+
+[data-world="observatory"][data-mode="dark"] { --world-texture-size: 240px 240px; }
+[data-world="observatory"][data-mode="light"] { --world-texture-size: 32px 32px; }
+[data-world="riso"] { --world-texture-size: 5px 5px; }
+
+/* Texture sits over everything at very low opacity and never takes input. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background-image: var(--world-texture);
+  background-size: var(--world-texture-size, 200px 200px);
+  opacity: var(--world-texture-opacity);
+}
+
+/* ------------------------------------------------------------------ */
+/* Typography, density, reading and motion tweaks.                     */
+/* ------------------------------------------------------------------ */
+
+[data-ui-font="geist"] { --ui-font: var(--font-geist), ui-sans-serif, system-ui, sans-serif; }
+[data-ui-font="plex-sans"] { --ui-font: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif; }
+[data-ui-font="outfit"] { --ui-font: var(--font-outfit), ui-sans-serif, system-ui, sans-serif; }
+[data-ui-font="instrument-sans"] { --ui-font: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif; }
+
+[data-reading-font="newsreader"] { --reading-font: var(--font-newsreader), Georgia, serif; }
+[data-reading-font="literata"] { --reading-font: var(--font-literata), Georgia, serif; }
+[data-reading-font="atkinson"] { --reading-font: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif; }
+[data-reading-font="lexend"] { --reading-font: var(--font-lexend), ui-sans-serif, system-ui, sans-serif; }
+
+[data-reading-width="narrow"] { --reading-measure: 48rem; }
+[data-reading-width="medium"] { --reading-measure: 64rem; }
+[data-reading-width="wide"] { --reading-measure: 80rem; }
+
+/* Density scales the rem, so Tailwind spacing and type follow. */
+[data-density="compact"] { font-size: 15px; }
+[data-density="spacious"] { font-size: 17px; }
+
+[data-motion="reduce"] *,
+[data-motion="reduce"] *::before,
+[data-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Notes and AI study output: the reader's own font, size and leading. */
+.reading-surface {
+  font-family: var(--reading-font);
+  font-size: var(--reading-size);
+  line-height: var(--reading-line-height);
+}
+
+/* Same voice, a step smaller, for chat bubbles and side panels. */
+.reading-surface-compact {
+  font-family: var(--reading-font);
+  font-size: calc(var(--reading-size) * 0.85);
+  line-height: calc(var(--reading-line-height) - 0.1);
 }
 
 @layer base {

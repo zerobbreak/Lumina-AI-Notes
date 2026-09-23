@@ -1,3 +1,4 @@
+import type { Appearance } from "@/lib/appearance/model";
 import type { Course } from "@/types";
 
 /** Response from `GET /users/me` (gamification fields omitted). */
@@ -12,7 +13,7 @@ export type UserDto = {
   semester?: string | null;
   courses: Course[];
   noteStyle?: string | null;
-  theme?: string | null;
+  appearance: Appearance;
   enabledBlocks: string[];
   tourCompleted: boolean;
   tourStep: number;
@@ -28,8 +29,9 @@ export type UpdateTourProgressInput = {
 export type UpdatePreferencesInput = {
   major?: string;
   noteStyle?: string;
-  theme?: string;
 };
+
+export type UpdateAppearanceInput = Partial<Appearance>;
 
 export type CompleteOnboardingInput = {
   major: string;
@@ -41,6 +43,5 @@ export type CompleteOnboardingInput = {
     defaultNoteStyle?: string;
   }>;
   noteStyle: string;
-  theme?: string;
   enabledBlocks: string[];
 };

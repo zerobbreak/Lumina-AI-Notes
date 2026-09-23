@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Db } from "../db/client.js";
 import { users } from "../db/schema/index.js";
 import { toGamificationStats } from "../gamification/stats.js";
+import { appearancePatchSchema, normalizeAppearance } from "../users/appearance.js";
 import { updateStudyStreak } from "../gamification/streaks.js";
 import { HttpError } from "../middleware/errors.js";
 import { currentUser, type User } from "../middleware/user.js";
@@ -29,6 +30,7 @@ export function toUserResponse(user: User) {
   } = user;
   return {
     ...rest,
+    appearance: normalizeAppearance(rest.appearance),
     courses: rest.courses ?? [],
     enabledBlocks: rest.enabledBlocks ?? [],
     tourStep: rest.tourStep ?? 0,
@@ -55,7 +57,6 @@ const onboardingBody = z.object({
       message: "Course ids must be unique",
     }),
   noteStyle,
-  theme: shortText(50).optional(),
   enabledBlocks: z.array(shortText(50)).max(100),
 });
 
@@ -67,7 +68,6 @@ const tourBody = z.object({
 const preferencesBody = z.object({
   major: shortText(100).optional(),
   noteStyle: noteStyle.optional(),
-  theme: shortText(50).optional(),
 });
 
 // No client timestamp: the server's clock decides what day it is, so a streak
@@ -128,6 +128,16 @@ export function createUsersRouter(db: Db) {
   // updatePreferences
   router.patch("/me/preferences", async (req, res) => {
     const updated = await update(currentUser(res), parse(preferencesBody, req.body));
+    res.json(toUserResponse(updated));
+  });
+
+  // Merges into the stored look, so each control can save on its own.
+  router.patch("/me/appearance", async (req, res) => {
+    const user = currentUser(res);
+    const patch = parse(appearancePatchSchema, req.body);
+    const updated = await update(user, {
+      appearance: { ...normalizeAppearance(user.appearance), ...patch },
+    });
     res.json(toUserResponse(updated));
   });
 

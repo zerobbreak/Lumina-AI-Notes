@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { useTheme } from "next-themes";
+import { useAppearance } from "@/components/providers/AppearanceProvider";
 import { useRouter } from "next/navigation";
 import { useAnalyticsChartsData } from "@/lib/hooks/analytics/useAnalyticsChartsData";
 import { Button } from "@/components/ui/button";
@@ -76,11 +76,11 @@ function InsightCard({
 
 export default function AnalyticsCharts({ showAnalytics }: AnalyticsChartsProps) {
   const router = useRouter();
-  const { resolvedTheme } = useTheme();
+  const { resolvedMode } = useAppearance();
   const tzOffsetMinutes = useMemo(() => new Date().getTimezoneOffset(), []);
   const [now, setNow] = useState(() => Date.now());
 
-  const isDark = resolvedTheme === "dark";
+  const isDark = resolvedMode === "dark";
 
   const tooltipContentStyle = {
     background: "hsl(var(--popover))",

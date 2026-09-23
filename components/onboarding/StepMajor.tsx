@@ -12,13 +12,9 @@ import {
   Calculator,
   Briefcase,
   Check,
-  Palette,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  getMajorTheme,
-  getStyleRecommendation,
-} from "@/lib/noteStyleRecommendations";
+import { getStyleRecommendation } from "@/lib/noteStyleRecommendations";
 
 const TEMPLATE_LABEL: Record<string, string> = {
   standard: "Standard",
@@ -58,7 +54,6 @@ export function StepMajor({ value, onChange }: StepMajorProps) {
   const profile = useMemo(() => {
     if (!value) return null;
     return {
-      theme: getMajorTheme(value),
       style: getStyleRecommendation(value),
     };
   }, [value]);
@@ -66,7 +61,7 @@ export function StepMajor({ value, onChange }: StepMajorProps) {
   return (
     <div className="flex flex-col gap-8 flex-1 min-h-0 overflow-y-auto pr-1 -mr-1 [scrollbar-gutter:stable]">
       <p className="text-sm text-muted-foreground leading-relaxed">
-        We use this to tune your workspace theme and how the assistant frames
+        We use this to pick your default note layout and tune how the assistant frames
         answers for your discipline.
       </p>
 
@@ -139,11 +134,6 @@ export function StepMajor({ value, onChange }: StepMajorProps) {
             className="rounded-xl border border-primary/25 bg-primary/[0.08] p-4 space-y-3 shrink-0"
           >
             <div className="flex flex-wrap gap-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-foreground/[0.06] px-2.5 py-1 text-foreground/90 ring-1 ring-foreground/[0.08]">
-                <Palette className="h-3.5 w-3.5 text-primary" />
-                Accent:{" "}
-                <span className="text-foreground capitalize">{profile.theme.accent}</span>
-              </span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-foreground/[0.06] px-2.5 py-1 text-foreground/90 ring-1 ring-foreground/[0.08]">
                 Default note layout:{" "}
                 <span className="text-foreground">

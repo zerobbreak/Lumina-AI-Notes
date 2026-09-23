@@ -50,6 +50,20 @@
       "when": 1790180886289,
       "tag": "0006_processing_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790203899311,
+      "tag": "0007_appearance",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790203903740,
+      "tag": "0008_drop_theme",
+      "breakpoints": true
     }
   ]
 }

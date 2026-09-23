@@ -1,18 +1,12 @@
 /**
  * Note Style Recommendations Configuration
- * Maps majors to note-taking styles and theme configurations
+ * Maps majors to note-taking styles and enabled blocks
  */
 
 export interface StyleRecommendation {
   primary: "standard" | "outline" | "mindmap";
   secondary: "standard" | "outline" | "mindmap";
   reason: string;
-}
-
-export interface MajorTheme {
-  accent: string;
-  gradient: string;
-  aiTemperature: number; // Lower = more precise (STEM), Higher = more creative (humanities)
 }
 
 // Major to style recommendations mapping
@@ -60,50 +54,6 @@ export const majorStyleRecommendations: Record<string, StyleRecommendation> = {
   },
 };
 
-// Major to theme mapping
-export const majorThemes: Record<string, MajorTheme> = {
-  cs: {
-    accent: "indigo",
-    gradient: "from-indigo-600 to-violet-600",
-    aiTemperature: 0.3,
-  },
-  engineering: {
-    accent: "amber",
-    gradient: "from-amber-600 to-orange-600",
-    aiTemperature: 0.2,
-  },
-  medicine: {
-    accent: "emerald",
-    gradient: "from-emerald-600 to-teal-600",
-    aiTemperature: 0.3,
-  },
-  biology: {
-    accent: "green",
-    gradient: "from-green-600 to-emerald-600",
-    aiTemperature: 0.4,
-  },
-  law: {
-    accent: "slate",
-    gradient: "from-slate-600 to-zinc-600",
-    aiTemperature: 0.3,
-  },
-  history: {
-    accent: "rose",
-    gradient: "from-rose-600 to-pink-600",
-    aiTemperature: 0.6,
-  },
-  business: {
-    accent: "blue",
-    gradient: "from-blue-600 to-cyan-600",
-    aiTemperature: 0.5,
-  },
-  other: {
-    accent: "purple",
-    gradient: "from-purple-600 to-fuchsia-600",
-    aiTemperature: 0.5,
-  },
-};
-
 /**
  * Get the recommended note-taking style for a given major
  * @param major - The major identifier (e.g., 'cs', 'engineering')
@@ -111,15 +61,6 @@ export const majorThemes: Record<string, MajorTheme> = {
  */
 export function getStyleRecommendation(major: string): StyleRecommendation {
   return majorStyleRecommendations[major] || majorStyleRecommendations.other;
-}
-
-/**
- * Get the theme configuration for a given major
- * @param major - The major identifier (e.g., 'cs', 'engineering')
- * @returns MajorTheme object with accent color, gradient, and AI temperature
- */
-export function getMajorTheme(major: string): MajorTheme {
-  return majorThemes[major] || majorThemes.other;
 }
 
 /**

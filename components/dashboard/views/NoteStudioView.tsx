@@ -63,7 +63,7 @@ function AssistantMarkdown({
   });
 
   return (
-    <div className="prose prose-sm dark:prose-invert prose-p:leading-relaxed prose-p:my-2 prose-li:my-1 prose-ul:my-2 prose-ol:my-2 prose-hr:my-4 prose-hr:border-border/60 prose-blockquote:border-l-primary/40 prose-blockquote:text-muted-foreground prose-pre:bg-background/60 prose-pre:border prose-pre:border-border/60 prose-pre:rounded-xl prose-pre:px-3 prose-pre:py-2 prose-code:bg-muted/40 prose-code:rounded prose-code:px-1 prose-code:py-0.5 prose-code:before:content-none prose-code:after:content-none max-w-none">
+    <div className="reading-surface-compact prose prose-sm dark:prose-invert prose-p:leading-relaxed prose-p:my-2 prose-li:my-1 prose-ul:my-2 prose-ol:my-2 prose-hr:my-4 prose-hr:border-border/60 prose-blockquote:border-l-primary/40 prose-blockquote:text-muted-foreground prose-pre:bg-background/60 prose-pre:border prose-pre:border-border/60 prose-pre:rounded-xl prose-pre:px-3 prose-pre:py-2 prose-code:bg-muted/40 prose-code:rounded prose-code:px-1 prose-code:py-0.5 prose-code:before:content-none prose-code:after:content-none max-w-none">
       <ReactMarkdown
         remarkPlugins={[remarkMath]}
         rehypePlugins={[rehypeKatex]}

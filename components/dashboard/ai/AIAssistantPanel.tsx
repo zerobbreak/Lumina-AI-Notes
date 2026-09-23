@@ -301,7 +301,7 @@ export function AIAssistantPanel({
                               : "bg-foreground/5 text-foreground/90 border border-border/60 rounded-bl-md"
                           }`}
                         >
-                          <div className="whitespace-pre-wrap prose prose-invert prose-sm max-w-none">
+                          <div className="whitespace-pre-wrap prose prose-invert prose-sm reading-surface-compact max-w-none">
                             {message.role === "ai" ? (
                               <ReactMarkdown>{message.content}</ReactMarkdown>
                             ) : (

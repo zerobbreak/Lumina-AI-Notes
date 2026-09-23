@@ -29,7 +29,6 @@ import {
 } from "@/components/onboarding/OnboardingChrome";
 import {
   getEnabledBlocksForMajor,
-  getMajorTheme,
   getStyleRecommendation,
 } from "@/lib/noteStyleRecommendations";
 
@@ -44,7 +43,7 @@ const STEP_HINTS: Record<
   },
   2: {
     title: "We adapt to your field",
-    body: "Your major shapes themes, shortcuts, and how the assistant reasons about your material.",
+    body: "Your major shapes note layouts, shortcuts, and how the assistant reasons about your material.",
     icon: GraduationCap,
   },
   3: {
@@ -136,14 +135,12 @@ export default function OnboardingPage() {
         }));
 
         const blocks = getEnabledBlocksForMajor(formData.major);
-        const theme = getMajorTheme(formData.major);
 
         await completeOnboarding({
           major: formData.major,
           semester: "Fall 2025",
           courses: coursesWithDefaults,
           noteStyle: defaultTemplate,
-          theme: theme.accent,
           enabledBlocks: blocks,
         });
 

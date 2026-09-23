@@ -2,7 +2,7 @@
 
 import { NodeViewWrapper, NodeViewProps } from "@tiptap/react";
 import { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
-import { useTheme } from "next-themes";
+import { useAppearance } from "@/components/providers/AppearanceProvider";
 import {
   Plus,
   Trash2,
@@ -48,6 +48,8 @@ type ChartThemeTokens = {
   foreground: string;
   primary: string;
   charts: string[];
+  /** Canvas text can't read CSS variables, so take the resolved UI font. */
+  font: string;
 };
 
 function readChartThemeTokens(el: Element): ChartThemeTokens {
@@ -65,6 +67,7 @@ function readChartThemeTokens(el: Element): ChartThemeTokens {
     foreground: hsl("--foreground", "0 0% 91%"),
     primary: hsl("--primary", "239 84% 67%"),
     charts,
+    font: s.fontFamily || "ui-sans-serif, system-ui",
   };
 }
 
@@ -82,7 +85,8 @@ function cssColorToHex(cssColor: string): string {
 export function ChartNodeView({ node, updateAttributes }: NodeViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { resolvedTheme } = useTheme();
+  // Any change to the look (world, accent, font) needs a redraw.
+  const { appearance, resolvedMode } = useAppearance();
 
   const [chartType, setChartType] = useState<ChartType>(node.attrs.chartType || "bar");
   const [data, setData] = useState<ChartDataPoint[]>(
@@ -159,7 +163,7 @@ export function ChartNodeView({ node, updateAttributes }: NodeViewProps) {
         ctx.fillRect(x, y, barWidth, barHeight);
 
         ctx.fillStyle = tokens.mutedForeground;
-        ctx.font = "10px var(--font-outfit, ui-sans-serif, system-ui)";
+        ctx.font = `10px ${tokens.font}`;
         ctx.textAlign = "center";
         ctx.fillText(point.label, x + barWidth / 2, height - padding + 15);
 
@@ -204,7 +208,7 @@ export function ChartNodeView({ node, updateAttributes }: NodeViewProps) {
         ctx.fill();
 
         ctx.fillStyle = tokens.mutedForeground;
-        ctx.font = "10px var(--font-outfit, ui-sans-serif, system-ui)";
+        ctx.font = `10px ${tokens.font}`;
         ctx.textAlign = "center";
         ctx.fillText(point.label, x, height - padding + 15);
 
@@ -245,7 +249,7 @@ export function ChartNodeView({ node, updateAttributes }: NodeViewProps) {
         const labelY = centerY + Math.sin(midAngle) * labelRadius;
 
         ctx.fillStyle = tokens.foreground;
-        ctx.font = "11px var(--font-outfit, ui-sans-serif, system-ui)";
+        ctx.font = `11px ${tokens.font}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         const percentage = Math.round((point.value / total) * 100);
@@ -285,7 +289,17 @@ export function ChartNodeView({ node, updateAttributes }: NodeViewProps) {
   useLayoutEffect(() => {
     drawChart();
     syncDerivedHexes();
-  }, [drawChart, syncDerivedHexes, resolvedTheme]);
+  }, [drawChart, syncDerivedHexes]);
+
+  // The provider writes a new look onto <html> in its own effect, which runs
+  // after this one, so redraw a frame later to read the new tokens.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      drawChart();
+      syncDerivedHexes();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [drawChart, syncDerivedHexes, appearance, resolvedMode]);
 
   useEffect(() => {
     const chartEl = containerRef.current;

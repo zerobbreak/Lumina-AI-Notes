@@ -1,15 +1,11 @@
 import type { Metadata } from "next";
-import { Outfit } from "next/font/google"; // Using Outfit for that modern tech look
 import "./globals.css";
 import { AppProvider } from "@/components/providers/AppProvider";
-import { Toaster } from "sonner";
 import { MobileWarning } from "@/components/MobileWarning";
-import { ThemeProvider } from "@/components/providers/ThemeProvider";
-
-const outfit = Outfit({
-  subsets: ["latin"],
-  variable: "--font-outfit",
-});
+import { AppearanceProvider } from "@/components/providers/AppearanceProvider";
+import { AppearanceToaster } from "@/components/providers/AppearanceToaster";
+import { fontVariables } from "@/lib/appearance/fonts";
+import { appearanceScript } from "@/lib/appearance/script";
 
 export const metadata: Metadata = {
   title: "Lumina AI - Student Command Center",
@@ -55,21 +51,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-theme="indigo" suppressHydrationWarning>
+    // The pre-paint script sets the look's attributes on <html>.
+    <html lang="en" className={fontVariables} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: appearanceScript() }} />
+      </head>
       <body
-        className={`${outfit.variable} antialiased bg-background text-foreground min-h-screen font-sans selection:bg-primary/20 selection:text-primary`}
+        className="antialiased bg-background text-foreground min-h-screen font-sans selection:bg-primary/20 selection:text-primary"
         suppressHydrationWarning
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <AppProvider>{children}</AppProvider>
-          <MobileWarning />
-          <Toaster theme="system" position="bottom-right" />
-        </ThemeProvider>
+        <AppProvider>
+          <AppearanceProvider>
+            {children}
+            <MobileWarning />
+            <AppearanceToaster />
+          </AppearanceProvider>
+        </AppProvider>
       </body>
     </html>
   );

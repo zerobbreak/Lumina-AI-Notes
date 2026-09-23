@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/select";
 import { useUserPreferencesActions } from "@/lib/hooks/mutations/useUserPreferencesActions";
 import { useCurrentUser } from "@/lib/queries/users/useCurrentUser";
+import { useAppearance } from "@/components/providers/AppearanceProvider";
+import type { AccentSwatch } from "@/lib/appearance/model";
 import { useUser, useClerk } from "@clerk/nextjs";
 import {
   User,
@@ -56,25 +58,26 @@ const MAJORS = [
   { id: "other", label: "Other" },
 ] as const;
 
-const THEMES = [
+const ACCENTS: { id: AccentSwatch; label: string; color: string }[] = [
+  { id: "red-pen", label: "Red Pen", color: "bg-red-600" },
   { id: "indigo", label: "Midnight Indigo", color: "bg-indigo-500" },
   { id: "rose", label: "Rose Red", color: "bg-rose-500" },
   { id: "blue", label: "Ocean Blue", color: "bg-blue-500" },
   { id: "purple", label: "Royal Purple", color: "bg-purple-500" },
   { id: "amber", label: "Sunset Amber", color: "bg-amber-500" },
   { id: "emerald", label: "Forest Emerald", color: "bg-emerald-500" },
-] as const;
+];
 
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { user } = useUser();
   const { signOut, openUserProfile } = useClerk();
   const { data: userData } = useCurrentUser();
   const { updatePreferences } = useUserPreferencesActions();
+  const { appearance, updateAppearance } = useAppearance();
 
   const [activeTab, setActiveTab] = useState("profile");
   const [major, setMajor] = useState(userData?.major ?? "other");
   const [noteStyle, setNoteStyle] = useState(userData?.noteStyle ?? "standard");
-  const [theme, setTheme] = useState(userData?.theme ?? "indigo");
   const [fullName, setFullName] = useState(user?.fullName || "");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
@@ -87,7 +90,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     if (!open || !userData) return;
     setMajor(userData.major ?? "other");
     setNoteStyle(userData.noteStyle ?? "standard");
-    setTheme(userData.theme ?? "indigo");
     if (user?.fullName) setFullName(user.fullName);
     setDirty(false);
   }, [open, userData, user]);
@@ -97,10 +99,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     if (!userData) return;
     const isMajorDirty = (userData.major ?? "other") !== major;
     const isNoteStyleDirty = (userData.noteStyle ?? "standard") !== noteStyle;
-    const isThemeDirty = (userData.theme ?? "indigo") !== theme;
     const isNameDirty = (user?.fullName ?? "") !== fullName;
-    setDirty(isMajorDirty || isNameDirty || isNoteStyleDirty || isThemeDirty);
-  }, [major, fullName, noteStyle, theme, userData, user]);
+    setDirty(isMajorDirty || isNameDirty || isNoteStyleDirty);
+  }, [major, fullName, noteStyle, userData, user]);
 
   const handleSave = async () => {
     if (!dirty) return;
@@ -110,7 +111,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       await updatePreferences({
         major: major || undefined,
         noteStyle: noteStyle || undefined,
-        theme: theme || undefined,
       });
 
       // 2. Update Clerk user data if name changed
@@ -440,16 +440,17 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
                     <div className="space-y-3">
                       <Label className="text-muted-foreground text-xs uppercase font-bold tracking-wider">
-                        App Theme
+                        Accent
                       </Label>
+                      {/* Applies and saves at once, like the rest of the look. */}
                       <div className="flex flex-wrap gap-3">
-                        {THEMES.map((t) => (
+                        {ACCENTS.map((t) => (
                           <button
                             key={t.id}
-                            onClick={() => setTheme(t.id)}
+                            onClick={() => updateAppearance({ accent: { kind: "swatch", id: t.id } })}
                             className={cn(
                               "h-10 px-4 rounded-lg border flex items-center gap-2 transition-all duration-200",
-                              theme === t.id
+                              appearance.accent.kind === "swatch" && appearance.accent.id === t.id
                                 ? "bg-foreground/10 border-blue-500 text-foreground shadow-[0_0_15px_rgba(59,130,246,0.2)]"
                                 : "bg-inset border-border text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
                             )}

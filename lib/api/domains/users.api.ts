@@ -4,6 +4,7 @@ import type { SetDailyGoalsInput } from "@/types/api/account";
 import type { GamificationStatsDto } from "@/types/api/gamification";
 import type {
   CompleteOnboardingInput,
+  UpdateAppearanceInput,
   UpdatePreferencesInput,
   UpdateTourProgressInput,
   UserDto,
@@ -24,6 +25,14 @@ export const usersApi = {
 
   updatePreferences(token: string, body: UpdatePreferencesInput) {
     return apiFetch<UserDto>(apiPath`/users/me/preferences`, {
+      method: "PATCH",
+      token,
+      body,
+    });
+  },
+
+  updateAppearance(token: string, body: UpdateAppearanceInput) {
+    return apiFetch<UserDto>(apiPath`/users/me/appearance`, {
       method: "PATCH",
       token,
       body,

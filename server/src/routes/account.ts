@@ -25,6 +25,7 @@ import { MAX_AI_CALLS_PER_DAY } from "../middleware/ai-rate-limit.js";
 import { currentUser } from "../middleware/user.js";
 import { AUDIO_LIMIT_MINUTES, getUserUsage } from "../recordings/usage.js";
 import type { Storage } from "../storage/s3.js";
+import { normalizeAppearance } from "../users/appearance.js";
 import { parse } from "./validation.js";
 
 /** Bumped whenever the export's shape changes, so importers can tell versions apart. */
@@ -130,6 +131,7 @@ export function createAccountRouter(db: Db, storage: Storage, clerkProfiles: Cle
         semester: user.semester,
         courses: user.courses ?? [],
         noteStyle: user.noteStyle,
+        appearance: normalizeAppearance(user.appearance),
         dailyGoalMinutes: user.dailyGoalMinutes,
         dailyGoalCards: user.dailyGoalCards,
         badges: user.badges ?? [],

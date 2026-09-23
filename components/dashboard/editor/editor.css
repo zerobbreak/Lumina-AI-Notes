@@ -125,7 +125,7 @@
 }
 
 .ProseMirror h1 {
-  font-size: 2rem;
+  font-size: 2em;
   font-weight: 700;
   margin-top: 1.5rem;
   margin-bottom: 0.5rem;
@@ -133,7 +133,7 @@
 }
 
 .ProseMirror h2 {
-  font-size: 1.5rem;
+  font-size: 1.5em;
   font-weight: 600;
   margin-top: 1.25rem;
   margin-bottom: 0.5rem;
@@ -141,7 +141,7 @@
 }
 
 .ProseMirror h3 {
-  font-size: 1.25rem;
+  font-size: 1.25em;
   font-weight: 600;
   margin-top: 1rem;
   margin-bottom: 0.5rem;
@@ -149,7 +149,7 @@
 }
 
 .ProseMirror h4 {
-  font-size: 1.1rem;
+  font-size: 1.1em;
   font-weight: 600;
   margin-top: 0.75rem;
   margin-bottom: 0.5rem;
@@ -166,7 +166,7 @@
   margin-top: 2px;
   margin-bottom: 2px;
   color: hsl(var(--foreground) / 0.85) !important;
-  line-height: 1.6;
+  line-height: inherit;
 }
 
 .ProseMirror ul {
@@ -253,9 +253,7 @@
   background: transparent;
   border-radius: 0;
   color: hsl(var(--foreground) / 0.9);
-  font-family:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
-    monospace;
+  font-family: var(--mono-font);
   font-size: inherit;
   line-height: inherit;
   white-space: pre;
@@ -360,9 +358,7 @@
   background-color: hsl(var(--muted-foreground) / 0.12);
   padding: 0.125em 0.4em;
   border-radius: 0.25rem;
-  font-family:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
-    monospace;
+  font-family: var(--mono-font);
   font-size: 0.875em;
 }
 

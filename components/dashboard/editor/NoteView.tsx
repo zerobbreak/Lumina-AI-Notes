@@ -321,7 +321,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     ],
     editorProps: {
       attributes: {
-        class: "prose dark:prose-invert max-w-none focus:outline-none min-h-[500px]",
+        class: "prose dark:prose-invert reading-surface max-w-none focus:outline-none min-h-[500px]",
       },
     },
     onUpdate: ({ editor }) => {
@@ -571,7 +571,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
         {/* Skeleton Content */}
         <div className="flex-1 overflow-hidden">
-          <div className="max-w-5xl mx-auto py-12 px-12">
+          <div className="max-w-reading mx-auto py-12 px-12">
             {/* Header Skeleton */}
             <div className="mb-8">
               <div className="flex justify-between items-start gap-4">
@@ -745,7 +745,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
       {/* 2. Main Scrollable Content */}
       <ScrollArea className="flex-1">
-        <div className="max-w-5xl mx-auto py-6 sm:py-8 px-4 sm:px-8 lg:px-16">
+        <div className="max-w-reading mx-auto py-6 sm:py-8 px-4 sm:px-8 lg:px-16">
           {/* Header Section - Not included in PDF export */}
           <div className="mb-5 sm:mb-6" data-html2canvas-ignore>
             {/* Title & Actions */}

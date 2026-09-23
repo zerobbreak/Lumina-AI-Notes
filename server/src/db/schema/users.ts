@@ -1,4 +1,5 @@
 import { boolean, index, integer, jsonb, pgTable, text } from "drizzle-orm/pg-core";
+import type { Appearance } from "../../users/appearance.js";
 import { createdAt, id, timestamptz, updatedAt } from "./columns.js";
 
 export type CourseModule = { id: string; title: string };
@@ -40,8 +41,11 @@ export const users = pgTable(
     courses: jsonb().$type<Course[]>(),
     /** "standard" | "outline" | "mindmap" */
     noteStyle: text(),
-    /** UI accent colour, e.g. "indigo" */
-    theme: text(),
+    /**
+     * World, accent, fonts and reading tweaks. Null until the user (or the
+     * theme migration) sets something; read it through normalizeAppearance.
+     */
+    appearance: jsonb().$type<Partial<Appearance>>(),
     enabledBlocks: text().array(),
 
     // Usage tracking

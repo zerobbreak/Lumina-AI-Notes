@@ -3,6 +3,7 @@ import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "../src/db/client.js";
 import { users } from "../src/db/schema/index.js";
+import { DEFAULT_APPEARANCE } from "../src/users/appearance.js";
 import { bearer, buildApp, createTestDb } from "./helpers.js";
 
 const ALICE = "user_alice";
@@ -36,7 +37,6 @@ const onboarding = {
     { id: "p0q2z", name: "Genetics", code: "REQ-001" },
   ],
   noteStyle: "outline",
-  theme: "emerald",
   enabledBlocks: ["diagram", "definition"],
 };
 
@@ -91,7 +91,6 @@ describe("POST /api/v1/users/me/onboarding", () => {
       major: "biology",
       semester: "Fall 2025",
       noteStyle: "outline",
-      theme: "emerald",
       enabledBlocks: ["diagram", "definition"],
       courses: [
         { id: "k3j9x", name: "Cell Biology", code: "REQ-001", defaultNoteStyle: "outline", modules: [] },
@@ -164,13 +163,56 @@ describe("PATCH /api/v1/users/me/tour", () => {
 describe("PATCH /api/v1/users/me/preferences", () => {
   it("updates only the fields sent", async () => {
     await as(ALICE).post("/api/v1/users/me/onboarding").send(onboarding);
-    const res = await as(ALICE).patch("/api/v1/users/me/preferences").send({ theme: "indigo" });
+    const res = await as(ALICE).patch("/api/v1/users/me/preferences").send({ major: "chemistry" });
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ theme: "indigo", major: "biology", noteStyle: "outline" });
+    expect(res.body).toMatchObject({ major: "chemistry", noteStyle: "outline" });
   });
 
   it("rejects an unknown note style", async () => {
     const res = await as(ALICE).patch("/api/v1/users/me/preferences").send({ noteStyle: "cornell" });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("PATCH /api/v1/users/me/appearance", () => {
+  it("gives new users the default look", async () => {
+    const res = await as(ALICE).get("/api/v1/users/me");
+    expect(res.body.appearance).toEqual(DEFAULT_APPEARANCE);
+    expect(res.body).not.toHaveProperty("theme");
+  });
+
+  it("merges the fields sent into the stored look", async () => {
+    await as(ALICE).patch("/api/v1/users/me/appearance").send({ world: "riso" });
+    const res = await as(ALICE)
+      .patch("/api/v1/users/me/appearance")
+      .send({ mode: "dark", accent: { kind: "custom", l: 0.6, c: 0.15, h: 200 } });
+    expect(res.status).toBe(200);
+    expect(res.body.appearance).toEqual({
+      ...DEFAULT_APPEARANCE,
+      world: "riso",
+      mode: "dark",
+      accent: { kind: "custom", l: 0.6, c: 0.15, h: 200 },
+    });
+    expect((await as(ALICE).get("/api/v1/users/me")).body.appearance.world).toBe("riso");
+  });
+
+  it.each([
+    [{ world: "terminal" }],
+    [{ accent: { kind: "swatch", id: "chartreuse" } }],
+    [{ readingSize: 40 }],
+    [{ sparkles: true }],
+  ])("rejects %j", async (body) => {
+    const res = await as(ALICE).patch("/api/v1/users/me/appearance").send(body);
+    expect(res.status).toBe(400);
+  });
+
+  it("repairs a stored look field by field instead of discarding it", async () => {
+    const { body: me } = await as(ALICE).get("/api/v1/users/me");
+    await db
+      .update(users)
+      .set({ appearance: { world: "observatory", uiFont: "comic-sans" } as never })
+      .where(eq(users.id, me.id));
+    const res = await as(ALICE).get("/api/v1/users/me");
+    expect(res.body.appearance).toMatchObject({ world: "observatory", uiFont: DEFAULT_APPEARANCE.uiFont });
   });
 });

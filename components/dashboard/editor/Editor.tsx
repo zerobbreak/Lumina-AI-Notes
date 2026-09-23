@@ -185,7 +185,7 @@ export default function Editor({
     editable: isEditable,
     editorProps: {
       attributes: {
-        class: "prose prose-invert max-w-none focus:outline-none min-h-[200px]",
+        class: "prose prose-invert reading-surface max-w-none focus:outline-none min-h-[200px]",
       },
       handleDrop: (view, event, slice, moved) => {
         if (!moved && event.dataTransfer) {
