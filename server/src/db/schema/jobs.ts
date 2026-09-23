@@ -42,6 +42,8 @@ export type RecordingJobCheckpoint = {
   };
   draft?: unknown;
   html?: string;
+  /** Generated title; applied only if the note still has a placeholder one. */
+  title?: string;
 };
 
 /**

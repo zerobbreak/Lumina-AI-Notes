@@ -86,6 +86,7 @@ beforeEach(async () => {
   for (const key of Object.keys(failNext) as Call[]) delete failNext[key];
   malformedNext.clear();
   draft = {
+    title: "Entropy and the Second Law",
     summary: "Entropy and the **second law**.",
     sections: [
       { type: "heading", content: "Entropy", level: 2 },
@@ -221,6 +222,29 @@ describe("processRecordingJob", () => {
     await processRecordingJob(deps, job.id, { isFinalAttempt: false });
     const note = await noteRow(target.id);
     expect(note.content).toMatch(/^<p>My own notes<\/p><h2>Summary<\/h2>/);
+    // A title the user typed is theirs to keep.
+    expect(note.title).toBe("Mine");
+  });
+
+  it("titles a new note after what the recording covered", async () => {
+    const { job, noteId } = await start({ noteTitle: "Session notes" });
+    await processRecordingJob(deps, job.id, { isFinalAttempt: false });
+    expect((await noteRow(noteId)).title).toBe("Entropy and the Second Law");
+  });
+
+  it("replaces a placeholder title on a target note", async () => {
+    const owner = await userId(ALICE);
+    const [target] = await db.insert(notes).values({ userId: owner, title: "Untitled Note", content: "" }).returning();
+    const { job } = await start({ targetNoteId: target.id });
+    await processRecordingJob(deps, job.id, { isFinalAttempt: false });
+    expect((await noteRow(target.id)).title).toBe("Entropy and the Second Law");
+  });
+
+  it("falls back to the first heading when the model gives no title", async () => {
+    draft = { ...(draft as object), title: undefined };
+    const { job, noteId } = await start();
+    await processRecordingJob(deps, job.id, { isFinalAttempt: false });
+    expect((await noteRow(noteId)).title).toBe("Entropy");
   });
 
   it("resumes from its checkpoint after a transient failure, without paying for earlier stages again", async () => {

@@ -33,6 +33,8 @@ export type NoteSection = {
 };
 
 export type StructuredNotes = {
+  /** The model's title for the notes; empty when it gave none usable. */
+  title: string;
   summary: string;
   sections: NoteSection[];
   actionItems: string[];
@@ -41,6 +43,7 @@ export type StructuredNotes = {
 };
 
 type Draft = {
+  title?: unknown;
   summary?: string;
   sections?: Array<{ id?: string; type?: string; content?: string; level?: number }>;
   actionItems?: unknown[];
@@ -160,6 +163,7 @@ export async function validateDraft(
   const diagramEdges = strings(working.diagramEdges);
 
   const notes: StructuredNotes = {
+    title: noteTitle(working.title, sections),
     summary: typeof working.summary === "string" ? working.summary : "",
     sections,
     actionItems: strings(working.actionItems),
@@ -170,6 +174,26 @@ export async function validateDraft(
     throw new RetryableError("Gemini returned empty notes");
   }
   return notes;
+}
+
+const MAX_TITLE_CHARS = 80;
+
+const TITLE_INSTRUCTION =
+  "A short, specific title (3-8 words) naming the main topic, e.g. Photosynthesis and the Calvin Cycle. No dates, and not generic words like Lecture, Session or Notes.";
+
+/** The model's title, tidied; falls back to the first heading when it gave none. */
+export function noteTitle(title: unknown, sections: NoteSection[]): string {
+  const clean = (value: string) =>
+    value
+      .replace(/<[^>]*>/g, "")
+      .replace(/^[#\s"'*]+|["'*\s.]+$/g, "")
+      .replace(/\s+/g, " ")
+      .slice(0, MAX_TITLE_CHARS)
+      .trim();
+  const fromModel = typeof title === "string" ? clean(title) : "";
+  if (fromModel) return fromModel;
+  const heading = sections.find((section) => section.type === "heading");
+  return heading ? clean(heading.content) : "";
 }
 
 function normalizeSections(draft: Draft): NoteSection[] {
@@ -232,6 +256,7 @@ ${CLARITY_RULES}
 
 Generate a JSON response with this EXACT structure (Notion-like section-based format). The example below shows the SHAPE only — the number of sections and their length must match how much the transcript actually covers, per the requirements below it:
 {
+  "title": "${TITLE_INSTRUCTION}",
   "summary": "A summary that: 1) Opens with a single clear sentence stating the EXACT main topic, 2) Explains WHY this topic matters, 3) Lists the key themes actually covered, 4) Highlights the most important points discussed, 5) Concludes with key takeaways — sized to how much the transcript covers, not padded to a fixed length.",
   "sections": [
     {"id": "sec-1", "type": "heading", "content": "Main Concept 1 Title", "level": 2},
@@ -341,7 +366,7 @@ ${contextSection}${webLinkSection}
 ${GROUNDING_RULES}
 ${CLARITY_RULES}
 
-Return JSON with keys: summary, sections (array with id,type,content,level), actionItems, reviewQuestions, diagramNodes, diagramEdges.
+Return JSON with keys: title (${TITLE_INSTRUCTION}), summary, sections (array with id,type,content,level), actionItems, reviewQuestions, diagramNodes, diagramEdges.
 ${getDepthRequirements(wordCountFn(found.enrichedTranscript))}
 Return ONLY valid JSON.`;
 }

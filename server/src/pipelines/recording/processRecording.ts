@@ -116,11 +116,12 @@ export async function processRecordingJob(
         options,
       );
       checkpoint.html = structuredNotesToHtml(structured);
+      checkpoint.title = structured.title;
       await save();
     }
 
     await enter("save");
-    await saveNote(db, job, checkpoint.html);
+    await saveNote(db, job, checkpoint.html, checkpoint.title);
     log.log(`[recording] job ${job.id} succeeded`);
   } catch (error) {
     const transient = isTransientError(error);
@@ -186,13 +187,23 @@ function toStoredTranscript(transcript: string) {
   return JSON.stringify([{ text, enhancedText: text, isImportant: false, concepts: [] }]);
 }
 
-async function saveNote(db: Db, job: typeof processingJobs.$inferSelect, html: string) {
+/**
+ * Titles the app gives a note before it has real content. Only these are
+ * replaced by the generated title, so a title the user typed is kept.
+ */
+const PLACEHOLDER_TITLES = new Set(["", "untitled", "untitled note", "session notes", "new note"]);
+
+export function hasPlaceholderTitle(title: string | null): boolean {
+  return PLACEHOLDER_TITLES.has((title ?? "").trim().toLowerCase());
+}
+
+async function saveNote(db: Db, job: typeof processingJobs.$inferSelect, html: string, title?: string) {
   if (!job.noteId) {
     throw new UserFacingError("The note was deleted before its notes were ready");
   }
   await db.transaction(async (tx) => {
     const [note] = await tx
-      .select({ content: notes.content })
+      .select({ title: notes.title, content: notes.content })
       .from(notes)
       .where(and(eq(notes.id, job.noteId!), eq(notes.userId, job.userId)))
       .limit(1);
@@ -204,6 +215,7 @@ async function saveNote(db: Db, job: typeof processingJobs.$inferSelect, html: s
       .update(notes)
       .set({
         content,
+        ...(title && hasPlaceholderTitle(note.title) && { title }),
         wordCount: content.replace(/<[^>]*>/g, " ").split(/\s+/).filter(Boolean).length,
         // A content change like any other save, so a stale editor gets a conflict.
         version: sql`${notes.version} + 1`,
