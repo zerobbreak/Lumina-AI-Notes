@@ -1,0 +1,6 @@
+# Never upload local secrets or build output; Railway builds from source.
+.env
+.env.*
+!.env.example
+node_modules
+dist
