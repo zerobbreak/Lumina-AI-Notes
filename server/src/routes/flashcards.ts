@@ -21,7 +21,7 @@ import {
 } from "../db/schema/index.js";
 import { HttpError } from "../middleware/errors.js";
 import { currentUser } from "../middleware/user.js";
-import { parse } from "./validation.js";
+import { parse, tzOffsetMinutes } from "./validation.js";
 
 const rowId = z.string().min(1).max(200);
 const title = z.string().trim().min(1).max(500);
@@ -71,7 +71,7 @@ const batchReviewsBody = z.object({
 
 const scheduleBody = z.object({
   rating: z.enum(["easy", "medium", "hard"]),
-  tzOffsetMinutes: z.number().int().optional(),
+  tzOffsetMinutes: tzOffsetMinutes.optional(),
 });
 
 const isDue = (column: typeof flashcards.nextReviewAt, now: Date) =>

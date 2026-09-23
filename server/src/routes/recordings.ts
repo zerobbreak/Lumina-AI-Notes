@@ -9,7 +9,7 @@ import { currentUser } from "../middleware/user.js";
 import { updateStudyStreak } from "../gamification/streaks.js";
 import { AUDIO_LIMIT_MINUTES, checkAndUpdateAudioUsage, getUserUsage } from "../recordings/usage.js";
 import { isOwnedKey, type Storage } from "../storage/s3.js";
-import { parse } from "./validation.js";
+import { parse, tzOffsetMinutes } from "./validation.js";
 
 type RecordingRow = typeof recordings.$inferSelect;
 
@@ -23,7 +23,7 @@ const saveBody = z.object({
   title,
   transcript: z.string().max(2_000_000),
   duration,
-  tzOffsetMinutes: z.number().int().optional(),
+  tzOffsetMinutes: tzOffsetMinutes.optional(),
 });
 
 const draftBody = saveBody;
@@ -33,7 +33,7 @@ const uploadedBody = z.object({
   storageKey: z.string().min(1).max(1024),
   duration,
   sessionId: sessionId.optional(),
-  tzOffsetMinutes: z.number().int().optional(),
+  tzOffsetMinutes: tzOffsetMinutes.optional(),
 });
 
 const transcriptBody = z.object({

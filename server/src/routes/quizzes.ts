@@ -7,7 +7,7 @@ import { updateStudyStreak } from "../gamification/streaks.js";
 import { HttpError } from "../middleware/errors.js";
 import { currentUser } from "../middleware/user.js";
 import { assertOwnedNote, findOwnedDeck, requireOwnedDeck } from "../quizzes/helpers.js";
-import { parse } from "./validation.js";
+import { parse, tzOffsetMinutes } from "./validation.js";
 
 const rowId = z.string().min(1).max(200);
 const title = z.string().trim().min(1).max(500);
@@ -34,7 +34,7 @@ const saveResultBody = z.object({
   totalQuestions: z.number().int().min(1),
   answers: z.array(z.number().int().min(0).max(3)),
   timeSpent: z.number().finite().min(0).optional(),
-  tzOffsetMinutes: z.number().int().optional(),
+  tzOffsetMinutes: tzOffsetMinutes.optional(),
 });
 
 /** Port of convex/quizzes.ts */

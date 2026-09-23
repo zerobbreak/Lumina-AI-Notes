@@ -5,6 +5,7 @@ import { getLocalDayStart } from "../src/analytics/helpers.js";
 import { resetStreaks, updateStudyStreak } from "../src/gamification/streaks.js";
 import type { Db } from "../src/db/client.js";
 import { users } from "../src/db/schema/index.js";
+import { MAX_BADGES } from "../src/routes/users.js";
 import { bearer, buildApp, createTestDb } from "./helpers.js";
 
 const ALICE = "user_alice";
@@ -132,5 +133,55 @@ describe("badges and daily goals", () => {
   it("only touches the caller's badges", async () => {
     await as(ALICE).post("/api/v1/users/me/badges").send({ badgeId: "alice-badge" });
     expect((await as(BOB).get("/api/v1/users/me/gamification")).body.badges).toEqual([]);
+  });
+});
+
+describe("streak integrity", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  it("ignores a client-supplied timestamp, so past days can't be replayed", async () => {
+    for (let day = 10; day >= 1; day--) {
+      await as(ALICE)
+        .post("/api/v1/users/me/study-streak")
+        .send({ tzOffsetMinutes: 0, timestamp: Date.now() - day * DAY });
+    }
+    const res = await as(ALICE).post("/api/v1/users/me/study-streak").send({ tzOffsetMinutes: 0 });
+    expect(res.body).toEqual({ currentStreak: 1, longestStreak: 1 });
+  });
+
+  it.each([-841, 721, 100_000])("rejects an impossible timezone offset (%i)", async (tzOffsetMinutes) => {
+    const res = await as(ALICE).post("/api/v1/users/me/study-streak").send({ tzOffsetMinutes });
+    expect(res.status).toBe(400);
+  });
+
+  it("doesn't reset the streak when a timezone change makes today start earlier", async () => {
+    const aliceId = await userId(ALICE);
+    // At 20:00 UTC, offset 600 puts the local day start at 14:00 UTC and
+    // offset -480 puts it at 08:00 UTC: the "new" day starts before the
+    // one already recorded. That used to count as a missed day.
+    const now = Date.UTC(2026, 0, 2, 20);
+    await updateStudyStreak(db, aliceId, { timestamp: now - DAY, tzOffsetMinutes: 600 });
+    await updateStudyStreak(db, aliceId, { timestamp: now, tzOffsetMinutes: 600 });
+    const streak = await updateStudyStreak(db, aliceId, { timestamp: now, tzOffsetMinutes: -480 });
+    expect(streak.currentStreak).toBe(2);
+  });
+});
+
+describe("badge limits", () => {
+  it.each(["", "has spaces", "<script>", "x".repeat(65)])("rejects badge id %j", async (badgeId) => {
+    expect((await as(ALICE).post("/api/v1/users/me/badges").send({ badgeId })).status).toBe(400);
+  });
+
+  it(`caps a user at ${MAX_BADGES} badges`, async () => {
+    const aliceId = await userId(ALICE);
+    await db
+      .update(users)
+      .set({ badges: Array.from({ length: MAX_BADGES }, (_, i) => `badge-${i}`) })
+      .where(eq(users.id, aliceId));
+    const res = await as(ALICE).post("/api/v1/users/me/badges").send({ badgeId: "one-more" });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe("too_many_badges");
+    // Re-awarding one they already hold is still fine.
+    expect((await as(ALICE).post("/api/v1/users/me/badges").send({ badgeId: "badge-0" })).status).toBe(204);
   });
 });

@@ -5,8 +5,9 @@ import type { Db } from "../db/client.js";
 import { users } from "../db/schema/index.js";
 import { toGamificationStats } from "../gamification/stats.js";
 import { updateStudyStreak } from "../gamification/streaks.js";
+import { HttpError } from "../middleware/errors.js";
 import { currentUser, type User } from "../middleware/user.js";
-import { parse } from "./validation.js";
+import { parse, tzOffsetMinutes } from "./validation.js";
 
 export const NOTE_STYLES = ["standard", "outline", "mindmap"] as const;
 export const noteStyle = z.enum(NOTE_STYLES);
@@ -69,13 +70,18 @@ const preferencesBody = z.object({
   theme: shortText(50).optional(),
 });
 
-const studyStreakBody = z.object({
-  timestamp: z.number().int().optional(),
-  tzOffsetMinutes: z.number().int(),
-});
+// No client timestamp: the server's clock decides what day it is, so a streak
+// can't be built by replaying days that have passed.
+const studyStreakBody = z.object({ tzOffsetMinutes });
+
+/** Badges have no server-side rules yet, so at least keep them small and tidy. */
+export const MAX_BADGES = 100;
 
 const badgeBody = z.object({
-  badgeId: shortText(100),
+  badgeId: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9][a-z0-9_-]{0,63}$/i, "Badge ids are letters, numbers, - and _"),
 });
 
 const dailyGoalsBody = z.object({
@@ -143,6 +149,9 @@ export function createUsersRouter(db: Db) {
     const user = currentUser(res);
     const { badgeId } = parse(badgeBody, req.body);
     const badges = [...new Set([...(user.badges ?? []), badgeId])];
+    if (badges.length > MAX_BADGES) {
+      throw new HttpError(400, `You can hold at most ${MAX_BADGES} badges`, "too_many_badges");
+    }
     await update(user, { badges });
     res.status(204).end();
   });

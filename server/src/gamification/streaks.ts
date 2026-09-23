@@ -21,7 +21,9 @@ export async function updateStudyStreak(
   const lastStudiedMs = user.lastStudiedDate?.getTime();
   let currentStreak = user.currentStreak ?? 0;
 
-  if (lastStudiedMs === todayStart) {
+  // Already counted today. "<=" also covers a move west, whose local day can
+  // start before the one already recorded; that used to reset the streak.
+  if (lastStudiedMs !== undefined && todayStart <= lastStudiedMs) {
     return {
       currentStreak,
       longestStreak: user.longestStreak ?? currentStreak,

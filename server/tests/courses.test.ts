@@ -13,6 +13,7 @@ import {
   quizDecks,
   users,
 } from "../src/db/schema/index.js";
+import { MAX_COURSES, MAX_MODULES_PER_COURSE } from "../src/routes/courses.js";
 import { bearer, buildApp, createTestDb, fakeStorage } from "./helpers.js";
 
 const ALICE = "user_alice";
@@ -229,5 +230,30 @@ describe("deleting a module", () => {
     expect(await db.select().from(files)).toHaveLength(1);
     expect(await db.select().from(flashcardDecks)).toHaveLength(1);
     expect(fake.mock.delete).not.toHaveBeenCalled();
+  });
+});
+
+describe("course limits", () => {
+  it(`caps a user at ${MAX_COURSES} courses`, async () => {
+    const { id } = await me(ALICE);
+    await db
+      .update(users)
+      .set({ courses: Array.from({ length: MAX_COURSES }, (_, i) => ({ id: `c${i}`, name: `Course ${i}`, code: "", modules: [] })) })
+      .where(eq(users.id, id));
+    const res = await as(ALICE).post("/api/v1/courses").send({ name: "One more", code: "" });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe("too_many_courses");
+  });
+
+  it(`caps a course at ${MAX_MODULES_PER_COURSE} modules`, async () => {
+    const { id } = await me(ALICE);
+    const modules = Array.from({ length: MAX_MODULES_PER_COURSE }, (_, i) => ({ id: `m${i}`, title: `Week ${i}` }));
+    await db
+      .update(users)
+      .set({ courses: [{ id: "c1", name: "Physics", code: "", modules }] })
+      .where(eq(users.id, id));
+    const res = await as(ALICE).post("/api/v1/courses/c1/modules").send({ title: "Week 101" });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe("too_many_modules");
   });
 });

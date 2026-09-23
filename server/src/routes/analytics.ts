@@ -16,16 +16,16 @@ import {
 import { requireOwnedDeck as requireFlashcardDeck } from "../flashcards/helpers.js";
 import { currentUser } from "../middleware/user.js";
 import { requireOwnedDeck as requireQuizDeck } from "../quizzes/helpers.js";
-import { parse } from "./validation.js";
+import { parse, tzOffsetMinutes } from "./validation.js";
 
 const rangeQuery = z.object({
   start: z.coerce.number().int().min(0),
   end: z.coerce.number().int().min(0),
-  tzOffsetMinutes: z.coerce.number().int(),
+  tzOffsetMinutes: z.coerce.number().pipe(tzOffsetMinutes),
 });
 
 const tzQuery = z.object({
-  tzOffsetMinutes: z.coerce.number().int(),
+  tzOffsetMinutes: z.coerce.number().pipe(tzOffsetMinutes),
 });
 
 const readinessQuery = z.object({

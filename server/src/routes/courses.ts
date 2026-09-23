@@ -38,6 +38,14 @@ const updateCourseBody = z.object({
 const moduleBody = z.object({ title: z.string().trim().min(1).max(200) });
 
 /**
+ * Courses live in one jsonb value on the user row, which every request loads,
+ * so an unbounded list would slow down everything that user does. Onboarding
+ * already caps courses at 50.
+ */
+export const MAX_COURSES = 50;
+export const MAX_MODULES_PER_COURSE = 100;
+
+/**
  * Runs `fn` against the caller's course list with their user row locked, then
  * saves the list. Courses are one jsonb value, so without the lock two quick
  * edits (rename + add module) would each overwrite the other's change.
@@ -162,6 +170,9 @@ export function createCoursesRouter(db: Db, storage: Storage) {
   router.post("/", async (req, res) => {
     const body = parse(createCourseBody, req.body);
     const course = await withCourses(db, currentUser(res).id, (courses) => {
+      if (courses.length >= MAX_COURSES) {
+        throw new HttpError(400, `You can have at most ${MAX_COURSES} courses`, "too_many_courses");
+      }
       const created: Course = { id: randomUUID(), ...body, modules: [] };
       courses.push(created);
       return created;
@@ -201,6 +212,13 @@ export function createCoursesRouter(db: Db, storage: Storage) {
     const { title } = parse(moduleBody, req.body);
     const module = await withCourses(db, currentUser(res).id, (courses) => {
       const course = findCourse(courses, req.params.courseId);
+      if ((course.modules?.length ?? 0) >= MAX_MODULES_PER_COURSE) {
+        throw new HttpError(
+          400,
+          `A course can have at most ${MAX_MODULES_PER_COURSE} modules`,
+          "too_many_modules",
+        );
+      }
       const created: CourseModule = { id: randomUUID(), title };
       course.modules = [...(course.modules ?? []), created];
       return created;
