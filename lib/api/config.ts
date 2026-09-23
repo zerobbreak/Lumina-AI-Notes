@@ -1,4 +1,7 @@
-/** Base URL for the Express API (includes `/api/v1`). */
+/**
+ * Base URL for the Express API (includes `/api/v1`). Either absolute, or
+ * "/api/v1" to go through the same-origin proxy in next.config.ts.
+ */
 export function getApiBaseUrl(): string {
   const url = process.env.NEXT_PUBLIC_API_URL;
   if (!url) {

@@ -5,17 +5,18 @@ import { Id } from "@/types/data-model";
 import { useResumeTarget } from "@/lib/queries/notes/useResumeTarget";
 import { Sparkles } from "lucide-react";
 import { Suspense, lazy, useEffect } from "react";
+import { viewLoaders } from "@/components/dashboard/viewLoaders";
 
-const NoteView = lazy(() => import("@/components/dashboard/editor/NoteView"));
-const FolderView = lazy(() => import("@/components/dashboard/views/FolderView"));
-const SmartFolderHub = lazy(() => import("@/components/dashboard/views/SmartFolderHub"));
-const FlashcardsView = lazy(() => import("@/components/dashboard/flashcards/FlashcardsView").then(m => ({ default: m.FlashcardsView })));
-const FlashcardStudy = lazy(() => import("@/components/dashboard/flashcards/FlashcardStudy").then(m => ({ default: m.FlashcardStudy })));
-const QuizzesView = lazy(() => import("@/components/dashboard/quizzes/QuizzesView").then(m => ({ default: m.QuizzesView })));
-const QuizTaking = lazy(() => import("@/components/dashboard/quizzes/QuizTaking").then(m => ({ default: m.QuizTaking })));
-const ArchiveView = lazy(() => import("@/components/dashboard/views/ArchiveView"));
-const CalendarView = lazy(() => import("@/components/dashboard/views/CalendarView"));
-const NoteStudioView = lazy(() => import("@/components/dashboard/views/NoteStudioView"));
+const NoteView = lazy(viewLoaders.note);
+const FolderView = lazy(viewLoaders.folder);
+const SmartFolderHub = lazy(viewLoaders.home);
+const FlashcardsView = lazy(() => viewLoaders.flashcards().then(m => ({ default: m.FlashcardsView })));
+const FlashcardStudy = lazy(() => viewLoaders.flashcardStudy().then(m => ({ default: m.FlashcardStudy })));
+const QuizzesView = lazy(() => viewLoaders.quizzes().then(m => ({ default: m.QuizzesView })));
+const QuizTaking = lazy(() => viewLoaders.quizTaking().then(m => ({ default: m.QuizTaking })));
+const ArchiveView = lazy(viewLoaders.archive);
+const CalendarView = lazy(viewLoaders.calendar);
+const NoteStudioView = lazy(viewLoaders.studio);
 
 function DashboardLoading() {
   return (

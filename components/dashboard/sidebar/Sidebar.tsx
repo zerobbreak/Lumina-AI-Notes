@@ -47,6 +47,11 @@ import { UploadDialog } from "@/components/dashboard/dialogs/UploadDialog";
 import { TagManagerDialog } from "@/components/dashboard/tags/TagManagerDialog";
 import { SidebarCourse } from "./SidebarCourse";
 import { SidebarNavItem } from "./SidebarNavItem";
+import {
+  preloadAllViewsWhenIdle,
+  preloadView,
+  viewForParam,
+} from "@/components/dashboard/viewLoaders";
 import { SidebarNote } from "./SidebarNote";
 import { SidebarSection, SidebarSectionAction } from "./SidebarSection";
 import { SidebarTag } from "./SidebarTag";
@@ -122,6 +127,8 @@ export function Sidebar() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => preloadAllViewsWhenIdle(), []);
 
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
   useEffect(() => {
@@ -382,6 +389,7 @@ export function Sidebar() {
             isRail={isRail}
             isActive={activeNavId === item.id}
             onClick={() => handleNavigate(item.href)}
+            onPrefetch={() => preloadView(viewForParam(item.view))}
           />
         ))}
       </nav>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { noteDetailToEditor } from "@/lib/api/adapters/note";
 import { notesApi } from "@/lib/api/domains/notes.api";
 import { ApiError } from "@/lib/api/errors";
@@ -15,7 +16,14 @@ import { noteKeys } from "@/lib/query-keys/notes";
  */
 export function useNoteDetailQueryOptions(noteId: string | null | undefined) {
   const { getApiToken, isReady } = useApiToken();
+  return noteDetailQueryOptions(noteId, getApiToken, isReady);
+}
 
+function noteDetailQueryOptions(
+  noteId: string | null | undefined,
+  getApiToken: () => Promise<string>,
+  isReady: boolean,
+) {
   return {
     queryKey: noteId ? noteKeys.detail(noteId) : noteKeys.all,
     queryFn: async () => {
@@ -37,4 +45,21 @@ export function useNoteDetailQueryOptions(noteId: string | null | undefined) {
 
 export function useNoteDetail(noteId: string | null | undefined) {
   return useQuery(useNoteDetailQueryOptions(noteId));
+}
+
+/**
+ * Loads a note into the cache ahead of opening it, e.g. when the pointer rests
+ * on its sidebar row. A note already cached and still fresh isn't refetched.
+ */
+export function usePrefetchNote() {
+  const queryClient = useQueryClient();
+  const { getApiToken, isReady } = useApiToken();
+
+  return useCallback(
+    (noteId: string) => {
+      if (!isReady) return;
+      void queryClient.prefetchQuery(noteDetailQueryOptions(noteId, getApiToken, isReady));
+    },
+    [queryClient, getApiToken, isReady],
+  );
 }

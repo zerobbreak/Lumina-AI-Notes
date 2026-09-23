@@ -112,7 +112,8 @@ NEXT_PUBLIC_PAYSTACK_SCHOLAR_PLAN_CODE=
 | `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | Yes | Sign-up route |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | Yes | Post sign-in redirect |
 | `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | Yes | Post sign-up redirect |
-| `NEXT_PUBLIC_API_URL` | Yes | REST API base URL for the Next.js client |
+| `NEXT_PUBLIC_API_URL` | Yes | REST API base URL for the Next.js client; `/api/v1` when using `API_PROXY_TARGET` |
+| `API_PROXY_TARGET` | No | API origin that Next proxies `/api/v1/*` to, so requests are same-origin and skip CORS preflights |
 | `GEMINI_API_KEY` | Yes (server) | Google AI Studio key — set in `server/.env` |
 | `UPLOADTHING_TOKEN` | Yes | UploadThing API token |
 | `NEXT_PUBLIC_PAYSTACK_SCHOLAR_PLAN_CODE` | No | Paystack plan code when billing is enabled |
@@ -161,7 +162,7 @@ Custom protocol handling and the `/electron-auth` route support bringing Clerk s
 
 ## Deployment notes
 
-- Deploy the Next.js app (e.g. Vercel) with `NEXT_PUBLIC_API_URL` pointing at your hosted API.
+- Deploy the Next.js app (e.g. Vercel) with `API_PROXY_TARGET` set to your hosted API's origin and `NEXT_PUBLIC_API_URL=/api/v1`, or point `NEXT_PUBLIC_API_URL` straight at the API.
 - Deploy the Express API (e.g. Railway) with Postgres and server env vars from `server/.env.example`.
 - Ensure Clerk domains match deployed URLs on both frontend and API.
 - Electron builds are separate artifacts; ship them through your desktop release process, not only Vercel.

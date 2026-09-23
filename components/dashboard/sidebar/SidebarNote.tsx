@@ -7,6 +7,8 @@ import { ActionMenu } from "@/components/shared/ActionMenu";
 import { useRouter } from "next/navigation";
 import { Id } from "@/types/data-model";
 import { cn } from "@/lib/utils";
+import { preloadView } from "@/components/dashboard/viewLoaders";
+import { usePrefetchNote } from "@/lib/queries/notes/useNoteDetail";
 
 interface SidebarNoteProps {
   note: {
@@ -58,6 +60,15 @@ function SidebarNoteComponent({
     router.push(`/dashboard?noteId=${note._id}`);
   }, [router, note._id]);
 
+  // Fetch the editor chunk and the note while the pointer is on its way to
+  // clicking, so the editor opens on data it already has.
+  const prefetchNote = usePrefetchNote();
+  const handlePrefetch = useCallback(() => {
+    if (isActive) return;
+    preloadView("note");
+    prefetchNote(note._id);
+  }, [isActive, prefetchNote, note._id]);
+
   return (
     <div
       className={cn(
@@ -80,6 +91,8 @@ function SidebarNoteComponent({
           isCompact && "w-8 h-8 justify-center px-0"
         )}
         onClick={handleClick}
+        onPointerEnter={handlePrefetch}
+        onFocus={handlePrefetch}
         title={isCompact ? note.title : undefined}
       >
         {isActive && (

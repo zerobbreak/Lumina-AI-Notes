@@ -16,6 +16,8 @@ interface SidebarNavItemProps {
   /** Icon-only presentation for the 60px rail. */
   isRail?: boolean;
   onClick: () => void;
+  /** Called when the row is hovered or focused, ahead of a likely click. */
+  onPrefetch?: () => void;
 }
 
 /**
@@ -29,11 +31,14 @@ function SidebarNavItemComponent({
   isActive = false,
   isRail = false,
   onClick,
+  onPrefetch,
 }: SidebarNavItemProps) {
   const row = (
     <button
       type="button"
       onClick={onClick}
+      onPointerEnter={onPrefetch}
+      onFocus={onPrefetch}
       aria-current={isActive ? "page" : undefined}
       className={cn(
         "group/nav relative flex w-full items-center gap-2.5 rounded-md text-[13px] transition-colors duration-100",

@@ -43,7 +43,8 @@ export function createApp(deps: AppDeps) {
     cors({
       origin: env.CORS_ORIGINS,
       allowedHeaders: ["Authorization", "Content-Type"],
-      maxAge: 600,
+      // Chrome caps this at 2h and Firefox at 24h; the longest we can get.
+      maxAge: 86_400,
     }),
   );
   // Notes send their whole HTML on every save, and JSON escaping makes that
