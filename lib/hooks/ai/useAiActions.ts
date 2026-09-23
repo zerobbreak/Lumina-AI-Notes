@@ -11,9 +11,6 @@ import type {
   GenerateDeckResult,
   GenerateNotesFromDocumentResult,
   IngestGenerateNoteResult,
-  IsolateTranscribeResult,
-  ProcessDocumentResult,
-  StructuredNotesResult,
 } from "@/types/api/ai";
 
 export function useAiActions() {
@@ -63,14 +60,6 @@ export function useAiActions() {
       const token = await getApiToken();
       const res = await aiApi.askAboutContext(token, args);
       return res.text;
-    },
-    [getApiToken],
-  );
-
-  const processDocument = useCallback(
-    async (args: { fileId: Id<"files"> }): Promise<ProcessDocumentResult> => {
-      const token = await getApiToken();
-      return aiApi.processDocument(token, args.fileId);
     },
     [getApiToken],
   );
@@ -165,56 +154,6 @@ export function useAiActions() {
     [getApiToken],
   );
 
-  const generateStructuredNotes = useCallback(
-    async (args: {
-      transcript: string;
-      title?: string;
-      style?: string;
-      previousNotesContent?: string;
-      referenceUrls?: string[];
-    }): Promise<StructuredNotesResult> => {
-      const token = await getApiToken();
-      return aiApi.generateStructuredNotes(token, args);
-    },
-    [getApiToken],
-  );
-
-  const generateFromPinnedAudio = useCallback(
-    async (args: {
-      transcript: string;
-      pinnedFileId?: Id<"files">;
-      previousNotesContent?: string;
-      referenceUrls?: string[];
-    }): Promise<StructuredNotesResult> => {
-      const token = await getApiToken();
-      return aiApi.generateFromPinnedAudio(token, {
-        transcript: args.transcript,
-        pinnedFileId: args.pinnedFileId,
-        previousNotesContent: args.previousNotesContent,
-        referenceUrls: args.referenceUrls,
-      });
-    },
-    [getApiToken],
-  );
-
-  const isolateAndTranscribe = useCallback(
-    async (args: {
-      storageId: Id<"_storage"> | string;
-      mimeType: string;
-      courseContext?: string;
-      fallbackToOriginal?: boolean;
-    }): Promise<IsolateTranscribeResult> => {
-      const token = await getApiToken();
-      return aiApi.isolateAndTranscribe(token, {
-        storageKey: String(args.storageId),
-        mimeType: args.mimeType,
-        courseContext: args.courseContext,
-        fallbackToOriginal: args.fallbackToOriginal,
-      });
-    },
-    [getApiToken],
-  );
-
   const extractFormulaFromImage = useCallback(
     async (args: {
       imageBase64: string;
@@ -233,7 +172,6 @@ export function useAiActions() {
     continueText,
     generateFlashcards,
     askAboutContext,
-    processDocument,
     askAboutFile,
     getDocumentReference,
     generateNotesFromDocument,
@@ -241,9 +179,6 @@ export function useAiActions() {
     generateAndSaveQuiz,
     ingestAndGenerateNote,
     ingestAndGenerateFlashcards,
-    generateStructuredNotes,
-    generateFromPinnedAudio,
-    isolateAndTranscribe,
     extractFormulaFromImage,
   };
 }

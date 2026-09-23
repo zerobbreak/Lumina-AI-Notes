@@ -210,17 +210,6 @@ describe.skipIf(!process.env.GEMINI_API_KEY)("POST /api/v1/ai/* (live Gemini)", 
     expect(Array.isArray(res.body)).toBe(true);
   }, 20_000);
 
-  it("generates structured notes with sections and a diagram", async () => {
-    const transcript = JSON.stringify([
-      { text: "Today we cover mitosis, the process of cell division.", timestamp: "0:00" },
-      { text: "Mitosis has four phases: prophase, metaphase, anaphase, and telophase.", timestamp: "0:10" },
-    ]);
-    const res = await as(ALICE).post("/api/v1/ai/generate-structured-notes").send({ transcript, title: "Mitosis" });
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.body.sections)).toBe(true);
-    expect(res.body.sections.length).toBeGreaterThan(0);
-  }, 60_000);
-
   it("cleans a lecture transcript", async () => {
     const res = await as(ALICE)
       .post("/api/v1/ai/clean-lecture-transcript")

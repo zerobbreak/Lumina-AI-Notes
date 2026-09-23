@@ -1,36 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
-import type { Id } from "@/types/data-model";
-import { useAiActions } from "@/lib/hooks/ai/useAiActions";
 import { usePendingFilesData } from "@/lib/hooks/files/usePendingFilesData";
 
 /**
- * Document Processor Hook
- * Automatically processes pending PDF documents after upload
- * Displays processing status for files
+ * Pending PDF count for the processing indicator. The worker service
+ * processes uploads; polling the pending list also re-queues any file whose
+ * hand-off to the worker failed.
  */
 export function useDocumentProcessor() {
   const pendingFiles = usePendingFilesData();
-  const { processDocument } = useAiActions();
-
-  // Auto-process pending files
-  useEffect(() => {
-    if (!pendingFiles || pendingFiles.length === 0) return;
-
-    const processNextFile = async () => {
-      const file = pendingFiles[0];
-      if (file) {
-        try {
-          await processDocument({ fileId: file._id as Id<"files"> });
-        } catch (error) {
-          console.error("Failed to process document:", error);
-        }
-      }
-    };
-
-    processNextFile();
-  }, [pendingFiles, processDocument]);
 
   return {
     pendingCount: pendingFiles?.length || 0,

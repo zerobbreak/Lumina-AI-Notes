@@ -65,6 +65,20 @@ export async function checkAndUpdateAudioUsage(
 }
 
 /**
+ * Records minutes for audio that was already transcribed. Unlike
+ * checkAndUpdateAudioUsage it never refuses: the work is done, so the
+ * minutes count even when they tip the user over the limit.
+ */
+export async function chargeAudioMinutes(db: Db, userId: string, durationMinutes: number) {
+  if (!(durationMinutes > 0)) return;
+  const usage = await getUserUsage(db, userId);
+  await db
+    .update(users)
+    .set({ monthlyUsage: { ...usage, audioMinutesUsed: usage.audioMinutesUsed + durationMinutes } })
+    .where(eq(users.id, userId));
+}
+
+/**
  * Refusal message when the user has no audio minutes left this month, else
  * null. Minutes are only counted when a recording is saved, so this can't
  * stop the one transcription that tips a user over; it stops the ones after.

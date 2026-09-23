@@ -4,7 +4,6 @@ import { useFolderViewData } from "@/lib/hooks/folder/useFolderViewData";
 import { useCourseActions } from "@/lib/hooks/mutations/useCourseActions";
 import { useFileActions } from "@/lib/hooks/mutations/useFileActions";
 import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
-import { useAiActions } from "@/lib/hooks/ai/useAiActions";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -73,7 +72,6 @@ export default function FolderView({
   const { addModuleToCourse, renameModule, deleteModule } = useCourseActions();
   const { deleteFile, renameFile, retryProcessing } = useFileActions();
   const { togglePinNote, deleteNote, renameNote } = useNoteActions();
-  const { processDocument } = useAiActions();
 
   const [renameTarget, setRenameTarget] = useState<{
     id: string | Id<"files"> | Id<"notes">;
@@ -503,7 +501,6 @@ export default function FolderView({
                         showRetry={f.processingStatus === "error"}
                         onRetry={async () => {
                           await retryProcessing({ fileId: f._id as Id<"files"> });
-                          await processDocument({ fileId: f._id as Id<"files"> });
                         }}
                         align="right"
                       />

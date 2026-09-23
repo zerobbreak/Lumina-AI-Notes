@@ -16,6 +16,8 @@ export const POLL_MS = {
   notifications: 30_000,
   /** Collaborators dialog while open */
   collaborators: 5_000,
+  /** A background AI job (recording -> notes) while it's queued or running */
+  job: 2_000,
 } as const;
 
 export const STALE_MS = {

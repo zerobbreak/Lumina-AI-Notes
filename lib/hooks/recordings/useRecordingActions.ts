@@ -3,7 +3,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import type { Id } from "@/types/data-model";
-import { recordingsApi } from "@/lib/api/domains/recordings.api";
+import { recordingsApi, type ProcessRecordingBody } from "@/lib/api/domains/recordings.api";
+import { noteKeys } from "@/lib/query-keys/notes";
+import { jobKeys } from "@/lib/query-keys/jobs";
 import { useApiToken } from "@/lib/api/use-api-token";
 import { invalidateRecordings } from "@/lib/invalidation";
 
@@ -50,6 +52,20 @@ export function useRecordingActions() {
     [getApiToken, invalidate],
   );
 
+  /** Starts background note generation; returns the job and the note it writes into. */
+  const processRecording = useCallback(
+    async (body: ProcessRecordingBody) => {
+      const token = await getApiToken();
+      const result = await recordingsApi.process(token, body);
+      queryClient.setQueryData(jobKeys.detail(result.job.id), result.job);
+      invalidate();
+      // The placeholder note (or the now-locked target) appears in lists and the editor.
+      void queryClient.invalidateQueries({ queryKey: noteKeys.all });
+      return result;
+    },
+    [getApiToken, invalidate, queryClient],
+  );
+
   const deleteRecording = useCallback(
     async (args: { recordingId: Id<"recordings"> }) => {
       const token = await getApiToken();
@@ -69,6 +85,7 @@ export function useRecordingActions() {
   return {
     upsertDraft,
     saveUploadedRecording,
+    processRecording,
     deleteRecording,
     cleanupOrphanedRecordings,
   };

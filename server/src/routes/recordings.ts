@@ -1,14 +1,23 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, exists, not } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
 import type { Db } from "../db/client.js";
-import { notes, recordings } from "../db/schema/index.js";
+import { files, notes, processingJobs, recordings, type RecordingJobInput } from "../db/schema/index.js";
+import { consumeAiQuota } from "../middleware/ai-rate-limit.js";
 import { HttpError } from "../middleware/errors.js";
 import { currentUser } from "../middleware/user.js";
 import { updateStudyStreak } from "../gamification/streaks.js";
-import { AUDIO_LIMIT_MINUTES, checkAndUpdateAudioUsage, getUserUsage } from "../recordings/usage.js";
+import { requireNote } from "../notes/access.js";
+import type { JobQueue } from "../queue/queues.js";
+import {
+  AUDIO_LIMIT_MINUTES,
+  audioQuotaExhausted,
+  checkAndUpdateAudioUsage,
+  getUserUsage,
+} from "../recordings/usage.js";
 import { isOwnedKey, type Storage } from "../storage/s3.js";
+import { enqueueOrFail, toJobResponse } from "./jobs.js";
 import { parse, tzOffsetMinutes } from "./validation.js";
 
 type RecordingRow = typeof recordings.$inferSelect;
@@ -40,12 +49,38 @@ const transcriptBody = z.object({
   transcript: z.string().max(2_000_000),
 });
 
+const processBody = z
+  .object({
+    /** The pill's session: the recording row is created or updated by it. */
+    sessionId: sessionId.optional(),
+    /** Re-generate from a saved recording's transcript instead (no new audio). */
+    recordingId: z.string().min(1).max(200).optional(),
+    title,
+    /** Captured or imported audio, already PUT to the bucket. */
+    storageKey: z.string().min(1).max(1024).optional(),
+    mimeType: z.string().max(200).optional(),
+    liveTranscript: z.string().max(2_000_000).optional(),
+    duration,
+    /** Generate into this note (added below its content) instead of a new one. */
+    targetNoteId: z.string().min(1).max(200).optional(),
+    noteTitle: z.string().trim().min(1).max(500).optional(),
+    major: z.string().trim().max(200).optional(),
+    courseContext: z.string().max(2000).optional(),
+    pinnedFileId: z.string().min(1).max(200).optional(),
+    referenceUrls: z.array(z.url({ protocol: /^https?$/ })).max(5).optional(),
+    tzOffsetMinutes: tzOffsetMinutes.optional(),
+  })
+  .refine((b) => b.sessionId || b.recordingId, { message: "Provide sessionId or recordingId" })
+  .refine((b) => b.recordingId || b.storageKey || b.liveTranscript?.trim(), {
+    message: "Provide audio (storageKey) or a transcript",
+  });
+
 const audioLimitQuery = z.object({
   estimatedMinutes: z.coerce.number().finite().min(0).max(AUDIO_LIMIT_MINUTES).optional(),
 });
 
 /** Port of convex/recordings.ts. Upload URLs live under /uploads. */
-export function createRecordingsRouter(db: Db, storage: Storage) {
+export function createRecordingsRouter(db: Db, storage: Storage, queue: JobQueue) {
   const router = Router();
 
   async function findOwned(recordingId: string, userId: string) {
@@ -105,7 +140,12 @@ export function createRecordingsRouter(db: Db, storage: Storage) {
   // cleanupOrphanedRecordings — before /:id so "cleanup-orphaned" isn't read as an id.
   router.post("/cleanup-orphaned", async (_req, res) => {
     const user = currentUser(res);
-    const rows = await db.select().from(recordings).where(eq(recordings.userId, user.id));
+    // A recording with a processing job is waiting for the worker to transcribe it.
+    const hasJob = exists(db.select().from(processingJobs).where(eq(processingJobs.recordingId, recordings.id)));
+    const rows = await db
+      .select()
+      .from(recordings)
+      .where(and(eq(recordings.userId, user.id), not(hasJob)));
     const TEN_MINUTES = 10 * 60 * 1000;
     const now = Date.now();
     let deletedCount = 0;
@@ -203,6 +243,110 @@ export function createRecordingsRouter(db: Db, storage: Storage) {
     }
 
     res.status(201).json(await toResponse(created));
+  });
+
+  /**
+   * Starts the recording -> notes pipeline in the background and returns at
+   * once. The note it writes into (a new placeholder, or targetNoteId) is
+   * locked until the job finishes; poll GET /jobs/:id for progress.
+   */
+  router.post("/process", async (req, res) => {
+    const user = currentUser(res);
+    const body = parse(processBody, req.body);
+
+    if (body.storageKey && !body.recordingId) {
+      if (!isOwnedKey(user.clerkUserId, body.storageKey)) {
+        throw new HttpError(404, "Upload not found", "not_found");
+      }
+      const outOfMinutes = await audioQuotaExhausted(db, user.id);
+      if (outOfMinutes) throw new HttpError(403, outOfMinutes, "audio_limit_exceeded");
+      if (!(await storage.stat(body.storageKey))) {
+        throw new HttpError(400, "Upload not found in storage; PUT the file first", "upload_missing");
+      }
+    }
+    const replayed = body.recordingId ? await findOwned(body.recordingId, user.id) : null;
+    const target = body.targetNoteId ? (await requireNote(db, body.targetNoteId, user.id, "edit")).note : null;
+    if (target?.generationJobId) {
+      throw new HttpError(409, "Notes are already being generated for this page", "note_generating");
+    }
+    if (body.pinnedFileId) {
+      const [file] = await db
+        .select({ id: files.id })
+        .from(files)
+        .where(and(eq(files.id, body.pinnedFileId), eq(files.userId, user.id)));
+      if (!file) throw new HttpError(404, "Pinned document not found", "not_found");
+    }
+    await consumeAiQuota(db, user.id);
+
+    const input: RecordingJobInput = {
+      title: body.title,
+      // A replay reuses the saved transcript; its audio was already charged.
+      audioStorageKey: replayed ? undefined : body.storageKey,
+      mimeType: body.mimeType,
+      liveTranscript: body.liveTranscript?.trim() || replayed?.transcript || undefined,
+      durationSeconds: body.duration,
+      courseContext: body.courseContext,
+      pinnedFileId: body.pinnedFileId,
+      referenceUrls: body.referenceUrls,
+      append: Boolean(target),
+    };
+    const jobId = randomUUID();
+
+    const { job, noteId, recordingId } = await db.transaction(async (tx) => {
+      let recording = replayed;
+      if (!recording) {
+        const [existing] = await tx
+          .select()
+          .from(recordings)
+          .where(and(eq(recordings.userId, user.id), eq(recordings.sessionId, body.sessionId!)))
+          .limit(1);
+        const fields = {
+          title: body.title,
+          duration: body.duration ?? null,
+          ...(body.storageKey && { audioStorageKey: body.storageKey }),
+        };
+        [recording] = existing
+          ? await tx.update(recordings).set(fields).where(eq(recordings.id, existing.id)).returning()
+          : await tx
+              .insert(recordings)
+              .values({ userId: user.id, sessionId: body.sessionId!, transcript: "", ...fields })
+              .returning();
+      }
+
+      let noteId: string;
+      if (target) {
+        await tx.update(notes).set({ generationJobId: jobId }).where(eq(notes.id, target.id));
+        noteId = target.id;
+      } else {
+        const [placeholder] = await tx
+          .insert(notes)
+          .values({
+            userId: user.id,
+            title: body.noteTitle ?? "Session notes",
+            content: "",
+            noteType: "quick",
+            major: body.major,
+            style: "standard",
+            lastAccessedAt: new Date(),
+            sourceRecordingId: recording.id,
+            generationJobId: jobId,
+          })
+          .returning({ id: notes.id });
+        noteId = placeholder.id;
+      }
+
+      const [job] = await tx
+        .insert(processingJobs)
+        .values({ id: jobId, userId: user.id, type: "recording.process", recordingId: recording.id, noteId, input })
+        .returning();
+      return { job, noteId, recordingId: recording.id };
+    });
+
+    if (body.tzOffsetMinutes !== undefined) {
+      await updateStudyStreak(db, user.id, { tzOffsetMinutes: body.tzOffsetMinutes });
+    }
+    await enqueueOrFail(db, queue, job);
+    res.status(202).json({ job: toJobResponse(job), noteId, recordingId });
   });
 
   // saveRecording

@@ -4,7 +4,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import type { Db } from "../src/db/client.js";
 import { documents, files, users } from "../src/db/schema/index.js";
 import { searchDocumentsByEmbedding } from "../src/search/vectorSearch.js";
-import { bearer, buildApp, createTestDb, testEnv } from "./helpers.js";
+import { processRecordingJob } from "../src/pipelines/recording/processRecording.js";
+import { bearer, buildApp, createTestDb, fakeStorage, testEnv } from "./helpers.js";
 
 /** Every prompt the routes sent to "Gemini", so tests can check what leaked into them. */
 const prompts: string[] = [];
@@ -73,11 +74,19 @@ async function linkFile(clerkUserId: string) {
   return file;
 }
 
-const generate = (pinnedFileId: string) =>
-  request(app)
-    .post("/api/v1/ai/generate-from-pinned-audio")
+/** Starts a recording job grounded in the pinned file, and runs it as the worker would. */
+async function generate(pinnedFileId: string) {
+  const res = await request(app)
+    .post("/api/v1/recordings/process")
     .set("Authorization", bearer(ALICE))
-    .send({ transcript: "Today we covered entropy and the second law.", pinnedFileId });
+    .send({ sessionId: crypto.randomUUID(), title: "Thermo", liveTranscript: "Today we covered entropy and the second law.", pinnedFileId });
+  expect(res.status).toBe(202);
+  await processRecordingJob(
+    { db, storage: fakeStorage().storage, keys: { gemini: "fake-key" }, log: { log() {}, warn() {}, error() {} } },
+    res.body.job.id,
+    { isFinalAttempt: true },
+  );
+}
 
 describe("searchDocumentsByEmbedding", () => {
   it("only returns chunks from the given upload", async () => {
@@ -91,13 +100,12 @@ describe("searchDocumentsByEmbedding", () => {
   });
 });
 
-describe("POST /api/v1/ai/generate-from-pinned-audio", () => {
+describe("recording jobs with a pinned document", () => {
   it("never puts another user's document chunks in the prompt when a link is pinned", async () => {
     await uploadedFileWithChunk(BOB, BOB_SECRET);
     const pinned = await linkFile(ALICE);
 
-    const res = await generate(pinned.id);
-    expect(res.status).toBe(200);
+    await generate(pinned.id);
     expect(prompts.length).toBeGreaterThan(0);
     expect(prompts.join("\n")).not.toContain("BOB-PRIVATE-CHUNK");
   });
@@ -106,7 +114,7 @@ describe("POST /api/v1/ai/generate-from-pinned-audio", () => {
     await uploadedFileWithChunk(BOB, BOB_SECRET);
     const pinned = await uploadedFileWithChunk(ALICE, ALICE_CHUNK);
 
-    await generate(pinned.id).expect(200);
+    await generate(pinned.id);
     const all = prompts.join("\n");
     expect(all).toContain("ALICE-CHUNK");
     expect(all).not.toContain("BOB-PRIVATE-CHUNK");

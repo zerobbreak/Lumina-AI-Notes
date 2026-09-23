@@ -5,6 +5,7 @@ import type { ClerkProfiles } from "./auth/clerk-profiles.js";
 import type { TokenVerifier } from "./auth/verify-token.js";
 import type { Db } from "./db/client.js";
 import type { Env } from "./env.js";
+import type { JobQueue } from "./queue/queues.js";
 import { errorHandler, notFound } from "./middleware/errors.js";
 import { createApiRouter } from "./routes/index.js";
 import { healthRouter } from "./routes/health.js";
@@ -18,6 +19,8 @@ export type AppDeps = {
   storage: Storage;
   clerkProfiles: ClerkProfiles;
   verifyToken: TokenVerifier;
+  /** Background work for the worker service (BullMQ). */
+  queue: JobQueue;
 };
 
 export function createApp(deps: AppDeps) {

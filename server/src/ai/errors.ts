@@ -6,7 +6,7 @@ export class UserFacingError extends Error {
   }
 }
 
-const BUSY = /RESOURCE_EXHAUSTED|quota|rate.?limit|\b429\b/i;
+const BUSY = /RESOURCE_EXHAUSTED|quota|rate.?limit|overloaded|\b(429|503)\b/i;
 
 /**
  * What to tell the client about a failure. Library errors (Gemini, S3, the

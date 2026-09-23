@@ -76,6 +76,19 @@ const envSchema = z.object({
   // instead (same as Convex's own `getGeminiModel` check).
   GEMINI_API_KEY: z.string().min(1).optional(),
   ELEVENLABS_API_KEY: z.string().min(1).optional(),
+
+  // Job queue (BullMQ). On Railway, reference ${{Redis.REDIS_URL}} (private
+  // network); locally, the Redis service's public URL.
+  REDIS_URL: z.url({ protocol: /^rediss?$/ }),
+  // Namespaces every queue key, so a laptop pointed at the Railway Redis
+  // can't pick up production jobs. Required so nobody forgets to set it.
+  QUEUE_PREFIX: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9_-]*$/i, "letters, digits, _ and - only, e.g. prod or dev-alice"),
+  // How many AI jobs one worker replica runs at once, and how many it may
+  // start per minute across them (keeps free-tier Gemini/ElevenLabs happy).
+  AI_WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(20).default(2),
+  AI_WORKER_RATE_PER_MIN: z.coerce.number().int().min(1).max(1000).default(10),
 });
 
 export type Env = Omit<z.infer<typeof envSchema>, "CLERK_AUTHORIZED_PARTIES"> & {

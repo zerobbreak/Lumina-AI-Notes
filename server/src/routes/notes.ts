@@ -246,6 +246,10 @@ export function createNotesRouter(db: Db) {
     await checkRefs(note.userId, { ...patch, tagIds });
 
     const isContentSave = CONTENT_FIELDS.some((f) => patch[f] !== undefined);
+    if (isContentSave && note.generationJobId) {
+      // The worker is about to write this note's content; an edit now would be lost.
+      throw new HttpError(409, "Notes are still being generated for this page", "note_generating");
+    }
     const existingTagRows = await db
       .select({ tagId: noteTags.tagId })
       .from(noteTags)

@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "../src/db/client.js";
 import { aiDailyUsage, aiRateLimitWindows, users } from "../src/db/schema/index.js";
 import { MAX_AI_CALLS_PER_DAY, MAX_AI_CALLS_PER_MINUTE } from "../src/middleware/ai-rate-limit.js";
+import { transcribeAudio } from "../src/pipelines/recording/transcribe.js";
 import { AUDIO_LIMIT_MINUTES, MAX_TRANSCRIBE_BYTES } from "../src/recordings/usage.js";
 import { bearer, buildApp, createTestDb, fakeStorage, testEnv } from "./helpers.js";
 
@@ -111,23 +112,30 @@ describe("transcription guards", () => {
       .where(eq(users.id, await userId(ALICE)));
   }
 
-  it.each(["/api/v1/ai/transcribe-audio", "/api/v1/ai/isolate-and-transcribe"])(
-    "%s refuses once the month's audio minutes are used up",
-    async (path) => {
-      await useAllAudioMinutes();
-      fake.objects.set(key, { size: 1024, contentType: "audio/webm" });
-      const res = await as(ALICE).post(path).send({ storageKey: key, mimeType: "audio/webm" });
-      expect(res.body.success).toBe(false);
-      expect(res.body.error).toMatch(/audio minutes/);
-      expect(fake.mock.getBytes).not.toHaveBeenCalled();
-    },
-  );
+  it("/api/v1/ai/transcribe-audio refuses once the month's audio minutes are used up", async () => {
+    await useAllAudioMinutes();
+    fake.objects.set(key, { size: 1024, contentType: "audio/webm" });
+    const res = await as(ALICE).post("/api/v1/ai/transcribe-audio").send({ storageKey: key, mimeType: "audio/webm" });
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toMatch(/audio minutes/);
+    expect(fake.mock.getBytes).not.toHaveBeenCalled();
+  });
 
-  it("isolate-and-transcribe refuses an oversized file before reading it", async () => {
+  it("/api/v1/recordings/process won't queue new audio once the month's minutes are used up", async () => {
+    await useAllAudioMinutes();
+    fake.objects.set(key, { size: 1024, contentType: "audio/webm" });
+    const res = await as(ALICE)
+      .post("/api/v1/recordings/process")
+      .send({ sessionId: "s1", title: "Lecture", storageKey: key, mimeType: "audio/webm" });
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe("audio_limit_exceeded");
+  });
+
+  it("the worker refuses an oversized file before reading it", async () => {
     fake.objects.set(key, { size: MAX_TRANSCRIBE_BYTES + 1, contentType: "audio/webm" });
-    const res = await as(ALICE).post("/api/v1/ai/isolate-and-transcribe").send({ storageKey: key, mimeType: "audio/webm" });
-    expect(res.body).toMatchObject({ success: false });
-    expect(res.body.error).toMatch(/too large/);
+    await expect(
+      transcribeAudio(fake.storage, { gemini: "fake-key" }, { storageKey: key, mimeType: "audio/webm", clerkUserId: ALICE }),
+    ).rejects.toThrow(/too large/);
     expect(fake.mock.getBytes).not.toHaveBeenCalled();
   });
 });

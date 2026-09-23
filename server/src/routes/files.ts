@@ -6,7 +6,8 @@ import { documents, files } from "../db/schema/index.js";
 import { HttpError } from "../middleware/errors.js";
 import { currentUser } from "../middleware/user.js";
 import { isOwnedKey, type Storage } from "../storage/s3.js";
-import { runProcessDocument, STALE_PROCESSING_MS } from "../ai/processDocument.js";
+import { STALE_PROCESSING_MS } from "../ai/processDocument.js";
+import type { JobQueue } from "../queue/queues.js";
 import { consumeAiQuota } from "../middleware/ai-rate-limit.js";
 import { queuePositionOf } from "../files/processing.js";
 import { parse } from "./validation.js";
@@ -41,7 +42,7 @@ const listQuery = z.object({
 const renameBody = z.object({ name: z.string().trim().min(1).max(255) });
 
 /** Port of convex/files.ts (the client-facing half). */
-export function createFilesRouter(db: Db, storage: Storage, geminiApiKey?: string) {
+export function createFilesRouter(db: Db, storage: Storage, queue: JobQueue) {
   const router = Router();
 
   /** Uploaded files get a fresh signed link; links keep their own URL. */
@@ -62,9 +63,15 @@ export function createFilesRouter(db: Db, storage: Storage, geminiApiKey?: strin
     return file;
   }
 
+  /**
+   * Hands a pending PDF to the worker. Never fails the request: a file whose
+   * enqueue failed stays pending and is enqueued again by GET /files/pending,
+   * which the client polls while anything is pending.
+   */
   const queueProcess = (fileId: string, userId: string) => {
-    if (!geminiApiKey) return;
-    void runProcessDocument(db, storage, fileId, userId, geminiApiKey);
+    queue.enqueueDocument(fileId, userId).catch((err: unknown) => {
+      console.error(`[files] couldn't enqueue processing for ${fileId}:`, err);
+    });
   };
 
   // uploadFile

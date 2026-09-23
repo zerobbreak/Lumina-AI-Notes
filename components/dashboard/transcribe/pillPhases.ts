@@ -58,11 +58,14 @@ export const THINKING_STAGES = [
   "Tightening the wording",
 ] as const;
 
-/** Captions while ElevenLabs strips background noise from the take. */
-export const ISOLATING_STAGES = [
-  "Isolating speech",
-  "Removing background noise",
-] as const;
+/** Captions while the captured audio uploads, after the mic closes. */
+export const SAVING_STAGES = ["Saving the recording"] as const;
+
+/**
+ * Captions while the session is handed to the worker. Transcription and
+ * generation happen in the background after this, in the note itself.
+ */
+export const QUEUEING_STAGES = ["Starting note generation"] as const;
 
 /** Milliseconds each thinking caption holds before the next fades in. */
 export const THINKING_STAGE_MS = 2200;
@@ -98,11 +101,11 @@ export function phaseLabel(phase: PillPhase): string {
     case "listening":
       return "Listening";
     case "isolating":
-      return "Isolating speech";
+      return "Saving the recording";
     case "paused":
       return "Paused";
     case "thinking":
-      return "Thinking";
+      return "Starting note generation";
     case "ready":
       return "Notes ready";
     case "searching":

@@ -11,7 +11,7 @@ export type WorkerResult = Record<string, number | string | boolean | null>;
 export type WorkerJob = {
   /** Human-readable name for logs. */
   description: string;
-  /** How often Convex ran this job; used by the in-process scheduler. */
+  /** How often it runs, via a BullMQ job scheduler (workers/maintenance.ts). */
   intervalMs: number;
   run: (ctx: WorkerContext) => Promise<WorkerResult>;
 };

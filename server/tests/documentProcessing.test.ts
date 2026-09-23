@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  MAX_CONCURRENT_DOCUMENTS,
   MAX_PDF_BYTES,
   runProcessDocument,
   STALE_PROCESSING_MS,
@@ -10,12 +9,10 @@ import {
 import type { Db } from "../src/db/client.js";
 import { aiDailyUsage, files, users } from "../src/db/schema/index.js";
 import { MAX_AI_CALLS_PER_DAY } from "../src/middleware/ai-rate-limit.js";
-import { bearer, buildApp, createTestDb, fakeStorage } from "./helpers.js";
+import { bearer, buildApp, createTestDb, fakeQueue, fakeStorage } from "./helpers.js";
 
 /** How many times "Gemini" was asked to read a PDF. */
 let extractions = 0;
-/** Held open by tests that need runs to overlap; resolved to let them finish. */
-let gate: Promise<void> = Promise.resolve();
 /** When set, "Gemini" fails the way the real SDK does, with request details in the message. */
 let geminiFailure: Error | null = null;
 
@@ -27,7 +24,6 @@ vi.mock("@google/generative-ai", async (importOriginal) => {
         embedContent: async () => ({ embedding: { values: Array.from({ length: 768 }, () => 0.1) } }),
         generateContent: async () => {
           extractions += 1;
-          await gate;
           if (geminiFailure) throw geminiFailure;
           return {
             response: {
@@ -48,6 +44,7 @@ let db: Db;
 let closeDb: () => Promise<void>;
 let fake: ReturnType<typeof fakeStorage>;
 let app: ReturnType<typeof buildApp>;
+let queue: ReturnType<typeof fakeQueue>;
 
 beforeAll(async () => {
   ({ db, close: closeDb } = await createTestDb());
@@ -57,11 +54,11 @@ afterAll(() => closeDb?.());
 beforeEach(async () => {
   await db.delete(users);
   extractions = 0;
-  gate = Promise.resolve();
   geminiFailure = null;
   fake = fakeStorage();
   fake.mock.getBytes.mockResolvedValue(new Uint8Array(1024));
-  app = buildApp({ storage: fake.storage, db });
+  queue = fakeQueue();
+  app = buildApp({ storage: fake.storage, db, queue });
 });
 
 const as = (user: string) => ({
@@ -88,32 +85,27 @@ async function pdf(owner: string, patch: Partial<typeof files.$inferInsert> = {}
 
 const statusOf = async (fileId: string) => (await db.select().from(files).where(eq(files.id, fileId)))[0];
 
-/** Holds every Gemini call open until the returned function is called. */
-function holdGemini() {
-  let release!: () => void;
-  gate = new Promise((resolve) => (release = resolve));
-  return release;
-}
-
 describe("runProcessDocument", () => {
-  it("processes a pending file once, even when asked to several times at once", async () => {
+  it("processes a pending file", async () => {
     const file = await pdf(ALICE);
-    const results = await Promise.all(
-      Array.from({ length: 5 }, () => runProcessDocument(db, fake.storage, file.id, file.userId, "key")),
-    );
-    expect(results.filter((r) => r.success)).toHaveLength(1);
+    const result = await runProcessDocument(db, fake.storage, file.id, file.userId, "key");
+    expect(result.success).toBe(true);
     expect(extractions).toBe(1);
-    expect(fake.mock.getBytes).toHaveBeenCalledTimes(1);
     expect(await statusOf(file.id)).toMatchObject({ processingStatus: "done", summary: "On entropy." });
   });
 
-  it("leaves a file that's already processing alone", async () => {
+  it("resumes a file left processing by a run that died (the queue re-delivered it)", async () => {
     const file = await pdf(ALICE, { processingStatus: "processing", progressPercent: 40 });
+    const result = await runProcessDocument(db, fake.storage, file.id, file.userId, "key");
+    expect(result.success).toBe(true);
+    expect((await statusOf(file.id)).processingStatus).toBe("done");
+  });
+
+  it("leaves a finished file alone", async () => {
+    const file = await pdf(ALICE, { processingStatus: "done" });
     const result = await runProcessDocument(db, fake.storage, file.id, file.userId, "key");
     expect(result).toEqual({ success: false, error: "File is not waiting to be processed" });
     expect(extractions).toBe(0);
-    // Not flipped to "error" underneath the run that owns it.
-    expect(await statusOf(file.id)).toMatchObject({ processingStatus: "processing", progressPercent: 40 });
   });
 
   it("won't process someone else's file", async () => {
@@ -134,24 +126,33 @@ describe("runProcessDocument", () => {
     expect(extractions).toBe(0);
     expect((await statusOf(file.id)).processingStatus).toBe("error");
   });
+});
 
-  it(`runs at most ${MAX_CONCURRENT_DOCUMENTS} at once and leaves the rest pending for later`, async () => {
-    const release = holdGemini();
-    const batch = await Promise.all(Array.from({ length: MAX_CONCURRENT_DOCUMENTS + 2 }, () => pdf(ALICE)));
-    const runs = batch.map((f) => runProcessDocument(db, fake.storage, f.id, f.userId, "key"));
+describe("handing documents to the worker", () => {
+  it("enqueues a PDF when it's recorded, and doesn't process it in the API", async () => {
+    const storageKey = `users/${ALICE}/${crypto.randomUUID()}/notes.pdf`;
+    fake.objects.set(storageKey, { size: 1024, contentType: "application/pdf" });
+    const res = await as(ALICE).post("/api/v1/files").send({ name: "notes.pdf", type: "pdf", storageKey });
+    expect(res.status).toBe(201);
+    expect(queue.enqueueDocument).toHaveBeenCalledWith(res.body.id, await userId(ALICE));
+    expect(extractions).toBe(0);
+  });
 
-    await vi.waitFor(() => expect(extractions).toBe(MAX_CONCURRENT_DOCUMENTS));
-    release();
-    const results = await Promise.all(runs);
+  it("doesn't enqueue links", async () => {
+    await as(ALICE).post("/api/v1/files").send({ name: "Wiki", type: "link", url: "https://example.com" }).expect(201);
+    expect(queue.enqueueDocument).not.toHaveBeenCalled();
+  });
 
-    expect(results.filter((r) => r.success)).toHaveLength(MAX_CONCURRENT_DOCUMENTS);
-    expect(fake.mock.getBytes).toHaveBeenCalledTimes(MAX_CONCURRENT_DOCUMENTS);
-    const statuses = await Promise.all(batch.map((f) => statusOf(f.id)));
-    expect(statuses.filter((f) => f.processingStatus === "pending")).toHaveLength(2);
+  it("still records the file when Redis is down; polling pending files enqueues it later", async () => {
+    queue.enqueueDocument.mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
+    const storageKey = `users/${ALICE}/${crypto.randomUUID()}/notes.pdf`;
+    fake.objects.set(storageKey, { size: 1024, contentType: "application/pdf" });
+    const created = await as(ALICE).post("/api/v1/files").send({ name: "notes.pdf", type: "pdf", storageKey });
+    expect(created.status).toBe(201);
 
-    // Once a slot frees up, the leftovers go through.
-    const leftover = statuses.find((f) => f.processingStatus === "pending")!;
-    expect((await runProcessDocument(db, fake.storage, leftover.id, leftover.userId, "key")).success).toBe(true);
+    await as(ALICE).get("/api/v1/files/pending").expect(200);
+    expect(queue.enqueueDocument).toHaveBeenCalledTimes(2);
+    expect(queue.enqueueDocument).toHaveBeenLastCalledWith(created.body.id, expect.any(String));
   });
 });
 
@@ -171,6 +172,7 @@ describe("POST /api/v1/files/:id/retry", () => {
     });
     expect((await as(ALICE).post(`/api/v1/files/${file.id}/retry`)).status).toBe(204);
     expect((await statusOf(file.id)).processingStatus).toBe("pending");
+    expect(queue.enqueueDocument).toHaveBeenCalledWith(file.id, file.userId);
   });
 
   it("counts against the AI rate limit", async () => {

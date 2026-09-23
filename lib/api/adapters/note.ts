@@ -2,7 +2,11 @@ import type { Doc, Id } from "@/types/data-model";
 import type { NoteDetailDto, NoteListItemDto } from "@/types/api/notes";
 
 /** Full note shape the editor expects, with REST optimistic-concurrency version. */
-export type NoteEditorModel = Doc<"notes"> & { version: number };
+export type NoteEditorModel = Doc<"notes"> & {
+  version: number;
+  /** The job generating this note; the editor is read-only while it's set. */
+  generationJobId?: string;
+};
 
 /** Card/list shape the dashboard still uses (`_id`, `content` snippet, etc.). */
 export type NoteCardModel = {
@@ -91,6 +95,7 @@ export function noteDetailToEditor(dto: NoteDetailDto): NoteEditorModel {
       | Id<"notes">
       | undefined,
     sourceRecordingId: (dto.sourceRecordingId ?? undefined) as Id<"recordings"> | undefined,
+    generationJobId: dto.generationJobId ?? undefined,
     version: dto.version,
   };
 }

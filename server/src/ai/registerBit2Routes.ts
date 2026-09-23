@@ -1,7 +1,6 @@
 import { GoogleGenerativeAI, TaskType } from "@google/generative-ai";
 import type { GenerativeModel } from "@google/generative-ai";
 import { and, eq, inArray } from "drizzle-orm";
-import { randomUUID } from "node:crypto";
 import type { Router } from "express";
 import { z } from "zod";
 import type { Db } from "../db/client.js";
@@ -10,32 +9,16 @@ import type { Env } from "../env.js";
 import { createDeckWithCards, createDeckWithCardsImmediate } from "../flashcards/createDeck.js";
 import { noteColumns, requireNote } from "../notes/access.js";
 import { createDeckWithQuestions } from "../quizzes/createDeck.js";
-import { searchDocumentsByEmbedding, searchFilesByEmbedding, searchNotesByEmbedding } from "../search/vectorSearch.js";
+import { searchFilesByEmbedding, searchNotesByEmbedding } from "../search/vectorSearch.js";
 import { parse } from "../routes/validation.js";
 import { currentUser } from "../middleware/user.js";
-import { audioQuotaExhausted, MAX_TRANSCRIBE_BYTES } from "../recordings/usage.js";
-import { isOwnedKey, userPrefix, type Storage } from "../storage/s3.js";
-import { applyLayeredLayout, buildDiagramData, layeredRanks, type DiagramNodeInput } from "./diagram.js";
+import { isOwnedKey, type Storage } from "../storage/s3.js";
+import { applyLayeredLayout, layeredRanks } from "./diagram.js";
 import { embedTextForVectorSearch } from "./embedding.js";
 import { clientMessage, UserFacingError } from "./errors.js";
-import { enrichTranscriptForPinned } from "./enrichTranscriptForPinned.js";
-import { getGeminiModel } from "./gemini.js";
-import { needsDepthRepair, tryParseJson, wordCountFn } from "./noteQuality.js";
-import { CLARITY_RULES, getDepthRequirements, GROUNDING_RULES } from "./notePrompts.js";
-import { runProcessDocument } from "./processDocument.js";
-import { normalizeTranscriptForPrompt } from "./transcript.js";
-import { fetchReferenceUrlsForPrompt, normalizeReferenceUrlList } from "./urlContent.js";
-import {
-  ELEVENLABS_ISOLATION_URL,
-  ISOLATED_AUDIO_MIME,
-  ISOLATION_TIMEOUT_MS,
-  isolationFileName,
-  shouldAttemptIsolation,
-} from "./audioIsolationConstants.js";
 
 const TEXT_OP_CHARS = 100_000;
 const GENERATION_CHARS = 1_000_000;
-const MAX_PREVIOUS_NOTES_CHARS = 100_000;
 const rowId = z.string().min(1).max(200);
 
 type Bit2Deps = {
@@ -252,13 +235,6 @@ Instructions:
         snippet: s.snippet,
       })),
     });
-  });
-
-  router.post("/process-document", async (req, res) => {
-    const { fileId } = parse(z.object({ fileId: rowId }), req.body);
-    const user = currentUser(res);
-    const apiKey = requireGeminiKey();
-    res.json(await runProcessDocument(db, storage, fileId, user.id, apiKey));
   });
 
   router.post("/generate-course-roadmap", async (req, res) => {
@@ -732,238 +708,6 @@ Generate ${count} flashcards. Return JSON array [{"front":"...","back":"..."}] O
     } catch (error) {
       console.error("ingestAndGenerateNote error:", error);
       res.json({ success: false, error: clientMessage(error, "Failed to generate note from PDF") });
-    }
-  });
-
-  router.post("/generate-from-pinned-audio", async (req, res) => {
-    const body = parse(
-      z.object({
-        transcript: z.string().max(GENERATION_CHARS),
-        pinnedFileId: rowId.optional(),
-        previousNotesContent: z.string().max(GENERATION_CHARS).optional(),
-        referenceUrls: z.array(z.string().url()).max(5).optional(),
-      }),
-      req.body,
-    );
-    try {
-      const user = currentUser(res);
-      const apiKey = requireGeminiKey();
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const gemini = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-      const normalizedTranscript = normalizeTranscriptForPrompt(body.transcript);
-      const referenceUrlsBlock = await fetchReferenceUrlsForPrompt(normalizeReferenceUrlList(body.referenceUrls));
-
-      let contextText = "";
-      if (body.pinnedFileId) {
-        const file = await requireOwnedFile(db, body.pinnedFileId, user.id);
-        const embedding = await embedTextForVectorSearch(genAI, normalizedTranscript, TaskType.RETRIEVAL_QUERY);
-        // Only uploads have chunks; a link file has no storageKey to scope the search to.
-        if (embedding && file.storageKey) {
-          const chunks = await searchDocumentsByEmbedding(db, embedding, 5, file.storageKey);
-          contextText = chunks.map((c) => c.text).join("\n\n---\n\n");
-        }
-        if (!contextText && file.extractedText) {
-          contextText = file.extractedText.substring(0, 8000);
-        }
-      }
-
-      const enrichedTranscript = await enrichTranscriptForPinned(gemini, normalizedTranscript, contextText);
-      const geminiJson = model({ responseMimeType: "application/json" });
-
-      const contextSection = contextText
-        ? `\n\nRelevant Context from Pinned Document:\n"""\n${contextText}\n"""\n`
-        : "";
-      const prev = body.previousNotesContent?.trim();
-      const revisionPinned = prev
-        ? `\n\nREVISION MODE — improve previous notes using transcript and pinned document:\n"""\n${prev.slice(0, MAX_PREVIOUS_NOTES_CHARS)}\n"""\n`
-        : "";
-      const webLinkSection = referenceUrlsBlock.trim()
-        ? `\n\n=== Reference web pages ===\n${referenceUrlsBlock}\n`
-        : "";
-
-      const prompt = `You are a world-class academic note-taker. Create exam-ready structured notes.
-
-Transcript:
-"""
-${enrichedTranscript}
-"""
-${contextSection}${webLinkSection}${revisionPinned}
-
-${GROUNDING_RULES}
-${CLARITY_RULES}
-
-Return JSON with keys: summary, sections (array with id,type,content,level), actionItems, reviewQuestions, diagramNodes, diagramEdges.
-${getDepthRequirements(wordCountFn(enrichedTranscript))}
-Return ONLY valid JSON.`;
-
-      const result = await geminiJson.generateContent(prompt);
-      let parsed = tryParseJson(result.response.text().trim());
-      if (!parsed) {
-        const fix = await geminiJson.generateContent(`Fix this JSON:\n${result.response.text()}`);
-        parsed = tryParseJson(fix.response.text().trim());
-      }
-      const draft = (parsed ?? {}) as {
-        summary?: string;
-        sections?: Array<{ id?: string; type?: string; content?: string; level?: number }>;
-        actionItems?: unknown[];
-        reviewQuestions?: unknown[];
-        diagramNodes?: unknown[];
-        diagramEdges?: unknown[];
-      };
-
-      let sections = Array.isArray(draft.sections)
-        ? draft.sections
-            .map((section, idx) => ({
-              id: section.id || `sec-${idx}`,
-              type: section.type || "paragraph",
-              content: String(section.content || "").trim(),
-              level: section.level,
-            }))
-            .filter((s) => s.content.length > 0)
-        : [];
-
-      if (needsDepthRepair(sections, wordCountFn(enrichedTranscript))) {
-        const repair = await geminiJson.generateContent(`Improve shallow notes grounded in transcript and pinned document. Return same JSON schema.\n${JSON.stringify(draft)}`);
-        const repaired = tryParseJson(repair.response.text().trim());
-        if (repaired && typeof repaired === "object" && Array.isArray((repaired as { sections?: unknown }).sections)) {
-          draft.summary = (repaired as { summary?: string }).summary ?? draft.summary;
-          sections = (repaired as { sections: typeof sections }).sections;
-        }
-      }
-
-      const diagramNodes: DiagramNodeInput[] = Array.isArray(draft.diagramNodes)
-        ? (draft.diagramNodes as DiagramNodeInput[])
-        : [];
-      const diagramEdges = Array.isArray(draft.diagramEdges)
-        ? draft.diagramEdges.map((e) => String(e || "").trim()).filter(Boolean)
-        : [];
-
-      res.json({
-        summary: draft.summary || "",
-        sections,
-        actionItems: Array.isArray(draft.actionItems) ? draft.actionItems.map(String) : [],
-        reviewQuestions: Array.isArray(draft.reviewQuestions) ? draft.reviewQuestions.map(String) : [],
-        diagramData: buildDiagramData(diagramNodes, diagramEdges),
-      });
-    } catch (error) {
-      console.error("generateFromPinnedAudio error:", error);
-      res.json({
-        summary: "Error generating structured notes.",
-        sections: [],
-        actionItems: [],
-        reviewQuestions: [],
-        diagramData: undefined,
-      });
-    }
-  });
-
-  router.post("/isolate-and-transcribe", async (req, res) => {
-    const { storageKey, mimeType, courseContext, fallbackToOriginal } = parse(
-      z.object({
-        storageKey: z.string().min(1).max(1024),
-        mimeType: z.string(),
-        courseContext: z.string().max(TEXT_OP_CHARS).optional(),
-        fallbackToOriginal: z.boolean().optional(),
-      }),
-      req.body,
-    );
-    const user = currentUser(res);
-    if (!isOwnedKey(user.clerkUserId, storageKey)) {
-      res.json({ transcript: "", success: false, isolated: false, error: "Not authenticated or file not found" });
-      return;
-    }
-    const refuse = (error: string) => res.json({ transcript: "", success: false, isolated: false, error });
-    const outOfMinutes = await audioQuotaExhausted(db, user.id);
-    if (outOfMinutes) {
-      refuse(outOfMinutes);
-      return;
-    }
-    // Checked before reading any bytes: both isolation and Gemini hold the whole file in memory.
-    const source = await storage.stat(storageKey);
-    if (!source) {
-      refuse("Audio file not found in storage. It may have been deleted.");
-      return;
-    }
-    if (source.size > MAX_TRANSCRIBE_BYTES) {
-      refuse(`Audio file is too large (${(source.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 50MB.`);
-      return;
-    }
-
-    let isolatedStorageKey: string | undefined;
-    let useKey = storageKey;
-
-    const apiKey = env.ELEVENLABS_API_KEY;
-    if (apiKey) {
-      try {
-        const sourceBytes = await storage.getBytes(storageKey);
-        if (shouldAttemptIsolation(sourceBytes.byteLength)) {
-          const form = new FormData();
-          form.append(
-            "audio",
-            new Blob([sourceBytes], { type: mimeType || "application/octet-stream" }),
-            isolationFileName(mimeType),
-          );
-          form.append("file_format", "other");
-          const abort = new AbortController();
-          const timer = setTimeout(() => abort.abort(), ISOLATION_TIMEOUT_MS);
-          let response: Response;
-          try {
-            response = await fetch(ELEVENLABS_ISOLATION_URL, {
-              method: "POST",
-              headers: { "xi-api-key": apiKey },
-              body: form,
-              signal: abort.signal,
-            });
-          } finally {
-            clearTimeout(timer);
-          }
-          if (response.ok) {
-            const isolatedBytes = await response.arrayBuffer();
-            if (isolatedBytes.byteLength >= 256) {
-              // Under the user's prefix, like every other object, so they can use it later.
-              isolatedStorageKey = `${userPrefix(user.clerkUserId)}isolated/${randomUUID()}.mp3`;
-              await storage.put(isolatedStorageKey, Buffer.from(isolatedBytes), ISOLATED_AUDIO_MIME);
-              useKey = isolatedStorageKey;
-            }
-          }
-        }
-      } catch (error) {
-        console.warn("[isolateAndTranscribe] isolation failed:", error);
-        if (!fallbackToOriginal) {
-          res.json({
-            transcript: "",
-            success: false,
-            isolated: false,
-            error: clientMessage(error, "Isolation failed"),
-          });
-          return;
-        }
-      }
-    }
-
-    // Reuse transcribe pipeline via internal fetch to same app would be heavy; inline minimal transcribe:
-    try {
-      const geminiKey = requireGeminiKey();
-      const bytes = await storage.getBytes(useKey);
-      const audioBase64 = Buffer.from(bytes).toString("base64");
-      const gemini = getGeminiModel(geminiKey);
-      const result = await gemini.generateContent([
-        { inlineData: { mimeType: isolatedStorageKey ? ISOLATED_AUDIO_MIME : mimeType, data: audioBase64 } },
-        { text: `Transcribe this audio file completely and accurately. Return plain text only.${courseContext ? `\nContext: ${courseContext}` : ""}` },
-      ]);
-      res.json({
-        transcript: result.response.text().trim(),
-        success: true,
-        isolated: Boolean(isolatedStorageKey),
-        isolatedStorageKey,
-      });
-    } catch (error) {
-      res.json({
-        transcript: "",
-        success: false,
-        isolated: false,
-        error: clientMessage(error, "Transcription failed"),
-      });
     }
   });
 }

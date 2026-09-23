@@ -227,5 +227,7 @@ function baseEnv() {
     S3_BUCKET: "b",
     S3_ACCESS_KEY_ID: "a",
     S3_SECRET_ACCESS_KEY: "s",
+    REDIS_URL: "redis://localhost:6379",
+    QUEUE_PREFIX: "test",
   };
 }

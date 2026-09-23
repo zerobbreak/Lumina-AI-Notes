@@ -3,6 +3,7 @@ import { createClerkProfiles } from "./auth/clerk-profiles.js";
 import { createTokenVerifier } from "./auth/verify-token.js";
 import { createDb } from "./db/client.js";
 import { loadEnv } from "./env.js";
+import { createJobQueue } from "./queue/queues.js";
 import { createStorage } from "./storage/s3.js";
 
 const env = loadEnv();
@@ -23,7 +24,8 @@ const verifyToken = createTokenVerifier({
 if (!env.CLERK_JWT_KEY) {
   console.warn("CLERK_JWT_KEY is not set; verifying tokens via Clerk's JWKS endpoint");
 }
-const app = createApp({ env, db, storage, clerkProfiles, verifyToken });
+const queue = createJobQueue(env.REDIS_URL, env.QUEUE_PREFIX);
+const app = createApp({ env, db, storage, clerkProfiles, verifyToken, queue });
 
 const server = app.listen(env.PORT, () => {
   console.log(`Lumina API listening on :${env.PORT} (${env.NODE_ENV})`);
@@ -33,7 +35,7 @@ const server = app.listen(env.PORT, () => {
 function shutdown(signal: string) {
   console.log(`${signal} received, closing server`);
   server.close((err) => {
-    pool.end().finally(() => {
+    Promise.allSettled([pool.end(), queue.close()]).finally(() => {
       if (err) {
         console.error(err);
         process.exit(1);

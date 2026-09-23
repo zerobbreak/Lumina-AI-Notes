@@ -82,6 +82,12 @@ export const notes = pgTable(
 
     /** Set when the note was generated from a saved recording. */
     sourceRecordingId: text().references(() => recordings.id, { onDelete: "set null" }),
+    /**
+     * The processing job writing into this note. The editor stays read-only
+     * while it's set; cleared when the job succeeds, kept on failure so the
+     * note can offer a retry. No foreign key: processing_jobs points here.
+     */
+    generationJobId: text(),
 
     searchTitle: searchVector("title"),
     searchContent: searchVector("content"),

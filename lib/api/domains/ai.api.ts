@@ -7,9 +7,6 @@ import type {
   GenerateDeckResult,
   GenerateNotesFromDocumentResult,
   IngestGenerateNoteResult,
-  IsolateTranscribeResult,
-  ProcessDocumentResult,
-  StructuredNotesResult,
 } from "@/types/api/ai";
 
 export const aiApi = {
@@ -53,14 +50,6 @@ export const aiApi = {
       method: "POST",
       token,
       body,
-    });
-  },
-
-  processDocument(token: string, fileId: string) {
-    return apiFetch<ProcessDocumentResult>(apiPath`/ai/process-document`, {
-      method: "POST",
-      token,
-      body: { fileId },
     });
   },
 
@@ -143,55 +132,6 @@ export const aiApi = {
     },
   ) {
     return apiFetch<GenerateDeckResult>(apiPath`/ai/ingest-and-generate-flashcards`, {
-      method: "POST",
-      token,
-      body,
-    });
-  },
-
-  generateStructuredNotes(
-    token: string,
-    body: {
-      transcript: string;
-      title?: string;
-      style?: string;
-      previousNotesContent?: string;
-      referenceUrls?: string[];
-    },
-  ) {
-    return apiFetch<StructuredNotesResult>(apiPath`/ai/generate-structured-notes`, {
-      method: "POST",
-      token,
-      body,
-    });
-  },
-
-  generateFromPinnedAudio(
-    token: string,
-    body: {
-      transcript: string;
-      pinnedFileId?: string;
-      previousNotesContent?: string;
-      referenceUrls?: string[];
-    },
-  ) {
-    return apiFetch<StructuredNotesResult>(apiPath`/ai/generate-from-pinned-audio`, {
-      method: "POST",
-      token,
-      body,
-    });
-  },
-
-  isolateAndTranscribe(
-    token: string,
-    body: {
-      storageKey: string;
-      mimeType: string;
-      courseContext?: string;
-      fallbackToOriginal?: boolean;
-    },
-  ) {
-    return apiFetch<IsolateTranscribeResult>(apiPath`/ai/isolate-and-transcribe`, {
       method: "POST",
       token,
       body,

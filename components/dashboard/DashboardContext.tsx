@@ -7,26 +7,6 @@ import {
   normalizeReferenceUrlList,
 } from "@/lib/shared/urlContent";
 
-// Section type for Notion-like note structure
-export interface NoteSection {
-  id: string;
-  type: "heading" | "paragraph" | "bullets" | "numbered" | "quote" | "divider";
-  content: string;
-  level?: number; // For headings: 1, 2, 3
-}
-
-// Structured notes type for passing between components
-export interface StructuredNotes {
-  summary: string;
-  sections: NoteSection[];
-  actionItems: string[];
-  reviewQuestions: string[];
-  diagramData?: {
-    nodes: any[];
-    edges: any[];
-  };
-}
-
 export interface PinnedContext {
   id: string;
   name: string;
@@ -65,11 +45,6 @@ interface DashboardContextType {
   toggleLeftSidebar: () => void;
   /** Swap between the full panel and the icon rail, never fully hiding it. */
   toggleLeftSidebarRail: () => void;
-  // Pending notes to inject into editor (scoped to a specific note so other tabs/routes don't receive them)
-  pendingNotes: StructuredNotes | null;
-  pendingNotesTargetNoteId: Id<"notes"> | null;
-  setPendingNotes: (notes: StructuredNotes, targetNoteId: Id<"notes">) => void;
-  clearPendingNotes: () => void;
   // Document pinned as extra context for note generation
   activeContext: PinnedContext | null;
   setActiveContext: (context: PinnedContext | null) => void;
@@ -94,11 +69,6 @@ export { DashboardContext };
 
 export function DashboardProvider({ children }: { children: ReactNode }) {
   const [leftSidebarState, setLeftSidebarState] = useState<SidebarState>("open");
-  const [pendingNotes, setPendingNotesState] = useState<StructuredNotes | null>(
-    null,
-  );
-  const [pendingNotesTargetNoteId, setPendingNotesTargetNoteId] =
-    useState<Id<"notes"> | null>(null);
   const [activeContext, setActiveContext] = useState<PinnedContext | null>(
     null
   );
@@ -114,18 +84,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   const toggleLeftSidebarRail = () => {
     setLeftSidebarState((prev) => (prev === "compact" ? "open" : "compact"));
-  };
-
-  const setPendingNotes = (
-    notes: StructuredNotes,
-    targetNoteId: Id<"notes">,
-  ) => {
-    setPendingNotesState(notes);
-    setPendingNotesTargetNoteId(targetNoteId);
-  };
-  const clearPendingNotes = () => {
-    setPendingNotesState(null);
-    setPendingNotesTargetNoteId(null);
   };
 
   /**
@@ -165,10 +123,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         setLeftSidebarState,
         toggleLeftSidebar,
         toggleLeftSidebarRail,
-        pendingNotes,
-        pendingNotesTargetNoteId,
-        setPendingNotes,
-        clearPendingNotes,
         activeContext,
         setActiveContext,
         referenceUrls,

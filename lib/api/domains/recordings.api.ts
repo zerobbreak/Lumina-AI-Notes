@@ -5,7 +5,30 @@ import type {
   CleanupOrphanedResultDto,
   RecordingDto,
 } from "@/types/api/recordings";
+import type { ProcessRecordingResultDto } from "@/types/api/jobs";
 
+export type ProcessRecordingBody = {
+  /** The pill's session id; the recording row is created or updated by it. */
+  sessionId?: string;
+  /** Re-generate from a saved recording's transcript instead. */
+  recordingId?: string;
+  title: string;
+  /** Audio already uploaded to the bucket. */
+  storageKey?: string;
+  mimeType?: string;
+  /** Browser speech-recognition text: a fallback if the audio can't be transcribed. */
+  liveTranscript?: string;
+  /** Seconds. */
+  duration?: number;
+  /** Add the notes below this note's content instead of creating a new note. */
+  targetNoteId?: string;
+  noteTitle?: string;
+  major?: string;
+  courseContext?: string;
+  pinnedFileId?: string;
+  referenceUrls?: string[];
+  tzOffsetMinutes?: number;
+};
 
 export const recordingsApi = {
   list(token: string) {
@@ -64,6 +87,19 @@ export const recordingsApi = {
     },
   ) {
     return apiFetch<RecordingDto>(apiPath`/recordings`, {
+      method: "POST",
+      token,
+      body,
+    });
+  },
+
+  /**
+   * Hands a session to the worker: transcription, research and note
+   * generation run in the background. Returns at once with the job to poll
+   * and the note it will write into.
+   */
+  process(token: string, body: ProcessRecordingBody) {
+    return apiFetch<ProcessRecordingResultDto>(apiPath`/recordings/process`, {
       method: "POST",
       token,
       body,

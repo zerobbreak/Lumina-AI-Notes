@@ -12,6 +12,7 @@ import { createDeadlinesRouter } from "./deadlines.js";
 import { createCoursesRouter } from "./courses.js";
 import { createFilesRouter } from "./files.js";
 import { createFlashcardsRouter } from "./flashcards.js";
+import { createJobsRouter } from "./jobs.js";
 import { createKnowledgeGraphRouter } from "./knowledgeGraph.js";
 import { createNoteListsRouter } from "./note-lists.js";
 import { createNotesRouter } from "./notes.js";
@@ -28,7 +29,7 @@ import { createUsersRouter } from "./users.js";
  * Everything under /api/v1 needs a verified Clerk session token, resolved to
  * the caller's `users` row. Mount one router per Convex module as it's ported.
  */
-export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken }: AppDeps) {
+export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken, queue }: AppDeps) {
   const router = Router();
 
   router.use(authenticate(verifyToken), loadUser(db, clerkProfiles));
@@ -39,11 +40,12 @@ export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken }
       maxUploadBytes: env.MAX_UPLOAD_BYTES,
       maxBytesPerDay: env.UPLOAD_BYTES_PER_DAY,
     }));
-  router.use("/files", createFilesRouter(db, storage, env.GEMINI_API_KEY));
+  router.use("/files", createFilesRouter(db, storage, queue));
   router.use("/flashcards", createFlashcardsRouter(db));
+  router.use("/jobs", createJobsRouter(db, queue));
   router.use("/knowledge-graph", createKnowledgeGraphRouter(db));
   router.use("/quizzes", createQuizzesRouter(db));
-  router.use("/recordings", createRecordingsRouter(db, storage));
+  router.use("/recordings", createRecordingsRouter(db, storage, queue));
   router.use("/search", createSearchRouter(db, storage, env.GEMINI_API_KEY));
   router.use("/users", createUsersRouter(db));
   router.use("/calendar", createCalendarRouter(db));

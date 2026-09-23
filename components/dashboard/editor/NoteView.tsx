@@ -5,6 +5,7 @@ import { useNoteEditorData } from "@/lib/hooks/notes/useNoteEditorData";
 import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
 import { useNotePresence } from "@/lib/hooks/presence/useNotePresence";
 import { useNoteAutosave } from "@/lib/hooks/notes/useNoteAutosave";
+import { useJob } from "@/lib/queries/jobs/useJob";
 import type { Doc, Id } from "@/types/data-model";
 import type { NoteBootstrap } from "@/components/dashboard/DashboardContext";
 import { useRouter } from "next/navigation";
@@ -33,6 +34,7 @@ import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
 import { editorLowlight } from "@/lib/editorLowlight";
 import { DiagramExtension } from "./extensions/DiagramExtension";
 import Editor from "./Editor";
+import { GenerationBanner } from "./GenerationBanner";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -92,20 +94,6 @@ function buildBootstrapDoc(
   } as Doc<"notes">;
 }
 
-/**
- * Serialise a value into a single-quoted HTML attribute. Diagram payloads carry
- * free text (node labels, edge relationship labels like "doesn't cause"), and an
- * unescaped apostrophe would terminate the attribute and silently drop the rest
- * of the graph on parse.
- */
-function toHtmlAttrJson(value: unknown): string {
-  return JSON.stringify(value)
-    .replace(/&/g, "&amp;")
-    .replace(/'/g, "&#39;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
 // Props for the NoteView
 interface NoteViewProps {
   noteId: Id<"notes">;
@@ -114,16 +102,14 @@ interface NoteViewProps {
 
 export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const router = useRouter();
-  const {
-    pendingNotes,
-    pendingNotesTargetNoteId,
-    clearPendingNotes,
-    noteBootstrap,
-    setNoteBootstrap,
-  } = useDashboard();
+  const { noteBootstrap, setNoteBootstrap } = useDashboard();
   const { isLoading: isExporting } = usePDF();
 
   const { noteQuery, parentNote, childNotes, userData } = useNoteEditorData(noteId);
+  // A background job is writing this note: read-only until it's done.
+  const generationJobId = noteQuery?.generationJobId;
+  const isGenerating = Boolean(generationJobId);
+  const { data: generationJob } = useJob(generationJobId);
   const { createNoteFlow } = useCreateNoteFlow();
   const {
     updateNote,
@@ -274,7 +260,8 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   useNoteAutosave({
     noteId,
     content: debouncedContent,
-    canSave: noteQuery !== null && (noteQuery !== undefined || noteBootstrap?.noteId === noteId),
+    canSave:
+      !isGenerating && noteQuery !== null && (noteQuery !== undefined || noteBootstrap?.noteId === noteId),
     save: saveContent,
     onSaved: markSaved,
     onError: reportSaveFailure,
@@ -343,13 +330,6 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     });
   }, []);
 
-  /** Recording flow: user chose Insert Notes and we are opening the note / injecting AI content */
-  const isAwaitingRecordingNotes = Boolean(
-    pendingNotes && pendingNotesTargetNoteId === noteId,
-  );
-  const recordingNotesOverlayLabel =
-    loadedNoteId === noteId ? "Adding your notes…" : "Opening your note…";
-
   // Helper function to detect if content is markdown and convert to HTML
   const convertMarkdownIfNeeded = async (content: string): Promise<string> => {
     if (!content) return "";
@@ -411,134 +391,17 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     scheduleEditorUpdate,
   ]);
 
-  // Inject structured notes from the transcription pill when pendingNotes changes
-  // Wait for note to be loaded (loadedNoteId === noteId) to avoid conflicts
   useEffect(() => {
-    if (!pendingNotes) return;
-    if (pendingNotesTargetNoteId !== noteId) return;
-    // Wait for the note content to be loaded first (important for new notes)
-    if (loadedNoteId !== noteIdRef.current) return;
+    if (editor && !editor.isDestroyed) editor.setEditable(!isGenerating);
+  }, [editor, isGenerating]);
 
-    // Build HTML content from structured notes with sections
-    if (!editor || editor.isDestroyed) return;
-
-    let cancelled = false;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-
-    const run = async () => {
-      let html = "";
-
-      // Summary: backend streaming returns markdown; must parse to HTML — raw markdown
-      // inside <blockquote> was shown as literal # and ** (TipTap does not parse MD in HTML text nodes).
-      if (pendingNotes.summary) {
-        html += `<h2>Summary</h2>`;
-        html += await markdownToHtml(pendingNotes.summary);
-      }
-
-      // Sections (Notion-like format)
-      if (pendingNotes.sections && pendingNotes.sections.length > 0) {
-        for (const section of pendingNotes.sections) {
-          switch (section.type) {
-            case "heading": {
-              const level = section.level || 2;
-              html += `<h${level}>${section.content}</h${level}>`;
-              break;
-            }
-            case "paragraph":
-              html += `<p>${section.content}</p>`;
-              break;
-            case "bullets":
-              html += `<ul>`;
-              section.content.split("\n").forEach((item) => {
-                const cleaned = item.replace(/^[•\u2022\-–]\s*/, "").trim();
-                if (cleaned) html += `<li>${cleaned}</li>`;
-              });
-              html += `</ul>`;
-              break;
-            case "numbered":
-              html += `<ol>`;
-              section.content.split("\n").forEach((item) => {
-                const cleaned = item.replace(/^\d+\.\s*/, "").trim();
-                if (cleaned) html += `<li>${cleaned}</li>`;
-              });
-              html += `</ol>`;
-              break;
-            case "quote":
-              html += await markdownToHtml(section.content);
-              break;
-            case "divider":
-              html += `<hr/>`;
-              break;
-            default:
-              html += `<p>${section.content}</p>`;
-          }
-        }
-      }
-
-      // Action Items
-      if (pendingNotes.actionItems.length > 0) {
-        html += `<h2>Action Items</h2>`;
-        html += `<ul>`;
-        pendingNotes.actionItems.forEach((item) => {
-          html += `<li>${item}</li>`;
-        });
-        html += `</ul>`;
-      }
-
-      // Review Questions
-      if (pendingNotes.reviewQuestions.length > 0) {
-        html += `<h2>Review Questions</h2>`;
-        html += `<ul>`;
-        pendingNotes.reviewQuestions.forEach((q) => {
-          const cleaned = q.replace(/^[•\u2022\-–]\s+/, "");
-          html += `<li>${cleaned}</li>`;
-        });
-        html += `</ul>`;
-      }
-
-      // Interactive Mind Map (ReactFlow)
-      if (
-        pendingNotes.diagramData &&
-        pendingNotes.diagramData.nodes &&
-        pendingNotes.diagramData.nodes.length > 0
-      ) {
-        html += `<h2>Mind Map</h2>`;
-        html += `<div data-type="diagram" data-nodes='${toHtmlAttrJson(pendingNotes.diagramData.nodes)}' data-edges='${toHtmlAttrJson(pendingNotes.diagramData.edges || [])}'></div>`;
-      }
-
-      if (cancelled) return;
-
-      timeoutId = setTimeout(() => {
-        scheduleEditorUpdate(() => {
-          if (editor && !editor.isDestroyed && editor.view) {
-            try {
-              editor.chain().focus().insertContent(html).run();
-              clearPendingNotes();
-            } catch (error) {
-              console.error("Failed to insert pending notes:", error);
-              clearPendingNotes();
-            }
-          }
-        });
-      }, 200);
-    };
-
-    void run();
-
-    return () => {
-      cancelled = true;
-      if (timeoutId !== undefined) clearTimeout(timeoutId);
-    };
-  }, [
-    pendingNotes,
-    pendingNotesTargetNoteId,
-    noteId,
-    editor,
-    clearPendingNotes,
-    loadedNoteId,
-    scheduleEditorUpdate,
-    markdownToHtml,
-  ]);
+  // When the job finishes, the note is refetched with its new content; load
+  // it into the editor (which otherwise only loads when the note changes).
+  const wasGenerating = useRef(isGenerating);
+  useEffect(() => {
+    if (wasGenerating.current && !isGenerating) setLoadedNoteId(null);
+    wasGenerating.current = isGenerating;
+  }, [isGenerating]);
 
   // --- Handlers ---
   const handleDelete = async () => {
@@ -652,14 +515,6 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   if (!userData || displayNote === undefined) {
     return (
       <div className="h-full flex flex-col bg-background relative">
-        {isAwaitingRecordingNotes && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-background/85 backdrop-blur-sm">
-            <Loader2 className="w-10 h-10 animate-spin text-primary" />
-            <p className="text-sm font-medium text-foreground">
-              {recordingNotesOverlayLabel}
-            </p>
-          </div>
-        )}
         {/* Skeleton Navigation */}
         <div className="h-16 flex items-center px-8 border-b border-border">
           <Skeleton className="h-4 w-24 mr-2" />
@@ -730,18 +585,6 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
   return (
     <div className="h-full flex flex-col bg-background relative animate-in fade-in duration-500">
-      {isAwaitingRecordingNotes && (
-        <div
-          className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-background/80 backdrop-blur-sm"
-          aria-busy="true"
-          aria-live="polite"
-        >
-          <Loader2 className="w-10 h-10 animate-spin text-primary" />
-          <p className="text-sm font-medium text-foreground">
-            {recordingNotesOverlayLabel}
-          </p>
-        </div>
-      )}
       {/* 1. Top Navigation / Breadcrumbs */}
       <div className="h-16 flex items-center px-4 lg:px-8 bg-background/95 backdrop-blur-sm border-b border-border/50 top-0 z-20 sticky justify-between">
         <div className="flex items-center gap-4">
@@ -982,6 +825,12 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
           <Separator className="bg-border mb-4 sm:mb-5" data-html2canvas-ignore />
 
+          {generationJobId && (
+            <div data-html2canvas-ignore>
+              <GenerationBanner job={generationJob} noteId={noteId} />
+            </div>
+          )}
+
           {/* PDF Export Area - This is what gets exported */}
           <div id="note-content-area">
             {/* Editor Content - Wrapped with DocumentDropZone for drag-drop note generation */}
@@ -1009,7 +858,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                     setIsSaving(true);
                     setDebouncedContent(content);
                   }}
-                  isEditable={true}
+                  isEditable={!isGenerating}
                 />
               ) : (
                 <>

@@ -11,6 +11,7 @@ import { createTokenVerifier, type TokenVerifier } from "../src/auth/verify-toke
 import { createDb, type Db } from "../src/db/client.js";
 import * as schema from "../src/db/schema/index.js";
 import { loadEnv } from "../src/env.js";
+import type { JobQueue } from "../src/queue/queues.js";
 import type { Storage } from "../src/storage/s3.js";
 
 /** Stands in for the Clerk instance's signing key; tests sign real RS256 JWTs with it. */
@@ -32,6 +33,8 @@ export const testEnv = loadEnv({
   S3_ACCESS_KEY_ID: "test",
   S3_SECRET_ACCESS_KEY: "test",
   MAX_UPLOAD_BYTES: String(10 * 1024 * 1024),
+  REDIS_URL: "redis://localhost:6379",
+  QUEUE_PREFIX: "test",
 });
 
 /** The real verifier, configured with the test key: nothing about Clerk is mocked. */
@@ -115,10 +118,21 @@ export const fakeClerkProfiles = {
   })),
 } satisfies ClerkProfiles;
 
+/** Records what routes enqueued instead of talking to Redis. */
+export function fakeQueue() {
+  const queue = {
+    enqueueRecording: vi.fn(async (_processingJobId: string, _run: number) => {}),
+    enqueueDocument: vi.fn(async (_fileId: string, _userId: string) => {}),
+    close: vi.fn(async () => {}),
+  };
+  return queue satisfies JobQueue;
+}
+
 export function buildApp(
-  options: { storage?: Storage; db?: Db; verifyToken?: TokenVerifier; env?: typeof testEnv } = {},
+  options: { storage?: Storage; db?: Db; verifyToken?: TokenVerifier; env?: typeof testEnv; queue?: JobQueue } = {},
 ) {
   return createApp({
+    queue: options.queue ?? fakeQueue(),
     env: options.env ?? testEnv,
     db: options.db ?? createDb(testEnv.DATABASE_URL).db,
     storage: options.storage ?? fakeStorage().storage,

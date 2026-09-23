@@ -1,37 +1,8 @@
 export type FlashcardPair = { front: string; back: string };
 
-export type StructuredNotesSection = {
-  id: string;
-  type: string;
-  content: string;
-  level?: number;
-};
-
-export type StructuredNotesResult = {
-  summary: string;
-  sections: StructuredNotesSection[];
-  actionItems: string[];
-  reviewQuestions: string[];
-  diagramData?: unknown;
-  outlineHtml?: string;
-};
-
-export type IsolateTranscribeResult = {
-  transcript: string;
-  success: boolean;
-  isolated: boolean;
-  isolatedStorageKey?: string;
-  error?: string;
-};
-
 export type AskAboutFileResult = {
   success: boolean;
   answer?: string;
-  error?: string;
-};
-
-export type ProcessDocumentResult = {
-  success: boolean;
   error?: string;
 };
 

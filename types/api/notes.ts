@@ -57,6 +57,8 @@ export type NoteDetailDto = {
   quickCaptureStatus?: string | null;
   quickCaptureExpandedNoteId?: string | null;
   sourceRecordingId?: string | null;
+  /** Set while a background job is generating this note's content. */
+  generationJobId?: string | null;
   version: number;
 };
 

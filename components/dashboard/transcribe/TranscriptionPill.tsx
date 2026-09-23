@@ -9,7 +9,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   ArrowRight,
-  Check,
   FileAudio,
   Mic,
   RotateCcw,
@@ -20,7 +19,7 @@ import {
 } from "lucide-react";
 
 import type { Id } from "@/types/data-model";
-import { useAiActions } from "@/lib/hooks/ai/useAiActions";
+import { ApiError } from "@/lib/api/errors";
 import { useRecordingActions } from "@/lib/hooks/recordings/useRecordingActions";
 import { useStorageUpload } from "@/lib/hooks/uploads/useStorageUpload";
 import { useCurrentUser } from "@/lib/queries/users/useCurrentUser";
@@ -31,15 +30,14 @@ import { Button } from "@/components/ui/button";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useMicLevels } from "@/hooks/useMicLevels";
-import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
-import type { StructuredNotes } from "@/components/dashboard/DashboardContext";
 import { PillWaveform } from "./PillWaveform";
 import { ThinkingSequence } from "./ThinkingSequence";
 import {
   formatElapsed,
   idleWaveform,
-  ISOLATING_STAGES,
   mirrorLevels,
+  QUEUEING_STAGES,
+  SAVING_STAGES,
   phaseLabel,
   resolvePhase,
 } from "./pillPhases";
@@ -99,7 +97,6 @@ const PHASE_ACCENT: Record<string, string> = {
   paused: "text-amber-600 dark:text-amber-400",
   thinking: "text-primary",
   isolating: "text-primary",
-  ready: "text-emerald-600 dark:text-emerald-400",
   searching: "text-foreground",
 };
 
@@ -112,10 +109,12 @@ export function TranscriptionPill() {
   const [isRecording, setIsRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [chunks, setChunks] = useState<string[]>([]);
+  /** Handing the session to the worker (a quick API call, not the generation itself). */
   const [isThinking, setIsThinking] = useState(false);
-  const [isIsolating, setIsIsolating] = useState(false);
-  const [notes, setNotes] = useState<StructuredNotes | null>(null);
-  const [isInserting, setIsInserting] = useState(false);
+  /** Uploading the captured audio after the mic closes. */
+  const [isUploading, setIsUploading] = useState(false);
+  /** The session's audio in the bucket; the worker transcribes it. */
+  const [audio, setAudio] = useState<{ storageKey: string; mimeType: string } | null>(null);
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [rawQuery, setRawQuery] = useState("");
@@ -130,13 +129,11 @@ export function TranscriptionPill() {
     useMicLevels(BANDS);
   const { transcript, resetTranscript } = useSpeechRecognition();
   const {
-    setPendingNotes,
     activeContext,
     referenceUrls,
     sessionToLoad,
     clearLoadedSession,
   } = useDashboard();
-  const { createNoteFlow } = useCreateNoteFlow();
 
   /** Set when replaying a session from the sidebar, so notes link back to it. */
   const [sourceRecordingId, setSourceRecordingId] =
@@ -144,12 +141,7 @@ export function TranscriptionPill() {
 
   const { data: userData } = useCurrentUser();
 
-  const { upsertDraft, saveUploadedRecording } = useRecordingActions();
-  const {
-    generateStructuredNotes,
-    generateFromPinnedAudio,
-    isolateAndTranscribe,
-  } = useAiActions();
+  const { upsertDraft, processRecording } = useRecordingActions();
   const uploadToStorage = useStorageUpload();
 
   const { data: matches } = useSearchNoteContent(
@@ -181,11 +173,11 @@ export function TranscriptionPill() {
     SpeechRecognition.stopListening();
     stopMeter();
     setIsRecording(false);
-    setIsIsolating(false);
+    setIsUploading(false);
     resetTranscript();
     setChunks([sessionToLoad.transcript]);
+    setAudio(null);
     setSourceRecordingId(sessionToLoad.recordingId);
-    setNotes(null);
     setElapsed(Math.round(sessionToLoad.duration ?? 0));
     clearLoadedSession();
   }, [sessionToLoad, stopMeter, resetTranscript, clearLoadedSession]);
@@ -202,11 +194,11 @@ export function TranscriptionPill() {
 
   const phase = resolvePhase({
     isRecording,
-    isIsolating,
+    isIsolating: isUploading,
     isThinking,
     isSearchOpen,
-    hasTranscript: fullTranscript.length > 0,
-    hasNotes: notes !== null,
+    hasTranscript: fullTranscript.length > 0 || audio !== null,
+    hasNotes: false,
   });
 
   const displayLevels = useMemo(
@@ -220,67 +212,44 @@ export function TranscriptionPill() {
     setIsRecording(false);
   }, [stopMeter]);
 
-  const isolateCapturedSession = useCallback(
+  /** Uploads the take so the worker can transcribe it; the live text stays as a fallback. */
+  const uploadCapturedSession = useCallback(
     async (liveTranscript: string) => {
-      setIsIsolating(true);
+      setIsUploading(true);
       try {
         const captured = await stopAndCollect();
         if (!captured) return;
-
-        const storageId = await uploadToStorage(
+        const storageKey = await uploadToStorage(
           new File([captured.blob], "recording.webm", { type: captured.mimeType }),
         );
-
-        const result = await isolateAndTranscribe({
-          storageId: storageId as Id<"_storage">,
-          mimeType: captured.mimeType,
-          courseContext: userData?.major || undefined,
-          fallbackToOriginal: liveTranscript.length === 0,
-        });
-
-        if (result.success && result.transcript.trim()) {
-          setChunks([result.transcript.trim()]);
-          resetTranscript();
-          if (result.isolated) {
-            toast.success("Isolated speech from background noise");
-          }
-        } else if (liveTranscript.length === 0) {
-          toast.error("Couldn't transcribe that recording", {
-            description: result.error,
-          });
-        }
+        setAudio({ storageKey, mimeType: captured.mimeType });
       } catch (e) {
-        console.error("[TranscriptionPill] audio isolation failed:", e);
-        if (!liveTranscript) {
-          toast.error("Couldn't process that recording");
-        }
+        console.error("[TranscriptionPill] audio upload failed:", e);
+        toast.error("Couldn't save the recording's audio", {
+          description: liveTranscript
+            ? "Notes will be generated from the live transcript instead."
+            : "Try recording again.",
+        });
       } finally {
-        setIsIsolating(false);
+        setIsUploading(false);
       }
     },
-    [
-      stopAndCollect,
-      uploadToStorage,
-      isolateAndTranscribe,
-      userData?.major,
-      resetTranscript,
-    ],
+    [stopAndCollect, uploadToStorage],
   );
 
   const handleToggleRecording = useCallback(async () => {
-    if (isIsolating) return;
+    if (isUploading) return;
 
     if (isRecording) {
       // Fold the in-flight utterance into the session before closing the mic,
-      // otherwise resetTranscript() would discard it. Isolation then replaces
-      // this live text when ElevenLabs returns a cleaner transcript.
+      // otherwise resetTranscript() would discard it.
       const pending = transcript.trim();
       const liveTranscript = [...chunks, pending].filter(Boolean).join(" ").trim();
       if (pending) setChunks((prev) => [...prev, pending]);
       resetTranscript();
       SpeechRecognition.stopListening();
       setIsRecording(false);
-      void isolateCapturedSession(liveTranscript);
+      void uploadCapturedSession(liveTranscript);
       return;
     }
 
@@ -298,12 +267,12 @@ export function TranscriptionPill() {
       });
     }
   }, [
-    isIsolating,
+    isUploading,
     isRecording,
     transcript,
     chunks,
     resetTranscript,
-    isolateCapturedSession,
+    uploadCapturedSession,
     startMeter,
   ]);
 
@@ -312,22 +281,60 @@ export function TranscriptionPill() {
     resetTranscript();
     setChunks([]);
     setElapsed(0);
-    setNotes(null);
-    setIsIsolating(false);
+    setAudio(null);
+    setIsUploading(false);
     setSourceRecordingId(null);
     sessionIdRef.current = crypto.randomUUID();
   }, [resetTranscript, stopListening]);
 
+  /**
+   * Hands the session to the worker, which transcribes the audio, researches
+   * and writes the notes in the background. The note it writes into (the
+   * open one, or a new one) opens straight away and fills in when it's done,
+   * so the user can keep working meanwhile.
+   */
+  const startGeneration = useCallback(
+    async (session: {
+      title: string;
+      storageKey?: string;
+      mimeType?: string;
+      liveTranscript?: string;
+      duration: number;
+    }) => {
+      const result = await processRecording({
+        ...session,
+        ...(sourceRecordingId
+          ? { recordingId: sourceRecordingId }
+          : { sessionId: sessionIdRef.current }),
+        targetNoteId: openNoteId ?? undefined,
+        noteTitle: "Session notes",
+        major: userData?.major || undefined,
+        courseContext: userData?.major || undefined,
+        // A pinned document grounds the notes in that source, not the transcript alone.
+        pinnedFileId: activeContext?.type === "file" ? activeContext.id : undefined,
+        referenceUrls: referenceUrls.length > 0 ? referenceUrls : undefined,
+        tzOffsetMinutes: new Date().getTimezoneOffset(),
+      });
+      if (result.noteId !== openNoteId) {
+        router.push(`/dashboard?noteId=${result.noteId}`);
+      }
+      toast.success("Generating your notes", {
+        description: "They'll appear in the note when ready. You can keep working.",
+      });
+    },
+    [processRecording, sourceRecordingId, openNoteId, userData?.major, activeContext, referenceUrls, router],
+  );
+
   const handleGenerate = useCallback(async () => {
     if (isRecording) stopListening();
-    if (!fullTranscript) return;
+    if (!fullTranscript && !audio) return;
 
     setIsThinking(true);
     const title = `Session ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
 
     // Replaying a saved session must not fork a duplicate draft of it.
-    if (!sourceRecordingId) {
-      // Save first: a failed generation should never cost the user the audio.
+    if (!sourceRecordingId && fullTranscript) {
+      // Save first: a failed hand-off should never cost the user the transcript.
       try {
         await upsertDraft({
           sessionId: sessionIdRef.current,
@@ -348,28 +355,20 @@ export function TranscriptionPill() {
       }
     }
 
-    const urls = referenceUrls.length > 0 ? referenceUrls : undefined;
-
     try {
-      // A pinned document routes through the context-aware action so the notes
-      // are grounded in that source rather than the transcript alone.
-      const generated =
-        activeContext?.type === "file"
-          ? await generateFromPinnedAudio({
-              transcript: fullTranscript,
-              pinnedFileId: activeContext.id as Id<"files">,
-              referenceUrls: urls,
-            })
-          : await generateStructuredNotes({
-              transcript: fullTranscript,
-              title,
-              referenceUrls: urls,
-            });
-      setNotes(generated as StructuredNotes);
+      await startGeneration({
+        title,
+        storageKey: audio?.storageKey,
+        mimeType: audio?.mimeType,
+        liveTranscript: fullTranscript || undefined,
+        duration: elapsed,
+      });
+      handleReset();
     } catch (e) {
-      console.error("[TranscriptionPill] note generation failed:", e);
-      toast.error("Couldn't generate notes", {
-        description: "Your transcript is saved — try again in a moment.",
+      console.error("[TranscriptionPill] couldn't start note generation:", e);
+      toast.error("Couldn't start generating notes", {
+        description:
+          e instanceof ApiError ? e.message : "Your transcript is saved — try again in a moment.",
       });
     } finally {
       setIsThinking(false);
@@ -378,55 +377,15 @@ export function TranscriptionPill() {
     isRecording,
     stopListening,
     fullTranscript,
+    audio,
     elapsed,
     upsertDraft,
-    generateStructuredNotes,
-    generateFromPinnedAudio,
-    activeContext,
-    referenceUrls,
+    startGeneration,
     sourceRecordingId,
-  ]);
-
-  const handleInsert = useCallback(async () => {
-    if (!notes) return;
-    setIsInserting(true);
-    try {
-      if (openNoteId) {
-        setPendingNotes(notes, openNoteId as Id<"notes">);
-        toast.success("Notes added to this page");
-      } else {
-        const result = await createNoteFlow({
-          title: "Session notes",
-          major: userData?.major || "general",
-          // Links the note back to its recording so the session can later be
-          // re-generated against the note it already produced.
-          ...(sourceRecordingId
-            ? { sourceRecordingId: sourceRecordingId }
-            : {}),
-        });
-        if (!result?.noteId) return;
-        setPendingNotes(notes, result.noteId);
-        router.push(`/dashboard?noteId=${result.noteId}`);
-        toast.success("Created a note from your session");
-      }
-      handleReset();
-    } catch (e) {
-      console.error("[TranscriptionPill] insert failed:", e);
-      toast.error("Couldn't insert notes");
-    } finally {
-      setIsInserting(false);
-    }
-  }, [
-    notes,
-    openNoteId,
-    setPendingNotes,
-    createNoteFlow,
-    userData?.major,
-    router,
     handleReset,
-    sourceRecordingId,
   ]);
 
+  /** An imported file goes straight to the worker: transcription is part of the job. */
   const handleAudioImport = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
@@ -440,53 +399,27 @@ export function TranscriptionPill() {
 
       setIsThinking(true);
       try {
+        // The backend meters audio minutes from this, so it must be real.
         const duration = await readAudioDuration(file);
-        // The pill's clock doubles as the session length: generating later
-        // upserts the draft with `elapsed`, which would otherwise overwrite the
-        // imported duration with 0.
-        setElapsed(Math.round(duration));
-        const storageId = await uploadToStorage(file);
-
-        await saveUploadedRecording({
+        const storageKey = await uploadToStorage(file);
+        sessionIdRef.current = crypto.randomUUID();
+        await startGeneration({
           title: file.name.replace(/\.[^/.]+$/, "") || "Imported audio",
-          storageId,
-          duration,
-          tzOffsetMinutes: new Date().getTimezoneOffset(),
-          sessionId: sessionIdRef.current,
-        });
-
-        const result = await isolateAndTranscribe({
-          storageId: storageId as Id<"_storage">,
+          storageKey,
           mimeType: file.type || "audio/mpeg",
-          courseContext: userData?.major || undefined,
-          fallbackToOriginal: true,
+          duration,
         });
-
-        if (result.success && result.transcript) {
-          setChunks([result.transcript]);
-          toast.success(
-            result.isolated
-              ? "Isolated speech and transcribed"
-              : "Audio transcribed",
-          );
-        } else {
-          toast.error("Couldn't transcribe that file", {
-            description: result.error,
-          });
-        }
+        handleReset();
       } catch (e) {
         console.error("[TranscriptionPill] audio import failed:", e);
-        toast.error("Couldn't import that audio file");
+        toast.error("Couldn't import that audio file", {
+          description: e instanceof ApiError ? e.message : undefined,
+        });
       } finally {
         setIsThinking(false);
       }
     },
-    [
-      uploadToStorage,
-      saveUploadedRecording,
-      isolateAndTranscribe,
-      userData?.major,
-    ],
+    [uploadToStorage, startGeneration, handleReset],
   );
 
   const closeSearch = useCallback(() => {
@@ -632,7 +565,7 @@ export function TranscriptionPill() {
               <button
                 type="button"
                 onClick={() => void handleToggleRecording()}
-                disabled={isThinking || isIsolating}
+                disabled={isThinking || isUploading}
                 aria-label={
                   isRecording ? "Stop recording" : "Start recording this session"
                 }
@@ -672,13 +605,16 @@ export function TranscriptionPill() {
                     )}
 
                     {phase === "thinking" && (
-                      <ThinkingSequence className="w-[188px]" />
+                      <ThinkingSequence
+                        className="w-[188px]"
+                        stages={QUEUEING_STAGES}
+                      />
                     )}
 
                     {phase === "isolating" && (
                       <ThinkingSequence
                         className="w-[188px]"
-                        stages={ISOLATING_STAGES}
+                        stages={SAVING_STAGES}
                       />
                     )}
 
@@ -688,14 +624,9 @@ export function TranscriptionPill() {
                           {formatElapsed(elapsed)}
                         </span>
                         <span className="mx-1.5 opacity-40">·</span>
-                        {wordCount} {wordCount === 1 ? "word" : "words"}
-                      </span>
-                    )}
-
-                    {phase === "ready" && (
-                      <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium">
-                        <Check className="h-3.5 w-3.5" aria-hidden />
-                        Notes ready
+                        {wordCount > 0 || !audio
+                          ? `${wordCount} ${wordCount === 1 ? "word" : "words"}`
+                          : "audio saved"}
                       </span>
                     )}
 
@@ -727,18 +658,7 @@ export function TranscriptionPill() {
                   </Button>
                 )}
 
-                {phase === "ready" && (
-                  <Button
-                    size="sm"
-                    onClick={() => void handleInsert()}
-                    disabled={isInserting}
-                    className="h-8 rounded-full px-3 text-xs"
-                  >
-                    {isInserting ? "Inserting…" : "Insert"}
-                  </Button>
-                )}
-
-                {(phase === "paused" || phase === "ready") && (
+                {phase === "paused" && (
                   <PillIconButton label="Discard session" onClick={handleReset}>
                     <RotateCcw className="h-3.5 w-3.5" />
                   </PillIconButton>

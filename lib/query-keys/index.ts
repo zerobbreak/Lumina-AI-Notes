@@ -14,3 +14,4 @@ export { presenceKeys } from "./presence";
 export { collaborationKeys } from "./collaboration";
 export { knowledgeGraphKeys } from "./knowledgeGraph";
 export { publicKeys } from "./public";
+export { jobKeys } from "./jobs";

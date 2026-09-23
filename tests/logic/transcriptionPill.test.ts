@@ -132,8 +132,8 @@ describe("waveform helpers", () => {
 describe("phaseLabel", () => {
   it("names every phase", () => {
     expect(phaseLabel("listening")).toBe("Listening");
-    expect(phaseLabel("isolating")).toBe("Isolating speech");
-    expect(phaseLabel("thinking")).toBe("Thinking");
+    expect(phaseLabel("isolating")).toBe("Saving the recording");
+    expect(phaseLabel("thinking")).toBe("Starting note generation");
     expect(phaseLabel("ready")).toBe("Notes ready");
     expect(phaseLabel("idle")).toBe("Transcribe session");
   });

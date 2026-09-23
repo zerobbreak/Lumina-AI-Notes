@@ -43,6 +43,13 @@
       "when": 1790162052022,
       "tag": "0005_upload_daily_usage",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790180886289,
+      "tag": "0006_processing_jobs",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI, TaskType } from "@google/generative-ai";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { files } from "../db/schema/index.js";
 import { saveExtractedContent, updateProcessingStatus } from "../files/processing.js";
@@ -16,18 +16,13 @@ export type ProcessDocumentResult = { success: boolean; error?: string };
  */
 export const MAX_PDF_BYTES = 15 * 1024 * 1024;
 
-/** Each run holds the whole PDF in memory twice (bytes + base64); cap how many run at once. */
-export const MAX_CONCURRENT_DOCUMENTS = 2;
-
 /** A run still "processing" after this long died mid-way (e.g. a redeploy) and may be retried. */
 export const STALE_PROCESSING_MS = 15 * 60 * 1000;
 
-let activeRuns = 0;
-
 /**
- * Atomically moves a pending file to processing. Only one caller can win, so
- * the background queue, a polling client and a retry can't each start their
- * own Gemini run for the same file.
+ * Atomically moves a waiting file to processing. "processing" is claimable
+ * too: the queue runs one job per file at a time, so a file already marked
+ * processing belongs to a run that died (a redeploy) and is being retried.
  */
 async function claimFile(db: Db, fileId: string, userId: string) {
   const [file] = await db
@@ -38,15 +33,21 @@ async function claimFile(db: Db, fileId: string, userId: string) {
       errorMessage: null,
       processingStartedAt: new Date(),
     })
-    .where(and(eq(files.id, fileId), eq(files.userId, userId), eq(files.processingStatus, "pending")))
+    .where(
+      and(
+        eq(files.id, fileId),
+        eq(files.userId, userId),
+        inArray(files.processingStatus, ["pending", "processing"]),
+      ),
+    )
     .returning();
   return file ?? null;
 }
 
 /**
- * Port of convex/ai.ts processDocument. Does nothing unless the file is
- * pending; a file left pending because the server was busy is picked up on
- * the next GET /files/pending.
+ * Port of convex/ai.ts processDocument, run by the worker's document.process
+ * job (concurrency is the worker's). Does nothing unless the file is waiting;
+ * its outcome, including errors, is recorded on the file row.
  */
 export async function runProcessDocument(
   db: Db,
@@ -55,21 +56,12 @@ export async function runProcessDocument(
   userId: string,
   apiKey: string,
 ): Promise<ProcessDocumentResult> {
-  if (activeRuns >= MAX_CONCURRENT_DOCUMENTS) {
-    return { success: false, error: "Document processing is busy; this file will be processed shortly" };
+  const file = await claimFile(db, fileId, userId);
+  if (!file) {
+    // Missing, someone else's, or finished. Leave its status alone.
+    return { success: false, error: "File is not waiting to be processed" };
   }
-  // Counted before the first await, so concurrent callers can't all pass the check.
-  activeRuns += 1;
-  try {
-    const file = await claimFile(db, fileId, userId);
-    if (!file) {
-      // Missing, someone else's, already running, or finished. Leave its status alone.
-      return { success: false, error: "File is not waiting to be processed" };
-    }
-    return await processClaimedFile(db, storage, file, apiKey);
-  } finally {
-    activeRuns -= 1;
-  }
+  return processClaimedFile(db, storage, file, apiKey);
 }
 
 async function processClaimedFile(
