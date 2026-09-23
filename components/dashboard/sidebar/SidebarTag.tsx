@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { ActionMenu } from "@/components/shared/ActionMenu";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { useNotesByContextData } from "@/lib/hooks/notes/useNotesByContextData";
 import { cn } from "@/lib/utils";
 import { SidebarNote } from "./SidebarNote";
 
@@ -33,9 +32,9 @@ export function SidebarTag({
 }: SidebarTagProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const tagNotes = useQuery(
-    api.notes.getNotesByTag,
-    isExpanded ? { tagId: tag._id } : "skip",
+  const tagNotes = useNotesByContextData(
+    { tagId: tag._id },
+    { enabled: isExpanded },
   );
 
   return (

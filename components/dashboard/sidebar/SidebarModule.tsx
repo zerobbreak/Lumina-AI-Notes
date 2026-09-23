@@ -4,8 +4,8 @@ import { useState, useMemo } from "react";
 import { Folder, ChevronRight, ChevronDown } from "lucide-react";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useNotesByContextData } from "@/lib/hooks/notes/useNotesByContextData";
+import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
 import { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import { SidebarNote } from "./SidebarNote";
@@ -41,16 +41,14 @@ export function SidebarModule({
   const activeNoteId = searchParams.get("noteId");
   const isActive = searchParams.get("contextId") === module.id;
 
-  const moduleNotes = useQuery(api.notes.getNotesByContext, {
-    moduleId: module.id,
-  });
+  const moduleNotes = useNotesByContextData({ moduleId: module.id });
 
   const rootModuleNotes = useMemo(
     () => moduleNotes?.filter((n) => !n.parentNoteId),
     [moduleNotes],
   );
 
-  const moveNoteToFolder = useMutation(api.notes.moveNoteToFolder);
+  const { moveNoteToFolder } = useNoteActions();
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();

@@ -4,8 +4,12 @@ import { useMemo, useState, useCallback } from "react";
 import type { ComponentProps } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import type { Doc } from "@/convex/_generated/dataModel";
 import { useRouter } from "next/navigation";
+import { isRestApiEnabled } from "@/lib/api/enabled";
+import type { CalendarNote, CalendarRecording } from "@/lib/api/adapters/calendar";
+import { useCalendarActivity } from "@/lib/queries/calendar/useCalendarActivity";
+import { useCurrentUser } from "@/lib/queries/users/useCurrentUser";
+import { useGamification } from "@/lib/queries/users/useGamification";
 import {
   Calendar as CalendarIcon,
   Mic,
@@ -52,7 +56,7 @@ function daysInMonth(y: number, m: number): number {
 
 type ActivityByDayMap = Map<
   string,
-  { recordings: Doc<"recordings">[]; notes: Doc<"notes">[] }
+  { recordings: CalendarRecording[]; notes: CalendarNote[] }
 >;
 
 function ActivityCalendarDayButton({
@@ -92,8 +96,18 @@ function ActivityCalendarDayButton({
 
 export default function CalendarView() {
   const router = useRouter();
-  const userData = useQuery(api.users.getUser);
-  const gamification = useQuery(api.users.getUserGamificationStats);
+  const useRest = isRestApiEnabled();
+
+  const convexUser = useQuery(api.users.getUser, useRest ? "skip" : {});
+  const restUser = useCurrentUser();
+  const userData = useRest ? restUser.data : convexUser;
+
+  const gamificationConvex = useQuery(
+    api.users.getUserGamificationStats,
+    useRest ? "skip" : {},
+  );
+  const gamificationRest = useGamification();
+  const gamification = useRest ? gamificationRest.data : gamificationConvex;
 
   const [cal, setCal] = useState(() => {
     const n = new Date();
@@ -116,12 +130,15 @@ export default function CalendarView() {
     return { startMs, endMs };
   }, [cursor.y, cursor.m]);
 
-  const activity = useQuery(api.calendar.getCalendarActivity, range);
+  const activityConvex = useQuery(api.calendar.getCalendarActivity, useRest ? "skip" : range);
+  const activityRest = useCalendarActivity(range);
+  const activity = useRest ? activityRest.data : activityConvex;
+  const activityLoading = useRest ? activityRest.isLoading : activity === undefined;
 
   const byDay = useMemo(() => {
     const map = new Map<
       string,
-      { recordings: Doc<"recordings">[]; notes: Doc<"notes">[] }
+      { recordings: CalendarRecording[]; notes: CalendarNote[] }
     >();
 
     if (!activity) return map;
@@ -242,7 +259,7 @@ export default function CalendarView() {
             Today
           </Button>
 
-          {activity === undefined ? (
+          {activityLoading ? (
             <div
               className="mb-3 flex items-center gap-2 text-xs text-muted-foreground"
               role="status"

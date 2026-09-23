@@ -1,7 +1,10 @@
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { isRestApiEnabled } from "@/lib/api/enabled";
+import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
+import { useArchivedNotes } from "@/lib/queries/notes/useArchivedNotes";
 import { Id } from "@/convex/_generated/dataModel";
 import { formatDistanceToNow } from "date-fns";
 import { Archive, RotateCcw, Trash2, FileText, Search } from "lucide-react";
@@ -23,9 +26,11 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function ArchiveView() {
-  const archivedNotes = useQuery(api.notes.getArchivedNotes);
-  const unarchiveNote = useMutation(api.notes.toggleArchiveNote);
-  const deleteNote = useMutation(api.notes.deleteNote);
+  const useRest = isRestApiEnabled();
+  const archivedNotesConvex = useQuery(api.notes.getArchivedNotes, useRest ? "skip" : {});
+  const archivedNotesRest = useArchivedNotes();
+  const archivedNotes = useRest ? archivedNotesRest.data : archivedNotesConvex;
+  const { toggleArchiveNote: unarchiveNote, deleteNote } = useNoteActions();
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredNotes = archivedNotes?.filter((note) =>
@@ -105,7 +110,12 @@ export default function ArchiveView() {
                         {note.title}
                       </h3>
                       <p className="text-xs text-gray-500">
-                        Archived {formatDistanceToNow(note._creationTime)} ago
+                        Archived{" "}
+                        {formatDistanceToNow(
+                          note.createdAt ??
+                            (note as unknown as { _creationTime: number })._creationTime,
+                        )}{" "}
+                        ago
                         {note.courseId && " • Course related"}
                       </p>
                     </div>

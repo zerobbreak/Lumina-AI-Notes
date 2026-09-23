@@ -3,9 +3,8 @@
 import { useState, useCallback } from "react";
 import { useDropzone, FileRejection, DropEvent } from "react-dropzone";
 import { motion, AnimatePresence } from "framer-motion";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
+import { useStorageUpload } from "@/lib/hooks/uploads/useStorageUpload";
 import { GenerateFromFileDialog } from "./dialogs/GenerateFromFileDialog";
 import { useSearchParams } from "next/navigation";
 
@@ -21,25 +20,8 @@ export const DragOverlayWrapper = ({ children }: DragOverlayWrapperProps) => {
     storageId: string;
   } | null>(null);
 
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const uploadFileToStorage = useStorageUpload();
   const searchParams = useSearchParams();
-
-  // Helper to upload file to Convex storage
-  const uploadFileToStorage = async (file: File): Promise<string> => {
-    const postUrl = await generateUploadUrl();
-    const result = await fetch(postUrl, {
-      method: "POST",
-      headers: { "Content-Type": file.type },
-      body: file,
-    });
-
-    if (!result.ok) {
-      throw new Error(`Upload failed: ${result.statusText}`);
-    }
-
-    const { storageId } = await result.json();
-    return storageId;
-  };
 
   const onDrop = useCallback(
     async (
@@ -110,7 +92,7 @@ export const DragOverlayWrapper = ({ children }: DragOverlayWrapperProps) => {
         setIsUploading(false);
       }
     },
-    [generateUploadUrl]
+    [uploadFileToStorage]
   );
 
   const handleDialogClose = () => {

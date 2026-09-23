@@ -4,8 +4,9 @@ import { useState, useCallback, memo, useMemo } from "react";
 import { ChevronRight, ChevronDown, Plus, FileText, Hash } from "lucide-react";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useNotesByContextData } from "@/lib/hooks/notes/useNotesByContextData";
+import { useCourseActions } from "@/lib/hooks/mutations/useCourseActions";
+import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
 import { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import { shouldShowCourseCode } from "@/lib/courseDisplay";
@@ -52,24 +53,22 @@ function SidebarCourseComponent({
   const activeNoteId = searchParams.get("noteId");
   const isActive = searchParams.get("contextId") === course.id;
 
-  const courseNotes = useQuery(api.notes.getNotesByContext, {
-    courseId: course.id,
-  });
+  const courseNotes = useNotesByContextData({ courseId: course.id });
 
-  const addModule = useMutation(api.users.addModuleToCourse);
-  const moveNoteToFolder = useMutation(api.notes.moveNoteToFolder);
+  const { addModuleToCourse } = useCourseActions();
+  const { moveNoteToFolder } = useNoteActions();
 
   const handleCreateModule = useCallback(
     async (e: React.MouseEvent) => {
       e.stopPropagation();
       try {
-        await addModule({ courseId: course.id, title: "New Module" });
+        await addModuleToCourse({ courseId: course.id, title: "New Module" });
         if (!isExpanded) onToggle();
       } catch (e) {
         console.error(e);
       }
     },
-    [addModule, course.id, isExpanded, onToggle],
+    [addModuleToCourse, course.id, isExpanded, onToggle],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {

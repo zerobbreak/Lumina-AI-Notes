@@ -3,6 +3,8 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { isRestApiEnabled } from "@/lib/api/enabled";
+import { useTagsWithCounts } from "@/lib/queries/tags/useTagsWithCounts";
 import {
   Popover,
   PopoverContent,
@@ -27,7 +29,10 @@ export function TagPicker({
   className,
   align = "start",
 }: TagPickerProps) {
-  const tags = useQuery(api.tags.getTags);
+  const useRest = isRestApiEnabled();
+  const tagsConvex = useQuery(api.tags.getTags, useRest ? "skip" : {});
+  const tagsRest = useTagsWithCounts();
+  const tags = useRest ? tagsRest.data : tagsConvex;
   const [open, setOpen] = useState(false);
   const [isManagerOpen, setIsManagerOpen] = useState(false);
 

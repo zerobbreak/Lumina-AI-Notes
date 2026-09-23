@@ -2,9 +2,8 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useTheme } from "next-themes";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
+import { useAnalyticsChartsData } from "@/lib/hooks/analytics/useAnalyticsChartsData";
 import { Button } from "@/components/ui/button";
 import {
   LineChart,
@@ -111,39 +110,19 @@ export default function AnalyticsCharts({ showAnalytics }: AnalyticsChartsProps)
   
   const heatmapStart = useMemo(() => now - 84 * 24 * 60 * 60 * 1000, [now]);
 
-  const dailyActivity = useQuery(
-    api.analytics.getDailyStudyActivity,
-    showAnalytics ? { start: heatmapStart, end: now, tzOffsetMinutes } : "skip",
-  );
-
-  const burnoutStats = useQuery(
-    api.analytics.getBurnoutStats,
-    showAnalytics ? { tzOffsetMinutes } : "skip",
-  );
-
-  const flashcardDecks = useQuery(
-    api.flashcards.getDecks,
-    showAnalytics ? {} : "skip",
-  );
-  const quizDecks = useQuery(api.quizzes.getDecks, showAnalytics ? {} : "skip");
-
-  const primaryDeckId = flashcardDecks?.[0]?._id;
-  const primaryQuizDeckId = quizDecks?.[0]?._id;
-  
-  const deckPerformance = useQuery(
-    api.analytics.getDeckPerformance,
-    showAnalytics && primaryQuizDeckId ? { deckId: primaryQuizDeckId } : "skip",
-  );
-
-  const readinessForecast = useQuery(
-    api.analytics.getReadinessForecast,
-    showAnalytics && primaryDeckId ? { deckId: primaryDeckId } : "skip",
-  );
-
-  const weakTopics = useQuery(
-    api.analytics.getWeakTopics,
-    showAnalytics && primaryDeckId ? { deckId: primaryDeckId } : "skip",
-  );
+  const {
+    dailyActivity,
+    burnoutStats,
+    primaryDeckId,
+    deckPerformance,
+    readinessForecast,
+    weakTopics,
+  } = useAnalyticsChartsData({
+    showAnalytics,
+    heatmapStart,
+    now,
+    tzOffsetMinutes,
+  });
 
   const heatmapDays = useMemo(() => {
     if (!dailyActivity) return [];

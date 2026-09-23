@@ -17,8 +17,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useMutation, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { isRestApiEnabled } from "@/lib/api/enabled";
+import { useUserPreferencesActions } from "@/lib/hooks/mutations/useUserPreferencesActions";
+import { useCurrentUser } from "@/lib/queries/users/useCurrentUser";
 import { useUser, useClerk } from "@clerk/nextjs";
 import {
   User,
@@ -34,6 +37,7 @@ import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { InAppNotificationsPanel } from "@/components/dashboard/settings/InAppNotificationsPanel";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -63,8 +67,11 @@ const THEMES = [
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { user } = useUser();
   const { signOut, openUserProfile } = useClerk();
-  const userData = useQuery(api.users.getUser);
-  const updatePreferences = useMutation(api.users.updatePreferences);
+  const useRest = isRestApiEnabled();
+  const convexUser = useQuery(api.users.getUser, useRest ? "skip" : {});
+  const restUser = useCurrentUser();
+  const userData = useRest ? restUser.data : convexUser;
+  const { updatePreferences } = useUserPreferencesActions();
 
   const [activeTab, setActiveTab] = useState("profile");
   const [major, setMajor] = useState(userData?.major ?? "other");
@@ -469,23 +476,36 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       Notifications
                     </h3>
                   </div>
-                  <div className="space-y-4">
-                    {[
-                      "Email digest of new notes",
-                      "Changes to shared documents",
-                      "Product updates and beta features",
-                      "Security alerts",
-                    ].map((label, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between py-3 border-b border-white/5 last:border-0"
-                      >
-                        <span className="text-sm text-gray-300">{label}</span>
-                        <div className="h-5 w-9 rounded-full bg-blue-600 relative cursor-pointer opacity-80 hover:opacity-100">
-                          <div className="absolute right-1 top-1 h-3 w-3 rounded-full bg-white" />
+
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      In-app
+                    </p>
+                    <InAppNotificationsPanel />
+                  </div>
+
+                  <div className="space-y-3 pt-2 border-t border-white/5">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      Email preferences
+                    </p>
+                    <div className="space-y-4">
+                      {[
+                        "Email digest of new notes",
+                        "Changes to shared documents",
+                        "Product updates and beta features",
+                        "Security alerts",
+                      ].map((label, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between py-3 border-b border-white/5 last:border-0"
+                        >
+                          <span className="text-sm text-gray-300">{label}</span>
+                          <div className="h-5 w-9 rounded-full bg-blue-600 relative cursor-pointer opacity-80 hover:opacity-100">
+                            <div className="absolute right-1 top-1 h-3 w-3 rounded-full bg-white" />
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}

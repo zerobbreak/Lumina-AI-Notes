@@ -4,6 +4,16 @@ import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRouter, useSearchParams } from "next/navigation";
+import { isRestApiEnabled } from "@/lib/api/enabled";
+import { useCurrentUser } from "@/lib/queries/users/useCurrentUser";
+import { useGamification } from "@/lib/queries/users/useGamification";
+import { useRecentNotes } from "@/lib/queries/notes/useRecentNotes";
+import { usePinnedNotes } from "@/lib/queries/notes/usePinnedNotes";
+import { useTodayQueue } from "@/lib/queries/flashcards/useTodayQueue";
+import { useUpdateTourProgress } from "@/lib/mutations/users/useUpdateTourProgress";
+import { useCreateCourse } from "@/lib/mutations/courses/useCreateCourse";
+import { useDeleteCourse } from "@/lib/mutations/courses/useDeleteCourse";
+import { useRenameCourse } from "@/lib/mutations/courses/useRenameCourse";
 import { Button } from "@/components/ui/button";
 import {
   Plus,
@@ -63,16 +73,32 @@ const itemVariants = {
   },
 };
 export default function SmartFolderHub() {
-  const userData = useQuery(api.users.getUser);
-  const createCourse = useMutation(api.users.createCourse);
-  const deleteCourse = useMutation(api.users.deleteCourse);
-  const renameCourse = useMutation(api.users.renameCourse);
-  const recentNotes = useQuery(api.notes.getRecentNotes);
-  const todayQueue = useQuery(api.flashcards.getTodayQueue);
-  const gamification = useQuery(api.users.getUserGamificationStats);
+  const useRest = isRestApiEnabled();
+
+  const convexUser = useQuery(api.users.getUser, useRest ? "skip" : {});
+  const restUser = useCurrentUser();
+  const userData = useRest ? restUser.data : convexUser;
+
+  const createCourseConvex = useMutation(api.users.createCourse);
+  const deleteCourseConvex = useMutation(api.users.deleteCourse);
+  const renameCourseConvex = useMutation(api.users.renameCourse);
+  const createCourseRest = useCreateCourse();
+  const deleteCourseRest = useDeleteCourse();
+  const renameCourseRest = useRenameCourse();
+
+  const recentNotesConvex = useQuery(api.notes.getRecentNotes, useRest ? "skip" : {});
+  const recentNotesRest = useRecentNotes();
+
+  const todayQueueConvex = useQuery(api.flashcards.getTodayQueue, useRest ? "skip" : {});
+  const todayQueueRest = useTodayQueue();
+
+  const gamificationConvex = useQuery(api.users.getUserGamificationStats, useRest ? "skip" : {});
+  const gamificationRest = useGamification();
+
   const router = useRouter();
   const searchParams = useSearchParams();
-  const updateTourProgress = useMutation(api.users.updateTourProgress);
+  const updateTourProgressConvex = useMutation(api.users.updateTourProgress);
+  const updateTourProgressRest = useUpdateTourProgress();
 
   const tourParam = searchParams.get("tour");
   /** Hide overlay immediately on dismiss; cleared when URL requests tour again. */
@@ -125,10 +151,16 @@ export default function SmartFolderHub() {
   const [showAnalytics, setShowAnalytics] = useState(false);
   // Notes: only fetch pinned when user requests tab
   const [wantsPinnedNotes, setWantsPinnedNotes] = useState(false);
-  const pinnedNotes = useQuery(
+  const pinnedNotesConvex = useQuery(
     api.notes.getPinnedNotes,
-    wantsPinnedNotes ? {} : "skip",
+    !useRest && wantsPinnedNotes ? {} : "skip",
   );
+  const pinnedNotesRest = usePinnedNotes(wantsPinnedNotes);
+
+  const recentNotes = useRest ? recentNotesRest.data : recentNotesConvex;
+  const todayQueue = useRest ? todayQueueRest.data : todayQueueConvex;
+  const gamification = useRest ? gamificationRest.data : gamificationConvex;
+  const pinnedNotes = useRest ? pinnedNotesRest.data : pinnedNotesConvex;
 
   // Rename State
   const [renameTarget, setRenameTarget] = useState<{
@@ -137,13 +169,30 @@ export default function SmartFolderHub() {
   } | null>(null);
 
   const handleCreateCourse = async () => {
-    await createCourse({ name: "New Course", code: "NEW 101" });
+    const payload = { name: "New Course", code: "NEW 101" };
+    if (useRest) {
+      await createCourseRest.mutateAsync(payload);
+    } else {
+      await createCourseConvex(payload);
+    }
   };
 
   const handleRenameConfirm = async (newName: string) => {
     if (!renameTarget) return;
-    await renameCourse({ courseId: renameTarget.id, name: newName });
+    if (useRest) {
+      await renameCourseRest.mutateAsync({ courseId: renameTarget.id, name: newName });
+    } else {
+      await renameCourseConvex({ courseId: renameTarget.id, name: newName });
+    }
     setRenameTarget(null);
+  };
+
+  const handleDeleteCourse = async (courseId: string) => {
+    if (useRest) {
+      await deleteCourseRest.mutateAsync(courseId);
+    } else {
+      await deleteCourseConvex({ courseId });
+    }
   };
 
   const tourSteps = useMemo<TourStep[]>(
@@ -191,7 +240,12 @@ export default function SmartFolderHub() {
 
   const closeTour = async (completed: boolean) => {
     setSuppressTourOverlay(true);
-    await updateTourProgress({ completed: completed ? true : false, step: 0 });
+    const payload = { completed: completed ? true : false, step: 0 };
+    if (useRest) {
+      await updateTourProgressRest.mutateAsync(payload);
+    } else {
+      await updateTourProgressConvex(payload);
+    }
     router.replace("/dashboard?view=home");
   };
 
@@ -412,7 +466,7 @@ export default function SmartFolderHub() {
                               "Are you sure you want to delete this course?",
                             )
                           ) {
-                            deleteCourse({ courseId: course.id });
+                            void handleDeleteCourse(course.id);
                           }
                         }}
                         align="right"

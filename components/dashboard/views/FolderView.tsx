@@ -1,7 +1,11 @@
 "use client";
 
-import { useQuery, useMutation, useAction } from "convex/react";
+import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { useFolderViewData } from "@/lib/hooks/folder/useFolderViewData";
+import { useCourseActions } from "@/lib/hooks/mutations/useCourseActions";
+import { useFileActions } from "@/lib/hooks/mutations/useFileActions";
+import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -61,35 +65,16 @@ export default function FolderView({
   contextType,
 }: FolderViewProps) {
   const router = useRouter();
-  const userData = useQuery(api.users.getUser);
-
-  // --- Queries ---
-  const contextNotes = useQuery(
-    api.notes.getNotesByContext,
-    contextId
-      ? {
-          courseId: contextType === "course" ? contextId : undefined,
-          moduleId: contextType === "module" ? contextId : undefined,
-        }
-      : "skip",
-  );
-
-  const contextFiles = useQuery(
-    api.files.getFilesByContext,
-    contextId && contextType === "course" ? { courseId: contextId } : "skip",
+  const { userData, contextNotes, contextFiles } = useFolderViewData(
+    contextId,
+    contextType,
   );
 
   const { createNoteFlow } = useCreateNoteFlow();
-  const addModule = useMutation(api.users.addModuleToCourse);
-  const renameModule = useMutation(api.users.renameModule);
-  const deleteModule = useMutation(api.users.deleteModule);
-  const deleteFile = useMutation(api.files.deleteFile);
-  const retryProcessing = useMutation(api.files.retryProcessing);
+  const { addModuleToCourse, renameModule, deleteModule } = useCourseActions();
+  const { deleteFile, renameFile, retryProcessing } = useFileActions();
+  const { togglePinNote, deleteNote, renameNote } = useNoteActions();
   const processDocument = useAction(api.ai.processDocument);
-  const renameFile = useMutation(api.files.renameFile);
-  const togglePinNote = useMutation(api.notes.togglePinNote);
-  const deleteNote = useMutation(api.notes.deleteNote);
-  const renameNote = useMutation(api.notes.renameNote);
 
   const [renameTarget, setRenameTarget] = useState<{
     id: string | Id<"files"> | Id<"notes">;
@@ -151,7 +136,7 @@ export default function FolderView({
   const handleAddModule = async () => {
     if (contextType !== "course") return;
     try {
-      await addModule({ courseId: contextId, title: "New Module" });
+      await addModuleToCourse({ courseId: contextId, title: "New Module" });
     } catch (e) {
       console.error(e);
     }
@@ -384,7 +369,7 @@ export default function FolderView({
                   if (a.isPinned && !b.isPinned) return -1;
                   if (!a.isPinned && b.isPinned) return 1;
                   // Then by creation date (newest first)
-                  return b.createdAt - a.createdAt;
+                  return (b.createdAt ?? 0) - (a.createdAt ?? 0);
                 })
                 .map((n) => (
                   <motion.div key={n._id} variants={itemVariants} className="group relative">
@@ -513,13 +498,13 @@ export default function FolderView({
                         }}
                         onDelete={() => {
                           if (confirm(`Delete "${f.name}"?`)) {
-                            deleteFile({ fileId: f._id });
+                            deleteFile({ fileId: f._id as Id<"files"> });
                           }
                         }}
                         showRetry={f.processingStatus === "error"}
                         onRetry={async () => {
-                          await retryProcessing({ fileId: f._id });
-                          await processDocument({ fileId: f._id });
+                          await retryProcessing({ fileId: f._id as Id<"files"> });
+                          await processDocument({ fileId: f._id as Id<"files"> });
                         }}
                         align="right"
                       />

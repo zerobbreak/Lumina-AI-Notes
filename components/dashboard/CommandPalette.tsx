@@ -5,6 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { isRestApiEnabled } from "@/lib/api/enabled";
+import { useSearch } from "@/lib/queries/search/useSearch";
+import { useFiles } from "@/lib/queries/files/useFiles";
+import { useQuickNotes } from "@/lib/queries/notes/useQuickNotes";
+import { useRecentNotes } from "@/lib/queries/notes/useRecentNotes";
+import { useNote } from "@/lib/queries/notes/useNote";
+import { useCurrentUser } from "@/lib/queries/users/useCurrentUser";
 import {
   Dialog,
   DialogContent,
@@ -47,24 +54,42 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentNoteId = searchParams.get("noteId");
-  const openNote = useQuery(
+  const useRest = isRestApiEnabled();
+  const openNoteConvex = useQuery(
     api.notes.getNote,
-    currentNoteId ? { noteId: currentNoteId as Id<"notes"> } : "skip",
+    !useRest && currentNoteId
+      ? { noteId: currentNoteId as Id<"notes"> }
+      : "skip",
   );
+  const openNoteRest = useNote(currentNoteId);
+  const openNote = useRest ? openNoteRest.data : openNoteConvex;
+
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const debouncedQuery = useDebounce(query, 150);
 
-  // Queries
-  const userData = useQuery(api.users.getUser);
-  const quickNotes = useQuery(api.notes.getQuickNotes);
-  const recentNotes = useQuery(api.notes.getRecentNotes);
-  const files = useQuery(api.files.getFiles);
-  const searchResponse = useQuery(
+  const userConvex = useQuery(api.users.getUser, useRest ? "skip" : {});
+  const userRest = useCurrentUser();
+  const userData = useRest ? userRest.data : userConvex;
+
+  const quickNotesConvex = useQuery(api.notes.getQuickNotes, useRest ? "skip" : {});
+  const quickNotesRest = useQuickNotes();
+  const quickNotes = useRest ? quickNotesRest.data : quickNotesConvex;
+
+  const recentNotesConvex = useQuery(api.notes.getRecentNotes, useRest ? "skip" : {});
+  const recentNotesRest = useRecentNotes();
+  const recentNotes = useRest ? recentNotesRest.data : recentNotesConvex;
+
+  const filesConvex = useQuery(api.files.getFiles, useRest ? "skip" : {});
+  const filesRest = useFiles();
+  const files = useRest ? filesRest.data : filesConvex;
+
+  const searchConvex = useQuery(
     api.search.search,
-    debouncedQuery.trim() ? { query: debouncedQuery } : "skip"
+    !useRest && debouncedQuery.trim() ? { query: debouncedQuery } : "skip",
   );
-  const searchResults = searchResponse?.results ?? [];
+  const searchRest = useSearch({ query: debouncedQuery }, Boolean(debouncedQuery.trim()));
+  const searchResults = (useRest ? searchRest.data : searchConvex)?.results ?? [];
 
   const { createNoteFlow } = useCreateNoteFlow();
 
@@ -95,7 +120,8 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       icon: Plus,
       category: "actions",
       action: async () => {
-        if (currentNoteId && openNote === undefined) return;
+        if (currentNoteId && (useRest ? openNoteRest.isLoading : openNote === undefined))
+          return;
         try {
           const result = await createNoteFlow({
             title: "Untitled Note",

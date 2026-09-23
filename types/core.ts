@@ -82,6 +82,7 @@ export interface UserData {
   semester?: string;
   courses?: Course[];
   noteStyle?: string;
+  theme?: string;
   enabledBlocks?: string[];
   currentStreak?: number;
   longestStreak?: number;

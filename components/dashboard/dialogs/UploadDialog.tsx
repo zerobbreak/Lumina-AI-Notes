@@ -1,8 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -24,12 +22,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Upload,
-  FileType,
-  Check,
   X,
   FileText,
   Image as ImageIcon,
 } from "lucide-react";
+import { useUploadFileFlow } from "@/lib/hooks/uploads/useUploadFileFlow";
 
 interface UploadDialogProps {
   open: boolean;
@@ -51,8 +48,7 @@ export function UploadDialog({
   onOpenChange,
   courseId,
 }: UploadDialogProps) {
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
-  const uploadFile = useMutation(api.files.uploadFile);
+  const uploadFileFlow = useUploadFileFlow();
 
   const [name, setName] = useState("");
   const [type, setType] = useState("pdf");
@@ -60,7 +56,6 @@ export function UploadDialog({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  // NOTE: Helper to reset everything on close
   const handleClose = () => {
     onOpenChange(false);
     setTimeout(() => {
@@ -74,7 +69,6 @@ export function UploadDialog({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setSelectedFile(e.target.files[0]);
-      // Auto-fill name if empty
       if (!name) {
         setName(e.target.files[0].name);
       }
@@ -88,38 +82,16 @@ export function UploadDialog({
 
     setIsUploading(true);
     const promise = async () => {
-      let storageId: string | undefined;
-
-      if (type !== "link" && selectedFile) {
-        // 1. Get short-lived upload URL
-        const postUrl = await generateUploadUrl();
-
-        // 2. POST the file to the URL
-        const result = await fetch(postUrl, {
-          method: "POST",
-          headers: { "Content-Type": selectedFile.type },
-          body: selectedFile,
-        });
-
-        if (!result.ok) throw new Error("Upload failed");
-
-        const { storageId: id } = await result.json();
-        storageId = id;
-      }
-
-      // 3. Save metadata to Convex
-      await uploadFile({
+      await uploadFileFlow({
         name,
         type,
         url: type === "link" ? url : undefined,
-        storageId,
+        file: type !== "link" ? selectedFile ?? undefined : undefined,
         courseId,
       });
-
       handleClose();
     };
 
-    setIsUploading(true);
     toast.promise(promise(), {
       loading: "Uploading resource...",
       success: "Resource moved to library",

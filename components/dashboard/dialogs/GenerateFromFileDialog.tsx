@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { isRestApiEnabled } from "@/lib/api/enabled";
+import { useCreateFileAction } from "@/lib/hooks/files/useCreateFileAction";
+import { useCurrentUser } from "@/lib/queries/users/useCurrentUser";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -43,8 +46,11 @@ export function GenerateFromFileDialog({
   onComplete,
 }: GenerateFromFileDialogProps) {
   const router = useRouter();
-  const userData = useQuery(api.users.getUser);
-  const uploadFile = useMutation(api.files.uploadFile);
+  const useRest = isRestApiEnabled();
+  const convexUser = useQuery(api.users.getUser, useRest ? "skip" : {});
+  const restUser = useCurrentUser();
+  const userData = useRest ? restUser.data : convexUser;
+  const createFile = useCreateFileAction();
   const ingestAndGenerateNote = useAction(api.ai.ingestAndGenerateNote);
   const ingestAndGenerateFlashcards = useAction(
     api.ai.ingestAndGenerateFlashcards
@@ -76,7 +82,7 @@ export function GenerateFromFileDialog({
 
   const saveFileToLibrary = async () => {
     // Save the file to the files table
-    await uploadFile({
+    await createFile({
       name: fileName,
       type: "pdf",
       storageId,

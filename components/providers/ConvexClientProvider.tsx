@@ -4,6 +4,7 @@ import { ClerkProvider, useAuth } from "@clerk/nextjs";
 import { ConvexReactClient } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { ReactNode, useEffect } from "react";
+import { QueryProvider } from "./QueryProvider";
 
 /**
  * Build the Convex client, tolerating a missing URL at module-evaluation time.
@@ -62,14 +63,20 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
         "NEXT_PUBLIC_CONVEX_URL is missing or invalid. Set it to your Convex deployment URL (e.g. https://your-app.convex.cloud).",
       );
     }
-    return <ClerkProvider>{children}</ClerkProvider>;
+    return (
+      <ClerkProvider>
+        <QueryProvider>{children}</QueryProvider>
+      </ClerkProvider>
+    );
   }
 
   return (
     <ClerkProvider>
-      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-        {children}
-      </ConvexProviderWithClerk>
+      <QueryProvider>
+        <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+          {children}
+        </ConvexProviderWithClerk>
+      </QueryProvider>
     </ClerkProvider>
   );
 }

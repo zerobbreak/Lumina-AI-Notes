@@ -16,13 +16,15 @@ import {
   Upload,
 } from "lucide-react";
 import { UserButton, useUser } from "@clerk/nextjs";
-import { useMutation, useQuery } from "convex/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { useCourseActions } from "@/lib/hooks/mutations/useCourseActions";
+import { useFileActions } from "@/lib/hooks/mutations/useFileActions";
+import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
+import { useTagActions } from "@/lib/hooks/mutations/useTagActions";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -53,6 +55,7 @@ import {
   SessionsCleanupAction,
   SidebarStudio,
 } from "./SidebarStudio";
+import { useSidebarListData } from "@/lib/hooks/sidebar/useSidebarListData";
 
 type RenameTarget = {
   id: string;
@@ -85,30 +88,25 @@ export function Sidebar() {
 
   const isClosed = leftSidebarState === "closed";
 
-  const userData = useQuery(api.users.getUser);
-  const quickNotes = useQuery(api.notes.getQuickNotes);
-  const recentFiles = useQuery(api.files.getFiles);
-  const pinnedNotes = useQuery(api.notes.getPinnedNotes);
-  const tags = useQuery(api.tags.getTagsWithCounts);
-  const todayQueue = useQuery(api.flashcards.getTodayQueue);
-  const upcomingDeadlines = useQuery(api.deadlines.getUpcoming, { limit: 1 });
+  const currentNoteId = searchParams.get("noteId");
 
-  const deleteNote = useMutation(api.notes.deleteNote);
-  const renameNote = useMutation(api.notes.renameNote);
-  const toggleArchiveNote = useMutation(api.notes.toggleArchiveNote);
+  const {
+    userData,
+    quickNotes,
+    recentFiles,
+    pinnedNotes,
+    tags,
+    todayQueue,
+    upcomingDeadlines,
+    openNote,
+    openNoteLoading,
+  } = useSidebarListData(currentNoteId);
 
-  const createCourse = useMutation(api.users.createCourse);
-  const renameCourse = useMutation(api.users.renameCourse);
-  const deleteCourse = useMutation(api.users.deleteCourse);
-
-  const renameModule = useMutation(api.users.renameModule);
-  const deleteModule = useMutation(api.users.deleteModule);
-
-  const updateTag = useMutation(api.tags.updateTag);
-  const deleteTag = useMutation(api.tags.deleteTag);
-
-  const deleteFile = useMutation(api.files.deleteFile);
-  const renameFile = useMutation(api.files.renameFile);
+  const { deleteNote, renameNote, toggleArchiveNote } = useNoteActions();
+  const { createCourse, renameCourse, deleteCourse, renameModule, deleteModule } =
+    useCourseActions();
+  const { updateTag, deleteTag } = useTagActions();
+  const { deleteFile, renameFile } = useFileActions();
 
   const [expandedCourses, setExpandedCourses] = useState<
     Record<string, boolean>
@@ -137,7 +135,6 @@ export function Sidebar() {
   // The mobile panel is an overlay, so it is always shown at full width.
   const isRail = leftSidebarState === "compact" && !isNarrowViewport;
 
-  const currentNoteId = searchParams.get("noteId");
   const activeNavId = activeDashboardNavId({
     view: searchParams.get("view"),
     noteId: currentNoteId,
@@ -152,11 +149,6 @@ export function Sidebar() {
     setLeftSidebarState(isNarrowViewport ? "closed" : "compact");
   }, [activeNavId, isNarrowViewport, setLeftSidebarState]);
 
-  const openNote = useQuery(
-    api.notes.getNote,
-    currentNoteId ? { noteId: currentNoteId as Id<"notes"> } : "skip",
-  );
-
   const handleNavigate = useCallback(
     (href: string) => {
       router.push(href);
@@ -166,7 +158,7 @@ export function Sidebar() {
   );
 
   const handleCreateNote = useCallback(async () => {
-    if (currentNoteId && openNote === undefined) return;
+    if (currentNoteId && openNoteLoading) return;
     try {
       setIsCreatingNote(true);
       const result = await createNoteFlow({
@@ -191,7 +183,7 @@ export function Sidebar() {
     } finally {
       setIsCreatingNote(false);
     }
-  }, [createNoteFlow, userData?.major, router, currentNoteId, openNote]);
+  }, [createNoteFlow, userData?.major, router, currentNoteId, openNote, openNoteLoading]);
 
   useKeyboardShortcut(
     "cmd+k",
@@ -647,7 +639,7 @@ export function Sidebar() {
                   <PinContextButton fileId={file._id} fileName={file.name} />
                   <ActionMenu
                     onRename={() => openRename(file._id, "file", file.name)}
-                    onDelete={() => deleteFile({ fileId: file._id })}
+                    onDelete={() => deleteFile({ fileId: file._id as Id<"files"> })}
                   />
                 </div>
               </div>

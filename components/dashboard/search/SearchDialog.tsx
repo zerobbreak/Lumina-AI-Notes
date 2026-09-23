@@ -14,6 +14,9 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { isRestApiEnabled } from "@/lib/api/enabled";
+import { useSearch } from "@/lib/queries/search/useSearch";
+import { useTagsWithCounts } from "@/lib/queries/tags/useTagsWithCounts";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   Popover,
@@ -47,12 +50,14 @@ export function SearchDialog({
   const [selectedTags, setSelectedTags] = React.useState<Id<"tags">[]>([]);
 
   const debouncedQuery = useDebounce(query, 300);
-  const tags = useQuery(api.tags.getTags);
+  const useRest = isRestApiEnabled();
+  const tagsConvex = useQuery(api.tags.getTags, useRest ? "skip" : {});
+  const tagsRest = useTagsWithCounts();
+  const tags = useRest ? tagsRest.data : tagsConvex;
 
-  // Conditionally fetch results only when query exists
-  const searchResponse = useQuery(
+  const searchConvex = useQuery(
     api.search.search,
-    debouncedQuery.trim()
+    !useRest && debouncedQuery.trim()
       ? {
           query: debouncedQuery,
           type: filterType,
@@ -60,7 +65,15 @@ export function SearchDialog({
         }
       : "skip",
   );
-
+  const searchRest = useSearch(
+    {
+      query: debouncedQuery,
+      type: filterType,
+      tagIds: selectedTags.length > 0 ? selectedTags.map(String) : undefined,
+    },
+    Boolean(debouncedQuery.trim()),
+  );
+  const searchResponse = useRest ? searchRest.data : searchConvex;
   const results = searchResponse?.results;
 
   React.useEffect(() => {

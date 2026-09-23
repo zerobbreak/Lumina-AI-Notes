@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { useNoteEditorData } from "@/lib/hooks/notes/useNoteEditorData";
+import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import type { NoteBootstrap } from "@/components/dashboard/DashboardContext";
 import { useRouter } from "next/navigation";
@@ -121,22 +123,17 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   } = useDashboard();
   const { isLoading: isExporting } = usePDF();
 
-  // Fetch data
-  const noteQuery = useQuery(api.notes.getNote, { noteId });
-  const parentNote = useQuery(
-    api.notes.getNote,
-    noteQuery?.parentNoteId ? { noteId: noteQuery.parentNoteId } : "skip",
-  );
-  const childNotes = useQuery(api.notes.getChildNotes, { parentNoteId: noteId });
-  const userData = useQuery(api.users.getUser);
+  const { noteQuery, parentNote, childNotes, userData } = useNoteEditorData(noteId);
   const { createNoteFlow } = useCreateNoteFlow();
-  const updateNote = useMutation(api.notes.updateNote);
-  const deleteNote = useMutation(api.notes.deleteNote);
-  const toggleArchiveNote = useMutation(api.notes.toggleArchiveNote);
-  const renameNote = useMutation(api.notes.renameNote);
-  const toggleShare = useMutation(api.notes.toggleShareNote);
-  const togglePinNote = useMutation(api.notes.togglePinNote);
-  const touchNote = useMutation(api.notes.touchNote);
+  const {
+    updateNote,
+    deleteNote,
+    toggleArchiveNote,
+    renameNote,
+    toggleShareNote: toggleShare,
+    togglePinNote,
+    touchNote,
+  } = useNoteActions();
 
   // Presence tracking
   const presenceHeartbeat = useMutation(api.presence.heartbeat);

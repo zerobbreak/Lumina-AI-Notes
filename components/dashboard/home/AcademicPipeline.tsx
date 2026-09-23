@@ -1,7 +1,10 @@
 import { CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useMutation, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { isRestApiEnabled } from "@/lib/api/enabled";
+import { useDeadlineActions } from "@/lib/hooks/mutations/useDeadlineActions";
+import { useUpcomingDeadlines } from "@/lib/queries/deadlines/useUpcomingDeadlines";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -58,11 +61,14 @@ function formatWhenLabel(dueAt: number) {
 }
 
 export function AcademicPipeline({ className }: { className?: string }) {
-  const createDeadline = useMutation(api.deadlines.createDeadline);
-  const upcoming = useQuery(api.deadlines.getUpcoming, {
-    limit: 6,
-    windowDays: 30,
-  });
+  const useRest = isRestApiEnabled();
+  const { createDeadline } = useDeadlineActions();
+  const upcomingConvex = useQuery(
+    api.deadlines.getUpcoming,
+    useRest ? "skip" : { limit: 6, windowDays: 30 },
+  );
+  const upcomingRest = useUpcomingDeadlines({ limit: 6, windowDays: 30 });
+  const upcoming = useRest ? upcomingRest.data : upcomingConvex;
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftKind, setDraftKind] = useState<DeadlineKind>("assignment");
