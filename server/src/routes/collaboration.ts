@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, count, eq, isNull, sql } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
 import { normalizeEmail, toPerson } from "../collaboration/helpers.js";
@@ -10,6 +10,9 @@ import { requireNote } from "../notes/access.js";
 import { parse } from "./validation.js";
 
 const role = z.enum(["viewer", "editor"]);
+
+/** Keeps one note from being used to mass-mail invites. */
+export const MAX_PENDING_INVITES_PER_NOTE = 50;
 
 const inviteBody = z.object({
   email: z.string().trim().min(3).max(320),
@@ -67,7 +70,13 @@ export function createCollaborationRouter(db: Db) {
     });
   });
 
-  /** inviteToNote */
+  /**
+   * inviteToNote. Always records a pending invite, which the invitee's app
+   * accepts on its next load (POST /auth/accept-invites), rather than adding
+   * an existing account on the spot. The reply is the same whether or not the
+   * email has an account, so the endpoint can't be used to find out who's
+   * signed up. People already on the note just get their role changed.
+   */
   router.post("/:id/collaborators/invite", async (req, res) => {
     const user = currentUser(res);
     const noteId = req.params.id;
@@ -77,38 +86,26 @@ export function createCollaborationRouter(db: Db) {
     const email = normalizeEmail(rawEmail);
     if (!email.includes("@")) throw new HttpError(400, "Invalid email", "invalid_request");
 
-    const [invitedUser] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    if (normalizeEmail(user.email) === email) {
+      res.json({ status: "owner", added: false });
+      return;
+    }
 
-    if (invitedUser) {
-      if (note.userId === invitedUser.id) {
-        res.json({ status: "owner", added: false });
-        return;
-      }
-
-      const [existing] = await db
-        .select()
-        .from(noteCollaborators)
-        .where(and(eq(noteCollaborators.noteId, noteId), eq(noteCollaborators.userId, invitedUser.id)))
-        .limit(1);
-
-      if (existing) {
-        await db.update(noteCollaborators).set({ role: inviteRole }).where(eq(noteCollaborators.id, existing.id));
-        res.json({ status: "updated", added: false });
-        return;
-      }
-
-      await db.insert(noteCollaborators).values({
-        noteId,
-        userId: invitedUser.id,
-        role: inviteRole,
-        addedBy: user.id,
-      });
-      res.json({ status: "added", added: true });
+    // Collaborators are already listed to the owner by email, so saying so reveals nothing.
+    const [existing] = await db
+      .select({ id: noteCollaborators.id })
+      .from(noteCollaborators)
+      .innerJoin(users, eq(users.id, noteCollaborators.userId))
+      .where(and(eq(noteCollaborators.noteId, note.id), sql`lower(${users.email}) = ${email}`))
+      .limit(1);
+    if (existing) {
+      await db.update(noteCollaborators).set({ role: inviteRole }).where(eq(noteCollaborators.id, existing.id));
+      res.json({ status: "updated", added: false });
       return;
     }
 
     const [existingInvite] = await db
-      .select()
+      .select({ id: noteInvites.id })
       .from(noteInvites)
       .where(and(eq(noteInvites.noteId, noteId), eq(noteInvites.email, email)))
       .limit(1);
@@ -126,6 +123,18 @@ export function createCollaborationRouter(db: Db) {
         .where(eq(noteInvites.id, existingInvite.id));
       res.json({ status: "invited", invited: true });
       return;
+    }
+
+    const [{ pending }] = await db
+      .select({ pending: count() })
+      .from(noteInvites)
+      .where(and(eq(noteInvites.noteId, noteId), isNull(noteInvites.acceptedAt)));
+    if (pending >= MAX_PENDING_INVITES_PER_NOTE) {
+      throw new HttpError(
+        400,
+        `A note can have at most ${MAX_PENDING_INVITES_PER_NOTE} pending invites`,
+        "too_many_invites",
+      );
     }
 
     await db.insert(noteInvites).values({

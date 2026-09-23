@@ -3,6 +3,7 @@ import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "../src/db/client.js";
 import { noteCollaborators, noteInvites, notes, users } from "../src/db/schema/index.js";
+import { MAX_PENDING_INVITES_PER_NOTE } from "../src/routes/collaboration.js";
 import { bearer, buildApp, createTestDb } from "./helpers.js";
 
 const ALICE = "user_alice";
@@ -74,15 +75,65 @@ describe("collaboration", () => {
     expect((await as(CAROL).get(`/api/v1/notes/${note.id}/collaborators`)).status).toBe(404);
   });
 
-  it("adds an existing user immediately on invite", async () => {
+  it("invites an existing user the same way as an unknown email, so accounts can't be probed", async () => {
     await userId(BOB);
+    const note = await createNote(ALICE);
+    const known = await as(ALICE)
+      .post(`/api/v1/notes/${note.id}/collaborators/invite`)
+      .send({ email: email(BOB), role: "editor" });
+    const unknown = await as(ALICE)
+      .post(`/api/v1/notes/${note.id}/collaborators/invite`)
+      .send({ email: "nobody@example.test", role: "editor" });
+    expect(known.status).toBe(200);
+    expect(known.body).toEqual(unknown.body);
+    expect(known.body).toEqual({ status: "invited", invited: true });
+
+    // Not added behind Bob's back: he gets access when his app accepts the invite.
+    expect((await as(BOB).get(`/api/v1/notes/${note.id}/access`)).status).toBe(404);
+    expect((await as(BOB).post("/api/v1/auth/accept-invites")).body).toEqual({ accepted: 1 });
+    expect((await as(BOB).get(`/api/v1/notes/${note.id}/access`)).body.role).toBe("editor");
+  });
+
+  it("changes the role of someone already on the note", async () => {
+    const note = await createNote(ALICE);
+    await db.insert(noteCollaborators).values({ noteId: note.id, userId: await userId(BOB), role: "viewer" });
+    const res = await as(ALICE)
+      .post(`/api/v1/notes/${note.id}/collaborators/invite`)
+      .send({ email: email(BOB).toUpperCase(), role: "editor" });
+    expect(res.body).toEqual({ status: "updated", added: false });
+    expect((await as(BOB).get(`/api/v1/notes/${note.id}/access`)).body.role).toBe("editor");
+  });
+
+  it("recognises the owner inviting themselves", async () => {
     const note = await createNote(ALICE);
     const res = await as(ALICE)
       .post(`/api/v1/notes/${note.id}/collaborators/invite`)
-      .send({ email: email(BOB), role: "editor" });
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: "added", added: true });
-    expect((await as(BOB).get(`/api/v1/notes/${note.id}/access`)).body.role).toBe("editor");
+      .send({ email: email(ALICE), role: "editor" });
+    expect(res.body).toEqual({ status: "owner", added: false });
+  });
+
+  it("caps pending invites per note", async () => {
+    const note = await createNote(ALICE);
+    const aliceId = await userId(ALICE);
+    await db.insert(noteInvites).values(
+      Array.from({ length: MAX_PENDING_INVITES_PER_NOTE }, (_, i) => ({
+        noteId: note.id,
+        email: `person${i}@example.test`,
+        role: "viewer" as const,
+        invitedBy: aliceId,
+      })),
+    );
+    const res = await as(ALICE)
+      .post(`/api/v1/notes/${note.id}/collaborators/invite`)
+      .send({ email: "one.more@example.test", role: "viewer" });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe("too_many_invites");
+
+    // Re-sending an existing invite still works at the cap.
+    const again = await as(ALICE)
+      .post(`/api/v1/notes/${note.id}/collaborators/invite`)
+      .send({ email: "person0@example.test", role: "editor" });
+    expect(again.body).toEqual({ status: "invited", invited: true });
   });
 
   it("stores a pending invite for unknown emails", async () => {
