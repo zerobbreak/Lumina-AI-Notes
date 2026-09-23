@@ -38,7 +38,7 @@ import { useAppCommand } from "@/lib/appCommands";
 import { shortcutFor } from "@/constants/shortcuts";
 import { DraggableDocument } from "@/components/documents";
 import { ActionMenu } from "@/components/shared/ActionMenu";
-import { ThemeCycleButton } from "@/components/shared/ThemeToggle";
+import { AppearanceSwitcher } from "@/components/shared/AppearanceSwitcher";
 import { SearchDialog } from "@/components/dashboard/search/SearchDialog";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { SettingsDialog } from "@/components/dashboard/dialogs/SettingsDialog";
@@ -120,6 +120,11 @@ export function Sidebar() {
   const [isCreatingNote, setIsCreatingNote] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState("profile");
+  const openSettings = (tab = "profile") => {
+    setSettingsTab(tab);
+    setIsSettingsOpen(true);
+  };
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -673,7 +678,7 @@ export function Sidebar() {
             variant="ghost"
             size="icon"
             className="h-8 w-8 rounded-md text-muted-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
-            onClick={() => setIsSettingsOpen(true)}
+            onClick={() => openSettings()}
             aria-label="Settings"
             title="Settings"
           >
@@ -704,12 +709,12 @@ export function Sidebar() {
               </p>
             )}
           </div>
-          <ThemeCycleButton />
+          <AppearanceSwitcher onOpenSettings={() => openSettings("appearance")} />
           <Button
             variant="ghost"
             size="icon"
             className="h-7 w-7 shrink-0 rounded-md text-muted-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
-            onClick={() => setIsSettingsOpen(true)}
+            onClick={() => openSettings()}
             aria-label="Settings"
             title="Settings"
           >
@@ -814,7 +819,11 @@ export function Sidebar() {
         />
       )}
       <SearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
-      <SettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
+      <SettingsDialog
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        initialTab={settingsTab}
+      />
       <TagManagerDialog
         open={isTagManagerOpen}
         onOpenChange={setIsTagManagerOpen}

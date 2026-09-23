@@ -31,6 +31,8 @@ type AppearanceContextValue = {
   appearance: Appearance;
   /** Light or dark after following the OS for "system". */
   resolvedMode: ResolvedMode;
+  /** The accent was shifted to stay legible on the current world. */
+  accentAdjusted: boolean;
   /** Applies at once, then saves to the account when signed in. */
   updateAppearance: (patch: Partial<Appearance>) => void;
 };
@@ -115,6 +117,17 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     );
   }, [appearance, systemDark, systemReducedMotion, pathname]);
 
+  // Worked out on a detached element: the same fitting, no effect needed.
+  // appearance is only non-null in the browser.
+  const accentAdjusted = useMemo(
+    () =>
+      appearance
+        ? applyAppearance(document.createElement("html"), appearance, systemDark, false, false)
+            .accentAdjusted
+        : false,
+    [appearance, systemDark],
+  );
+
   useEffect(() => {
     if (appearance) writeCookie(appearance);
   }, [appearance]);
@@ -167,9 +180,10 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     return {
       appearance: current,
       resolvedMode: resolveMode(current.mode, systemDark),
+      accentAdjusted,
       updateAppearance,
     };
-  }, [appearance, systemDark, updateAppearance]);
+  }, [appearance, systemDark, accentAdjusted, updateAppearance]);
 
   return <AppearanceContext.Provider value={value}>{children}</AppearanceContext.Provider>;
 }

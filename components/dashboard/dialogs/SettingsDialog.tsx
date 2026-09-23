@@ -19,8 +19,6 @@ import {
 } from "@/components/ui/select";
 import { useUserPreferencesActions } from "@/lib/hooks/mutations/useUserPreferencesActions";
 import { useCurrentUser } from "@/lib/queries/users/useCurrentUser";
-import { useAppearance } from "@/components/providers/AppearanceProvider";
-import type { AccentSwatch } from "@/lib/appearance/model";
 import { useUser, useClerk } from "@clerk/nextjs";
 import {
   User,
@@ -33,6 +31,7 @@ import {
   Camera,
   Target,
   Database,
+  Palette,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
@@ -41,10 +40,13 @@ import Image from "next/image";
 import { InAppNotificationsPanel } from "@/components/dashboard/settings/InAppNotificationsPanel";
 import { StudyGoalsTab } from "@/components/dashboard/settings/StudyGoalsTab";
 import { AccountDataTab } from "@/components/dashboard/settings/AccountDataTab";
+import { AppearanceTab } from "@/components/dashboard/settings/AppearanceTab";
 
 interface SettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Tab to show each time the dialog opens; the last one visited otherwise. */
+  initialTab?: string;
 }
 
 const MAJORS = [
@@ -58,24 +60,19 @@ const MAJORS = [
   { id: "other", label: "Other" },
 ] as const;
 
-const ACCENTS: { id: AccentSwatch; label: string; color: string }[] = [
-  { id: "red-pen", label: "Red Pen", color: "bg-red-600" },
-  { id: "indigo", label: "Midnight Indigo", color: "bg-indigo-500" },
-  { id: "rose", label: "Rose Red", color: "bg-rose-500" },
-  { id: "blue", label: "Ocean Blue", color: "bg-blue-500" },
-  { id: "purple", label: "Royal Purple", color: "bg-purple-500" },
-  { id: "amber", label: "Sunset Amber", color: "bg-amber-500" },
-  { id: "emerald", label: "Forest Emerald", color: "bg-emerald-500" },
-];
-
-export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
+export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialogProps) {
   const { user } = useUser();
   const { signOut, openUserProfile } = useClerk();
   const { data: userData } = useCurrentUser();
   const { updatePreferences } = useUserPreferencesActions();
-  const { appearance, updateAppearance } = useAppearance();
 
-  const [activeTab, setActiveTab] = useState("profile");
+  const [activeTab, setActiveTab] = useState(initialTab ?? "profile");
+  // Jump to initialTab on each open (adjusting state while rendering, not in an effect).
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open && initialTab) setActiveTab(initialTab);
+  }
   const [major, setMajor] = useState(userData?.major ?? "other");
   const [noteStyle, setNoteStyle] = useState(userData?.noteStyle ?? "standard");
   const [fullName, setFullName] = useState(user?.fullName || "");
@@ -153,6 +150,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       label: "Profile",
       icon: User,
       description: "Your name, photo and study preferences.",
+    },
+    {
+      id: "appearance",
+      label: "Appearance",
+      icon: Palette,
+      description: "Your world, accent, fonts and how notes read.",
     },
     {
       id: "security",
@@ -437,34 +440,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                         </Select>
                       </div>
                     </div>
-
-                    <div className="space-y-3">
-                      <Label className="text-muted-foreground text-xs uppercase font-bold tracking-wider">
-                        Accent
-                      </Label>
-                      {/* Applies and saves at once, like the rest of the look. */}
-                      <div className="flex flex-wrap gap-3">
-                        {ACCENTS.map((t) => (
-                          <button
-                            key={t.id}
-                            onClick={() => updateAppearance({ accent: { kind: "swatch", id: t.id } })}
-                            className={cn(
-                              "h-10 px-4 rounded-lg border flex items-center gap-2 transition-all duration-200",
-                              appearance.accent.kind === "swatch" && appearance.accent.id === t.id
-                                ? "bg-foreground/10 border-blue-500 text-foreground shadow-[0_0_15px_rgba(59,130,246,0.2)]"
-                                : "bg-inset border-border text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
-                            )}
-                          >
-                            <div
-                              className={cn("w-3 h-3 rounded-full", t.color)}
-                            />
-                            <span className="text-sm font-medium capitalize">
-                              {t.label}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
                   </div>
                 </>
               )}
@@ -510,6 +485,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   </div>
                 </div>
               )}
+
+              {activeTab === "appearance" && <AppearanceTab />}
 
               {activeTab === "study" && <StudyGoalsTab />}
 
