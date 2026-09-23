@@ -22,13 +22,6 @@ vi.mock("sonner", () => ({
   },
 }));
 
-// Mock Convex
-vi.mock("convex/react", () => ({
-  useQuery: vi.fn(),
-  useMutation: vi.fn(() => vi.fn()),
-  useAction: vi.fn(() => vi.fn()),
-}));
-
 // Mock Clerk
 vi.mock("@clerk/nextjs", () => ({
   useUser: () => ({
