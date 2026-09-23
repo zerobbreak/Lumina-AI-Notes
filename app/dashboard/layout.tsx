@@ -3,11 +3,13 @@
 import { Suspense, useState, useCallback, useEffect, lazy } from "react";
 import dynamic from "next/dynamic";
 import { DashboardProvider } from "@/components/dashboard/DashboardContext";
+import { RealtimeProvider } from "@/components/providers/RealtimeProvider";
 import { DragOverlayWrapper } from "@/components/dashboard/DragOverlayWrapper";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { Sparkles } from "lucide-react";
-import { useMutation, useQuery, useConvexAuth } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useAcceptPendingInvites } from "@/lib/hooks/auth/useAcceptPendingInvites";
+import { useAppAuth } from "@/lib/hooks/auth/useAppAuth";
+import { useUserData } from "@/lib/hooks/users/useUserData";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -56,11 +58,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [mountHeavyPanels, setMountHeavyPanels] = useState(false);
-  const acceptPendingInvites = useMutation(
-    api.collaboration.acceptPendingInvites,
-  );
-  const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
-  const userData = useQuery(api.users.getUser);
+  const acceptPendingInvites = useAcceptPendingInvites();
+  const { isLoading: authLoading, isAuthenticated } = useAppAuth();
+  const userData = useUserData();
   const router = useRouter();
   const searchParams = useSearchParams();
   // The Studio's own AI chat is unrelated to live transcription — the
@@ -238,9 +238,11 @@ export default function DashboardLayout({
   return (
     <Suspense fallback={<DashboardLayoutLoading />}>
       <DashboardProvider>
-        <DragOverlayWrapper>
-          <DashboardLayoutContent>{children}</DashboardLayoutContent>
-        </DragOverlayWrapper>
+        <RealtimeProvider>
+          <DragOverlayWrapper>
+            <DashboardLayoutContent>{children}</DashboardLayoutContent>
+          </DragOverlayWrapper>
+        </RealtimeProvider>
       </DashboardProvider>
     </Suspense>
   );

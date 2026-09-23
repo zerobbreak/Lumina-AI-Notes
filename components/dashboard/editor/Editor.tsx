@@ -28,7 +28,7 @@ import { OutlineExtension } from "./extensions/OutlineExtension";
 import { DiagramExtension } from "./extensions/DiagramExtension";
 import { MathExtensions } from "./extensions/MathExtension";
 import { OutlineMetadata, NoteStyleType } from "@/types";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Id } from "@/types/data-model";
 import "./editor.css";
 
 const ResourceMention = Node.create({

@@ -3,8 +3,11 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery, useConvexAuth } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useAppAuth } from "@/lib/hooks/auth/useAppAuth";
+import { useCompleteOnboarding } from "@/lib/hooks/users/useCompleteOnboarding";
+import { useUserData } from "@/lib/hooks/users/useUserData";
+import { useCreateFileAction } from "@/lib/hooks/files/useCreateFileAction";
+import { useStorageUpload } from "@/lib/hooks/uploads/useStorageUpload";
 import { Button } from "@/components/ui/button";
 import {
   ChevronRight,
@@ -64,10 +67,10 @@ function formatMajorLabel(id: string) {
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const completeOnboarding = useMutation(api.users.completeOnboarding);
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
-  const uploadFile = useMutation(api.files.uploadFile);
-  const userData = useQuery(api.users.getUser);
+  const completeOnboarding = useCompleteOnboarding();
+  const uploadToStorage = useStorageUpload();
+  const uploadFile = useCreateFileAction();
+  const userData = useUserData();
 
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -78,7 +81,7 @@ export default function OnboardingPage() {
 
   const [isInitializing, setIsInitializing] = useState(false);
 
-  const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAppAuth();
 
   useEffect(() => {
     if (userData && userData.onboardingComplete) {
@@ -108,17 +111,7 @@ export default function OnboardingPage() {
     setTimeout(async () => {
       try {
         const coursePromises = formData.files.map(async (file) => {
-          const postUrl = await generateUploadUrl();
-
-          const result = await fetch(postUrl, {
-            method: "POST",
-            headers: { "Content-Type": file.type || "application/pdf" },
-            body: file,
-          });
-
-          if (!result.ok) throw new Error(`Failed to upload ${file.name}`);
-          const { storageId } = await result.json();
-
+          const storageId = await uploadToStorage(file);
           const courseId = Math.random().toString(36).substring(7);
 
           await uploadFile({

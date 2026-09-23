@@ -5,7 +5,7 @@ import { FileText, GripVertical, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { useRouter } from "next/navigation";
-import { Id } from "@/convex/_generated/dataModel";
+import { Id } from "@/types/data-model";
 import { cn } from "@/lib/utils";
 
 interface SidebarNoteProps {

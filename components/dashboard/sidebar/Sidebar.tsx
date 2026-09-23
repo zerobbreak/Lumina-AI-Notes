@@ -20,7 +20,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { Id } from "@/convex/_generated/dataModel";
+import { Id } from "@/types/data-model";
 import { useCourseActions } from "@/lib/hooks/mutations/useCourseActions";
 import { useFileActions } from "@/lib/hooks/mutations/useFileActions";
 import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";

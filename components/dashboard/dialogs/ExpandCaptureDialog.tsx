@@ -1,13 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import { isRestApiEnabled } from "@/lib/api/enabled";
+import type { Id } from "@/types/data-model";
 import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
 import { useCurrentUser } from "@/lib/queries/users/useCurrentUser";
 import { Button } from "@/components/ui/button";
@@ -48,10 +45,7 @@ export function ExpandCaptureDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const useRest = isRestApiEnabled();
-  const convexUser = useQuery(api.users.getUser, useRest ? "skip" : {});
-  const restUser = useCurrentUser();
-  const userData = useRest ? restUser.data : convexUser;
+  const { data: userData } = useCurrentUser();
   const { updateNote } = useNoteActions();
   const { createNoteFlow } = useCreateNoteFlow();
 

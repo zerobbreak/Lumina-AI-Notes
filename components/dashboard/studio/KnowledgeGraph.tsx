@@ -15,11 +15,10 @@ import {
   type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useQuery } from "convex/react";
 import { Search, Workflow, Sparkles } from "lucide-react";
 
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Id } from "@/types/data-model";
+import { useKnowledgeGraphData } from "@/lib/hooks/knowledgeGraph/useKnowledgeGraphData";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { applyForceLayout } from "@/components/diagram/layouts";
@@ -80,7 +79,7 @@ interface KnowledgeGraphProps {
 }
 
 export function KnowledgeGraph({ onOpenNote, onDiscussInChat }: KnowledgeGraphProps) {
-  const graph = useQuery(api.knowledgeGraph.getGraph);
+  const graph = useKnowledgeGraphData();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [clusterByTopic, setClusterByTopic] = useState(true);
   const [search, setSearch] = useState("");

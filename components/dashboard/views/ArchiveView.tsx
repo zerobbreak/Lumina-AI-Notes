@@ -1,11 +1,8 @@
 "use client";
 
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { isRestApiEnabled } from "@/lib/api/enabled";
 import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
 import { useArchivedNotes } from "@/lib/queries/notes/useArchivedNotes";
-import { Id } from "@/convex/_generated/dataModel";
+import { Id } from "@/types/data-model";
 import { formatDistanceToNow } from "date-fns";
 import { Archive, RotateCcw, Trash2, FileText, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,10 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function ArchiveView() {
-  const useRest = isRestApiEnabled();
-  const archivedNotesConvex = useQuery(api.notes.getArchivedNotes, useRest ? "skip" : {});
-  const archivedNotesRest = useArchivedNotes();
-  const archivedNotes = useRest ? archivedNotesRest.data : archivedNotesConvex;
+  const { data: archivedNotes } = useArchivedNotes();
   const { toggleArchiveNote: unarchiveNote, deleteNote } = useNoteActions();
   const [searchQuery, setSearchQuery] = useState("");
 

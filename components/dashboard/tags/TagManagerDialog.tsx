@@ -1,10 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
-import { isRestApiEnabled } from "@/lib/api/enabled";
+import { Id } from "@/types/data-model";
 import { useTagActions } from "@/lib/hooks/mutations/useTagActions";
 import { useTagsWithCounts } from "@/lib/queries/tags/useTagsWithCounts";
 import {
@@ -47,10 +44,7 @@ export function TagManagerDialog({
   open,
   onOpenChange,
 }: TagManagerDialogProps) {
-  const useRest = isRestApiEnabled();
-  const tagsConvex = useQuery(api.tags.getTags, useRest ? "skip" : {});
-  const tagsRest = useTagsWithCounts();
-  const tags = useRest ? tagsRest.data : tagsConvex;
+  const { data: tags } = useTagsWithCounts();
   const { createTag, deleteTag } = useTagActions();
 
   const [newTagName, setNewTagName] = useState("");

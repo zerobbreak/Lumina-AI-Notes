@@ -7,7 +7,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ChipChat } from "./ChipChat";
-import { Id } from "@/convex/_generated/dataModel";
+import { Id } from "@/types/data-model";
 
 export function ResourceMentionNode({ node, editor }: NodeViewProps) {
   const { id, label } = node.attrs as { id: string; label: string };

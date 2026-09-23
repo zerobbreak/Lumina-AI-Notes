@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useAiActions } from "@/lib/hooks/ai/useAiActions";
 import {
   Dialog,
   DialogContent,
@@ -48,7 +47,7 @@ export function ImageUploadDialog({
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
   // Formula extraction state
-  const extractFormula = useAction(api.ai.extractFormulaFromImage);
+  const { extractFormulaFromImage: extractFormula } = useAiActions();
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [mimeType, setMimeType] = useState<string>("image/png");

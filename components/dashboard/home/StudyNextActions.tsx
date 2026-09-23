@@ -1,7 +1,7 @@
 import { ArrowRight, Brain, GraduationCap, Layers, Play, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Id } from "@/types/data-model";
 
 type RecentNoteLike = {
   _id: Id<"notes">;

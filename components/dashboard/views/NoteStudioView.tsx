@@ -14,9 +14,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useQuery, useMutation, useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Id } from "@/types/data-model";
+import { useChatActions } from "@/lib/hooks/chats/useChatActions";
+import { useChatStudioData } from "@/lib/hooks/chats/useChatStudioData";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -123,9 +123,6 @@ function AssistantMarkdown({
 
 export default function NoteStudioView() {
   const router = useRouter();
-  const sessions = useQuery(api.chats.getSessions) || [];
-  const recentNotes = useQuery(api.notes.getRecentNotes) || [];
-  
   const [activeSessionId, setActiveSessionId] = useState<Id<"chatSessions"> | null>(null);
   const [studioMode, setStudioMode] = useState<"graph" | "chat">("chat");
   const [input, setInput] = useState("");
@@ -137,13 +134,19 @@ export default function NoteStudioView() {
   const [selectedNotes, setSelectedNotes] = useState<SelectedNote[]>([]);
   const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
   
-  const createSession = useMutation(api.chats.createSession);
-  const sendMessage = useMutation(api.chats.sendMessage);
-  const deleteSession = useMutation(api.chats.deleteSession);
-  const generateAssistantReply = useAction(api.chatsAi.generateAssistantReply);
-  const pinNotesToSession = useMutation(api.chats.pinNotesToSession);
-  const unpinNoteFromSession = useMutation(api.chats.unpinNoteFromSession);
-  const setSessionMode = useMutation(api.chats.setSessionMode);
+  const {
+    createSession,
+    sendMessage,
+    deleteSession,
+    generateAssistantReply,
+    pinNotesToSession,
+    unpinNoteFromSession,
+    setSessionMode,
+  } = useChatActions();
+
+  const { sessions, messages, activeSession, pinnedNotes, recentNotes } =
+    useChatStudioData(activeSessionId);
+
   const [isThinking, setIsThinking] = useState(false);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -175,20 +178,6 @@ export default function NoteStudioView() {
     })();
   }, [activeSessionId, sessions, createSession]);
 
-  const messages = useQuery(
-    api.chats.getMessages,
-    activeSessionId ? { sessionId: activeSessionId } : "skip",
-  );
-  const activeSession = useQuery(
-    api.chats.getSession,
-    activeSessionId ? { sessionId: activeSessionId } : "skip",
-  );
-  const pinnedNotes = useQuery(
-    api.chats.getContextNotes,
-    activeSession?.pinnedNoteIds && activeSession.pinnedNoteIds.length > 0
-      ? { noteIds: activeSession.pinnedNoteIds as Id<"notes">[] }
-      : { noteIds: [] },
-  );
   const mode = (activeSession?.mode as ChatMode | undefined) ?? "explain";
 
   // Scroll to bottom on new messages

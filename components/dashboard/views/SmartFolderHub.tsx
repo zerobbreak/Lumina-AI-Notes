@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { useRouter, useSearchParams } from "next/navigation";
-import { isRestApiEnabled } from "@/lib/api/enabled";
 import { useCurrentUser } from "@/lib/queries/users/useCurrentUser";
 import { useGamification } from "@/lib/queries/users/useGamification";
 import { useRecentNotes } from "@/lib/queries/notes/useRecentNotes";
@@ -30,7 +27,6 @@ import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { motion } from "framer-motion";
-import type { Doc } from "@/convex/_generated/dataModel";
 import { NotesRail } from "@/components/dashboard/home/NotesRail";
 import { StudyNextActions } from "@/components/dashboard/home/StudyNextActions";
 import { ProductivityPanel } from "@/components/dashboard/home/ProductivityPanel";
@@ -73,32 +69,17 @@ const itemVariants = {
   },
 };
 export default function SmartFolderHub() {
-  const useRest = isRestApiEnabled();
-
-  const convexUser = useQuery(api.users.getUser, useRest ? "skip" : {});
-  const restUser = useCurrentUser();
-  const userData = useRest ? restUser.data : convexUser;
-
-  const createCourseConvex = useMutation(api.users.createCourse);
-  const deleteCourseConvex = useMutation(api.users.deleteCourse);
-  const renameCourseConvex = useMutation(api.users.renameCourse);
-  const createCourseRest = useCreateCourse();
-  const deleteCourseRest = useDeleteCourse();
-  const renameCourseRest = useRenameCourse();
-
-  const recentNotesConvex = useQuery(api.notes.getRecentNotes, useRest ? "skip" : {});
-  const recentNotesRest = useRecentNotes();
-
-  const todayQueueConvex = useQuery(api.flashcards.getTodayQueue, useRest ? "skip" : {});
-  const todayQueueRest = useTodayQueue();
-
-  const gamificationConvex = useQuery(api.users.getUserGamificationStats, useRest ? "skip" : {});
-  const gamificationRest = useGamification();
+  const { data: userData } = useCurrentUser();
+  const createCourse = useCreateCourse();
+  const deleteCourse = useDeleteCourse();
+  const renameCourse = useRenameCourse();
+  const { data: recentNotes } = useRecentNotes();
+  const { data: todayQueue } = useTodayQueue();
+  const { data: gamification } = useGamification();
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const updateTourProgressConvex = useMutation(api.users.updateTourProgress);
-  const updateTourProgressRest = useUpdateTourProgress();
+  const updateTourProgress = useUpdateTourProgress();
 
   const tourParam = searchParams.get("tour");
   /** Hide overlay immediately on dismiss; cleared when URL requests tour again. */
@@ -151,16 +132,7 @@ export default function SmartFolderHub() {
   const [showAnalytics, setShowAnalytics] = useState(false);
   // Notes: only fetch pinned when user requests tab
   const [wantsPinnedNotes, setWantsPinnedNotes] = useState(false);
-  const pinnedNotesConvex = useQuery(
-    api.notes.getPinnedNotes,
-    !useRest && wantsPinnedNotes ? {} : "skip",
-  );
-  const pinnedNotesRest = usePinnedNotes(wantsPinnedNotes);
-
-  const recentNotes = useRest ? recentNotesRest.data : recentNotesConvex;
-  const todayQueue = useRest ? todayQueueRest.data : todayQueueConvex;
-  const gamification = useRest ? gamificationRest.data : gamificationConvex;
-  const pinnedNotes = useRest ? pinnedNotesRest.data : pinnedNotesConvex;
+  const { data: pinnedNotes } = usePinnedNotes(wantsPinnedNotes);
 
   // Rename State
   const [renameTarget, setRenameTarget] = useState<{
@@ -169,30 +141,17 @@ export default function SmartFolderHub() {
   } | null>(null);
 
   const handleCreateCourse = async () => {
-    const payload = { name: "New Course", code: "NEW 101" };
-    if (useRest) {
-      await createCourseRest.mutateAsync(payload);
-    } else {
-      await createCourseConvex(payload);
-    }
+    await createCourse.mutateAsync({ name: "New Course", code: "NEW 101" });
   };
 
   const handleRenameConfirm = async (newName: string) => {
     if (!renameTarget) return;
-    if (useRest) {
-      await renameCourseRest.mutateAsync({ courseId: renameTarget.id, name: newName });
-    } else {
-      await renameCourseConvex({ courseId: renameTarget.id, name: newName });
-    }
+    await renameCourse.mutateAsync({ courseId: renameTarget.id, name: newName });
     setRenameTarget(null);
   };
 
   const handleDeleteCourse = async (courseId: string) => {
-    if (useRest) {
-      await deleteCourseRest.mutateAsync(courseId);
-    } else {
-      await deleteCourseConvex({ courseId });
-    }
+    await deleteCourse.mutateAsync(courseId);
   };
 
   const tourSteps = useMemo<TourStep[]>(
@@ -240,12 +199,7 @@ export default function SmartFolderHub() {
 
   const closeTour = async (completed: boolean) => {
     setSuppressTourOverlay(true);
-    const payload = { completed: completed ? true : false, step: 0 };
-    if (useRest) {
-      await updateTourProgressRest.mutateAsync(payload);
-    } else {
-      await updateTourProgressConvex(payload);
-    }
+    await updateTourProgress.mutateAsync({ completed: completed ? true : false, step: 0 });
     router.replace("/dashboard?view=home");
   };
 
@@ -348,8 +302,8 @@ export default function SmartFolderHub() {
         {/* Workspace (stacked sections) */}
         <div className="space-y-6">
           <NotesRail
-            recentNotes={recentNotes as Doc<"notes">[] | undefined}
-            pinnedNotes={pinnedNotes as Doc<"notes">[] | undefined}
+            recentNotes={recentNotes}
+            pinnedNotes={pinnedNotes}
             onRequestPinned={() => setWantsPinnedNotes(true)}
             onOpenNote={(id) => router.push(`/dashboard?noteId=${id}`)}
             lookupLabels={labelLookup}
@@ -358,7 +312,7 @@ export default function SmartFolderHub() {
           <StudyNextActions
             dueTodayCount={dueTodayCount}
             streakDays={gamification?.currentStreak ?? 0}
-            recentNote={recentNotes?.[0] as Doc<"notes"> | undefined}
+            recentNote={recentNotes?.[0]}
             onStartFlashcards={() => router.push("/dashboard?view=flashcards")}
             onOpenRecentNote={(id) => router.push(`/dashboard?noteId=${id}`)}
           />

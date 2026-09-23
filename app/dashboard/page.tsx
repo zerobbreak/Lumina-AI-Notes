@@ -1,9 +1,8 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { Id } from "@/types/data-model";
+import { useResumeTarget } from "@/lib/queries/notes/useResumeTarget";
 import { Sparkles } from "lucide-react";
 import { Suspense, lazy, useEffect } from "react";
 
@@ -153,10 +152,10 @@ function DashboardContent() {
  */
 function ResumeGate() {
   const router = useRouter();
-  const target = useQuery(api.notes.getResumeTarget);
+  const { data: target } = useResumeTarget();
 
   useEffect(() => {
-    if (target === undefined) return;
+    if (!target) return;
     if (target.target === "note") {
       router.replace(`/dashboard?noteId=${target.noteId}`);
     } else {

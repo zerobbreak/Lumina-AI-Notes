@@ -1,6 +1,6 @@
 import { ArrowUpRight, Clock, Pin, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Id } from "@/types/data-model";
 
 type NoteLike = {
   _id: Id<"notes">;

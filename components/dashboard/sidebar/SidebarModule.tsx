@@ -6,7 +6,7 @@ import { ActionMenu } from "@/components/shared/ActionMenu";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useNotesByContextData } from "@/lib/hooks/notes/useNotesByContextData";
 import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
-import { Id } from "@/convex/_generated/dataModel";
+import { Id } from "@/types/data-model";
 import { cn } from "@/lib/utils";
 import { SidebarNote } from "./SidebarNote";
 import { toast } from "sonner";

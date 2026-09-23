@@ -1,8 +1,7 @@
 "use client";
 
 import { Editor } from "@tiptap/react";
-import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useAiActions } from "@/lib/hooks/ai/useAiActions";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -32,10 +31,7 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [showAI, setShowAI] = useState(false);
 
-  const simplifyText = useAction(api.ai.simplifyText);
-  const expandText = useAction(api.ai.expandText);
-  const continueText = useAction(api.ai.continueText);
-  const generateFlashcards = useAction(api.ai.generateFlashcards);
+  const { simplifyText, expandText, continueText, generateFlashcards } = useAiActions();
 
   useEffect(() => {
     setIsMounted(true);

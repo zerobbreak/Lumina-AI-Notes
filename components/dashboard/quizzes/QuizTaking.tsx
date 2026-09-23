@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { Id } from "@/types/data-model";
+import { useQuizStudyActions } from "@/lib/hooks/quizzes/useQuizStudyActions";
+import { useQuizStudyData } from "@/lib/hooks/quizzes/useQuizStudyData";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
@@ -24,13 +24,8 @@ interface Question {
 
 export function QuizTaking({ deckId }: QuizTakingProps) {
   const router = useRouter();
-  const deck = useQuery(api.quizzes.getDeck, {
-    deckId: deckId as Id<"quizDecks">,
-  });
-  const questions = useQuery(api.quizzes.getQuestions, {
-    deckId: deckId as Id<"quizDecks">,
-  });
-  const saveResult = useMutation(api.quizzes.saveResult);
+  const { deck, questions } = useQuizStudyData(deckId);
+  const { saveResult } = useQuizStudyActions();
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<number[]>([]);

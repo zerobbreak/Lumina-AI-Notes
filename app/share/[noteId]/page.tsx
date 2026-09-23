@@ -1,8 +1,7 @@
 "use client";
 
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { Id } from "@/types/data-model";
+import { usePublicNoteData } from "@/lib/hooks/public/usePublicNoteData";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,7 +16,7 @@ export default function PublicNotePage() {
   const params = useParams();
   const noteId = params.noteId as Id<"notes">;
 
-  const note = useQuery(api.notes.getPublicNote, { noteId });
+  const note = usePublicNoteData(noteId);
 
   const editor = useEditor({
     immediatelyRender: false,

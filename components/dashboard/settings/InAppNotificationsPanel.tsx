@@ -2,7 +2,6 @@
 
 import { Loader2, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { isRestApiEnabled } from "@/lib/api/enabled";
 import { useMarkAllNotificationsRead } from "@/lib/mutations/notifications/useMarkAllNotificationsRead";
 import { useMarkNotificationRead } from "@/lib/mutations/notifications/useMarkNotificationRead";
 import { useNotifications } from "@/lib/queries/notifications/useNotifications";
@@ -10,19 +9,6 @@ import { useUnreadNotificationCount } from "@/lib/queries/notifications/useUnrea
 import { cn } from "@/lib/utils";
 
 export function InAppNotificationsPanel() {
-  if (!isRestApiEnabled()) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        In-app notifications are available when the Express API is connected (
-        <code className="text-xs">NEXT_PUBLIC_API_URL</code>).
-      </p>
-    );
-  }
-
-  return <InAppNotificationsPanelRest />;
-}
-
-function InAppNotificationsPanelRest() {
   const { data: notifications, isLoading } = useNotifications({ limit: 30 });
   const { data: unread } = useUnreadNotificationCount();
   const markRead = useMarkNotificationRead();
@@ -94,7 +80,7 @@ function InAppNotificationsPanelRest() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 shrink-0 text-[11px] px-2"
+                      className="h-7 shrink-0 text-xs"
                       disabled={markRead.isPending}
                       onClick={() => markRead.mutate(n.id)}
                     >

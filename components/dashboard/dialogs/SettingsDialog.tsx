@@ -17,9 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { isRestApiEnabled } from "@/lib/api/enabled";
 import { useUserPreferencesActions } from "@/lib/hooks/mutations/useUserPreferencesActions";
 import { useCurrentUser } from "@/lib/queries/users/useCurrentUser";
 import { useUser, useClerk } from "@clerk/nextjs";
@@ -67,10 +64,7 @@ const THEMES = [
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { user } = useUser();
   const { signOut, openUserProfile } = useClerk();
-  const useRest = isRestApiEnabled();
-  const convexUser = useQuery(api.users.getUser, useRest ? "skip" : {});
-  const restUser = useCurrentUser();
-  const userData = useRest ? restUser.data : convexUser;
+  const { data: userData } = useCurrentUser();
   const { updatePreferences } = useUserPreferencesActions();
 
   const [activeTab, setActiveTab] = useState("profile");

@@ -1,11 +1,11 @@
 "use client";
 
 import React, { createContext, useState, ReactNode } from "react";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Id } from "@/types/data-model";
 import {
   MAX_REFERENCE_URLS,
   normalizeReferenceUrlList,
-} from "@/convex/shared/urlContent";
+} from "@/lib/shared/urlContent";
 
 // Section type for Notion-like note structure
 export interface NoteSection {

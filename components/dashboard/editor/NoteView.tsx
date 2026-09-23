@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { useNoteEditorData } from "@/lib/hooks/notes/useNoteEditorData";
 import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
-import type { Doc, Id } from "@/convex/_generated/dataModel";
+import { useNotePresence } from "@/lib/hooks/presence/useNotePresence";
+import type { Doc, Id } from "@/types/data-model";
 import type { NoteBootstrap } from "@/components/dashboard/DashboardContext";
 import { useRouter } from "next/navigation";
 import {
@@ -70,7 +69,6 @@ import { toast } from "sonner";
 import "./editor.css";
 
 // Heartbeat interval for presence tracking (120 seconds - reduced for DB usage)
-const PRESENCE_HEARTBEAT_INTERVAL = 120 * 1000;
 
 function buildBootstrapDoc(
   noteId: Id<"notes">,
@@ -135,9 +133,6 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     touchNote,
   } = useNoteActions();
 
-  // Presence tracking
-  const presenceHeartbeat = useMutation(api.presence.heartbeat);
-  const presenceLeave = useMutation(api.presence.leave);
 
   // Editor State
   const [isSaving, setIsSaving] = useState(false);
@@ -294,22 +289,8 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     touchNote({ noteId }).catch(() => {});
   }, [noteId, touchNote]);
 
-  // Presence Heartbeat Effect - sends heartbeat on mount and every 30 seconds
-  useEffect(() => {
-    // Send initial heartbeat
-    presenceHeartbeat({ noteId }).catch(console.error);
-
-    // Set up interval for regular heartbeats
-    const intervalId = setInterval(() => {
-      presenceHeartbeat({ noteId }).catch(console.error);
-    }, PRESENCE_HEARTBEAT_INTERVAL);
-
-    // Cleanup: send leave signal and clear interval
-    return () => {
-      clearInterval(intervalId);
-      presenceLeave({ noteId }).catch(console.error);
-    };
-  }, [noteId, presenceHeartbeat, presenceLeave]);
+  // Presence only for a note that loaded, by the id the server returned.
+  useNotePresence(noteQuery ? noteQuery._id : null);
 
   const editor = useEditor({
     editable: true,

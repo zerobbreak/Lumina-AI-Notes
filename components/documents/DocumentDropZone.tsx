@@ -2,9 +2,8 @@
 
 import React, { useState, useCallback } from "react";
 import { useDropzone, DropzoneOptions } from "react-dropzone";
-import { useAction, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { Id } from "@/types/data-model";
+import { useAiActions } from "@/lib/hooks/ai/useAiActions";
 import { FileText, Loader2, X, Sparkles, Upload } from "lucide-react";
 import { marked } from "marked";
 import { toast } from "sonner";
@@ -40,7 +39,7 @@ export function DocumentDropZone({
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const generateNotesFromDocument = useAction(api.ai.generateNotesFromDocument);
+  const { generateNotesFromDocument } = useAiActions();
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -302,7 +301,7 @@ export function QuickReferenceInsert({
   onInsert,
 }: QuickReferenceInsertProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const getDocumentReference = useAction(api.ai.getDocumentReference);
+  const { getDocumentReference } = useAiActions();
 
   const handleInsertReference = async () => {
     setIsLoading(true);

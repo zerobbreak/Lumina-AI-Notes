@@ -1,14 +1,14 @@
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
-import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ClipboardList, Plus, Trash2, Clock, BookOpen, Sparkles } from "lucide-react";
-import { Id } from "@/convex/_generated/dataModel";
+import { Id } from "@/types/data-model";
 import { useState } from "react";
 import { GenerateQuizDialog } from "@/components/dashboard/dialogs/GenerateQuizDialog";
+import { useQuizStudyActions } from "@/lib/hooks/quizzes/useQuizStudyActions";
+import { useQuizzesViewData } from "@/lib/hooks/quizzes/useQuizzesViewData";
 
 interface QuizDeck {
   _id: string;
@@ -19,8 +19,8 @@ interface QuizDeck {
 
 export function QuizzesView() {
   const router = useRouter();
-  const decks = useQuery(api.quizzes.getDecks);
-  const deleteDeck = useMutation(api.quizzes.deleteDeck);
+  const decks = useQuizzesViewData();
+  const { deleteDeck } = useQuizStudyActions();
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
 
   const handleTakeQuiz = (deckId: string) => {

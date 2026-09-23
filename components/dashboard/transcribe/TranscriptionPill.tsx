@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import SpeechRecognition, {
   useSpeechRecognition,
 } from "react-speech-recognition";
-import { useAction, useMutation, useQuery } from "convex/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -20,9 +19,13 @@ import {
   X,
 } from "lucide-react";
 
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import { splitHighlightSegments } from "@/convex/shared/keywordSearch";
+import type { Id } from "@/types/data-model";
+import { useAiActions } from "@/lib/hooks/ai/useAiActions";
+import { useRecordingActions } from "@/lib/hooks/recordings/useRecordingActions";
+import { useStorageUpload } from "@/lib/hooks/uploads/useStorageUpload";
+import { useCurrentUser } from "@/lib/queries/users/useCurrentUser";
+import { useSearchNoteContent } from "@/lib/queries/search/useSearchNoteContent";
+import { splitHighlightSegments } from "@/lib/shared/keywordSearch";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useDashboard } from "@/hooks/useDashboard";
@@ -117,19 +120,20 @@ export function TranscriptionPill() {
   const [sourceRecordingId, setSourceRecordingId] =
     useState<Id<"recordings"> | null>(null);
 
-  const userData = useQuery(api.users.getUser);
-  const upsertDraft = useMutation(api.recordings.upsertRecordingDraft);
-  const generateStructuredNotes = useAction(api.ai.generateStructuredNotes);
-  const generateFromPinnedAudio = useAction(api.notes.generateFromPinnedAudio);
-  const generateUploadUrl = useMutation(api.recordings.generateUploadUrl);
-  const saveUploadedRecording = useMutation(
-    api.recordings.saveUploadedRecording,
-  );
-  const isolateAndTranscribe = useAction(api.audioIsolation.isolateAndTranscribe);
+  const { data: userData } = useCurrentUser();
 
-  const matches = useQuery(
-    api.search.searchNoteContent,
-    isSearchOpen && query.trim().length >= 2 ? { query, limit: 6 } : "skip",
+  const { upsertDraft, saveUploadedRecording } = useRecordingActions();
+  const {
+    generateStructuredNotes,
+    generateFromPinnedAudio,
+    isolateAndTranscribe,
+  } = useAiActions();
+  const uploadToStorage = useStorageUpload();
+
+  const { data: matches } = useSearchNoteContent(
+    query,
+    6,
+    isSearchOpen && query.trim().length >= 2,
   );
 
   useEffect(() => {
@@ -201,14 +205,9 @@ export function TranscriptionPill() {
         const captured = await stopAndCollect();
         if (!captured) return;
 
-        const uploadUrl = await generateUploadUrl();
-        const res = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { "Content-Type": captured.mimeType },
-          body: captured.blob,
-        });
-        if (!res.ok) throw new Error("upload failed");
-        const { storageId } = (await res.json()) as { storageId: string };
+        const storageId = await uploadToStorage(
+          new File([captured.blob], "recording.webm", { type: captured.mimeType }),
+        );
 
         const result = await isolateAndTranscribe({
           storageId: storageId as Id<"_storage">,
@@ -239,7 +238,7 @@ export function TranscriptionPill() {
     },
     [
       stopAndCollect,
-      generateUploadUrl,
+      uploadToStorage,
       isolateAndTranscribe,
       userData?.major,
       resetTranscript,
@@ -336,7 +335,7 @@ export function TranscriptionPill() {
         activeContext?.type === "file"
           ? await generateFromPinnedAudio({
               transcript: fullTranscript,
-              pinnedFileId: activeContext.id,
+              pinnedFileId: activeContext.id as Id<"files">,
               referenceUrls: urls,
             })
           : await generateStructuredNotes({
@@ -344,7 +343,7 @@ export function TranscriptionPill() {
               title,
               referenceUrls: urls,
             });
-      setNotes(generated);
+      setNotes(generated as StructuredNotes);
     } catch (e) {
       console.error("[TranscriptionPill] note generation failed:", e);
       toast.error("Couldn't generate notes", {
@@ -420,14 +419,7 @@ export function TranscriptionPill() {
       setIsThinking(true);
       try {
         const duration = await readAudioDuration(file);
-        const uploadUrl = await generateUploadUrl();
-        const res = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { "Content-Type": file.type },
-          body: file,
-        });
-        if (!res.ok) throw new Error("upload failed");
-        const { storageId } = await res.json();
+        const storageId = await uploadToStorage(file);
 
         await saveUploadedRecording({
           title: file.name.replace(/\.[^/.]+$/, "") || "Imported audio",
@@ -464,7 +456,7 @@ export function TranscriptionPill() {
       }
     },
     [
-      generateUploadUrl,
+      uploadToStorage,
       saveUploadedRecording,
       isolateAndTranscribe,
       userData?.major,

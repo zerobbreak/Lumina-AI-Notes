@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useUserData } from "@/lib/hooks/users/useUserData";
 import {
   Dialog,
   DialogContent,
@@ -33,7 +32,7 @@ export function CreateNoteDialog({
   open,
   onOpenChange,
 }: CreateNoteDialogProps) {
-  const userData = useQuery(api.users.getUser);
+  const userData = useUserData();
   const { createNoteFlow } = useCreateNoteFlow();
 
   const [title, setTitle] = useState("");

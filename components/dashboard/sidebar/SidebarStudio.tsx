@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import { FileAudio, Link2, Pin, Sparkles, Trash2, X } from "lucide-react";
 
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import { normalizeTranscriptForPrompt } from "@/convex/shared/transcript";
+import type { Id } from "@/types/data-model";
+import { useRecordingActions } from "@/lib/hooks/recordings/useRecordingActions";
+import { useRecordingStudioData } from "@/lib/hooks/recordings/useRecordingStudioData";
+import { normalizeTranscriptForPrompt } from "@/lib/shared/transcript";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,8 +33,8 @@ export function SidebarStudio() {
     loadSession,
   } = useDashboard();
 
-  const recordings = useQuery(api.recordings.getRecordings);
-  const deleteRecording = useMutation(api.recordings.deleteRecording);
+  const recordings = useRecordingStudioData();
+  const { deleteRecording } = useRecordingActions();
 
   const [urlDraft, setUrlDraft] = useState("");
   const [showLinks, setShowLinks] = useState(false);
@@ -187,8 +187,8 @@ export function SidebarStudio() {
  * transcript are dead weight, so offer to clear them once some exist.
  */
 export function SessionsCleanupAction() {
-  const recordings = useQuery(api.recordings.getRecordings);
-  const cleanupOrphaned = useMutation(api.recordings.cleanupOrphanedRecordings);
+  const recordings = useRecordingStudioData();
+  const { cleanupOrphanedRecordings } = useRecordingActions();
 
   const failedCount = (recordings ?? []).filter(
     (r) => !r.transcript || r.transcript.trim().length === 0,
@@ -202,7 +202,7 @@ export function SessionsCleanupAction() {
       className="shrink-0 rounded px-1 py-0.5 text-[10px] text-amber-600 hover:underline dark:text-amber-500"
       onClick={async () => {
         try {
-          const r = await cleanupOrphaned();
+          const r = await cleanupOrphanedRecordings();
           toast.success(`Removed ${r.deletedCount} failed recording(s)`);
         } catch {
           toast.error("Cleanup failed");

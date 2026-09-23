@@ -1,20 +1,20 @@
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
-import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Layers, Plus, Trash2, Clock, BookOpen, Sparkles } from "lucide-react";
-import { Id } from "@/convex/_generated/dataModel";
+import { Id } from "@/types/data-model";
 import { FlashcardDeck } from "@/types";
 import { useState } from "react";
+import { useFlashcardStudyActions } from "@/lib/hooks/flashcards/useFlashcardStudyActions";
+import { useFlashcardsViewData } from "@/lib/hooks/flashcards/useFlashcardsViewData";
 import { GenerateFlashcardsDialog } from "@/components/dashboard/dialogs/GenerateFlashcardsDialog";
 
 export function FlashcardsView() {
   const router = useRouter();
-  const decks = useQuery(api.flashcards.getDecks);
-  const deleteDeck = useMutation(api.flashcards.deleteDeck);
+  const decks = useFlashcardsViewData();
+  const { deleteDeck } = useFlashcardStudyActions();
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
 
   const handleStudyDeck = (deckId: string) => {

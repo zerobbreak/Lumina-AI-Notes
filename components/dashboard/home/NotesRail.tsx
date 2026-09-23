@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Bookmark, Clock, Pin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Id } from "@/types/data-model";
 import { NoteCard, type NoteLabelLookup } from "./NoteCard";
 
 type NoteLike = Parameters<typeof NoteCard>[0]["note"];

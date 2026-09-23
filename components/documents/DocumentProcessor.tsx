@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
-import { useQuery, useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { useEffect } from "react";
+import type { Id } from "@/types/data-model";
+import { useAiActions } from "@/lib/hooks/ai/useAiActions";
+import { usePendingFilesData } from "@/lib/hooks/files/usePendingFilesData";
 
 /**
  * Document Processor Hook
@@ -11,8 +11,8 @@ import { Id } from "@/convex/_generated/dataModel";
  * Displays processing status for files
  */
 export function useDocumentProcessor() {
-  const pendingFiles = useQuery(api.files.getPendingFiles);
-  const processDocument = useAction(api.ai.processDocument);
+  const pendingFiles = usePendingFilesData();
+  const { processDocument } = useAiActions();
 
   // Auto-process pending files
   useEffect(() => {

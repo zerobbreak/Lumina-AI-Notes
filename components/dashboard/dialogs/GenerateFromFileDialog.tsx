@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useAction, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { isRestApiEnabled } from "@/lib/api/enabled";
+import { useAiActions } from "@/lib/hooks/ai/useAiActions";
 import { useCreateFileAction } from "@/lib/hooks/files/useCreateFileAction";
 import { useCurrentUser } from "@/lib/queries/users/useCurrentUser";
 import { toast } from "sonner";
@@ -46,15 +44,9 @@ export function GenerateFromFileDialog({
   onComplete,
 }: GenerateFromFileDialogProps) {
   const router = useRouter();
-  const useRest = isRestApiEnabled();
-  const convexUser = useQuery(api.users.getUser, useRest ? "skip" : {});
-  const restUser = useCurrentUser();
-  const userData = useRest ? restUser.data : convexUser;
+  const { data: userData } = useCurrentUser();
   const createFile = useCreateFileAction();
-  const ingestAndGenerateNote = useAction(api.ai.ingestAndGenerateNote);
-  const ingestAndGenerateFlashcards = useAction(
-    api.ai.ingestAndGenerateFlashcards
-  );
+  const { ingestAndGenerateNote, ingestAndGenerateFlashcards } = useAiActions();
 
   const [selectedCourse, setSelectedCourse] = useState<string>(
     defaultCourseId || ""

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { ActionMenu } from "@/components/shared/ActionMenu";
-import { Id } from "@/convex/_generated/dataModel";
+import { Id } from "@/types/data-model";
 import { useNotesByContextData } from "@/lib/hooks/notes/useNotesByContextData";
 import { cn } from "@/lib/utils";
 import { SidebarNote } from "./SidebarNote";

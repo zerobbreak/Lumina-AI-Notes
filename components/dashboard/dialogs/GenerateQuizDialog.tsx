@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useAction, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { useAiActions } from "@/lib/hooks/ai/useAiActions";
+import { useRecentNotes } from "@/lib/queries/notes/useRecentNotes";
+import { Id } from "@/types/data-model";
 import {
   Dialog,
   DialogContent,
@@ -36,8 +36,8 @@ export function GenerateQuizDialog({
   defaultNoteId,
 }: GenerateQuizDialogProps) {
   const router = useRouter();
-  const notes = useQuery(api.notes.getRecentNotes);
-  const generateQuiz = useAction(api.ai.generateAndSaveQuiz);
+  const { data: notes } = useRecentNotes();
+  const { generateAndSaveQuiz: generateQuiz } = useAiActions();
 
   const [selectedNoteId, setSelectedNoteId] = useState<string>(
     defaultNoteId || ""

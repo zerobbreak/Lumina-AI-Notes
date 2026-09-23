@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { Id } from "@/types/data-model";
+import { useFlashcardStudyActions } from "@/lib/hooks/flashcards/useFlashcardStudyActions";
+import { useFlashcardStudyData } from "@/lib/hooks/flashcards/useFlashcardStudyData";
 import { FlashcardCard } from "./FlashcardCard";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,10 +26,8 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
   const router = useRouter();
   const typedDeckId = deckId as Id<"flashcardDecks">;
   
-  const deck = useQuery(api.flashcards.getDeck, { deckId: typedDeckId });
-  const flashcards = useQuery(api.flashcards.getFlashcards, { deckId: typedDeckId });
-  const markStudied = useMutation(api.flashcards.markDeckStudied);
-  const scheduleNextReview = useMutation(api.flashcards.scheduleNextReview);
+  const { deck, flashcards } = useFlashcardStudyData(deckId);
+  const { markStudied, scheduleNextReview } = useFlashcardStudyActions();
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -93,7 +91,7 @@ export function FlashcardStudy({ deckId }: FlashcardStudyProps) {
 
     if (card) {
       scheduleNextReview({
-        cardId: card._id,
+        cardId: card._id as Id<"flashcards">,
         rating,
         tzOffsetMinutes: new Date().getTimezoneOffset(),
       });

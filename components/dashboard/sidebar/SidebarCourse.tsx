@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useNotesByContextData } from "@/lib/hooks/notes/useNotesByContextData";
 import { useCourseActions } from "@/lib/hooks/mutations/useCourseActions";
 import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
-import { Id } from "@/convex/_generated/dataModel";
+import { Id } from "@/types/data-model";
 import { cn } from "@/lib/utils";
 import { shouldShowCourseCode } from "@/lib/courseDisplay";
 import { Course, Module } from "@/types";

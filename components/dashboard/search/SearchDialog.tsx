@@ -11,10 +11,7 @@ import {
   Check,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
-import { isRestApiEnabled } from "@/lib/api/enabled";
+import { Id } from "@/types/data-model";
 import { useSearch } from "@/lib/queries/search/useSearch";
 import { useTagsWithCounts } from "@/lib/queries/tags/useTagsWithCounts";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -50,22 +47,8 @@ export function SearchDialog({
   const [selectedTags, setSelectedTags] = React.useState<Id<"tags">[]>([]);
 
   const debouncedQuery = useDebounce(query, 300);
-  const useRest = isRestApiEnabled();
-  const tagsConvex = useQuery(api.tags.getTags, useRest ? "skip" : {});
-  const tagsRest = useTagsWithCounts();
-  const tags = useRest ? tagsRest.data : tagsConvex;
-
-  const searchConvex = useQuery(
-    api.search.search,
-    !useRest && debouncedQuery.trim()
-      ? {
-          query: debouncedQuery,
-          type: filterType,
-          tagIds: selectedTags.length > 0 ? selectedTags : undefined,
-        }
-      : "skip",
-  );
-  const searchRest = useSearch(
+  const { data: tags } = useTagsWithCounts();
+  const { data: searchResponse, isLoading: searchLoading } = useSearch(
     {
       query: debouncedQuery,
       type: filterType,
@@ -73,7 +56,6 @@ export function SearchDialog({
     },
     Boolean(debouncedQuery.trim()),
   );
-  const searchResponse = useRest ? searchRest.data : searchConvex;
   const results = searchResponse?.results;
 
   React.useEffect(() => {
@@ -204,7 +186,7 @@ export function SearchDialog({
             </div>
           )}
 
-          {debouncedQuery && !searchResponse && (
+          {debouncedQuery && searchLoading && (
             <div className="text-center py-10 text-gray-600 text-sm animate-pulse">
               Searching...
             </div>

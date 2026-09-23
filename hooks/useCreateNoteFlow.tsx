@@ -1,10 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import { isRestApiEnabled } from "@/lib/api/enabled";
+import type { Id } from "@/types/data-model";
 import { useCreateNoteAction } from "@/lib/hooks/mutations/useNoteActions";
 import { useCurrentUser } from "@/lib/queries/users/useCurrentUser";
 import { useDashboard } from "@/hooks/useDashboard";
@@ -24,10 +21,7 @@ export function useCreateNoteFlow(): {
     input: CreateNoteInput,
   ) => Promise<{ noteId: Id<"notes">; style: string }>;
 } {
-  const useRest = isRestApiEnabled();
-  const convexUser = useQuery(api.users.getUser, useRest ? "skip" : {});
-  const restUser = useCurrentUser();
-  const userData = useRest ? restUser.data : convexUser;
+  const { data: userData } = useCurrentUser();
 
   const createNote = useCreateNoteAction();
   const { setNoteBootstrap } = useDashboard();

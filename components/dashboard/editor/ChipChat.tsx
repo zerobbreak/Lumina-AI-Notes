@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useRef, KeyboardEvent } from "react";
-import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { useAiActions } from "@/lib/hooks/ai/useAiActions";
+import { Id } from "@/types/data-model";
 import { Copy, Send, Loader2, FileText } from "lucide-react";
 
 interface Message {
@@ -18,7 +17,7 @@ interface ChipChatProps {
 }
 
 export function ChipChat({ fileId, fileName, onCopyToNote }: ChipChatProps) {
-  const askAboutFile = useAction(api.ai.askAboutFile);
+  const { askAboutFile } = useAiActions();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);

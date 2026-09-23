@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Outfit } from "next/font/google"; // Using Outfit for that modern tech look
 import "./globals.css";
-import { ConvexClientProvider } from "@/components/providers/ConvexClientProvider";
+import { AppProvider } from "@/components/providers/AppProvider";
 import { Toaster } from "sonner";
 import { MobileWarning } from "@/components/MobileWarning";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
@@ -66,7 +66,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ConvexClientProvider>{children}</ConvexClientProvider>
+          <AppProvider>{children}</AppProvider>
           <MobileWarning />
           <Toaster theme="system" position="bottom-right" />
         </ThemeProvider>

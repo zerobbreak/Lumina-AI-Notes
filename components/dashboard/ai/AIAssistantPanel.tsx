@@ -20,8 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useAiActions } from "@/lib/hooks/ai/useAiActions";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 
@@ -81,7 +80,7 @@ export function AIAssistantPanel({
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const askAboutContext = useAction(api.ai.askAboutContext);
+  const { askAboutContext } = useAiActions();
 
   // Copy to clipboard
   const handleCopy = async (content: string, index: number) => {

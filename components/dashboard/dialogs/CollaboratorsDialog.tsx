@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { Id } from "@/types/data-model";
+import { useCollaborationActions } from "@/lib/hooks/collaboration/useCollaborationActions";
+import { useCollaborationData } from "@/lib/hooks/collaboration/useCollaborationData";
 import {
   Dialog,
   DialogContent,
@@ -50,12 +50,9 @@ export function CollaboratorsDialog({
   onOpenChange: (open: boolean) => void;
   noteId: Id<"notes">;
 }) {
-  const access = useQuery(api.collaboration.listPeopleWithAccess, { noteId });
-
-  const invite = useMutation(api.collaboration.inviteToNote);
-  const remove = useMutation(api.collaboration.removeCollaborator);
-  const updateRole = useMutation(api.collaboration.updateCollaboratorRole);
-  const revokeInvite = useMutation(api.collaboration.revokeInvite);
+  const access = useCollaborationData(noteId, open);
+  const { inviteToNote: invite, removeCollaborator: remove, updateCollaboratorRole: updateRole, revokeInvite } =
+    useCollaborationActions(noteId);
 
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("viewer");

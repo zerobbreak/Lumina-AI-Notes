@@ -1,11 +1,10 @@
 "use client";
 
-import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { useFolderViewData } from "@/lib/hooks/folder/useFolderViewData";
 import { useCourseActions } from "@/lib/hooks/mutations/useCourseActions";
 import { useFileActions } from "@/lib/hooks/mutations/useFileActions";
 import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
+import { useAiActions } from "@/lib/hooks/ai/useAiActions";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -18,7 +17,7 @@ import {
   Plus,
   File,
 } from "lucide-react";
-import { Id } from "@/convex/_generated/dataModel";
+import { Id } from "@/types/data-model";
 import { Course, Module } from "@/types";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
@@ -74,7 +73,7 @@ export default function FolderView({
   const { addModuleToCourse, renameModule, deleteModule } = useCourseActions();
   const { deleteFile, renameFile, retryProcessing } = useFileActions();
   const { togglePinNote, deleteNote, renameNote } = useNoteActions();
-  const processDocument = useAction(api.ai.processDocument);
+  const { processDocument } = useAiActions();
 
   const [renameTarget, setRenameTarget] = useState<{
     id: string | Id<"files"> | Id<"notes">;

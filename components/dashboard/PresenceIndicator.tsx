@@ -1,8 +1,10 @@
 "use client";
 
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { Id } from "@/types/data-model";
+import {
+  usePresenceCountData,
+  usePresenceViewersData,
+} from "@/lib/hooks/presence/usePresenceData";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
@@ -66,7 +68,7 @@ export function PresenceIndicator({
   className,
   maxAvatars = 5,
 }: PresenceIndicatorProps) {
-  const viewers = useQuery(api.presence.getViewers, { noteId }) as Viewer[] | undefined;
+  const viewers = usePresenceViewersData(noteId) as Viewer[] | undefined;
 
   if (!viewers || viewers.length === 0) {
     return null;
@@ -198,7 +200,7 @@ export function PresenceIndicatorCompact({
   noteId: Id<"notes">;
   className?: string;
 }) {
-  const viewerCount = useQuery(api.presence.getViewerCount, { noteId });
+  const viewerCount = usePresenceCountData(noteId);
 
   if (!viewerCount || viewerCount === 0) {
     return null;
