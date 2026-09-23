@@ -6,7 +6,7 @@ import {
   shouldAttemptIsolation,
   MAX_ISOLATION_BYTES,
   MIN_ISOLATION_BYTES,
-} from "@/convex/shared/audioIsolation";
+} from "@/lib/shared/audioIsolation";
 import {
   pickRecorderMimeType,
   recorderContainerMime,

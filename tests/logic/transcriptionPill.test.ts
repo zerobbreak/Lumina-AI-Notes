@@ -19,12 +19,12 @@ import {
   parseKeywords,
   splitHighlightSegments,
   stripHtmlToText,
-} from "@/convex/shared/keywordSearch";
+} from "@/lib/shared/keywordSearch";
 import {
   MAX_REFERENCE_URLS,
   normalizeReferenceUrlList,
-} from "@/convex/shared/urlContent";
-import { normalizeTranscriptForPrompt } from "@/convex/shared/transcript";
+} from "@/lib/shared/urlContent";
+import { normalizeTranscriptForPrompt } from "@/lib/shared/transcript";
 
 const base = {
   isRecording: false,

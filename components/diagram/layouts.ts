@@ -2,7 +2,7 @@ import ELK, { ElkNode } from "elkjs/lib/elk.bundled.js";
 import { Node, Edge } from "@xyflow/react";
 import { LayoutType, LayoutOptions } from "@/types";
 // Shared with the server-side layout so both reserve the same box for a node.
-import { getNodeDimensions } from "@/convex/shared/diagram";
+import { getNodeDimensions } from "@/lib/shared/diagram";
 
 const elk = new ELK();
 

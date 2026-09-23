@@ -12,7 +12,7 @@ import {
   layeredRanks,
   parseDiagramEdge,
   type LayoutNode,
-} from "../../convex/shared/diagram";
+} from "@/lib/shared/diagram";
 
 function node(id: string, type = "topic", label?: string): LayoutNode {
   return { id, type, data: { label }, position: { x: 0, y: 0 } };

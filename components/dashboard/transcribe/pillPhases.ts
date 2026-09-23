@@ -73,7 +73,7 @@ export const THINKING_STAGE_MS = 2200;
  */
 export function thinkingStageIndex(
   elapsedMs: number,
-  stageCount = THINKING_STAGES.length,
+  stageCount: number = THINKING_STAGES.length,
 ): number {
   if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return 0;
   return Math.min(stageCount - 1, Math.floor(elapsedMs / THINKING_STAGE_MS));
