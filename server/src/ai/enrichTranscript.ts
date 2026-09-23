@@ -1,4 +1,4 @@
-import type { GenerativeModel } from "@google/generative-ai";
+import type { GeminiModel } from "./gemini.js";
 import { ENRICHMENT_WORD_THRESHOLD } from "./transcript.js";
 
 /**
@@ -9,7 +9,7 @@ import { ENRICHMENT_WORD_THRESHOLD } from "./transcript.js";
  * Ported from convex/ai.ts verbatim.
  */
 export const enrichTranscript = async (
-  model: GenerativeModel,
+  model: GeminiModel,
   normalizedTranscript: string,
   title?: string,
 ): Promise<string> => {

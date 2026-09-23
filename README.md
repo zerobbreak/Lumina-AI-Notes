@@ -115,6 +115,7 @@ NEXT_PUBLIC_PAYSTACK_SCHOLAR_PLAN_CODE=
 | `NEXT_PUBLIC_API_URL` | Yes | REST API base URL for the Next.js client; `/api/v1` when using `API_PROXY_TARGET` |
 | `API_PROXY_TARGET` | No | API origin that Next proxies `/api/v1/*` to, so requests are same-origin and skip CORS preflights |
 | `GEMINI_API_KEY` | Yes (server) | Google AI Studio key — set in `server/.env` |
+| `GEMINI_MODELS` | No (server) | Comma-separated Gemini models, tried in order when one is overloaded; defaults to `gemini-3.8-flash,gemini-3.5-flash,gemini-3.5-flash-lite` |
 | `UPLOADTHING_TOKEN` | Yes | UploadThing API token |
 | `NEXT_PUBLIC_PAYSTACK_SCHOLAR_PLAN_CODE` | No | Paystack plan code when billing is enabled |
 

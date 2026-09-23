@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getGeminiModel } from "../ai/gemini.js";
 import type { Db } from "../db/client.js";
 import { noteTags, notes, tags } from "../db/schema/index.js";
 const MAX_TAGS_PER_USER = 200;
@@ -64,11 +64,7 @@ export async function autoTagNote(db: Db, noteId: string, apiKey: string) {
   const userTags = await db.select().from(tags).where(eq(tags.userId, note.userId));
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: { responseMimeType: "application/json" },
-    });
+    const model = getGeminiModel(apiKey, { responseMimeType: "application/json" });
 
     const result = await model.generateContent(`You tag study notes for a student's note-taking app.
 

@@ -1,5 +1,4 @@
 import { GoogleGenerativeAI, TaskType } from "@google/generative-ai";
-import type { GenerativeModel } from "@google/generative-ai";
 import { and, eq, inArray } from "drizzle-orm";
 import type { Router } from "express";
 import { z } from "zod";
@@ -16,6 +15,7 @@ import { isOwnedKey, type Storage } from "../storage/s3.js";
 import { applyLayeredLayout, layeredRanks } from "./diagram.js";
 import { embedTextForVectorSearch } from "./embedding.js";
 import { clientMessage, UserFacingError } from "./errors.js";
+import { getGeminiModel, type GeminiModel } from "./gemini.js";
 
 const TEXT_OP_CHARS = 100_000;
 const GENERATION_CHARS = 1_000_000;
@@ -25,7 +25,7 @@ type Bit2Deps = {
   db: Db;
   env: Env;
   storage: Storage;
-  model: (config?: { responseMimeType: string }) => GenerativeModel;
+  model: (config?: { responseMimeType: string }) => GeminiModel;
 };
 
 async function requireOwnedFile(db: Db, fileId: string, userId: string) {
@@ -636,8 +636,7 @@ Return ONLY valid JSON.`);
       }
       const apiKey = requireGeminiKey();
       const pdfBase64 = await extractPdfBase64(storage, body.pdfBase64, body.storageKey);
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const pdfModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const pdfModel = getGeminiModel(apiKey);
       const extractionResult = await pdfModel.generateContent([
         { inlineData: { mimeType: "application/pdf", data: pdfBase64 } },
         { text: "Extract complete text from this PDF for flashcard generation. Return ONLY the extracted text with markdown structure." },
@@ -681,8 +680,7 @@ Generate ${count} flashcards. Return JSON array [{"front":"...","back":"..."}] O
       }
       const apiKey = requireGeminiKey();
       const pdfBase64 = await extractPdfBase64(storage, body.pdfBase64, body.storageKey);
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const pdfModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const pdfModel = getGeminiModel(apiKey);
       const noteGenerationResult = await pdfModel.generateContent([
         { inlineData: { mimeType: "application/pdf", data: pdfBase64 } },
         {

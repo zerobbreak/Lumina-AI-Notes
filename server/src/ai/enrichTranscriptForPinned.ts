@@ -1,9 +1,9 @@
-import type { GenerativeModel } from "@google/generative-ai";
+import type { GeminiModel } from "./gemini.js";
 import { ENRICHMENT_WORD_THRESHOLD } from "./transcript.js";
 
 /** Port of enrichTranscriptForPinned in convex/notes.ts */
 export async function enrichTranscriptForPinned(
-  model: GenerativeModel,
+  model: GeminiModel,
   normalizedTranscript: string,
   contextText: string,
 ): Promise<string> {

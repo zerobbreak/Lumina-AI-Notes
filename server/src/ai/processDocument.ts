@@ -6,6 +6,7 @@ import { saveExtractedContent, updateProcessingStatus } from "../files/processin
 import type { Storage } from "../storage/s3.js";
 import { embedTextForVectorSearch } from "./embedding.js";
 import { clientMessage, UserFacingError } from "./errors.js";
+import { getGeminiModel } from "./gemini.js";
 
 export type ProcessDocumentResult = { success: boolean; error?: string };
 
@@ -90,7 +91,7 @@ async function processClaimedFile(
     await updateProcessingStatus(db, fileId, { processingStatus: "processing", progressPercent: 40 });
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = getGeminiModel(apiKey);
 
     const extractionResult = await model.generateContent([
       { inlineData: { mimeType: "application/pdf", data: base64Data } },

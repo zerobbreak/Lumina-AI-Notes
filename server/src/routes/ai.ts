@@ -1,8 +1,7 @@
-import type { GenerativeModel } from "@google/generative-ai";
 import { Router } from "express";
 import { z } from "zod";
 import { clientMessage } from "../ai/errors.js";
-import { getGeminiModel } from "../ai/gemini.js";
+import { getGeminiModel, type GeminiModel } from "../ai/gemini.js";
 import { normalizeTranscriptForPrompt } from "../ai/transcript.js";
 import { fetchReferenceUrlsForPrompt, normalizeReferenceUrlList } from "../ai/urlContent.js";
 import type { Env } from "../env.js";
@@ -104,7 +103,7 @@ const transcribeAudioBody = z.object({
 
 /** Shared by /clean-lecture-transcript and transcribeAudio's internal cleanup pipeline. */
 async function runCleanLectureTranscript(
-  gemini: GenerativeModel,
+  gemini: GeminiModel,
   transcript: string,
   context: string | undefined,
 ): Promise<{ cleanedTranscript: string; metadata: CleanupMetadata }> {
@@ -203,7 +202,7 @@ IMPORTANT:
 }
 
 /** Shared by /detect-lecture-segments and transcribeAudio's internal cleanup pipeline. */
-async function runDetectLectureSegments(gemini: GenerativeModel, transcript: string): Promise<LectureStructureResult> {
+async function runDetectLectureSegments(gemini: GeminiModel, transcript: string): Promise<LectureStructureResult> {
   const prompt = `Analyze this lecture transcript and identify its structure and segments.
 
 Transcript (first 15,000 chars):

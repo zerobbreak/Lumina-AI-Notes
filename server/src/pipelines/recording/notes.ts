@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, TaskType, type GenerativeModel } from "@google/generative-ai";
+import { GoogleGenerativeAI, TaskType } from "@google/generative-ai";
 import { and, eq } from "drizzle-orm";
 import type { Db } from "../../db/client.js";
 import { files, type RecordingJobCheckpoint } from "../../db/schema/index.js";
@@ -6,6 +6,7 @@ import { buildDiagramData, type DiagramData, type DiagramNodeInput } from "../..
 import { embedTextForVectorSearch } from "../../ai/embedding.js";
 import { enrichTranscript } from "../../ai/enrichTranscript.js";
 import { enrichTranscriptForPinned } from "../../ai/enrichTranscriptForPinned.js";
+import { getGeminiModel, type GeminiModel } from "../../ai/gemini.js";
 import { UserFacingError } from "../../ai/errors.js";
 import { RetryableError } from "../../queue/errors.js";
 import { needsDepthRepair, tryParseJson, wordCountFn } from "../../ai/noteQuality.js";
@@ -62,11 +63,8 @@ export function geminiModels(apiKey: string | undefined) {
   const genAI = new GoogleGenerativeAI(apiKey);
   return {
     genAI,
-    text: genAI.getGenerativeModel({ model: "gemini-2.5-flash" }),
-    json: genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: { responseMimeType: "application/json" },
-    }),
+    text: getGeminiModel(apiKey),
+    json: getGeminiModel(apiKey, { responseMimeType: "application/json" }),
   };
 }
 
@@ -190,7 +188,7 @@ function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.map((v) => String(v ?? "").trim()).filter(Boolean) : [];
 }
 
-async function parseOrFix(model: GenerativeModel, text: string): Promise<unknown> {
+async function parseOrFix(model: GeminiModel, text: string): Promise<unknown> {
   const stripped = text.replace(/^```json?\s*/i, "").replace(/```\s*$/i, "");
   const parsed = tryParseJson(stripped);
   if (parsed) return parsed;

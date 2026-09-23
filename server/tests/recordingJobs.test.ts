@@ -70,9 +70,15 @@ let app: ReturnType<typeof buildApp>;
 let deps: RecordingJobDeps;
 
 beforeAll(async () => {
+  // One model, so a failNext 503/429 is "every model busy" and reaches the
+  // job's own retry instead of being absorbed by the model fallback chain.
+  vi.stubEnv("GEMINI_MODELS", "gemini-test");
   ({ db, close: closeDb } = await createTestDb());
 });
-afterAll(() => closeDb?.());
+afterAll(() => {
+  vi.unstubAllEnvs();
+  return closeDb?.();
+});
 
 beforeEach(async () => {
   await db.delete(users);

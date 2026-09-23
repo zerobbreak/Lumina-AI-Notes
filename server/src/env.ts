@@ -75,6 +75,9 @@ const envSchema = z.object({
   // boots without it; a route that needs it fails loudly at call time
   // instead (same as Convex's own `getGeminiModel` check).
   GEMINI_API_KEY: z.string().min(1).optional(),
+  // Comma-separated fallback chain; ai/gemini.ts reads it at call time and
+  // falls back to its defaults. Declared here so it shows up with the rest.
+  GEMINI_MODELS: z.string().optional(),
   ELEVENLABS_API_KEY: z.string().min(1).optional(),
 
   // Job queue (BullMQ). On Railway, reference ${{Redis.REDIS_URL}} (private
