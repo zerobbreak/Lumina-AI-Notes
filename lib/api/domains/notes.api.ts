@@ -1,48 +1,47 @@
-import { getApiBaseUrl } from "@/lib/api/config";
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, apiUrl } from "@/lib/api/client";
+import { apiPath } from "@/lib/api/path";
 import { ApiError, VersionConflictError } from "@/lib/api/errors";
 import type { NoteDetailDto, NoteListItemDto, UpdateNoteBody } from "@/types/api/notes";
 
-function qs(params: Record<string, string | number | undefined>) {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined) search.set(key, String(value));
-  }
-  const query = search.toString();
-  return query ? `?${query}` : "";
-}
 
 export const notesApi = {
   getRecent(token: string, limit = 5) {
-    return apiFetch<NoteListItemDto[]>(`/notes/recent${qs({ limit })}`, { token });
+    return apiFetch<NoteListItemDto[]>(apiPath`/notes/recent`, { query: { limit }, token });
   },
 
   getPinned(token: string, limit = 20) {
-    return apiFetch<NoteListItemDto[]>(`/notes/pinned${qs({ limit })}`, { token });
+    return apiFetch<NoteListItemDto[]>(apiPath`/notes/pinned`, { query: { limit }, token });
   },
 
   getQuick(token: string, limit = 10) {
-    return apiFetch<NoteListItemDto[]>(`/notes/quick${qs({ limit })}`, { token });
+    return apiFetch<NoteListItemDto[]>(apiPath`/notes/quick`, { query: { limit }, token });
   },
 
   getArchived(token: string) {
-    return apiFetch<NoteListItemDto[]>("/notes/archived", { token });
+    return apiFetch<NoteListItemDto[]>(apiPath`/notes/archived`, { token });
+  },
+
+  getResumeTarget(token: string) {
+    return apiFetch<{ target: "home" } | { target: "note"; noteId: string }>(
+      apiPath`/notes/resume-target`,
+      { token },
+    );
   },
 
   getByContext(
     token: string,
     params: { courseId?: string; moduleId?: string; tagId?: string },
   ) {
-    return apiFetch<NoteListItemDto[]>(`/notes${qs(params)}`, { token });
+    return apiFetch<NoteListItemDto[]>(apiPath`/notes`, { query: params, token });
   },
 
   getById(token: string, noteId: string) {
-    return apiFetch<NoteDetailDto>(`/notes/${encodeURIComponent(noteId)}`, { token });
+    return apiFetch<NoteDetailDto>(apiPath`/notes/${noteId}`, { token });
   },
 
   getChildNotes(token: string, parentNoteId: string) {
     return apiFetch<NoteListItemDto[]>(
-      `/notes/${encodeURIComponent(parentNoteId)}/children`,
+      apiPath`/notes/${parentNoteId}/children`,
       { token },
     );
   },
@@ -60,11 +59,11 @@ export const notesApi = {
       sourceRecordingId?: string;
     },
   ) {
-    return apiFetch<NoteDetailDto>("/notes", { method: "POST", token, body });
+    return apiFetch<NoteDetailDto>(apiPath`/notes`, { method: "POST", token, body });
   },
 
   async update(token: string, noteId: string, body: UpdateNoteBody) {
-    const res = await fetch(`${getApiBaseUrl()}/notes/${encodeURIComponent(noteId)}`, {
+    const res = await fetch(apiUrl(apiPath`/notes/${noteId}`), {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -112,14 +111,14 @@ export const notesApi = {
   },
 
   touch(token: string, noteId: string) {
-    return apiFetch<void>(`/notes/${encodeURIComponent(noteId)}/touch`, {
+    return apiFetch<void>(apiPath`/notes/${noteId}/touch`, {
       method: "POST",
       token,
     });
   },
 
   delete(token: string, noteId: string) {
-    return apiFetch<void>(`/notes/${encodeURIComponent(noteId)}`, {
+    return apiFetch<void>(apiPath`/notes/${noteId}`, {
       method: "DELETE",
       token,
     });
@@ -130,7 +129,7 @@ export const notesApi = {
     noteId: string,
     body: { courseId?: string; moduleId?: string },
   ) {
-    return apiFetch<NoteDetailDto>(`/notes/${encodeURIComponent(noteId)}/move`, {
+    return apiFetch<NoteDetailDto>(apiPath`/notes/${noteId}/move`, {
       method: "POST",
       token,
       body,

@@ -2,7 +2,6 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { notesApi } from "@/lib/api/domains/notes.api";
-import { isRestApiEnabled } from "@/lib/api/enabled";
 import { useApiToken } from "@/lib/api/use-api-token";
 import { invalidateNotes } from "@/lib/invalidation";
 
@@ -23,10 +22,7 @@ export function useCreateNote() {
 
   return useMutation({
     mutationFn: async (input: CreateNoteInput) => {
-      if (!isRestApiEnabled()) {
-        throw new Error("REST API is not enabled");
-      }
-      const token = await getApiToken();
+const token = await getApiToken();
       const note = await notesApi.create(token, input);
       return note.id;
     },

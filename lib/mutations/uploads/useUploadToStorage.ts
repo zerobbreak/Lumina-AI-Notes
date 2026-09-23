@@ -2,7 +2,6 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { uploadsApi } from "@/lib/api/domains/uploads.api";
-import { isRestApiEnabled } from "@/lib/api/enabled";
 import { useApiToken } from "@/lib/api/use-api-token";
 
 export function useUploadToStorage() {
@@ -10,10 +9,7 @@ export function useUploadToStorage() {
 
   return useMutation({
     mutationFn: async (file: File): Promise<string> => {
-      if (!isRestApiEnabled()) {
-        throw new Error("REST API is not enabled");
-      }
-      const token = await getApiToken();
+const token = await getApiToken();
       const contentType = file.type || "application/octet-stream";
       const target = await uploadsApi.createUpload(token, {
         filename: file.name,

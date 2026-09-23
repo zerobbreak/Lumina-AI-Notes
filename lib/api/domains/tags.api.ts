@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api/client";
+import { apiPath } from "@/lib/api/path";
 import type { TagWithCountDto } from "@/types/api/tags";
 
 export type TagDto = {
@@ -11,15 +12,15 @@ export type TagDto = {
 
 export const tagsApi = {
   listWithCounts(token: string) {
-    return apiFetch<TagWithCountDto[]>("/tags", { token });
+    return apiFetch<TagWithCountDto[]>(apiPath`/tags`, { token });
   },
 
   create(token: string, body: { name: string; color: string }) {
-    return apiFetch<TagDto>("/tags", { method: "POST", token, body });
+    return apiFetch<TagDto>(apiPath`/tags`, { method: "POST", token, body });
   },
 
   update(token: string, tagId: string, body: { name?: string; color?: string }) {
-    return apiFetch<TagDto>(`/tags/${encodeURIComponent(tagId)}`, {
+    return apiFetch<TagDto>(apiPath`/tags/${tagId}`, {
       method: "PATCH",
       token,
       body,
@@ -27,7 +28,7 @@ export const tagsApi = {
   },
 
   delete(token: string, tagId: string) {
-    return apiFetch<void>(`/tags/${encodeURIComponent(tagId)}`, {
+    return apiFetch<void>(apiPath`/tags/${tagId}`, {
       method: "DELETE",
       token,
     });

@@ -1,56 +1,35 @@
 "use client";
 
-import { useMutation } from "convex/react";
 import { useCallback } from "react";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import { isRestApiEnabled } from "@/lib/api/enabled";
+import type { Id } from "@/types/data-model";
 import { useDeleteFile } from "@/lib/mutations/files/useDeleteFile";
 import { useRenameFile } from "@/lib/mutations/files/useRenameFile";
 import { useRetryFileProcessing } from "@/lib/mutations/files/useRetryFileProcessing";
 
 export function useFileActions() {
-  const useRest = isRestApiEnabled();
-
-  const deleteFileConvex = useMutation(api.files.deleteFile);
-  const renameFileConvex = useMutation(api.files.renameFile);
-  const retryProcessingConvex = useMutation(api.files.retryProcessing);
-
-  const deleteFileRest = useDeleteFile();
-  const renameFileRest = useRenameFile();
-  const retryProcessingRest = useRetryFileProcessing();
+  const deleteFileMutation = useDeleteFile();
+  const renameFileMutation = useRenameFile();
+  const retryProcessingMutation = useRetryFileProcessing();
 
   const deleteFile = useCallback(
     async (args: { fileId: Id<"files"> }) => {
-      if (useRest) {
-        await deleteFileRest.mutateAsync(args.fileId);
-      } else {
-        await deleteFileConvex(args);
-      }
+      await deleteFileMutation.mutateAsync(args.fileId);
     },
-    [useRest, deleteFileConvex, deleteFileRest],
+    [deleteFileMutation],
   );
 
   const renameFile = useCallback(
     async (args: { fileId: Id<"files">; name: string }) => {
-      if (useRest) {
-        await renameFileRest.mutateAsync(args);
-      } else {
-        await renameFileConvex(args);
-      }
+      await renameFileMutation.mutateAsync(args);
     },
-    [useRest, renameFileConvex, renameFileRest],
+    [renameFileMutation],
   );
 
   const retryProcessing = useCallback(
     async (args: { fileId: Id<"files"> }) => {
-      if (useRest) {
-        await retryProcessingRest.mutateAsync(args.fileId);
-      } else {
-        await retryProcessingConvex(args);
-      }
+      await retryProcessingMutation.mutateAsync(args.fileId);
     },
-    [useRest, retryProcessingConvex, retryProcessingRest],
+    [retryProcessingMutation],
   );
 
   return { deleteFile, renameFile, retryProcessing };

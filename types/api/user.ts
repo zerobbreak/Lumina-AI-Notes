@@ -30,3 +30,17 @@ export type UpdatePreferencesInput = {
   noteStyle?: string;
   theme?: string;
 };
+
+export type CompleteOnboardingInput = {
+  major: string;
+  semester: string;
+  courses: Array<{
+    id: string;
+    name: string;
+    code: string;
+    defaultNoteStyle?: string;
+  }>;
+  noteStyle: string;
+  theme?: string;
+  enabledBlocks: string[];
+};

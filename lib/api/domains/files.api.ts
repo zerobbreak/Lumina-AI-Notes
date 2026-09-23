@@ -1,26 +1,19 @@
 import { apiFetch } from "@/lib/api/client";
+import { apiPath } from "@/lib/api/path";
 import type { CreateFileBody, FileListItemDto } from "@/types/api/files";
 
-function qs(params: Record<string, string | number | undefined>) {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined) search.set(key, String(value));
-  }
-  const query = search.toString();
-  return query ? `?${query}` : "";
-}
 
 export const filesApi = {
   list(token: string, params?: { courseId?: string; limit?: number }) {
-    return apiFetch<FileListItemDto[]>(`/files${qs(params ?? {})}`, { token });
+    return apiFetch<FileListItemDto[]>(apiPath`/files`, { query: params ?? {}, token });
   },
 
   create(token: string, body: CreateFileBody) {
-    return apiFetch<FileListItemDto>("/files", { method: "POST", token, body });
+    return apiFetch<FileListItemDto>(apiPath`/files`, { method: "POST", token, body });
   },
 
   rename(token: string, fileId: string, name: string) {
-    return apiFetch<FileListItemDto>(`/files/${encodeURIComponent(fileId)}`, {
+    return apiFetch<FileListItemDto>(apiPath`/files/${fileId}`, {
       method: "PATCH",
       token,
       body: { name },
@@ -28,16 +21,20 @@ export const filesApi = {
   },
 
   delete(token: string, fileId: string) {
-    return apiFetch<void>(`/files/${encodeURIComponent(fileId)}`, {
+    return apiFetch<void>(apiPath`/files/${fileId}`, {
       method: "DELETE",
       token,
     });
   },
 
   retryProcessing(token: string, fileId: string) {
-    return apiFetch<void>(`/files/${encodeURIComponent(fileId)}/retry`, {
+    return apiFetch<void>(apiPath`/files/${fileId}/retry`, {
       method: "POST",
       token,
     });
+  },
+
+  listPending(token: string) {
+    return apiFetch<FileListItemDto[]>(apiPath`/files/pending`, { token });
   },
 };

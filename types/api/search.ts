@@ -12,3 +12,15 @@ export type SearchResponseDto = {
   limitReached: boolean;
   totalFound?: number;
 };
+
+export type KeywordMatchDto = {
+  noteId: string;
+  title: string;
+  snippet: string;
+  matchedKeywords: string[];
+  url: string;
+};
+
+export type SearchNoteContentResponseDto = {
+  matches: KeywordMatchDto[];
+};

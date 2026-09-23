@@ -3,9 +3,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { noteDetailToEditor } from "@/lib/api/adapters/note";
 import { notesApi } from "@/lib/api/domains/notes.api";
-import { isRestApiEnabled } from "@/lib/api/enabled";
 import { ApiError } from "@/lib/api/errors";
 import { useApiToken } from "@/lib/api/use-api-token";
+import { editorQueryOptions } from "@/lib/queries/polling";
 import { noteKeys } from "@/lib/query-keys/notes";
 
 export function useNoteDetail(noteId: string | null | undefined) {
@@ -25,6 +25,7 @@ export function useNoteDetail(noteId: string | null | undefined) {
         throw error;
       }
     },
-    enabled: isRestApiEnabled() && isReady && Boolean(noteId),
+    enabled: isReady && Boolean(noteId),
+    ...editorQueryOptions(),
   });
 }

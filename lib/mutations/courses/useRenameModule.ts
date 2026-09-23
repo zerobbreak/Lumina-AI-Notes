@@ -2,7 +2,6 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { coursesApi } from "@/lib/api/domains/courses.api";
-import { isRestApiEnabled } from "@/lib/api/enabled";
 import { useApiToken } from "@/lib/api/use-api-token";
 import { invalidateUser } from "@/lib/invalidation";
 
@@ -20,10 +19,7 @@ export function useRenameModule() {
       moduleId: string;
       title: string;
     }) => {
-      if (!isRestApiEnabled()) {
-        throw new Error("REST API is not enabled");
-      }
-      const token = await getApiToken();
+const token = await getApiToken();
       await coursesApi.renameModule(token, courseId, moduleId, { title });
     },
     onSuccess: () => {

@@ -1,10 +1,37 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { createQueryClient } from "@/lib/query-client";
 
+/**
+ * One query cache per signed-in user. Clerk signs in and out without a page
+ * reload, and cache keys don't include the user, so a shared cache would show
+ * the next person on this device the last one's notes. When the user changes
+ * (sign-out, sign-in, account switch) the cache is swapped out during render,
+ * before anything can read the old one.
+ */
 export function QueryProvider({ children }: { children: ReactNode }) {
-  const [queryClient] = useState(() => createQueryClient());
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  const { isLoaded, userId } = useAuth();
+  // undefined while Clerk is still loading; null when signed out.
+  const owner = isLoaded ? (userId ?? null) : undefined;
+
+  const [cache, setCache] = useState(() => ({ owner, client: createQueryClient() }));
+  let current = cache;
+  if (owner !== undefined && owner !== cache.owner) {
+    current = { owner, client: createQueryClient() };
+    setCache(current);
+  }
+
+  // Drop the previous user's data from memory too, not just from view.
+  const previous = useRef(current.client);
+  useEffect(() => {
+    if (previous.current !== current.client) {
+      previous.current.clear();
+      previous.current = current.client;
+    }
+  }, [current.client]);
+
+  return <QueryClientProvider client={current.client}>{children}</QueryClientProvider>;
 }

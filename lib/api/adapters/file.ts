@@ -1,4 +1,4 @@
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Id } from "@/types/data-model";
 import type { FileListItemDto } from "@/types/api/files";
 import type { UserFile } from "@/types";
 

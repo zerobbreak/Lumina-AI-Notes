@@ -5,9 +5,9 @@ export type FlashcardDeckDto = {
   sourceNoteId?: string | null;
   courseId?: string | null;
   cardCount: number;
-  createdAt: number;
-  lastStudiedAt?: number | null;
-  examDate?: number | null;
+  createdAt: string | number;
+  lastStudiedAt?: string | number | null;
+  examDate?: string | number | null;
 };
 
 export type QuizDeckDto = {
@@ -17,6 +17,6 @@ export type QuizDeckDto = {
   sourceNoteId?: string | null;
   courseId?: string | null;
   questionCount: number;
-  createdAt: number;
-  lastTakenAt?: number | null;
+  createdAt: string | number;
+  lastTakenAt?: string | number | null;
 };

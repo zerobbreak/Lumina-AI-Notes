@@ -2,7 +2,6 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { coursesApi } from "@/lib/api/domains/courses.api";
-import { isRestApiEnabled } from "@/lib/api/enabled";
 import { useApiToken } from "@/lib/api/use-api-token";
 import { userKeys } from "@/lib/query-keys/users";
 
@@ -12,10 +11,7 @@ export function useRenameCourse() {
 
   return useMutation({
     mutationFn: async ({ courseId, name }: { courseId: string; name: string }) => {
-      if (!isRestApiEnabled()) {
-        throw new Error("REST API is not enabled");
-      }
-      const token = await getApiToken();
+const token = await getApiToken();
       return coursesApi.rename(token, courseId, name);
     },
     onSuccess: () => {

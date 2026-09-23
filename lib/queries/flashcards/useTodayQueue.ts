@@ -2,7 +2,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { flashcardsApi } from "@/lib/api/domains/flashcards.api";
-import { isRestApiEnabled } from "@/lib/api/enabled";
 import { useApiToken } from "@/lib/api/use-api-token";
 import { flashcardKeys } from "@/lib/query-keys/flashcards";
 
@@ -15,6 +14,6 @@ export function useTodayQueue() {
       const token = await getApiToken();
       return flashcardsApi.getTodayQueue(token);
     },
-    enabled: isRestApiEnabled() && isReady,
+    enabled: isReady,
   });
 }

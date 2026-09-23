@@ -3,7 +3,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { noteListItemsToSidebar } from "@/lib/api/adapters/note";
 import { notesApi } from "@/lib/api/domains/notes.api";
-import { isRestApiEnabled } from "@/lib/api/enabled";
 import { useApiToken } from "@/lib/api/use-api-token";
 import { noteKeys } from "@/lib/query-keys/notes";
 
@@ -16,6 +15,6 @@ export function useQuickNotes(limit = 10) {
       const token = await getApiToken();
       return noteListItemsToSidebar(await notesApi.getQuick(token, limit));
     },
-    enabled: isRestApiEnabled() && isReady,
+    enabled: isReady,
   });
 }

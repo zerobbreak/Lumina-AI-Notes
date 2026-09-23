@@ -2,7 +2,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { searchApi } from "@/lib/api/domains/search.api";
-import { isRestApiEnabled } from "@/lib/api/enabled";
 import { useApiToken } from "@/lib/api/use-api-token";
 import { searchKeys } from "@/lib/query-keys/search";
 
@@ -24,6 +23,6 @@ export function useSearch(
       const token = await getApiToken();
       return searchApi.search(token, { ...params, query: trimmed });
     },
-    enabled: isRestApiEnabled() && isReady && enabled && trimmed.length > 0,
+    enabled: isReady && enabled && trimmed.length > 0,
   });
 }

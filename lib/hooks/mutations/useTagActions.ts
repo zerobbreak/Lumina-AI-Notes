@@ -1,56 +1,35 @@
 "use client";
 
-import { useMutation } from "convex/react";
 import { useCallback } from "react";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import { isRestApiEnabled } from "@/lib/api/enabled";
+import type { Id } from "@/types/data-model";
 import { useCreateTag } from "@/lib/mutations/tags/useCreateTag";
 import { useDeleteTag } from "@/lib/mutations/tags/useDeleteTag";
 import { useUpdateTag } from "@/lib/mutations/tags/useUpdateTag";
 
 export function useTagActions() {
-  const useRest = isRestApiEnabled();
-
-  const createTagConvex = useMutation(api.tags.createTag);
-  const updateTagConvex = useMutation(api.tags.updateTag);
-  const deleteTagConvex = useMutation(api.tags.deleteTag);
-
-  const createTagRest = useCreateTag();
-  const updateTagRest = useUpdateTag();
-  const deleteTagRest = useDeleteTag();
+  const createTagMutation = useCreateTag();
+  const updateTagMutation = useUpdateTag();
+  const deleteTagMutation = useDeleteTag();
 
   const createTag = useCallback(
     async (args: { name: string; color: string }) => {
-      if (useRest) {
-        await createTagRest.mutateAsync(args);
-      } else {
-        await createTagConvex(args);
-      }
+      await createTagMutation.mutateAsync(args);
     },
-    [useRest, createTagConvex, createTagRest],
+    [createTagMutation],
   );
 
   const updateTag = useCallback(
     async (args: { tagId: Id<"tags">; name?: string; color?: string }) => {
-      if (useRest) {
-        await updateTagRest.mutateAsync(args);
-      } else {
-        await updateTagConvex(args);
-      }
+      await updateTagMutation.mutateAsync(args);
     },
-    [useRest, updateTagConvex, updateTagRest],
+    [updateTagMutation],
   );
 
   const deleteTag = useCallback(
     async (args: { tagId: Id<"tags"> }) => {
-      if (useRest) {
-        await deleteTagRest.mutateAsync(args.tagId);
-      } else {
-        await deleteTagConvex(args);
-      }
+      await deleteTagMutation.mutateAsync(args.tagId);
     },
-    [useRest, deleteTagConvex, deleteTagRest],
+    [deleteTagMutation],
   );
 
   return { createTag, updateTag, deleteTag };

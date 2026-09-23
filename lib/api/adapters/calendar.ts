@@ -1,4 +1,4 @@
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Id } from "@/types/data-model";
 import type { CalendarActivityDto } from "@/types/api/calendar";
 
 export type CalendarRecording = {

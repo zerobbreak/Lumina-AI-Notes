@@ -1,4 +1,4 @@
-import type { Doc, Id } from "@/convex/_generated/dataModel";
+import type { Doc, Id } from "@/types/data-model";
 import type { NoteDetailDto, NoteListItemDto } from "@/types/api/notes";
 
 /** Full note shape the editor expects, with REST optimistic-concurrency version. */

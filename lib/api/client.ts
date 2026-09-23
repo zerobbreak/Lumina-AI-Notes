@@ -1,14 +1,22 @@
 import { getApiBaseUrl } from "./config";
 import { ApiError } from "./errors";
+import { queryString, type ApiPath, type QueryParams } from "./path";
 
 type ApiFetchOptions = Omit<RequestInit, "body"> & {
   token?: string;
   body?: unknown;
+  /** Sent as the query string; undefined and null values are left out. */
+  query?: QueryParams;
 };
 
-export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
-  const { token, body, headers, ...rest } = options;
-  const res = await fetch(`${getApiBaseUrl()}${path}`, {
+/** Full URL for an API path. Build `path` with the `apiPath` tag. */
+export function apiUrl(path: ApiPath, query?: QueryParams): string {
+  return `${getApiBaseUrl()}${path}${queryString(query)}`;
+}
+
+export async function apiFetch<T>(path: ApiPath, options: ApiFetchOptions = {}): Promise<T> {
+  const { token, body, headers, query, ...rest } = options;
+  const res = await fetch(apiUrl(path, query), {
     ...rest,
     headers: {
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),

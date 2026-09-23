@@ -3,13 +3,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { noteDetailToEditor } from "@/lib/api/adapters/note";
 import { notesApi } from "@/lib/api/domains/notes.api";
-import { isRestApiEnabled } from "@/lib/api/enabled";
 import { VersionConflictError } from "@/lib/api/errors";
 import { useApiToken } from "@/lib/api/use-api-token";
 import { invalidateNotes } from "@/lib/invalidation";
 import { noteKeys } from "@/lib/query-keys/notes";
 import type { UpdateNoteBody } from "@/types/api/notes";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Id } from "@/types/data-model";
 
 const CONTENT_FIELDS = ["content", "outlineData", "outlineMetadata", "wordCount"] as const;
 
@@ -35,10 +34,7 @@ export function useUpdateNote() {
 
   return useMutation({
     mutationFn: async (input: UpdateNoteInput) => {
-      if (!isRestApiEnabled()) {
-        throw new Error("REST API is not enabled");
-      }
-      const { noteId, ...patch } = input;
+const { noteId, ...patch } = input;
       const token = await getApiToken();
       const isContentSave = CONTENT_FIELDS.some(
         (field) => patch[field as keyof typeof patch] !== undefined,

@@ -2,7 +2,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { usersApi } from "@/lib/api/domains/users.api";
-import { isRestApiEnabled } from "@/lib/api/enabled";
 import { useApiToken } from "@/lib/api/use-api-token";
 import { userKeys } from "@/lib/query-keys/users";
 
@@ -15,6 +14,6 @@ export function useGamification() {
       const token = await getApiToken();
       return usersApi.getGamification(token);
     },
-    enabled: isRestApiEnabled() && isReady,
+    enabled: isReady,
   });
 }

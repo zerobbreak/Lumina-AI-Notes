@@ -6,4 +6,6 @@ export const searchKeys = {
     courseId?: string;
     tagIds?: string[];
   }) => [...searchKeys.all, params] as const,
+  noteContent: (query: string, limit: number) =>
+    [...searchKeys.all, "note-content", query, limit] as const,
 };

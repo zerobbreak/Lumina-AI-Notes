@@ -3,7 +3,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { noteListItemToCard, noteListItemsToSidebar } from "@/lib/api/adapters/note";
 import { notesApi } from "@/lib/api/domains/notes.api";
-import { isRestApiEnabled } from "@/lib/api/enabled";
 import { useApiToken } from "@/lib/api/use-api-token";
 import { noteKeys } from "@/lib/query-keys/notes";
 
@@ -24,6 +23,6 @@ export function useNotesByContext(
       const items = await notesApi.getByContext(token, params);
       return format === "card" ? items.map(noteListItemToCard) : noteListItemsToSidebar(items);
     },
-    enabled: isRestApiEnabled() && isReady && enabled,
+    enabled: isReady && enabled,
   });
 }

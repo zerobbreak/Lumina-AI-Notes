@@ -1,16 +1,10 @@
 "use client";
 
-import { useMutation } from "convex/react";
 import { useCallback } from "react";
-import { api } from "@/convex/_generated/api";
-import { isRestApiEnabled } from "@/lib/api/enabled";
 import { useCreateDeadline } from "@/lib/mutations/deadlines/useCreateDeadline";
 
 export function useDeadlineActions() {
-  const useRest = isRestApiEnabled();
-
-  const createDeadlineConvex = useMutation(api.deadlines.createDeadline);
-  const createDeadlineRest = useCreateDeadline();
+  const createDeadlineMutation = useCreateDeadline();
 
   const createDeadline = useCallback(
     async (args: {
@@ -21,13 +15,9 @@ export function useDeadlineActions() {
       moduleId?: string;
       notes?: string;
     }) => {
-      if (useRest) {
-        await createDeadlineRest.mutateAsync(args);
-      } else {
-        await createDeadlineConvex(args);
-      }
+      await createDeadlineMutation.mutateAsync(args);
     },
-    [useRest, createDeadlineConvex, createDeadlineRest],
+    [createDeadlineMutation],
   );
 
   return { createDeadline };

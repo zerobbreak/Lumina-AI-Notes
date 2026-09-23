@@ -8,4 +8,5 @@ export const noteKeys = {
     [...noteKeys.all, "context", params] as const,
   detail: (noteId: string) => [...noteKeys.all, "detail", noteId] as const,
   children: (parentNoteId: string) => [...noteKeys.all, "children", parentNoteId] as const,
+  resumeTarget: () => [...noteKeys.all, "resume-target"] as const,
 };

@@ -2,8 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { notificationsApi } from "@/lib/api/domains/notifications.api";
-import { isRestApiEnabled } from "@/lib/api/enabled";
 import { useApiToken } from "@/lib/api/use-api-token";
+import { pollWhileVisible, POLL_MS } from "@/lib/queries/polling";
 import { notificationKeys } from "@/lib/query-keys/notifications";
 
 export function useNotifications(
@@ -18,6 +18,7 @@ export function useNotifications(
       const token = await getApiToken();
       return notificationsApi.list(token, params);
     },
-    enabled: isRestApiEnabled() && isReady && enabled,
+    enabled: isReady && enabled,
+    ...pollWhileVisible(POLL_MS.notifications),
   });
 }

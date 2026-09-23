@@ -1,11 +1,7 @@
 "use client";
 
-import { useMutation } from "convex/react";
 import { useCallback } from "react";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import { isRestApiEnabled } from "@/lib/api/enabled";
-import { useCreateNote } from "@/lib/mutations/notes/useCreateNote";
+import type { Id } from "@/types/data-model";
 import { useDeleteNote } from "@/lib/mutations/notes/useDeleteNote";
 import { useMoveNoteToFolder } from "@/lib/mutations/notes/useMoveNoteToFolder";
 import { useRenameNote } from "@/lib/mutations/notes/useRenameNote";
@@ -15,70 +11,45 @@ import { useToggleShareNote } from "@/lib/mutations/notes/useToggleShareNote";
 import { useTouchNote } from "@/lib/mutations/notes/useTouchNote";
 import { useUpdateNote } from "@/lib/mutations/notes/useUpdateNote";
 import type { UpdateNoteInput } from "@/lib/mutations/notes/useUpdateNote";
+import { useCreateNote } from "@/lib/mutations/notes/useCreateNote";
+import type { CreateNoteInput } from "@/lib/mutations/notes/useCreateNote";
 
 export function useNoteActions() {
-  const useRest = isRestApiEnabled();
-
-  const deleteNoteConvex = useMutation(api.notes.deleteNote);
-  const renameNoteConvex = useMutation(api.notes.renameNote);
-  const toggleArchiveConvex = useMutation(api.notes.toggleArchiveNote);
-  const togglePinConvex = useMutation(api.notes.togglePinNote);
-  const toggleShareConvex = useMutation(api.notes.toggleShareNote);
-  const moveNoteConvex = useMutation(api.notes.moveNoteToFolder);
-  const updateNoteConvex = useMutation(api.notes.updateNote);
-  const touchNoteConvex = useMutation(api.notes.touchNote);
-
-  const deleteNoteRest = useDeleteNote();
-  const renameNoteRest = useRenameNote();
-  const toggleArchiveRest = useToggleArchiveNote();
-  const togglePinRest = useTogglePinNote();
-  const toggleShareRest = useToggleShareNote();
-  const moveNoteRest = useMoveNoteToFolder();
-  const updateNoteRest = useUpdateNote();
-  const touchNoteRest = useTouchNote();
+  const deleteNoteMutation = useDeleteNote();
+  const renameNoteMutation = useRenameNote();
+  const toggleArchiveMutation = useToggleArchiveNote();
+  const togglePinMutation = useTogglePinNote();
+  const toggleShareMutation = useToggleShareNote();
+  const moveNoteMutation = useMoveNoteToFolder();
+  const updateNoteMutation = useUpdateNote();
+  const touchNoteMutation = useTouchNote();
 
   const deleteNote = useCallback(
     async (args: { noteId: Id<"notes"> }) => {
-      if (useRest) {
-        await deleteNoteRest.mutateAsync(args.noteId);
-      } else {
-        await deleteNoteConvex(args);
-      }
+      await deleteNoteMutation.mutateAsync(args.noteId);
     },
-    [useRest, deleteNoteConvex, deleteNoteRest],
+    [deleteNoteMutation],
   );
 
   const renameNote = useCallback(
     async (args: { noteId: Id<"notes">; title: string }) => {
-      if (useRest) {
-        await renameNoteRest.mutateAsync(args);
-      } else {
-        await renameNoteConvex(args);
-      }
+      await renameNoteMutation.mutateAsync(args);
     },
-    [useRest, renameNoteConvex, renameNoteRest],
+    [renameNoteMutation],
   );
 
   const toggleArchiveNote = useCallback(
     async (args: { noteId: Id<"notes"> }) => {
-      if (useRest) {
-        await toggleArchiveRest.mutateAsync(args.noteId);
-      } else {
-        await toggleArchiveConvex(args);
-      }
+      await toggleArchiveMutation.mutateAsync(args.noteId);
     },
-    [useRest, toggleArchiveConvex, toggleArchiveRest],
+    [toggleArchiveMutation],
   );
 
   const togglePinNote = useCallback(
     async (args: { noteId: Id<"notes"> }) => {
-      if (useRest) {
-        await togglePinRest.mutateAsync(args.noteId);
-      } else {
-        await togglePinConvex(args);
-      }
+      await togglePinMutation.mutateAsync(args.noteId);
     },
-    [useRest, togglePinConvex, togglePinRest],
+    [togglePinMutation],
   );
 
   const moveNoteToFolder = useCallback(
@@ -87,46 +58,31 @@ export function useNoteActions() {
       courseId?: string;
       moduleId?: string;
     }) => {
-      if (useRest) {
-        await moveNoteRest.mutateAsync(args);
-      } else {
-        await moveNoteConvex(args);
-      }
+      await moveNoteMutation.mutateAsync(args);
     },
-    [useRest, moveNoteConvex, moveNoteRest],
+    [moveNoteMutation],
   );
 
   const updateNote = useCallback(
     async (args: UpdateNoteInput) => {
-      if (useRest) {
-        await updateNoteRest.mutateAsync(args);
-      } else {
-        await updateNoteConvex(args);
-      }
+      await updateNoteMutation.mutateAsync(args);
     },
-    [useRest, updateNoteConvex, updateNoteRest],
+    [updateNoteMutation],
   );
 
   const touchNote = useCallback(
     async (args: { noteId: Id<"notes"> }) => {
-      if (useRest) {
-        await touchNoteRest.mutateAsync(args.noteId);
-      } else {
-        await touchNoteConvex(args);
-      }
+      await touchNoteMutation.mutateAsync(args.noteId);
     },
-    [useRest, touchNoteConvex, touchNoteRest],
+    [touchNoteMutation],
   );
 
   const toggleShareNote = useCallback(
     async (args: { noteId: Id<"notes"> }): Promise<boolean> => {
-      if (useRest) {
-        const dto = await toggleShareRest.mutateAsync(args.noteId);
-        return dto.isShared;
-      }
-      return toggleShareConvex(args);
+      const dto = await toggleShareMutation.mutateAsync(args.noteId);
+      return dto.isShared;
     },
-    [useRest, toggleShareConvex, toggleShareRest],
+    [toggleShareMutation],
   );
 
   return {
@@ -142,17 +98,12 @@ export function useNoteActions() {
 }
 
 export function useCreateNoteAction() {
-  const useRest = isRestApiEnabled();
-  const createNoteConvex = useMutation(api.notes.createNote);
-  const createNoteRest = useCreateNote();
+  const createNoteMutation = useCreateNote();
 
   return useCallback(
-    async (args: Parameters<typeof createNoteConvex>[0]) => {
-      if (useRest) {
-        return (await createNoteRest.mutateAsync(args)) as Id<"notes">;
-      }
-      return createNoteConvex(args);
+    async (args: CreateNoteInput) => {
+      return (await createNoteMutation.mutateAsync(args)) as Id<"notes">;
     },
-    [useRest, createNoteConvex, createNoteRest],
+    [createNoteMutation],
   );
 }

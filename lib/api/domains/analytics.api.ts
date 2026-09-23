@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api/client";
+import { apiPath } from "@/lib/api/path";
 import type {
   BurnoutStats,
   DailyStudyActivityPoint,
@@ -7,14 +8,6 @@ import type {
   WeakTopic,
 } from "@/types/api/analytics";
 
-function qs(params: Record<string, string | number | undefined>) {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined) search.set(key, String(value));
-  }
-  const query = search.toString();
-  return query ? `?${query}` : "";
-}
 
 export const analyticsApi = {
   getDailyStudyActivity(
@@ -22,35 +15,35 @@ export const analyticsApi = {
     params: { start: number; end: number; tzOffsetMinutes: number },
   ) {
     return apiFetch<DailyStudyActivityPoint[]>(
-      `/analytics/daily-study-activity${qs(params)}`,
-      { token },
+      apiPath`/analytics/daily-study-activity`,
+      { query: params, token },
     );
   },
 
   getBurnoutStats(token: string, tzOffsetMinutes: number) {
     return apiFetch<BurnoutStats>(
-      `/analytics/burnout-stats${qs({ tzOffsetMinutes })}`,
-      { token },
+      apiPath`/analytics/burnout-stats`,
+      { query: { tzOffsetMinutes }, token },
     );
   },
 
   getDeckPerformance(token: string, deckId: string) {
     return apiFetch<DeckPerformancePoint[]>(
-      `/analytics/quiz-decks/${encodeURIComponent(deckId)}/performance`,
+      apiPath`/analytics/quiz-decks/${deckId}/performance`,
       { token },
     );
   },
 
   getReadinessForecast(token: string, deckId: string) {
     return apiFetch<ReadinessForecast>(
-      `/analytics/flashcard-decks/${encodeURIComponent(deckId)}/readiness-forecast`,
+      apiPath`/analytics/flashcard-decks/${deckId}/readiness-forecast`,
       { token },
     );
   },
 
   getWeakTopics(token: string, deckId: string) {
     return apiFetch<WeakTopic[]>(
-      `/analytics/flashcard-decks/${encodeURIComponent(deckId)}/weak-topics`,
+      apiPath`/analytics/flashcard-decks/${deckId}/weak-topics`,
       { token },
     );
   },

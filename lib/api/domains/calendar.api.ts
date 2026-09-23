@@ -1,12 +1,12 @@
 import { apiFetch } from "@/lib/api/client";
+import { apiPath } from "@/lib/api/path";
 import type { CalendarActivityDto } from "@/types/api/calendar";
 
 export const calendarApi = {
   getActivity(token: string, params: { startMs: number; endMs: number }) {
-    const search = new URLSearchParams({
-      startMs: String(params.startMs),
-      endMs: String(params.endMs),
+    return apiFetch<CalendarActivityDto>(apiPath`/calendar/activity`, {
+      token,
+      query: { startMs: params.startMs, endMs: params.endMs },
     });
-    return apiFetch<CalendarActivityDto>(`/calendar/activity?${search}`, { token });
   },
 };

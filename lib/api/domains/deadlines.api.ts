@@ -1,21 +1,14 @@
 import { apiFetch } from "@/lib/api/client";
+import { apiPath } from "@/lib/api/path";
 import type { DeadlineDto } from "@/types/api/deadlines";
 
-function qs(params: Record<string, string | number | boolean | undefined>) {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined) search.set(key, String(value));
-  }
-  const query = search.toString();
-  return query ? `?${query}` : "";
-}
 
 export const deadlinesApi = {
   getUpcoming(
     token: string,
     params?: { limit?: number; windowDays?: number; includeCompleted?: boolean },
   ) {
-    return apiFetch<DeadlineDto[]>(`/deadlines/upcoming${qs(params ?? {})}`, { token });
+    return apiFetch<DeadlineDto[]>(apiPath`/deadlines/upcoming`, { query: params ?? {}, token });
   },
 
   create(
@@ -29,6 +22,6 @@ export const deadlinesApi = {
       notes?: string;
     },
   ) {
-    return apiFetch<DeadlineDto>("/deadlines", { method: "POST", token, body });
+    return apiFetch<DeadlineDto>(apiPath`/deadlines`, { method: "POST", token, body });
   },
 };

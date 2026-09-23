@@ -1,14 +1,7 @@
 import { apiFetch } from "@/lib/api/client";
-import type { SearchResponseDto } from "@/types/api/search";
+import { apiPath } from "@/lib/api/path";
+import type { SearchNoteContentResponseDto, SearchResponseDto } from "@/types/api/search";
 
-function qs(params: Record<string, string | number | undefined>) {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined) search.set(key, String(value));
-  }
-  const query = search.toString();
-  return query ? `?${query}` : "";
-}
 
 export const searchApi = {
   search(
@@ -22,8 +15,15 @@ export const searchApi = {
   ) {
     const tagIds = params.tagIds?.length ? params.tagIds.join(",") : undefined;
     return apiFetch<SearchResponseDto>(
-      `/search${qs({ ...params, tagIds })}`,
-      { token },
+      apiPath`/search`,
+      { query: { ...params, tagIds }, token },
+    );
+  },
+
+  searchNoteContent(token: string, query: string, limit = 6) {
+    return apiFetch<SearchNoteContentResponseDto>(
+      apiPath`/search/note-content`,
+      { query: { query, limit }, token },
     );
   },
 };

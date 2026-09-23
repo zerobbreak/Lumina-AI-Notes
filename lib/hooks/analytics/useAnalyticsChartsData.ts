@@ -1,10 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import { isRestApiEnabled } from "@/lib/api/enabled";
 import { useBurnoutStats } from "@/lib/queries/analytics/useBurnoutStats";
 import { useDailyStudyActivity } from "@/lib/queries/analytics/useDailyStudyActivity";
 import { useDeckPerformance } from "@/lib/queries/analytics/useDeckPerformance";
@@ -20,91 +16,53 @@ export function useAnalyticsChartsData(options: {
   tzOffsetMinutes: number;
 }) {
   const { showAnalytics, heatmapStart, now, tzOffsetMinutes } = options;
-  const useRest = isRestApiEnabled();
 
   const activityParams = showAnalytics ? { start: heatmapStart, end: now, tzOffsetMinutes } : null;
 
-  const dailyActivityConvex = useQuery(
-    api.analytics.getDailyStudyActivity,
-    !useRest && activityParams ? activityParams : "skip",
-  );
-  const dailyActivityRest = useDailyStudyActivity(useRest ? activityParams : null);
+  const dailyActivityRest = useDailyStudyActivity(activityParams);
 
-  const burnoutStatsConvex = useQuery(
-    api.analytics.getBurnoutStats,
-    !useRest && showAnalytics ? { tzOffsetMinutes } : "skip",
-  );
-  const burnoutStatsRest = useBurnoutStats(tzOffsetMinutes, useRest && showAnalytics);
+  const burnoutStatsRest = useBurnoutStats(tzOffsetMinutes, showAnalytics);
 
-  const flashcardDecksConvex = useQuery(
-    api.flashcards.getDecks,
-    !useRest && showAnalytics ? {} : "skip",
-  );
-  const flashcardDecksRest = useFlashcardDecks(useRest && showAnalytics);
+  const flashcardDecksRest = useFlashcardDecks(showAnalytics);
 
-  const quizDecksConvex = useQuery(api.quizzes.getDecks, !useRest && showAnalytics ? {} : "skip");
-  const quizDecksRest = useQuizDecks(useRest && showAnalytics);
+  const quizDecksRest = useQuizDecks(showAnalytics);
 
-  const flashcardDecks = useRest ? flashcardDecksRest.data : flashcardDecksConvex;
-  const quizDecks = useRest ? quizDecksRest.data : quizDecksConvex;
+  const flashcardDecks = flashcardDecksRest.data;
+  const quizDecks = quizDecksRest.data;
 
   const primaryDeckId = flashcardDecks?.[0]?._id;
   const primaryQuizDeckId = quizDecks?.[0]?._id;
 
-  const deckPerformanceConvex = useQuery(
-    api.analytics.getDeckPerformance,
-    !useRest && showAnalytics && primaryQuizDeckId
-      ? { deckId: primaryQuizDeckId as Id<"quizDecks"> }
-      : "skip",
-  );
   const deckPerformanceRest = useDeckPerformance(
-    useRest && showAnalytics ? primaryQuizDeckId : undefined,
+    showAnalytics ? primaryQuizDeckId : undefined,
   );
 
-  const readinessForecastConvex = useQuery(
-    api.analytics.getReadinessForecast,
-    !useRest && showAnalytics && primaryDeckId
-      ? { deckId: primaryDeckId as Id<"flashcardDecks"> }
-      : "skip",
-  );
   const readinessForecastRest = useReadinessForecast(
-    useRest && showAnalytics ? primaryDeckId : undefined,
+    showAnalytics ? primaryDeckId : undefined,
   );
 
-  const weakTopicsConvex = useQuery(
-    api.analytics.getWeakTopics,
-    !useRest && showAnalytics && primaryDeckId
-      ? { deckId: primaryDeckId as Id<"flashcardDecks"> }
-      : "skip",
-  );
-  const weakTopicsRest = useWeakTopics(useRest && showAnalytics ? primaryDeckId : undefined);
+  const weakTopicsRest = useWeakTopics(showAnalytics ? primaryDeckId : undefined);
 
   return useMemo(
     () => ({
-      dailyActivity: useRest ? dailyActivityRest.data : dailyActivityConvex,
-      burnoutStats: useRest ? burnoutStatsRest.data : burnoutStatsConvex,
+      dailyActivity: dailyActivityRest.data,
+      burnoutStats: burnoutStatsRest.data,
       flashcardDecks,
       quizDecks,
       primaryDeckId,
-      deckPerformance: useRest ? deckPerformanceRest.data : deckPerformanceConvex,
-      readinessForecast: useRest ? readinessForecastRest.data : readinessForecastConvex,
-      weakTopics: useRest ? weakTopicsRest.data : weakTopicsConvex,
+      deckPerformance: deckPerformanceRest.data,
+      readinessForecast: readinessForecastRest.data,
+      weakTopics: weakTopicsRest.data,
     }),
     [
-      useRest,
       dailyActivityRest.data,
-      dailyActivityConvex,
       burnoutStatsRest.data,
-      burnoutStatsConvex,
       flashcardDecks,
       quizDecks,
       primaryDeckId,
       deckPerformanceRest.data,
-      deckPerformanceConvex,
       readinessForecastRest.data,
-      readinessForecastConvex,
       weakTopicsRest.data,
-      weakTopicsConvex,
     ],
   );
 }
