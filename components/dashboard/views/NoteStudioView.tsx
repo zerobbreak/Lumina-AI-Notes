@@ -126,7 +126,6 @@ export default function NoteStudioView() {
   const [activeSessionId, setActiveSessionId] = useState<Id<"chatSessions"> | null>(null);
   const [studioMode, setStudioMode] = useState<"graph" | "chat">("chat");
   const [input, setInput] = useState("");
-  const isCreatingFallbackSessionRef = useRef(false);
   
   // @ Mention State
   const [showMentions, setShowMentions] = useState(false);
@@ -144,39 +143,23 @@ export default function NoteStudioView() {
     setSessionMode,
   } = useChatActions();
 
-  const { sessions, messages, activeSession, pinnedNotes, recentNotes } =
+  const { sessions, sessionsSettled, messages, activeSession, pinnedNotes, recentNotes } =
     useChatStudioData(activeSessionId);
 
   const [isThinking, setIsThinking] = useState(false);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Keep the selection pointing at a chat that exists: pick the newest one when
+  // nothing is selected or the selected chat is gone (deleted elsewhere, stale).
+  // This never creates a chat — handleSend creates one on demand — because the
+  // list can lag behind a create, and creating here would loop.
   useEffect(() => {
-    if (sessions.length > 0 && !activeSessionId) {
-      setActiveSessionId(sessions[0]._id);
-    }
-  }, [sessions, activeSessionId]);
-
-  // If the active session disappears (deleted elsewhere / stale URL / etc),
-  // automatically spin up a fresh chat like the "first message" flow.
-  useEffect(() => {
-    const activeMissing =
-      activeSessionId !== null && !sessions.some((s) => s._id === activeSessionId);
-    if (!activeMissing) return;
-    if (isCreatingFallbackSessionRef.current) return;
-    isCreatingFallbackSessionRef.current = true;
-
-    void (async () => {
-      try {
-        const newSessionId = await createSession({ title: "New Chat" });
-        setActiveSessionId(newSessionId);
-        setInput("");
-        setSelectedNotes([]);
-      } finally {
-        isCreatingFallbackSessionRef.current = false;
-      }
-    })();
-  }, [activeSessionId, sessions, createSession]);
+    if (!sessionsSettled) return;
+    if (activeSessionId !== null && sessions.some((s) => s._id === activeSessionId)) return;
+    const next = sessions[0]?._id ?? null;
+    if (next !== activeSessionId) setActiveSessionId(next);
+  }, [sessions, sessionsSettled, activeSessionId]);
 
   const mode = (activeSession?.mode as ChatMode | undefined) ?? "explain";
 
@@ -202,24 +185,14 @@ export default function NoteStudioView() {
     e.preventDefault();
     e.stopPropagation();
 
-    const ok = window.confirm("Delete this chat? This cannot be undone.");
-    if (!ok) return;
-
+    // Move off the chat before it's gone, so its messages aren't fetched.
+    const remaining = sessions.filter((s) => s._id !== sessionId);
     if (activeSessionId === sessionId) {
-      // Prevent `getMessages` from firing while deletion is in-flight.
-      setActiveSessionId(null);
+      setActiveSessionId(remaining[0]?._id ?? null);
     }
 
     await deleteSession({ sessionId });
-
-    const remaining = sessions.filter((s) => s._id !== sessionId);
-    if (remaining.length > 0) {
-      // If we deleted the active session, move to the next one.
-      if (activeSessionId === sessionId) {
-        setActiveSessionId(remaining[0]!._id);
-      }
-      return;
-    }
+    if (remaining.length > 0) return;
 
     // No chats left — auto-spin up a new one.
     const newSessionId = await createSession({ title: "New Chat" });

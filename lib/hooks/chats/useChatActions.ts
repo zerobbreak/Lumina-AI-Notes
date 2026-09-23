@@ -3,10 +3,12 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import type { Id } from "@/types/data-model";
+import type { ChatSessionModel } from "@/lib/api/adapters/chat";
 import { chatsApi } from "@/lib/api/domains/chats.api";
 import type { ChatModeDto } from "@/types/api/chats";
 import { useApiToken } from "@/lib/api/use-api-token";
-import { invalidateChats } from "@/lib/invalidation";
+import { invalidateChats, refreshChats } from "@/lib/invalidation";
+import { chatKeys } from "@/lib/query-keys/chats";
 
 type ChatMode = ChatModeDto;
 
@@ -22,10 +24,12 @@ export function useChatActions() {
     async (args: { title: string }) => {
       const token = await getApiToken();
       const { id } = await chatsApi.createSession(token, args.title);
-      invalidate();
+      // Wait for the refetch so callers that select the new chat see it in the
+      // sessions list straight away, instead of a stale list without it.
+      await refreshChats(queryClient);
       return id as Id<"chatSessions">;
     },
-    [getApiToken, invalidate],
+    [getApiToken, queryClient],
   );
 
   const sendMessage = useCallback(
@@ -48,11 +52,21 @@ export function useChatActions() {
 
   const deleteSession = useCallback(
     async (args: { sessionId: Id<"chatSessions"> }) => {
-      const token = await getApiToken();
-      await chatsApi.deleteSession(token, args.sessionId);
-      invalidate();
+      // Drop the chat from the list straight away. An in-flight poll could put
+      // it back, so cancel that first. If the delete fails, the refetch below
+      // brings it back.
+      await queryClient.cancelQueries({ queryKey: chatKeys.sessions() });
+      queryClient.setQueryData<ChatSessionModel[]>(chatKeys.sessions(), (old) =>
+        old?.filter((s) => s._id !== args.sessionId),
+      );
+      try {
+        const token = await getApiToken();
+        await chatsApi.deleteSession(token, args.sessionId);
+      } finally {
+        await refreshChats(queryClient);
+      }
     },
-    [getApiToken, invalidate],
+    [getApiToken, queryClient],
   );
 
   const pinNotesToSession = useCallback(

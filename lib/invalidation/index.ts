@@ -38,6 +38,11 @@ export function invalidateChats(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: chatKeys.all });
 }
 
+/** Like invalidateChats, but resolves once the active chat queries have refetched. */
+export function refreshChats(queryClient: QueryClient) {
+  return queryClient.invalidateQueries({ queryKey: chatKeys.all });
+}
+
 export function invalidateFlashcards(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: flashcardKeys.all });
 }

@@ -11,6 +11,9 @@ import { useRecentNotes } from "@/lib/queries/notes/useRecentNotes";
 export function useChatStudioData(activeSessionId: Id<"chatSessions"> | null) {
   const sessionsRest = useChatSessions();
   const sessions = sessionsRest.data ?? [];
+  // True once the list is loaded and no refetch is in flight, so it is safe to
+  // treat a session missing from it as gone.
+  const sessionsSettled = sessionsRest.isSuccess && !sessionsRest.isFetching;
 
   const messagesRest = useChatMessages(activeSessionId);
   const messages = messagesRest.data;
@@ -31,6 +34,7 @@ export function useChatStudioData(activeSessionId: Id<"chatSessions"> | null) {
 
   return {
     sessions,
+    sessionsSettled,
     messages,
     activeSession,
     pinnedNotes,
