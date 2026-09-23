@@ -5,10 +5,49 @@ import { files } from "../db/schema/index.js";
 import { saveExtractedContent, updateProcessingStatus } from "../files/processing.js";
 import type { Storage } from "../storage/s3.js";
 import { embedTextForVectorSearch } from "./embedding.js";
+import { clientMessage, UserFacingError } from "./errors.js";
 
 export type ProcessDocumentResult = { success: boolean; error?: string };
 
-/** Port of convex/ai.ts processDocument. */
+/**
+ * Gemini takes at most 20 MB of inline request data, and base64 grows a file
+ * by a third, so anything bigger would fail there anyway. Checking first also
+ * keeps a 100 MB upload from being read into memory at all.
+ */
+export const MAX_PDF_BYTES = 15 * 1024 * 1024;
+
+/** Each run holds the whole PDF in memory twice (bytes + base64); cap how many run at once. */
+export const MAX_CONCURRENT_DOCUMENTS = 2;
+
+/** A run still "processing" after this long died mid-way (e.g. a redeploy) and may be retried. */
+export const STALE_PROCESSING_MS = 15 * 60 * 1000;
+
+let activeRuns = 0;
+
+/**
+ * Atomically moves a pending file to processing. Only one caller can win, so
+ * the background queue, a polling client and a retry can't each start their
+ * own Gemini run for the same file.
+ */
+async function claimFile(db: Db, fileId: string, userId: string) {
+  const [file] = await db
+    .update(files)
+    .set({
+      processingStatus: "processing",
+      progressPercent: 10,
+      errorMessage: null,
+      processingStartedAt: new Date(),
+    })
+    .where(and(eq(files.id, fileId), eq(files.userId, userId), eq(files.processingStatus, "pending")))
+    .returning();
+  return file ?? null;
+}
+
+/**
+ * Port of convex/ai.ts processDocument. Does nothing unless the file is
+ * pending; a file left pending because the server was busy is picked up on
+ * the next GET /files/pending.
+ */
 export async function runProcessDocument(
   db: Db,
   storage: Storage,
@@ -16,17 +55,42 @@ export async function runProcessDocument(
   userId: string,
   apiKey: string,
 ): Promise<ProcessDocumentResult> {
+  if (activeRuns >= MAX_CONCURRENT_DOCUMENTS) {
+    return { success: false, error: "Document processing is busy; this file will be processed shortly" };
+  }
+  // Counted before the first await, so concurrent callers can't all pass the check.
+  activeRuns += 1;
   try {
-    const [file] = await db
-      .select()
-      .from(files)
-      .where(and(eq(files.id, fileId), eq(files.userId, userId)))
-      .limit(1);
-    if (!file?.storageKey) {
-      throw new Error("File not found or missing storage key");
+    const file = await claimFile(db, fileId, userId);
+    if (!file) {
+      // Missing, someone else's, already running, or finished. Leave its status alone.
+      return { success: false, error: "File is not waiting to be processed" };
+    }
+    return await processClaimedFile(db, storage, file, apiKey);
+  } finally {
+    activeRuns -= 1;
+  }
+}
+
+async function processClaimedFile(
+  db: Db,
+  storage: Storage,
+  file: typeof files.$inferSelect,
+  apiKey: string,
+): Promise<ProcessDocumentResult> {
+  const fileId = file.id;
+  try {
+    if (!file.storageKey) {
+      throw new UserFacingError("File not found or missing storage key");
     }
 
-    await updateProcessingStatus(db, fileId, { processingStatus: "processing", progressPercent: 10 });
+    const object = await storage.stat(file.storageKey);
+    if (!object) {
+      throw new UserFacingError("File not found in storage");
+    }
+    if (object.size > MAX_PDF_BYTES) {
+      throw new UserFacingError(`PDF is too large to process (max ${MAX_PDF_BYTES / 1024 / 1024} MB)`);
+    }
 
     const bytes = await storage.getBytes(file.storageKey);
     const base64Data = Buffer.from(bytes).toString("base64");
@@ -86,13 +150,13 @@ Return ONLY valid JSON, no markdown code fences or explanation.`,
     }
 
     if (!extractedText.trim()) {
-      throw new Error("No text could be extracted from PDF");
+      throw new UserFacingError("No text could be extracted from PDF");
     }
 
     const textForEmbedding = `${summary}\n\n${extractedText.substring(0, 5000)}`;
     const embedding = await embedTextForVectorSearch(genAI, textForEmbedding, TaskType.RETRIEVAL_DOCUMENT);
     if (!embedding) {
-      throw new Error("Failed to generate document embedding");
+      throw new UserFacingError("Failed to generate document embedding");
     }
 
     await updateProcessingStatus(db, fileId, { processingStatus: "processing", progressPercent: 90 });
@@ -111,13 +175,9 @@ Return ONLY valid JSON, no markdown code fences or explanation.`,
     return { success: true };
   } catch (error) {
     console.error("processDocument error:", error);
-    await updateProcessingStatus(db, fileId, {
-      processingStatus: "error",
-      errorMessage: error instanceof Error ? error.message : "Processing failed",
-    });
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Processing failed",
-    };
+    // Stored and shown in the file list, so never a raw library error.
+    const message = clientMessage(error, "Processing failed");
+    await updateProcessingStatus(db, fileId, { processingStatus: "error", errorMessage: message });
+    return { success: false, error: message };
   }
 }

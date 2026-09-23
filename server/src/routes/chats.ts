@@ -5,6 +5,7 @@ import { generateAssistantReply } from "../ai/chatReply.js";
 import { requireSessionOwner, toSessionResponse } from "../chats/helpers.js";
 import type { Db } from "../db/client.js";
 import { chatMessages, chatSessions, notes } from "../db/schema/index.js";
+import { consumeAiQuota } from "../middleware/ai-rate-limit.js";
 import { HttpError } from "../middleware/errors.js";
 import { currentUser } from "../middleware/user.js";
 import { parse } from "./validation.js";
@@ -12,7 +13,9 @@ import { parse } from "./validation.js";
 const rowId = z.string().min(1).max(200);
 const title = z.string().trim().min(1).max(500);
 const chatMode = z.enum(["explain", "synthesize", "compare", "apply", "quiz", "fill_gaps"]);
-const chatRole = z.enum(["user", "assistant"]);
+// Assistant messages are only written by the server (see generateAssistantReply),
+// so a client can't plant fake replies that get fed back into later prompts.
+const chatRole = z.literal("user");
 
 const createSessionBody = z.object({ title });
 const setModeBody = z.object({ mode: chatMode });
@@ -223,6 +226,9 @@ export function createChatsRouter(db: Db, geminiApiKey?: string) {
   router.post("/sessions/:id/reply", async (req, res) => {
     const user = currentUser(res);
     const body = parse(replyBody, req.body);
+    // 404 for someone else's session before it can cost anyone quota.
+    await requireSessionOwner(db, req.params.id, user.id);
+    await consumeAiQuota(db, user.id);
     try {
       const result = await generateAssistantReply(db, geminiApiKey, user.id, {
         sessionId: req.params.id,

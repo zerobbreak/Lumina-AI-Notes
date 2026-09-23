@@ -4,6 +4,7 @@ import { Router } from "express";
 import { z } from "zod";
 import type { Db } from "../db/client.js";
 import { flashcardDecks, files, notes } from "../db/schema/index.js";
+import { consumeAiQuota } from "../middleware/ai-rate-limit.js";
 import { currentUser } from "../middleware/user.js";
 import { embedTextForVectorSearch } from "../ai/embedding.js";
 import { noteIdsWithAllTags } from "../notes/tagFilters.js";
@@ -269,6 +270,8 @@ export function createSearchRouter(db: Db, storage: Storage, geminiApiKey?: stri
     }
 
     const user = currentUser(res);
+    // Embedding the query is a Gemini call.
+    await consumeAiQuota(db, user.id);
     const genAI = new GoogleGenerativeAI(geminiApiKey);
     const queryEmbedding = await embedTextForVectorSearch(genAI, args.query, TaskType.RETRIEVAL_QUERY);
     if (!queryEmbedding) {

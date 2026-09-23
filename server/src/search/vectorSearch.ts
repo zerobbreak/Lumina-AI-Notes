@@ -48,17 +48,18 @@ export async function searchFilesByEmbedding(
   return rows.map((r) => ({ id: r.id, score: Number(r.score) }));
 }
 
-/** Chunk search in documents, optionally scoped to one source file's storage key. */
+/**
+ * Chunk search within one uploaded file's chunks. `storageKey` is required:
+ * the documents table holds every user's chunks, so an unscoped search would
+ * hand one user's documents to another.
+ */
 export async function searchDocumentsByEmbedding(
   db: Db,
   embedding: number[],
   limit: number,
-  storageKey?: string,
+  storageKey: string,
 ): Promise<Array<VectorHit & { text: string }>> {
   const vec = vectorSql(embedding);
-  const filters = storageKey
-    ? and(eq(documents.storageKey, storageKey))
-    : undefined;
   const rows = await db
     .select({
       id: documents.id,
@@ -66,7 +67,7 @@ export async function searchDocumentsByEmbedding(
       score: sql<number>`(1 - (${documents.embedding} <=> ${vec}))`.as("score"),
     })
     .from(documents)
-    .where(filters)
+    .where(eq(documents.storageKey, storageKey))
     .orderBy(sql`${documents.embedding} <=> ${vec}`)
     .limit(limit);
   return rows.map((r) => ({ id: r.id, text: r.text, score: Number(r.score) }));

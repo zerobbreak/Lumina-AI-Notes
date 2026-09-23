@@ -1,4 +1,4 @@
-import { asc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, count, eq, inArray, lt, or } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { files } from "../db/schema/index.js";
 
@@ -71,4 +71,25 @@ export async function recomputeFileQueuePositions(db: Db) {
   }
 
   return { updated: queue.length };
+}
+
+/** Only the head of the queue gets a number, as recomputeFileQueuePositions does. */
+const NUMBERED_QUEUE_LENGTH = 20;
+
+/**
+ * Where each of these files sits in the processing queue, worked out without
+ * writing anything: a request from one user mustn't rewrite every user's rows
+ * (the worker's recomputeFileQueuePositions keeps the stored column fresh).
+ */
+export async function queuePositionOf(db: Db, file: { createdAt: Date }): Promise<number | null> {
+  const [{ ahead }] = await db
+    .select({ ahead: count() })
+    .from(files)
+    .where(
+      and(
+        or(eq(files.processingStatus, "pending"), eq(files.processingStatus, "processing")),
+        lt(files.createdAt, file.createdAt),
+      ),
+    );
+  return ahead < NUMBERED_QUEUE_LENGTH ? ahead + 1 : null;
 }

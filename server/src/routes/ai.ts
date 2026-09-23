@@ -3,6 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { buildDiagramData, type DiagramNodeInput } from "../ai/diagram.js";
 import { enrichTranscript } from "../ai/enrichTranscript.js";
+import { clientMessage } from "../ai/errors.js";
 import { getGeminiModel } from "../ai/gemini.js";
 import { needsDepthRepair, tryParseJson, wordCountFn } from "../ai/noteQuality.js";
 import { CLARITY_RULES, getDepthRequirements, GROUNDING_RULES } from "../ai/notePrompts.js";
@@ -12,6 +13,7 @@ import type { Env } from "../env.js";
 import { aiRateLimit } from "../middleware/ai-rate-limit.js";
 import { currentUser } from "../middleware/user.js";
 import type { Db } from "../db/client.js";
+import { audioQuotaExhausted, MAX_TRANSCRIBE_BYTES } from "../recordings/usage.js";
 import { isOwnedKey, type Storage } from "../storage/s3.js";
 import { registerBit2Routes } from "../ai/registerBit2Routes.js";
 import { parse } from "./validation.js";
@@ -1043,7 +1045,7 @@ Return ONLY valid JSON.`;
       console.error("extractFormulaFromImage error:", error);
       res.json({
         success: false,
-        error: error instanceof Error ? error.message : "Failed to extract formula from image",
+        error: clientMessage(error, "Failed to extract formula from image"),
       });
     }
   });
@@ -1059,9 +1061,14 @@ Return ONLY valid JSON.`;
       return;
     }
 
-    const userId = currentUser(res).clerkUserId;
-    if (!isOwnedKey(userId, storageKey)) {
+    const user = currentUser(res);
+    if (!isOwnedKey(user.clerkUserId, storageKey)) {
       failure("Audio file not found in storage. It may have been deleted.");
+      return;
+    }
+    const outOfMinutes = await audioQuotaExhausted(db, user.id);
+    if (outOfMinutes) {
+      failure(outOfMinutes);
       return;
     }
 
@@ -1072,8 +1079,7 @@ Return ONLY valid JSON.`;
         return;
       }
 
-      const MAX_FILE_SIZE = 50 * 1024 * 1024;
-      if (stat.size > MAX_FILE_SIZE) {
+      if (stat.size > MAX_TRANSCRIBE_BYTES) {
         failure(`Audio file is too large (${(stat.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 50MB.`);
         return;
       }

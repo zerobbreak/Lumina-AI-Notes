@@ -45,6 +45,8 @@ export const files = pgTable(
     /** "pending" | "processing" | "done" | "error" */
     processingStatus: text(),
     processedAt: timestamptz(),
+    /** When the current run claimed the file; lets a run that died mid-way be retried. */
+    processingStartedAt: timestamptz(),
     queuePosition: integer(),
     progressPercent: doublePrecision(),
     errorMessage: text(),

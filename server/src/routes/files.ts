@@ -6,8 +6,9 @@ import { documents, files } from "../db/schema/index.js";
 import { HttpError } from "../middleware/errors.js";
 import { currentUser } from "../middleware/user.js";
 import { isOwnedKey, type Storage } from "../storage/s3.js";
-import { runProcessDocument } from "../ai/processDocument.js";
-import { recomputeFileQueuePositions } from "../files/processing.js";
+import { runProcessDocument, STALE_PROCESSING_MS } from "../ai/processDocument.js";
+import { consumeAiQuota } from "../middleware/ai-rate-limit.js";
+import { queuePositionOf } from "../files/processing.js";
 import { parse } from "./validation.js";
 
 type FileRow = typeof files.$inferSelect;
@@ -88,6 +89,10 @@ export function createFilesRouter(db: Db, storage: Storage, geminiApiKey?: strin
       object?.contentType === "application/pdf" ||
       body.name.toLowerCase().endsWith(".pdf");
 
+    // Recording a PDF starts a Gemini run, so it spends AI quota. Checked
+    // before the row exists, so a refused upload can simply be sent again.
+    if (isPdf) await consumeAiQuota(db, user.id);
+
     const now = new Date();
     const [file] = await db
       .insert(files)
@@ -152,7 +157,6 @@ export function createFilesRouter(db: Db, storage: Storage, geminiApiKey?: strin
 
   // getPendingFiles
   router.get("/pending", async (_req, res) => {
-    await recomputeFileQueuePositions(db);
     const user = currentUser(res);
     const rows = await db
       .select(listColumns)
@@ -163,7 +167,9 @@ export function createFilesRouter(db: Db, storage: Storage, geminiApiKey?: strin
     for (const row of rows) {
       queueProcess(row.id, user.id);
     }
-    res.json(rows);
+    res.json(
+      await Promise.all(rows.map(async (row) => ({ ...row, queuePosition: await queuePositionOf(db, row) }))),
+    );
   });
 
   // getFile
@@ -208,7 +214,12 @@ export function createFilesRouter(db: Db, storage: Storage, geminiApiKey?: strin
   // retryProcessing
   router.post("/:id/retry", async (req, res) => {
     const user = currentUser(res);
-    await findOwned(req.params.id, user.id);
+    const file = await findOwned(req.params.id, user.id);
+    const startedAt = file.processingStartedAt?.getTime();
+    if (file.processingStatus === "processing" && startedAt && Date.now() - startedAt < STALE_PROCESSING_MS) {
+      throw new HttpError(409, "This file is already being processed", "already_processing");
+    }
+    await consumeAiQuota(db, user.id);
     await db
       .update(files)
       .set({ processingStatus: "pending", progressPercent: 0, errorMessage: null, queuePosition: null })

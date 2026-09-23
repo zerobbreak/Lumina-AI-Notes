@@ -4,6 +4,9 @@ import { users, type MonthlyUsage } from "../db/schema/index.js";
 
 export const AUDIO_LIMIT_MINUTES = 300;
 
+/** Largest audio file the transcription routes will read into memory and send to Gemini. */
+export const MAX_TRANSCRIBE_BYTES = 50 * 1024 * 1024;
+
 /** Mirrors convex/recordings.ts getUserUsage — resets in memory when the month rolls over. */
 export function normalizeUsage(
   raw: MonthlyUsage | null | undefined,
@@ -59,4 +62,16 @@ export async function checkAndUpdateAudioUsage(
     allowed: true,
     remaining: limit - usage.audioMinutesUsed - durationMinutes,
   };
+}
+
+/**
+ * Refusal message when the user has no audio minutes left this month, else
+ * null. Minutes are only counted when a recording is saved, so this can't
+ * stop the one transcription that tips a user over; it stops the ones after.
+ */
+export async function audioQuotaExhausted(db: Db, userId: string): Promise<string | null> {
+  const usage = await getUserUsage(db, userId);
+  return usage.audioMinutesUsed >= AUDIO_LIMIT_MINUTES
+    ? `You've used all ${AUDIO_LIMIT_MINUTES} audio minutes for this month.`
+    : null;
 }

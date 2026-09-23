@@ -8,15 +8,16 @@ import type { Db } from "../db/client.js";
 import { files, notes } from "../db/schema/index.js";
 import type { Env } from "../env.js";
 import { createDeckWithCards, createDeckWithCardsImmediate } from "../flashcards/createDeck.js";
-import { recomputeFileQueuePositions } from "../files/processing.js";
 import { noteColumns, requireNote } from "../notes/access.js";
 import { createDeckWithQuestions } from "../quizzes/createDeck.js";
 import { searchDocumentsByEmbedding, searchFilesByEmbedding, searchNotesByEmbedding } from "../search/vectorSearch.js";
 import { parse } from "../routes/validation.js";
 import { currentUser } from "../middleware/user.js";
-import { isOwnedKey, type Storage } from "../storage/s3.js";
+import { audioQuotaExhausted, MAX_TRANSCRIBE_BYTES } from "../recordings/usage.js";
+import { isOwnedKey, userPrefix, type Storage } from "../storage/s3.js";
 import { applyLayeredLayout, buildDiagramData, layeredRanks, type DiagramNodeInput } from "./diagram.js";
 import { embedTextForVectorSearch } from "./embedding.js";
+import { clientMessage, UserFacingError } from "./errors.js";
 import { enrichTranscriptForPinned } from "./enrichTranscriptForPinned.js";
 import { getGeminiModel } from "./gemini.js";
 import { needsDepthRepair, tryParseJson, wordCountFn } from "./noteQuality.js";
@@ -50,13 +51,13 @@ async function requireOwnedFile(db: Db, fileId: string, userId: string) {
     .from(files)
     .where(and(eq(files.id, fileId), eq(files.userId, userId)))
     .limit(1);
-  if (!file) throw new Error("File not found");
+  if (!file) throw new UserFacingError("File not found");
   return file;
 }
 
 async function extractPdfBase64(storage: Storage, pdfBase64?: string, storageKey?: string) {
   if (pdfBase64) return pdfBase64;
-  if (!storageKey) throw new Error("No PDF content provided");
+  if (!storageKey) throw new UserFacingError("No PDF content provided");
   const bytes = await storage.getBytes(storageKey);
   return Buffer.from(bytes).toString("base64");
 }
@@ -291,7 +292,7 @@ Instructions:
       const result = await gemini.generateContent(prompt);
       let text = result.response.text().trim().replace(/^```json?\s*/i, "").replace(/```\s*$/i, "");
       const match = text.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error("Failed to generate roadmap JSON");
+      if (!match) throw new UserFacingError("Failed to generate roadmap JSON");
       const data = JSON.parse(match[0]) as {
         nodes: Array<{ id: string; type: string; data: { label: string; color: string }; position: { x: number; y: number } }>;
         edges: Array<{ id: string; source: string; target: string; animated?: boolean }>;
@@ -358,7 +359,7 @@ Instructions:
       res.json({ success: true, answer: result.response.text() });
     } catch (error) {
       console.error("askAboutFile error:", error);
-      res.json({ success: false, error: error instanceof Error ? error.message : "Failed to answer question" });
+      res.json({ success: false, error: clientMessage(error, "Failed to answer question") });
     }
   });
 
@@ -370,7 +371,7 @@ Instructions:
     try {
       const file = await requireOwnedFile(db, fileId, currentUser(res).id);
       if (file.processingStatus !== "done" || !file.extractedText) {
-        throw new Error("Document not yet processed");
+        throw new UserFacingError("Document not yet processed");
       }
       const context = currentNoteContent?.replace(/<[^>]*>/g, " ") || "";
       const gemini = model();
@@ -413,7 +414,7 @@ Return a JSON response:
 Return ONLY valid JSON.`;
       const result = await gemini.generateContent(prompt);
       const jsonMatch = result.response.text().trim().match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("Failed to parse AI response");
+      if (!jsonMatch) throw new UserFacingError("Failed to parse AI response");
       const parsed = JSON.parse(jsonMatch[0]) as {
         summary?: string;
         relevantExcerpts?: string[];
@@ -429,7 +430,7 @@ Return ONLY valid JSON.`;
       });
     } catch (error) {
       console.error("getDocumentReference error:", error);
-      res.json({ success: false, error: error instanceof Error ? error.message : "Failed to get reference" });
+      res.json({ success: false, error: clientMessage(error, "Failed to get reference") });
     }
   });
 
@@ -441,7 +442,7 @@ Return ONLY valid JSON.`;
     try {
       const file = await requireOwnedFile(db, fileId, currentUser(res).id);
       if (file.processingStatus !== "done" || !file.extractedText) {
-        throw new Error("Document not yet processed. Please wait for processing to complete.");
+        throw new UserFacingError("Document not yet processed. Please wait for processing to complete.");
       }
       const style = noteStyle || "detailed";
       const styleInstructions: Record<string, string> = {
@@ -489,7 +490,7 @@ Return ONLY the title, no quotes or explanation.`);
       });
     } catch (error) {
       console.error("generateNotesFromDocument error:", error);
-      res.json({ success: false, error: error instanceof Error ? error.message : "Failed to generate notes" });
+      res.json({ success: false, error: clientMessage(error, "Failed to generate notes") });
     }
   });
 
@@ -519,7 +520,7 @@ Return ONLY the title, no quotes or explanation.`);
           summary: f.summary || "",
         }));
       if (validDocs.length === 0) {
-        throw new Error("No processed documents found. Please wait for document processing to complete.");
+        throw new UserFacingError("No processed documents found. Please wait for document processing to complete.");
       }
       const docContext = validDocs
         .map((d, i) => `[${i + 1}] ${d.name}:\nSummary: ${d.summary}\nContent: ${d.content}`)
@@ -547,7 +548,7 @@ Instructions:
       });
     } catch (error) {
       console.error("improveNoteWithDocuments error:", error);
-      res.json({ success: false, error: error instanceof Error ? error.message : "Failed to improve note" });
+      res.json({ success: false, error: clientMessage(error, "Failed to improve note") });
     }
   });
 
@@ -579,9 +580,9 @@ ${plainText.substring(0, 8000)}
 Return a JSON array: [{"front": "Question", "back": "Answer"}]
 Return ONLY valid JSON.`);
       const jsonMatch = result.response.text().trim().match(/\[[\s\S]*\]/);
-      if (!jsonMatch) throw new Error("Failed to parse AI response");
+      if (!jsonMatch) throw new UserFacingError("Failed to parse AI response");
       const cards = JSON.parse(jsonMatch[0]) as Array<{ front: string; back: string }>;
-      if (!cards.length) throw new Error("No flashcards generated");
+      if (!cards.length) throw new UserFacingError("No flashcards generated");
       const deckId = await createDeckWithCards(db, user.id, {
         title,
         sourceNoteId: noteId,
@@ -591,7 +592,7 @@ Return ONLY valid JSON.`);
       res.json({ success: true, deckId, cardCount: cards.length });
     } catch (error) {
       console.error("generateAndSaveFlashcards error:", error);
-      res.json({ success: false, error: error instanceof Error ? error.message : "Failed to generate flashcards" });
+      res.json({ success: false, error: clientMessage(error, "Failed to generate flashcards") });
     }
   });
 
@@ -621,7 +622,7 @@ Return JSON array:
 [{"question": "...", "options": ["A","B","C","D"], "correctAnswer": 0, "explanation": "..."}]
 Return ONLY valid JSON.`);
       const jsonMatch = result.response.text().trim().match(/\[[\s\S]*\]/);
-      if (!jsonMatch) throw new Error("Failed to parse AI response");
+      if (!jsonMatch) throw new UserFacingError("Failed to parse AI response");
       const questions = JSON.parse(jsonMatch[0]) as Array<{
         question: string;
         options: string[];
@@ -637,7 +638,7 @@ Return ONLY valid JSON.`);
       res.json({ success: true, deckId, questionCount: questions.length });
     } catch (error) {
       console.error("generateAndSaveQuiz error:", error);
-      res.json({ success: false, error: error instanceof Error ? error.message : "Failed to generate quiz" });
+      res.json({ success: false, error: clientMessage(error, "Failed to generate quiz") });
     }
   });
 
@@ -655,7 +656,7 @@ Return ONLY valid JSON.`);
     try {
       const user = currentUser(res);
       if (body.storageKey && !isOwnedKey(user.clerkUserId, body.storageKey)) {
-        throw new Error("File not found in storage");
+        throw new UserFacingError("File not found in storage");
       }
       const apiKey = requireGeminiKey();
       const pdfBase64 = await extractPdfBase64(storage, body.pdfBase64, body.storageKey);
@@ -666,13 +667,13 @@ Return ONLY valid JSON.`);
         { text: "Extract complete text from this PDF for flashcard generation. Return ONLY the extracted text with markdown structure." },
       ]);
       const extractedText = extractionResult.response.text().trim();
-      if (extractedText.length < 50) throw new Error("Could not extract sufficient text from PDF");
+      if (extractedText.length < 50) throw new UserFacingError("Could not extract sufficient text from PDF");
       const count = body.cardCount ?? 10;
       const flashcardResult = await pdfModel.generateContent(`[Context: ${extractedText.substring(0, 15000)}]
 
 Generate ${count} flashcards. Return JSON array [{"front":"...","back":"..."}] ONLY.`);
       const jsonMatch = flashcardResult.response.text().trim().match(/\[[\s\S]*\]/);
-      if (!jsonMatch) throw new Error("Failed to parse flashcard response from AI");
+      if (!jsonMatch) throw new UserFacingError("Failed to parse flashcard response from AI");
       const cards = JSON.parse(jsonMatch[0]) as Array<{ front: string; back: string }>;
       const deckId = await createDeckWithCardsImmediate(db, user.id, {
         title: body.fileName.replace(/\.pdf$/i, "") + " - Quick Cards",
@@ -683,7 +684,7 @@ Generate ${count} flashcards. Return JSON array [{"front":"...","back":"..."}] O
       res.json({ success: true, deckId, cardCount: cards.length });
     } catch (error) {
       console.error("ingestAndGenerateFlashcards error:", error);
-      res.json({ success: false, error: error instanceof Error ? error.message : "Failed to generate flashcards from PDF" });
+      res.json({ success: false, error: clientMessage(error, "Failed to generate flashcards from PDF") });
     }
   });
 
@@ -700,7 +701,7 @@ Generate ${count} flashcards. Return JSON array [{"front":"...","back":"..."}] O
     try {
       const user = currentUser(res);
       if (body.storageKey && !isOwnedKey(user.clerkUserId, body.storageKey)) {
-        throw new Error("File not found in storage");
+        throw new UserFacingError("File not found in storage");
       }
       const apiKey = requireGeminiKey();
       const pdfBase64 = await extractPdfBase64(storage, body.pdfBase64, body.storageKey);
@@ -713,7 +714,7 @@ Generate ${count} flashcards. Return JSON array [{"front":"...","back":"..."}] O
         },
       ]);
       const jsonMatch = noteGenerationResult.response.text().trim().match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("Failed to parse note generation response");
+      if (!jsonMatch) throw new UserFacingError("Failed to parse note generation response");
       const parsed = JSON.parse(jsonMatch[0]) as { title?: string; content?: string };
       const now = new Date();
       const [created] = await db
@@ -730,7 +731,7 @@ Generate ${count} flashcards. Return JSON array [{"front":"...","back":"..."}] O
       res.json({ success: true, noteId: created.id, title: created.title });
     } catch (error) {
       console.error("ingestAndGenerateNote error:", error);
-      res.json({ success: false, error: error instanceof Error ? error.message : "Failed to generate note from PDF" });
+      res.json({ success: false, error: clientMessage(error, "Failed to generate note from PDF") });
     }
   });
 
@@ -756,9 +757,9 @@ Generate ${count} flashcards. Return JSON array [{"front":"...","back":"..."}] O
       if (body.pinnedFileId) {
         const file = await requireOwnedFile(db, body.pinnedFileId, user.id);
         const embedding = await embedTextForVectorSearch(genAI, normalizedTranscript, TaskType.RETRIEVAL_QUERY);
-        if (embedding) {
-          const storageKey = file.storageKey ?? undefined;
-          const chunks = await searchDocumentsByEmbedding(db, embedding, 5, storageKey);
+        // Only uploads have chunks; a link file has no storageKey to scope the search to.
+        if (embedding && file.storageKey) {
+          const chunks = await searchDocumentsByEmbedding(db, embedding, 5, file.storageKey);
           contextText = chunks.map((c) => c.text).join("\n\n---\n\n");
         }
         if (!contextText && file.extractedText) {
@@ -871,6 +872,22 @@ Return ONLY valid JSON.`;
       res.json({ transcript: "", success: false, isolated: false, error: "Not authenticated or file not found" });
       return;
     }
+    const refuse = (error: string) => res.json({ transcript: "", success: false, isolated: false, error });
+    const outOfMinutes = await audioQuotaExhausted(db, user.id);
+    if (outOfMinutes) {
+      refuse(outOfMinutes);
+      return;
+    }
+    // Checked before reading any bytes: both isolation and Gemini hold the whole file in memory.
+    const source = await storage.stat(storageKey);
+    if (!source) {
+      refuse("Audio file not found in storage. It may have been deleted.");
+      return;
+    }
+    if (source.size > MAX_TRANSCRIBE_BYTES) {
+      refuse(`Audio file is too large (${(source.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 50MB.`);
+      return;
+    }
 
     let isolatedStorageKey: string | undefined;
     let useKey = storageKey;
@@ -903,7 +920,8 @@ Return ONLY valid JSON.`;
           if (response.ok) {
             const isolatedBytes = await response.arrayBuffer();
             if (isolatedBytes.byteLength >= 256) {
-              isolatedStorageKey = `${user.clerkUserId}/isolated/${randomUUID()}.mp3`;
+              // Under the user's prefix, like every other object, so they can use it later.
+              isolatedStorageKey = `${userPrefix(user.clerkUserId)}isolated/${randomUUID()}.mp3`;
               await storage.put(isolatedStorageKey, Buffer.from(isolatedBytes), ISOLATED_AUDIO_MIME);
               useKey = isolatedStorageKey;
             }
@@ -916,7 +934,7 @@ Return ONLY valid JSON.`;
             transcript: "",
             success: false,
             isolated: false,
-            error: error instanceof Error ? error.message : "Isolation failed",
+            error: clientMessage(error, "Isolation failed"),
           });
           return;
         }
@@ -944,12 +962,8 @@ Return ONLY valid JSON.`;
         transcript: "",
         success: false,
         isolated: false,
-        error: error instanceof Error ? error.message : "Transcription failed",
+        error: clientMessage(error, "Transcription failed"),
       });
     }
-  });
-
-  router.post("/recompute-file-queue", async (_req, res) => {
-    res.json(await recomputeFileQueuePositions(db));
   });
 }
