@@ -7,6 +7,9 @@ import { describe, it, expect } from "vitest";
 import {
   formatElapsed,
   idleWaveform,
+  jobPhase,
+  jobStepIndex,
+  JOB_STEPS,
   mirrorLevels,
   phaseLabel,
   resolvePhase,
@@ -31,7 +34,6 @@ const base = {
   isThinking: false,
   isSearchOpen: false,
   hasTranscript: false,
-  hasNotes: false,
 };
 
 describe("resolvePhase", () => {
@@ -46,7 +48,7 @@ describe("resolvePhase", () => {
         isSearchOpen: true,
         isRecording: true,
         isThinking: true,
-        hasNotes: true,
+        job: { status: "running", stage: "generate" },
       }),
     ).toBe("searching");
   });
@@ -69,14 +71,37 @@ describe("resolvePhase", () => {
     );
   });
 
-  it("shows ready once notes exist, even with a transcript present", () => {
-    expect(
-      resolvePhase({ ...base, hasTranscript: true, hasNotes: true }),
-    ).toBe("ready");
+  it("shows a background job's stage when nothing more immediate is going on", () => {
+    expect(resolvePhase({ ...base, job: { status: "running", stage: "transcribe" } })).toBe("transcribing");
+    expect(resolvePhase({ ...base, job: { status: "succeeded", stage: null } })).toBe("ready");
   });
 
-  it("falls back to paused when a transcript exists but notes do not", () => {
+  it("lets a new session take over the pill while an earlier job runs", () => {
+    const job = { status: "running", stage: "generate" } as const;
+    expect(resolvePhase({ ...base, isRecording: true, job })).toBe("listening");
+    expect(resolvePhase({ ...base, hasTranscript: true, job })).toBe("paused");
+  });
+
+  it("falls back to paused when a transcript exists and no job is running", () => {
     expect(resolvePhase({ ...base, hasTranscript: true })).toBe("paused");
+  });
+});
+
+describe("jobPhase", () => {
+  it("maps each pipeline stage to its own face", () => {
+    expect(jobPhase({ status: "queued", stage: null })).toBe("queued");
+    expect(jobPhase({ status: "running", stage: "research" })).toBe("researching");
+    expect(jobPhase({ status: "running", stage: "generate" })).toBe("writing");
+    expect(jobPhase({ status: "running", stage: "validate" })).toBe("checking");
+    expect(jobPhase({ status: "running", stage: "save" })).toBe("saving");
+    expect(jobPhase({ status: "retrying", stage: "generate" })).toBe("retrying");
+    expect(jobPhase({ status: "failed", stage: "generate" })).toBe("failed");
+  });
+
+  it("tracks which step dot is current", () => {
+    expect(jobStepIndex({ status: "queued", stage: null })).toBe(-1);
+    expect(jobStepIndex({ status: "running", stage: "generate" })).toBe(2);
+    expect(jobStepIndex({ status: "succeeded", stage: null })).toBe(JOB_STEPS.length);
   });
 });
 

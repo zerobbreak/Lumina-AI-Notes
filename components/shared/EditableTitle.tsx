@@ -8,6 +8,8 @@ interface EditableTitleProps {
   onSave: (newValue: string) => Promise<void>;
   className?: string; // For h1 styling
   placeholder?: string;
+  /** Shows the title without letting it be edited. */
+  readOnly?: boolean;
 }
 
 export function EditableTitle({
@@ -15,6 +17,7 @@ export function EditableTitle({
   onSave,
   className,
   placeholder = "Untitled",
+  readOnly = false,
 }: EditableTitleProps) {
   const [isEditing, setIsEditing] = React.useState(false);
   const [value, setValue] = React.useState(initialValue);
@@ -69,10 +72,11 @@ export function EditableTitle({
 
   return (
     <h1
-      onClick={() => setIsEditing(true)}
+      onClick={readOnly ? undefined : () => setIsEditing(true)}
       className={cn(
         "cursor-text hover:bg-white/5 rounded px-1 -ml-1 transition-colors truncate",
         className,
+        readOnly && "cursor-default",
         !value && "text-gray-500 italic"
       )}
     >

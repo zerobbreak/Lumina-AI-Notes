@@ -1,7 +1,15 @@
 import { UserFacingError } from "../ai/errors.js";
 
+/** A failure a later attempt could get past, e.g. a model reply that wasn't usable this time. */
+export class RetryableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RetryableError";
+  }
+}
+
 const TRANSIENT_MESSAGE =
-  /\b(429|500|502|503|504)\b|RESOURCE_EXHAUSTED|UNAVAILABLE|overloaded|rate.?limit|quota|timed? ?out|timeout|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|socket hang up|fetch failed|network|not valid JSON|empty notes/i;
+  /\b(429|500|502|503|504)\b|RESOURCE_EXHAUSTED|UNAVAILABLE|overloaded|rate.?limit|quota|timed? ?out|timeout|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|socket hang up|fetch failed|network/i;
 
 /**
  * Whether trying again later could succeed: rate limits, 5xx, timeouts,
@@ -9,6 +17,7 @@ const TRANSIENT_MESSAGE =
  * a missing file, a message written for users) fails the job straight away.
  */
 export function isTransientError(error: unknown): boolean {
+  if (error instanceof RetryableError) return true;
   if (error instanceof UserFacingError) return false;
   if (!(error instanceof Error)) return false;
   const status = (error as { status?: unknown }).status;

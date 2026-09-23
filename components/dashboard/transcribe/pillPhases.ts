@@ -5,14 +5,31 @@
  * without mounting audio hardware or Convex.
  */
 
+import type { JobStatus, RecordingStage } from "@/types/api/jobs";
+
+/** Faces for a background recording job, one per pipeline stage. */
+export type JobPhase =
+  | "queued"
+  | "transcribing"
+  | "researching"
+  | "writing"
+  | "checking"
+  | "saving"
+  | "retrying"
+  | "failed"
+  | "ready";
+
 export type PillPhase =
   | "idle"
   | "listening"
   | "isolating"
   | "paused"
   | "thinking"
-  | "ready"
-  | "searching";
+  | "searching"
+  | JobPhase;
+
+/** The part of a job the pill reads (see GET /jobs/:id). */
+export type PillJob = { status: JobStatus; stage: RecordingStage | null };
 
 export type PillPhaseInput = {
   isRecording: boolean;
@@ -20,15 +37,61 @@ export type PillPhaseInput = {
   isThinking: boolean;
   isSearchOpen: boolean;
   hasTranscript: boolean;
-  hasNotes: boolean;
+  /** The recording job the pill is following, if any. */
+  job?: PillJob | null;
 };
+
+/** The pipeline in order, as the pill's step dots show it. */
+export const JOB_STEPS: readonly RecordingStage[] = [
+  "transcribe",
+  "research",
+  "generate",
+  "validate",
+  "save",
+];
+
+const STAGE_PHASE: Record<RecordingStage, JobPhase> = {
+  transcribe: "transcribing",
+  research: "researching",
+  generate: "writing",
+  validate: "checking",
+  save: "saving",
+};
+
+const JOB_PHASES: readonly string[] = [
+  "queued", "transcribing", "researching", "writing", "checking", "saving", "retrying", "failed", "ready",
+] satisfies JobPhase[];
+
+export const isJobPhase = (phase: PillPhase): phase is JobPhase => JOB_PHASES.includes(phase);
+
+export function jobPhase(job: PillJob): JobPhase {
+  switch (job.status) {
+    case "succeeded":
+      return "ready";
+    case "failed":
+      return "failed";
+    case "retrying":
+      return "retrying";
+    case "queued":
+      return "queued";
+    default:
+      return job.stage ? STAGE_PHASE[job.stage] : "queued";
+  }
+}
+
+/** Index of the job's current step in JOB_STEPS: -1 before it starts, JOB_STEPS.length once done. */
+export function jobStepIndex(job: PillJob): number {
+  if (job.status === "succeeded") return JOB_STEPS.length;
+  return job.stage ? JOB_STEPS.indexOf(job.stage) : -1;
+}
 
 /**
  * Single source of truth for which face the pill shows.
  *
  * Ordering is deliberate: an explicit search overlay wins over everything, then
- * live audio, then background work, so the pill never claims to be listening
- * while the mic is closed.
+ * live audio, then work the user is waiting on right now, then a session that
+ * still needs generating. A background job only shows when nothing more
+ * immediate is going on, so starting a new recording never hides behind it.
  */
 export function resolvePhase({
   isRecording,
@@ -36,14 +99,14 @@ export function resolvePhase({
   isThinking,
   isSearchOpen,
   hasTranscript,
-  hasNotes,
+  job,
 }: PillPhaseInput): PillPhase {
   if (isSearchOpen) return "searching";
   if (isRecording) return "listening";
   if (isIsolating) return "isolating";
   if (isThinking) return "thinking";
-  if (hasNotes) return "ready";
   if (hasTranscript) return "paused";
+  if (job) return jobPhase(job);
   return "idle";
 }
 
@@ -106,6 +169,22 @@ export function phaseLabel(phase: PillPhase): string {
       return "Paused";
     case "thinking":
       return "Starting note generation";
+    case "queued":
+      return "Waiting for a free worker";
+    case "transcribing":
+      return "Transcribing";
+    case "researching":
+      return "Reading your sources";
+    case "writing":
+      return "Writing notes";
+    case "checking":
+      return "Checking depth";
+    case "saving":
+      return "Adding to your note";
+    case "retrying":
+      return "Retrying shortly";
+    case "failed":
+      return "Couldn't generate notes";
     case "ready":
       return "Notes ready";
     case "searching":

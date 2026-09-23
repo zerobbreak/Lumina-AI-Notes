@@ -6,6 +6,12 @@ export type CollaboratorPersonDto = {
   image?: string | null;
 };
 
+export type NoteRoleDto = "owner" | "viewer" | "editor";
+
+export type NoteAccessDto = {
+  role: NoteRoleDto;
+};
+
 export type PendingInviteDto = {
   email: string;
   role: "viewer" | "editor";

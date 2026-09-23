@@ -21,7 +21,13 @@ export const wordCountFn = (text: string): number =>
 export const tryParseJson = (text: string): unknown => {
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) return null;
-  return JSON.parse(jsonMatch[0]);
+  try {
+    return JSON.parse(jsonMatch[0]);
+  } catch {
+    // Models often return almost-JSON (a stray quote, a trailing comma);
+    // callers ask the model to fix it rather than failing outright.
+    return null;
+  }
 };
 
 /**

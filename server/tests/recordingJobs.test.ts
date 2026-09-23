@@ -13,6 +13,8 @@ type Call = "transcribe" | "enrich" | "generate" | "repair" | "fix";
 const calls: Record<Call, number> = { transcribe: 0, enrich: 0, generate: 0, repair: 0, fix: 0 };
 /** Makes the next call of a kind throw, the way the SDK reports failures. */
 const failNext: Partial<Record<Call, Error>> = {};
+/** Makes the next call of a kind answer with almost-JSON, as the real model sometimes does. */
+const malformedNext = new Set<Call>();
 /** What "Gemini" writes as the notes draft. */
 let draft: unknown;
 
@@ -38,6 +40,9 @@ vi.mock("@google/generative-ai", async (importOriginal) => {
           if (failure) {
             delete failNext[kind];
             throw failure;
+          }
+          if (malformedNext.delete(kind)) {
+            return { response: { text: () => '{"summary": "Entropy" "sections": []}' } };
           }
           const text =
             kind === "transcribe"
@@ -73,6 +78,7 @@ beforeEach(async () => {
   await db.delete(users);
   for (const key of Object.keys(calls) as Call[]) calls[key] = 0;
   for (const key of Object.keys(failNext) as Call[]) delete failNext[key];
+  malformedNext.clear();
   draft = {
     summary: "Entropy and the **second law**.",
     sections: [
@@ -225,6 +231,23 @@ describe("processRecordingJob", () => {
     expect((await jobRow(job.id)).status).toBe("succeeded");
     expect(calls.transcribe).toBe(1);
     expect(await minutesUsed()).toBe(2);
+  });
+
+  it("has the model fix almost-JSON instead of failing the job", async () => {
+    const { job, noteId } = await start();
+    malformedNext.add("generate");
+    await processRecordingJob(deps, job.id, { isFinalAttempt: false });
+    expect((await jobRow(job.id)).status).toBe("succeeded");
+    expect(calls.fix).toBe(1);
+    expect((await noteRow(noteId)).content).toContain("Summary");
+  });
+
+  it("retries when even the fixed JSON is unreadable", async () => {
+    const { job } = await start();
+    malformedNext.add("generate");
+    malformedNext.add("fix");
+    await expect(processRecordingJob(deps, job.id, { isFinalAttempt: false })).rejects.toThrow(/valid JSON/);
+    expect((await jobRow(job.id)).status).toBe("retrying");
   });
 
   it("fails for good on its last attempt", async () => {

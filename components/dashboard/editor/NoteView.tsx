@@ -5,7 +5,7 @@ import { useNoteEditorData } from "@/lib/hooks/notes/useNoteEditorData";
 import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
 import { useNotePresence } from "@/lib/hooks/presence/useNotePresence";
 import { useNoteAutosave } from "@/lib/hooks/notes/useNoteAutosave";
-import { useJob } from "@/lib/queries/jobs/useJob";
+import { useNoteRole } from "@/lib/queries/collaboration/useNoteRole";
 import type { Doc, Id } from "@/types/data-model";
 import type { NoteBootstrap } from "@/components/dashboard/DashboardContext";
 import { useRouter } from "next/navigation";
@@ -34,7 +34,6 @@ import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
 import { editorLowlight } from "@/lib/editorLowlight";
 import { DiagramExtension } from "./extensions/DiagramExtension";
 import Editor from "./Editor";
-import { GenerationBanner } from "./GenerationBanner";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -106,10 +105,16 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   const { isLoading: isExporting } = usePDF();
 
   const { noteQuery, parentNote, childNotes, userData } = useNoteEditorData(noteId);
-  // A background job is writing this note: read-only until it's done.
-  const generationJobId = noteQuery?.generationJobId;
-  const isGenerating = Boolean(generationJobId);
-  const { data: generationJob } = useJob(generationJobId);
+  // The server rejects edits by viewers and owner-only changes by editors;
+  // offer only what the caller's role allows. A note just created here
+  // (bootstrap, not yet loaded) is the caller's own.
+  const { data: fetchedRole } = useNoteRole(noteId);
+  const role = fetchedRole ?? (noteBootstrap?.noteId === noteId ? "owner" : undefined);
+  const isOwner = role === "owner";
+  const canEdit = role === "owner" || role === "editor";
+  // A background job is writing this note: read-only until it's done. The
+  // transcription pill shows its progress and offers retry on failure.
+  const isGenerating = Boolean(noteQuery?.generationJobId);
   const { createNoteFlow } = useCreateNoteFlow();
   const {
     updateNote,
@@ -261,7 +266,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     noteId,
     content: debouncedContent,
     canSave:
-      !isGenerating && noteQuery !== null && (noteQuery !== undefined || noteBootstrap?.noteId === noteId),
+      canEdit && !isGenerating && noteQuery !== null && (noteQuery !== undefined || noteBootstrap?.noteId === noteId),
     save: saveContent,
     onSaved: markSaved,
     onError: reportSaveFailure,
@@ -276,8 +281,15 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   // Presence only for a note that loaded, by the id the server returned.
   useNotePresence(noteQuery ? noteQuery._id : null);
 
+  // Which note's saved content the editor holds. Until it's this note, the
+  // editor is empty or showing another note, so its updates aren't edits.
+  const contentLoadedForRef = useRef<Id<"notes"> | null>(null);
+  // Use ref to track current noteId without causing dependency array issues
+  const noteIdRef = useRef(noteId);
+
   const editor = useEditor({
-    editable: true,
+    // Turned on once the caller's role is known to allow editing.
+    editable: false,
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({ codeBlock: false }),
@@ -308,6 +320,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       },
     },
     onUpdate: ({ editor }) => {
+      if (contentLoadedForRef.current !== noteIdRef.current) return;
       setIsSaving(true);
       setDebouncedContent(editor.getHTML());
     },
@@ -315,8 +328,6 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
   // Track which note we've loaded content for to detect note changes
   const [loadedNoteId, setLoadedNoteId] = useState<Id<"notes"> | null>(null);
-  // Use ref to track current noteId without causing dependency array issues
-  const noteIdRef = useRef(noteId);
 
   useEffect(() => {
     noteIdRef.current = noteId;
@@ -377,6 +388,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
           // Loading what's saved isn't an edit: without this, TipTap v3 fires
           // onUpdate and every note open saved (and re-versioned) the note.
           editor.commands.setContent(htmlContent, { emitUpdate: false });
+          contentLoadedForRef.current = noteId;
           setLoadedNoteId(noteId);
         }
       });
@@ -392,8 +404,10 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
   ]);
 
   useEffect(() => {
-    if (editor && !editor.isDestroyed) editor.setEditable(!isGenerating);
-  }, [editor, isGenerating]);
+    // No update event: it would run onUpdate, and before the note has loaded
+    // that autosaves the empty editor over it.
+    if (editor && !editor.isDestroyed) editor.setEditable(canEdit && !isGenerating, false);
+  }, [editor, canEdit, isGenerating]);
 
   // When the job finishes, the note is refetched with its new content; load
   // it into the editor (which otherwise only loads when the note changes).
@@ -680,10 +694,16 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
 
 
+          {!canEdit && role && (
+            <span className="text-xs font-medium text-muted-foreground border border-border rounded-full px-2.5 py-0.5 mr-1">
+              View only
+            </span>
+          )}
+
           <ActionMenu
-            onRename={() => setIsRenameOpen(true)}
-            onDelete={handleDelete}
-            onArchive={handleArchive}
+            onRename={canEdit ? () => setIsRenameOpen(true) : undefined}
+            onDelete={isOwner ? handleDelete : undefined}
+            onArchive={isOwner ? handleArchive : undefined}
             onGenerateFlashcards={() => setIsFlashcardsOpen(true)}
             onGenerateQuiz={() => setIsQuizOpen(true)}
             isArchived={note.isArchived}
@@ -703,6 +723,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                 <EditableTitle
                   initialValue={note.title || ""}
                   onSave={handleRenameConfirm}
+                  readOnly={!canEdit}
                   className="text-4xl font-bold text-foreground leading-tight px-0 -ml-0.5 hover:bg-transparent hover:text-foreground transition-colors cursor-text"
                   placeholder="Untitled Note"
                 />
@@ -719,53 +740,58 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                   <User className="w-4 h-4 mr-2" />
                   Collaborate
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={async () => {
-                    await togglePinNote({ noteId });
-                  }}
-                  className={`${note.isPinned ? "text-foreground bg-accent hover:bg-accent/80" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}
-                  title={note.isPinned ? "Unpin note" : "Pin note"}
-                >
-                  <Pin
-                    className={`w-4 h-4 mr-2 ${note.isPinned ? "fill-current" : ""}`}
-                  />
-                  {note.isPinned ? "Pinned" : "Pin"}
-                </Button>
-                <Button
-                  variant={note.isShared ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={async () => {
-                    try {
-                      const isSharedNow = await toggleShare({ noteId });
-                      if (isSharedNow) {
-                        const url = `${window.location.origin}/share/${noteId}`;
-                        await navigator.clipboard.writeText(url);
-                        alert("Public link copied to clipboard: " + url);
-                      }
-                    } catch (e) {
-                      console.error("Failed to share", e);
-                    }
-                  }}
-                  className={`${note.isShared ? "bg-accent text-foreground border border-border hover:bg-accent/80" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}
-                >
-                  <Share2 className="w-4 h-4 mr-2" />
-                  {note.isShared ? "Shared" : "Share"}
-                </Button>
+                {/* Pin, share and tags are the owner's to change. */}
+                {isOwner && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={async () => {
+                        await togglePinNote({ noteId });
+                      }}
+                      className={`${note.isPinned ? "text-foreground bg-accent hover:bg-accent/80" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}
+                      title={note.isPinned ? "Unpin note" : "Pin note"}
+                    >
+                      <Pin
+                        className={`w-4 h-4 mr-2 ${note.isPinned ? "fill-current" : ""}`}
+                      />
+                      {note.isPinned ? "Pinned" : "Pin"}
+                    </Button>
+                    <Button
+                      variant={note.isShared ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          const isSharedNow = await toggleShare({ noteId });
+                          if (isSharedNow) {
+                            const url = `${window.location.origin}/share/${noteId}`;
+                            await navigator.clipboard.writeText(url);
+                            alert("Public link copied to clipboard: " + url);
+                          }
+                        } catch (e) {
+                          console.error("Failed to share", e);
+                        }
+                      }}
+                      className={`${note.isShared ? "bg-accent text-foreground border border-border hover:bg-accent/80" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}
+                    >
+                      <Share2 className="w-4 h-4 mr-2" />
+                      {note.isShared ? "Shared" : "Share"}
+                    </Button>
 
-                {/* Tag Picker */}
-                <div className="h-6 w-px bg-border mx-1 hidden sm:block" />
-                <TagPicker
-                  selectedTagIds={note.tagIds || []}
-                  onTagToggle={async (tagId) => {
-                    const currentTags = note.tagIds || [];
-                    const newTags = currentTags.includes(tagId)
-                      ? currentTags.filter((t) => t !== tagId)
-                      : [...currentTags, tagId];
-                    await updateNote({ noteId, tagIds: newTags });
-                  }}
-                />
+                    {/* Tag Picker */}
+                    <div className="h-6 w-px bg-border mx-1 hidden sm:block" />
+                    <TagPicker
+                      selectedTagIds={note.tagIds || []}
+                      onTagToggle={async (tagId) => {
+                        const currentTags = note.tagIds || [];
+                        const newTags = currentTags.includes(tagId)
+                          ? currentTags.filter((t) => t !== tagId)
+                          : [...currentTags, tagId];
+                        await updateNote({ noteId, tagIds: newTags });
+                      }}
+                    />
+                  </>
+                )}
               </div>
             </div>
 
@@ -774,16 +800,18 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Sub-pages
                 </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={handleCreateSubPage}
-                >
-                  <Plus className="w-3.5 h-3.5 mr-1" />
-                  New sub-page
-                </Button>
+                {canEdit && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={handleCreateSubPage}
+                  >
+                    <Plus className="w-3.5 h-3.5 mr-1" />
+                    New sub-page
+                  </Button>
+                )}
               </div>
               {childNotes && childNotes.length > 0 && (
                 <ul className="mt-2 space-y-1">
@@ -825,18 +853,12 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
           <Separator className="bg-border mb-4 sm:mb-5" data-html2canvas-ignore />
 
-          {generationJobId && (
-            <div data-html2canvas-ignore>
-              <GenerationBanner job={generationJob} noteId={noteId} />
-            </div>
-          )}
-
           {/* PDF Export Area - This is what gets exported */}
           <div id="note-content-area">
             {/* Editor Content - Wrapped with DocumentDropZone for drag-drop note generation */}
             <DocumentDropZone
               onNotesGenerated={(content, title, sourceDoc) => {
-                if (editor && !editor.isDestroyed) {
+                if (canEdit && editor && !editor.isDestroyed) {
                   // Insert generated notes at cursor or end
                   const sourceTag = `<p><em>[Source: ${sourceDoc.name}]</em></p>`;
                   editor
@@ -858,7 +880,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
                     setIsSaving(true);
                     setDebouncedContent(content);
                   }}
-                  isEditable={!isGenerating}
+                  isEditable={canEdit && !isGenerating}
                 />
               ) : (
                 <>
@@ -881,7 +903,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         context={note.content || ""}
         contextType="note"
         contextTitle={note.title}
-        onInsertToNote={handleInsertFromAI}
+        onInsertToNote={canEdit ? handleInsertFromAI : undefined}
       />
 
       <RenameDialog

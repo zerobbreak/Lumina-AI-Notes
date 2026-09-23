@@ -7,6 +7,7 @@ import { embedTextForVectorSearch } from "../../ai/embedding.js";
 import { enrichTranscript } from "../../ai/enrichTranscript.js";
 import { enrichTranscriptForPinned } from "../../ai/enrichTranscriptForPinned.js";
 import { UserFacingError } from "../../ai/errors.js";
+import { RetryableError } from "../../queue/errors.js";
 import { needsDepthRepair, tryParseJson, wordCountFn } from "../../ai/noteQuality.js";
 import { CLARITY_RULES, getDepthRequirements, GROUNDING_RULES } from "../../ai/notePrompts.js";
 import { normalizeTranscriptForPrompt } from "../../ai/transcript.js";
@@ -119,7 +120,7 @@ export async function generateDraft(models: Models, found: Research, options: No
   const draft = await parseOrFix(models.json, text);
   if (!draft) {
     // Usually a truncated or chatty response; worth another attempt.
-    throw new Error("Gemini returned notes that aren't valid JSON");
+    throw new RetryableError("Gemini returned notes that aren't valid JSON");
   }
   return draft as Draft;
 }
@@ -168,7 +169,7 @@ export async function validateDraft(
     diagramData: buildDiagramData(diagramNodes, diagramEdges),
   };
   if (!notes.summary.trim() && notes.sections.length === 0) {
-    throw new Error("Gemini returned empty notes");
+    throw new RetryableError("Gemini returned empty notes");
   }
   return notes;
 }

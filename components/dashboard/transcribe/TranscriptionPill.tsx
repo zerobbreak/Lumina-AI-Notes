@@ -31,10 +31,13 @@ import { useDashboard } from "@/hooks/useDashboard";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useMicLevels } from "@/hooks/useMicLevels";
 import { PillWaveform } from "./PillWaveform";
+import { isActiveJobPhase, PillJobProgressBar, PillJobStatus } from "./PillJobStatus";
+import { usePillJob } from "./usePillJob";
 import { ThinkingSequence } from "./ThinkingSequence";
 import {
   formatElapsed,
   idleWaveform,
+  isJobPhase,
   mirrorLevels,
   QUEUEING_STAGES,
   SAVING_STAGES,
@@ -98,6 +101,15 @@ const PHASE_ACCENT: Record<string, string> = {
   thinking: "text-primary",
   isolating: "text-primary",
   searching: "text-foreground",
+  queued: "text-primary",
+  transcribing: "text-primary",
+  researching: "text-primary",
+  writing: "text-primary",
+  checking: "text-primary",
+  saving: "text-primary",
+  retrying: "text-amber-600 dark:text-amber-400",
+  failed: "text-destructive",
+  ready: "text-emerald-600 dark:text-emerald-400",
 };
 
 export function TranscriptionPill() {
@@ -142,6 +154,7 @@ export function TranscriptionPill() {
   const { data: userData } = useCurrentUser();
 
   const { upsertDraft, processRecording } = useRecordingActions();
+  const pillJob = usePillJob(openNoteId);
   const uploadToStorage = useStorageUpload();
 
   const { data: matches } = useSearchNoteContent(
@@ -198,8 +211,10 @@ export function TranscriptionPill() {
     isThinking,
     isSearchOpen,
     hasTranscript: fullTranscript.length > 0 || audio !== null,
-    hasNotes: false,
+    job: pillJob.job,
   });
+  /** Set while the pill is showing the background job rather than a session. */
+  const jobFace = isJobPhase(phase) ? phase : null;
 
   const displayLevels = useMemo(
     () => (isRecording ? mirrorLevels(levels) : idleWaveform(BANDS * 2)),
@@ -315,14 +330,13 @@ export function TranscriptionPill() {
         referenceUrls: referenceUrls.length > 0 ? referenceUrls : undefined,
         tzOffsetMinutes: new Date().getTimezoneOffset(),
       });
+      // The pill follows the job from here; the note fills in when it's done.
+      pillJob.track(result.job.id);
       if (result.noteId !== openNoteId) {
         router.push(`/dashboard?noteId=${result.noteId}`);
       }
-      toast.success("Generating your notes", {
-        description: "They'll appear in the note when ready. You can keep working.",
-      });
     },
-    [processRecording, sourceRecordingId, openNoteId, userData?.major, activeContext, referenceUrls, router],
+    [processRecording, sourceRecordingId, openNoteId, userData?.major, activeContext, referenceUrls, router, pillJob],
   );
 
   const handleGenerate = useCallback(async () => {
@@ -541,6 +555,10 @@ export function TranscriptionPill() {
             />
           )}
 
+          {jobFace && isActiveJobPhase(jobFace) && pillJob.job && (
+            <PillJobProgressBar progress={pillJob.job.progress} />
+          )}
+
           {isSearchOpen ? (
             <>
               <Search
@@ -630,6 +648,10 @@ export function TranscriptionPill() {
                       </span>
                     )}
 
+                    {jobFace && pillJob.job && (
+                      <PillJobStatus job={pillJob.job} phase={jobFace} />
+                    )}
+
                     {phase === "idle" && (
                       <>
                         <PillWaveform
@@ -661,6 +683,40 @@ export function TranscriptionPill() {
                 {phase === "paused" && (
                   <PillIconButton label="Discard session" onClick={handleReset}>
                     <RotateCcw className="h-3.5 w-3.5" />
+                  </PillIconButton>
+                )}
+
+                {jobFace === "failed" && (
+                  <Button
+                    size="sm"
+                    onClick={pillJob.retry}
+                    disabled={pillJob.isActing}
+                    className="h-8 rounded-full px-3 text-xs"
+                  >
+                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                    Retry
+                  </Button>
+                )}
+
+                {jobFace === "ready" && pillJob.job?.noteId && pillJob.job.noteId !== openNoteId && (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      router.push(`/dashboard?noteId=${pillJob.job!.noteId}`);
+                      pillJob.dismiss();
+                    }}
+                    className="h-8 rounded-full px-3 text-xs"
+                  >
+                    Open
+                  </Button>
+                )}
+
+                {(jobFace === "failed" || jobFace === "ready") && (
+                  <PillIconButton
+                    label={jobFace === "failed" ? "Dismiss and unlock the note" : "Dismiss"}
+                    onClick={pillJob.dismiss}
+                  >
+                    <X className="h-3.5 w-3.5" />
                   </PillIconButton>
                 )}
 

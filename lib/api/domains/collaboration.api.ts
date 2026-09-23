@@ -3,9 +3,14 @@ import { apiPath } from "@/lib/api/path";
 import type {
   CollaboratorsListDto,
   InviteToNoteResultDto,
+  NoteAccessDto,
 } from "@/types/api/collaboration";
 
 export const collaborationApi = {
+  getNoteAccess(token: string, noteId: string) {
+    return apiFetch<NoteAccessDto>(apiPath`/notes/${noteId}/access`, { token });
+  },
+
   listPeopleWithAccess(token: string, noteId: string) {
     return apiFetch<CollaboratorsListDto>(apiPath`/notes/${noteId}/collaborators`, { token });
   },
