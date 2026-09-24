@@ -137,4 +137,32 @@ describe("deadlines", () => {
     expect(res.body.map((d: { title: string }) => d.title)).toEqual(["Yesterday", "Last week"]);
     expect(res.body[0].source).toBe("manual");
   });
+
+  it("lists every deadline due in a range, finished ones included, for the calendar", async () => {
+    const day = 24 * 60 * 60 * 1000;
+    const start = Date.UTC(2026, 9, 1);
+    const make = (title: string, dueAt: number) =>
+      as(ALICE).post("/api/v1/deadlines").send({ title, dueAt, kind: "assignment" });
+    await make("Before", start - day);
+    await make("First", start + day);
+    const done = await make("Done", start + 2 * day);
+    await as(ALICE).patch(`/api/v1/deadlines/${done.body.id}`).send({ completed: true });
+    await make("After", start + 40 * day);
+    await as(BOB).post("/api/v1/deadlines").send({ title: "Bob's", dueAt: start + day, kind: "task" });
+
+    const res = await as(ALICE)
+      .get("/api/v1/deadlines/range")
+      .query({ startMs: start, endMs: start + 31 * day });
+    expect(res.status).toBe(200);
+    expect(res.body.map((d: { title: string; completedAt?: number }) => [d.title, d.completedAt !== undefined])).toEqual([
+      ["First", false],
+      ["Done", true],
+    ]);
+  });
+
+  it("refuses a backwards or overly long range", async () => {
+    const q = (startMs: number, endMs: number) => as(ALICE).get("/api/v1/deadlines/range").query({ startMs, endMs });
+    expect((await q(2000, 1000)).status).toBe(400);
+    expect((await q(0, 90 * 24 * 60 * 60 * 1000)).status).toBe(400);
+  });
 });

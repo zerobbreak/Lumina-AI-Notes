@@ -49,6 +49,15 @@ const overdueQuery = z.object({
   windowDays: z.coerce.number().int().min(1).max(90).optional(),
 });
 
+const rangeQuery = z
+  .object({
+    startMs: z.coerce.number().int().min(0),
+    endMs: z.coerce.number().int().min(0),
+  })
+  .refine((q) => q.endMs >= q.startMs, { message: "endMs must not be before startMs" })
+  // About six weeks: one calendar month plus the days either side of it.
+  .refine((q) => q.endMs - q.startMs <= 45 * 24 * 60 * 60 * 1000, { message: "Range is too long" });
+
 async function requireOwnedDeadline(db: Db, deadlineId: string, userId: string) {
   const [row] = await db
     .select()
@@ -110,6 +119,27 @@ export function createDeadlinesRouter(db: Db) {
       .where(and(...conditions))
       .orderBy(deadlines.dueAt)
       .limit(limit);
+
+    res.json(rows.map(toDeadlineResponse));
+  });
+
+  // Every deadline due in a range, finished ones included, for the calendar.
+  router.get("/range", async (req, res) => {
+    const user = currentUser(res);
+    const { startMs, endMs } = parse(rangeQuery, req.query);
+
+    const rows = await db
+      .select()
+      .from(deadlines)
+      .where(
+        and(
+          eq(deadlines.userId, user.id),
+          gte(deadlines.dueAt, new Date(startMs)),
+          lte(deadlines.dueAt, new Date(endMs)),
+        ),
+      )
+      .orderBy(deadlines.dueAt)
+      .limit(500);
 
     res.json(rows.map(toDeadlineResponse));
   });

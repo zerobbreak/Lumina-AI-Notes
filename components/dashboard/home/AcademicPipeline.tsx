@@ -1,14 +1,11 @@
-import { AlertTriangle, CalendarClock, ExternalLink, GraduationCap } from "lucide-react";
-import { toast } from "sonner";
+import { AlertTriangle, CalendarClock, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDeadlineActions } from "@/lib/hooks/mutations/useDeadlineActions";
 import { useUpcomingDeadlines } from "@/lib/queries/deadlines/useUpcomingDeadlines";
 import { useOverdueDeadlines } from "@/lib/queries/deadlines/useOverdueDeadlines";
 import { useBrightspaceStatus } from "@/lib/queries/integrations/useBrightspaceStatus";
-import { useSetDeadlineCompleted } from "@/lib/mutations/deadlines/useSetDeadlineCompleted";
-import type { DeadlineModel } from "@/lib/api/adapters/deadline";
 import { dispatchAppCommand } from "@/lib/appCommands";
-import { Checkbox } from "@/components/ui/checkbox";
+import { DeadlineRow, type DeadlineKind } from "@/components/dashboard/deadlines/DeadlineRow";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,29 +24,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useMemo, useState } from "react";
-
-type DeadlineKind = "assignment" | "exam" | "event" | "task";
-
-function kindToTone(kind: DeadlineKind) {
-  if (kind === "exam" || kind === "assignment") return "red";
-  if (kind === "event") return "amber";
-  return "slate";
-}
-
-function pillClasses(tone: ReturnType<typeof kindToTone>) {
-  if (tone === "red")
-    return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20";
-  if (tone === "amber")
-    return "bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20";
-  return "bg-muted/30 text-muted-foreground border-border dark:bg-foreground/5";
-}
-
-function kindLabel(kind: DeadlineKind) {
-  if (kind === "assignment") return "ASSIGNMENT";
-  if (kind === "exam") return "EXAM";
-  if (kind === "event") return "EVENT";
-  return "TASK";
-}
 
 function formatWhenLabel(dueAt: number) {
   const now = Date.now();
@@ -70,70 +44,6 @@ function formatOverdueLabel(dueAt: number, now: number) {
   if (hours < 24) return `${hours} hr overdue`;
   const days = Math.floor(hours / 24);
   return `${days} day${days === 1 ? "" : "s"} overdue`;
-}
-
-function DeadlineRow({
-  deadline,
-  when,
-  overdue = false,
-}: {
-  deadline: DeadlineModel;
-  when: string;
-  overdue?: boolean;
-}) {
-  const setCompleted = useSetDeadlineCompleted();
-  const tone = kindToTone(deadline.kind as DeadlineKind);
-  const fromBrightspace = deadline.source === "brightspace";
-
-  return (
-    <div className="flex items-start gap-3">
-      <Checkbox
-        className="mt-0.5"
-        checked={setCompleted.isPending}
-        disabled={setCompleted.isPending}
-        aria-label={`Mark ${deadline.title} done`}
-        onCheckedChange={() =>
-          setCompleted.mutate(
-            { id: deadline._id, completed: true },
-            { onError: () => toast.error("Couldn't mark it done") },
-          )
-        }
-      />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-foreground truncate">{deadline.title}</p>
-        <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <span className={overdue ? "text-destructive" : undefined}>{when}</span>
-          {fromBrightspace && (
-            <>
-              <span aria-hidden>·</span>
-              {deadline.externalUrl ? (
-                <a
-                  href={deadline.externalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 hover:text-foreground hover:underline"
-                >
-                  Brightspace
-                  <ExternalLink className="w-3 h-3" aria-hidden />
-                  <span className="sr-only">(opens in a new tab)</span>
-                </a>
-              ) : (
-                <span>Brightspace</span>
-              )}
-            </>
-          )}
-        </p>
-      </div>
-      <span
-        className={cn(
-          "shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold tracking-wide",
-          pillClasses(tone),
-        )}
-      >
-        {kindLabel(deadline.kind as DeadlineKind)}
-      </span>
-    </div>
-  );
 }
 
 /** Nudges toward connecting Brightspace, or flags a connection that stopped syncing. */

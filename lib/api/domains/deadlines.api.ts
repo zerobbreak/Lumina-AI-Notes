@@ -11,6 +11,11 @@ export const deadlinesApi = {
     return apiFetch<DeadlineDto[]>(apiPath`/deadlines/upcoming`, { query: params ?? {}, token });
   },
 
+  /** Every deadline due in a range, finished ones included. */
+  getRange(token: string, params: { startMs: number; endMs: number }) {
+    return apiFetch<DeadlineDto[]>(apiPath`/deadlines/range`, { query: params, token });
+  },
+
   getOverdue(token: string, params?: { limit?: number; windowDays?: number }) {
     return apiFetch<DeadlineDto[]>(apiPath`/deadlines/overdue`, { query: params ?? {}, token });
   },

@@ -5,6 +5,9 @@ import type { ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 import type { CalendarNote, CalendarRecording } from "@/lib/api/adapters/calendar";
 import { useCalendarActivity } from "@/lib/queries/calendar/useCalendarActivity";
+import { useDeadlinesInRange } from "@/lib/queries/deadlines/useDeadlinesInRange";
+import type { DeadlineModel } from "@/lib/api/adapters/deadline";
+import { DeadlineRow } from "@/components/dashboard/deadlines/DeadlineRow";
 import { useCurrentUser } from "@/lib/queries/users/useCurrentUser";
 import { useGamification } from "@/lib/queries/users/useGamification";
 import {
@@ -14,6 +17,7 @@ import {
   Clock,
   Flame,
   Loader2,
+  ListTodo,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -51,10 +55,11 @@ function daysInMonth(y: number, m: number): number {
   return new Date(y, m + 1, 0).getDate();
 }
 
-type ActivityByDayMap = Map<
-  string,
-  { recordings: CalendarRecording[]; notes: CalendarNote[] }
->;
+type DayBundle = { recordings: CalendarRecording[]; notes: CalendarNote[]; deadlines: DeadlineModel[] };
+
+type ActivityByDayMap = Map<string, DayBundle>;
+
+const emptyDay = (): DayBundle => ({ recordings: [], notes: [], deadlines: [] });
 
 function ActivityCalendarDayButton({
   byDay,
@@ -64,13 +69,20 @@ function ActivityCalendarDayButton({
   const bundle = byDay.get(key);
   const recN = bundle?.recordings.length ?? 0;
   const noteN = bundle?.notes.length ?? 0;
-  const total = recN + noteN;
+  const dueN = bundle?.deadlines.filter((d) => d.completedAt === undefined).length ?? 0;
+  const total = recN + noteN + dueN;
 
   return (
     <CalendarDayButton {...props}>
       {props.children}
       {total > 0 ? (
         <span className="flex shrink-0 justify-center gap-0.5" aria-hidden>
+          {dueN > 0 && (
+            <span
+              className="inline-block size-1.5 rounded-full bg-destructive"
+              title="Deadlines"
+            />
+          )}
           {recN > 0 && (
             <span
               className="inline-block size-1.5 rounded-full bg-primary"
@@ -95,6 +107,7 @@ export default function CalendarView() {
   const router = useRouter();
   const { data: userData } = useCurrentUser();
   const { data: gamification } = useGamification();
+  const [nowMs] = useState(() => Date.now());
 
   const [cal, setCal] = useState(() => {
     const n = new Date();
@@ -118,29 +131,22 @@ export default function CalendarView() {
   }, [cursor.y, cursor.m]);
 
   const { data: activity, isLoading: activityLoading } = useCalendarActivity(range);
+  const { data: deadlines, isLoading: deadlinesLoading } = useDeadlinesInRange(range);
 
   const byDay = useMemo(() => {
-    const map = new Map<
-      string,
-      { recordings: CalendarRecording[]; notes: CalendarNote[] }
-    >();
-
-    if (!activity) return map;
-
-    for (const r of activity.recordings) {
-      const k = localDayKey(r.createdAt);
-      const cur = map.get(k) ?? { recordings: [], notes: [] };
-      cur.recordings.push(r);
+    const map: ActivityByDayMap = new Map();
+    const day = (ts: number) => {
+      const k = localDayKey(ts);
+      const cur = map.get(k) ?? emptyDay();
       map.set(k, cur);
-    }
-    for (const n of activity.notes) {
-      const k = localDayKey(n.createdAt);
-      const cur = map.get(k) ?? { recordings: [], notes: [] };
-      cur.notes.push(n);
-      map.set(k, cur);
-    }
+      return cur;
+    };
+
+    for (const r of activity?.recordings ?? []) day(r.createdAt).recordings.push(r);
+    for (const n of activity?.notes ?? []) day(n.createdAt).notes.push(n);
+    for (const d of deadlines ?? []) day(d.dueAt).deadlines.push(d);
     return map;
-  }, [activity]);
+  }, [activity, deadlines]);
 
   const displayMonthStart = useMemo(
     () => new Date(cursor.y, cursor.m, 1),
@@ -209,10 +215,10 @@ export default function CalendarView() {
           </div>
           <div>
             <h1 className="text-lg font-semibold text-foreground tracking-tight">
-              Activity calendar
+              Calendar
             </h1>
             <p className="text-sm text-muted-foreground">
-              Sessions and notes by day — keep your streak going.
+              Deadlines, sessions and notes by day.
             </p>
           </div>
         </div>
@@ -243,14 +249,14 @@ export default function CalendarView() {
             Today
           </Button>
 
-          {activityLoading ? (
+          {activityLoading || deadlinesLoading ? (
             <div
               className="mb-3 flex items-center gap-2 text-xs text-muted-foreground"
               role="status"
               aria-live="polite"
             >
               <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-              Loading activity…
+              Loading your month…
             </div>
           ) : null}
 
@@ -276,6 +282,10 @@ export default function CalendarView() {
 
           <div className="mt-4 flex items-center gap-4 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
+              Deadline
+            </span>
+            <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-primary" />
               Session
             </span>
@@ -297,12 +307,38 @@ export default function CalendarView() {
               })}
             </h2>
             {!selectedBundle ||
-            (selectedBundle.recordings.length === 0 && selectedBundle.notes.length === 0) ? (
-              <p className="text-xs text-muted-foreground mt-1">No activity on this day.</p>
+            (selectedBundle.recordings.length === 0 &&
+              selectedBundle.notes.length === 0 &&
+              selectedBundle.deadlines.length === 0) ? (
+              <p className="text-xs text-muted-foreground mt-1">Nothing due and no activity on this day.</p>
             ) : null}
           </div>
           <ScrollArea className="flex-1 min-h-0">
             <div className="p-4 md:p-6 space-y-8">
+              {selectedBundle && selectedBundle.deadlines.length > 0 && (
+                <section>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
+                    <ListTodo className="w-3.5 h-3.5" />
+                    Due
+                  </h3>
+                  <ul className="space-y-3">
+                    {selectedBundle.deadlines.map((d) => (
+                      <li key={d._id}>
+                        <DeadlineRow
+                          deadline={d}
+                          when={new Date(d.dueAt).toLocaleTimeString(undefined, {
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                          overdue={d.dueAt < nowMs}
+                          detail={courseName(d.courseId)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
               {selectedBundle && selectedBundle.recordings.length > 0 && (
                 <section>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
