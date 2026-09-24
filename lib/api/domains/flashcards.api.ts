@@ -1,7 +1,11 @@
 import { apiFetch } from "@/lib/api/client";
 import { apiPath } from "@/lib/api/path";
 import type { FlashcardDeckDto } from "@/types/api/decks";
-import type { FlashcardDto, FlashcardTodayQueueDto } from "@/types/api/flashcards";
+import type {
+  FlashcardDeckStatsDto,
+  FlashcardDto,
+  FlashcardTodayQueueDto,
+} from "@/types/api/flashcards";
 
 export const flashcardsApi = {
   getTodayQueue(token: string) {
@@ -14,6 +18,10 @@ export const flashcardsApi = {
 
   getDeck(token: string, deckId: string) {
     return apiFetch<FlashcardDeckDto>(apiPath`/flashcards/decks/${deckId}`, { token });
+  },
+
+  getDeckStats(token: string, deckId: string) {
+    return apiFetch<FlashcardDeckStatsDto | null>(apiPath`/flashcards/decks/${deckId}/stats`, { token });
   },
 
   getCards(token: string, deckId: string) {

@@ -4,4 +4,5 @@ export const flashcardKeys = {
   decks: () => [...flashcardKeys.all, "decks"] as const,
   deck: (deckId: string) => [...flashcardKeys.all, "deck", deckId] as const,
   cards: (deckId: string) => [...flashcardKeys.all, "cards", deckId] as const,
+  deckStats: (deckId: string) => [...flashcardKeys.all, "deck-stats", deckId] as const,
 };

@@ -24,3 +24,16 @@ export type FlashcardDto = {
   lastRating?: string | null;
   createdAt?: string | number;
 };
+
+/** Response from `GET /flashcards/decks/:deckId/stats` (null when the deck is gone). */
+export type FlashcardDeckStatsDto = {
+  totalCards: number;
+  newCards: number;
+  learningCards: number;
+  reviewCards: number;
+  dueNow: number;
+  dueToday: number;
+  masteredCards: number;
+  averageEaseFactor: number;
+  lastStudiedAt: string | number | null;
+};

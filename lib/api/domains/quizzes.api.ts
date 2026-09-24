@@ -1,7 +1,7 @@
 import { apiFetch } from "@/lib/api/client";
 import { apiPath } from "@/lib/api/path";
 import type { QuizDeckDto } from "@/types/api/decks";
-import type { QuizQuestionDto } from "@/types/api/quizzes";
+import type { QuizQuestionDto, QuizResultDto } from "@/types/api/quizzes";
 
 export const quizzesApi = {
   getDecks(token: string) {
@@ -10,6 +10,10 @@ export const quizzesApi = {
 
   getDeck(token: string, deckId: string) {
     return apiFetch<QuizDeckDto>(apiPath`/quizzes/decks/${deckId}`, { token });
+  },
+
+  getLatestResult(token: string, deckId: string) {
+    return apiFetch<QuizResultDto | null>(apiPath`/quizzes/decks/${deckId}/results/latest`, { token });
   },
 
   getQuestions(token: string, deckId: string) {
