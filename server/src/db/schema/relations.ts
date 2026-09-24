@@ -3,6 +3,7 @@ import { chatMessages, chatSessions } from "./chat.js";
 import { noteCollaborators, noteInvites, presence } from "./collaboration.js";
 import { deadlineReminders, deadlines, notifications } from "./deadlines.js";
 import { files } from "./files.js";
+import { lmsConnections, lmsCourseLinks } from "./integrations.js";
 import {
   flashcardDecks,
   flashcardReviewEvents,
@@ -26,6 +27,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   chatSessions: many(chatSessions),
   deadlines: many(deadlines),
   notifications: many(notifications),
+  lmsConnections: many(lmsConnections),
 }));
 
 export const notesRelations = relations(notes, ({ one, many }) => ({
@@ -137,6 +139,7 @@ export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
 
 export const deadlinesRelations = relations(deadlines, ({ one, many }) => ({
   owner: one(users, { fields: [deadlines.userId], references: [users.id] }),
+  connection: one(lmsConnections, { fields: [deadlines.connectionId], references: [lmsConnections.id] }),
   reminders: many(deadlineReminders),
 }));
 
@@ -146,4 +149,14 @@ export const deadlineRemindersRelations = relations(deadlineReminders, ({ one })
 
 export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, { fields: [notifications.userId], references: [users.id] }),
+}));
+
+export const lmsConnectionsRelations = relations(lmsConnections, ({ one, many }) => ({
+  owner: one(users, { fields: [lmsConnections.userId], references: [users.id] }),
+  courseLinks: many(lmsCourseLinks),
+  deadlines: many(deadlines),
+}));
+
+export const lmsCourseLinksRelations = relations(lmsCourseLinks, ({ one }) => ({
+  connection: one(lmsConnections, { fields: [lmsCourseLinks.connectionId], references: [lmsConnections.id] }),
 }));

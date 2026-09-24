@@ -13,6 +13,8 @@ export function toDeadlineResponse(row: DeadlineRow) {
     moduleId: row.moduleId ?? undefined,
     notes: row.notes ?? undefined,
     completedAt: row.completedAt?.getTime(),
+    source: row.source,
+    externalUrl: row.externalUrl ?? undefined,
     createdAt: row.createdAt.getTime(),
     updatedAt: row.updatedAt.getTime(),
   };

@@ -1,5 +1,6 @@
 import { createPublicKey } from "node:crypto";
 import { z } from "zod";
+import { parseKey } from "./integrations/secretBox.js";
 
 function isPublicKey(pem: string) {
   if (!pem.startsWith("-----BEGIN PUBLIC KEY-----")) return false;
@@ -79,6 +80,15 @@ const envSchema = z.object({
   // falls back to its defaults. Declared here so it shows up with the rest.
   GEMINI_MODELS: z.string().optional(),
   ELEVENLABS_API_KEY: z.string().min(1).optional(),
+
+  // Seals students' LMS credentials (Brightspace feed URLs and tokens) at
+  // rest: 32 random bytes, base64 (`openssl rand -base64 32`). Optional so
+  // the API boots without it; the integration routes need it. Changing it
+  // makes every stored connection unreadable, so students must reconnect.
+  LMS_ENCRYPTION_KEY: z
+    .string()
+    .refine((value) => parseKey(value) !== null, { message: "Must be 32 bytes, base64-encoded" })
+    .optional(),
 
   // Job queue (BullMQ). On Railway, reference ${{Redis.REDIS_URL}} (private
   // network); locally, the Redis service's public URL.

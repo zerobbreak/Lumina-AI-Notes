@@ -10,6 +10,7 @@ export * from "./flashcards.js";
 export * from "./quizzes.js";
 export * from "./chat.js";
 export * from "./deadlines.js";
+export * from "./integrations.js";
 export * from "./jobs.js";
 export * from "./announcements.js";
 export * from "./relations.js";
