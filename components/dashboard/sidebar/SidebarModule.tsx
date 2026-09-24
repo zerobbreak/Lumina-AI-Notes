@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Folder, ChevronRight, ChevronDown } from "lucide-react";
+import { Folder } from "lucide-react";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useNotesByContextData } from "@/lib/hooks/notes/useNotesByContextData";
 import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
 import { Id } from "@/types/data-model";
-import { cn } from "@/lib/utils";
 import { SidebarNote } from "./SidebarNote";
+import { SidebarRow, SidebarRowGroup } from "./SidebarRow";
+import { usePersistedDisclosure } from "./usePersistedDisclosure";
 import { toast } from "sonner";
 
 interface SidebarModuleProps {
@@ -35,7 +36,7 @@ export function SidebarModule({
 }: SidebarModuleProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isExpanded, setIsExpanded] = useState(false);
+  const { isOpen, toggle, setIsOpen } = usePersistedDisclosure(`module.${module.id}`, false);
   const [isDragOver, setIsDragOver] = useState(false);
 
   const activeNoteId = searchParams.get("noteId");
@@ -71,94 +72,59 @@ export function SidebarModule({
 
     const noteId = e.dataTransfer.getData("application/lumina-note-id");
     const noteTitle = e.dataTransfer.getData("application/lumina-note-title");
+    if (!noteId) return;
 
-    if (noteId) {
-      try {
-        await moveNoteToFolder({
-          noteId: noteId as Id<"notes">,
-          courseId: courseId,
-          moduleId: module.id,
-        });
-        toast.success(`Moved "${noteTitle}" to ${module.title}`);
-        setIsExpanded(true);
-      } catch (error) {
-        console.error("Failed to move note:", error);
-        toast.error("Failed to move note");
-      }
+    try {
+      await moveNoteToFolder({
+        noteId: noteId as Id<"notes">,
+        courseId: courseId,
+        moduleId: module.id,
+      });
+      toast.success(`Moved "${noteTitle}" to ${module.title}`);
+      setIsOpen(true);
+    } catch (error) {
+      console.error("Failed to move note:", error);
+      toast.error("Failed to move note");
     }
   };
 
   return (
-    <div className="relative group/module">
-      <div className="flex items-center">
-        <div
-          aria-current={isActive ? "page" : undefined}
-          className={cn(
-            "relative flex-1 flex items-center h-7 px-2 text-[12px] gap-1.5 transition-colors duration-100 cursor-pointer rounded-md",
-            isDragOver
-              ? "text-primary bg-primary/10 ring-1 ring-primary/20"
-              : isActive
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50",
-          )}
-          onClick={() => {
-            router.push(`/dashboard?contextId=${module.id}&contextType=module`);
-          }}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          <div
-            className="p-0.5 rounded-sm text-muted-foreground/35 hover:text-muted-foreground/60 cursor-pointer transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsExpanded(!isExpanded);
-            }}
-          >
-            {isExpanded ? (
-              <ChevronDown className="w-2.5 h-2.5" />
-            ) : (
-              <ChevronRight className="w-2.5 h-2.5" />
-            )}
-          </div>
-
-          <Folder
-            className={cn(
-              "w-3.5 h-3.5 shrink-0 transition-opacity",
-              isActive || isDragOver ? "opacity-100" : "opacity-55",
-            )}
-          />
-          <span className="truncate flex-1">{module.title}</span>
-
-          {isDragOver && (
-            <span className="text-[9px] bg-primary/10 px-1 py-0.5 rounded text-primary/70 animate-pulse">
-              Drop
-            </span>
-          )}
-        </div>
-
-        <div className="absolute right-1 opacity-0 group-hover/module:opacity-100 transition-opacity">
+    <div>
+      <SidebarRow
+        label={module.title}
+        icon={<Folder className="h-[14px] w-[14px]" />}
+        isActive={isActive}
+        isDropTarget={isDragOver}
+        onClick={() => router.push(`/dashboard?contextId=${module.id}&contextType=module`)}
+        meta={isDragOver ? "Drop to move" : rootModuleNotes?.length || undefined}
+        disclosure={{ isOpen, onToggle: toggle }}
+        dragProps={{ onDragOver: handleDragOver, onDragLeave: handleDragLeave, onDrop: handleDrop }}
+        actions={
           <ActionMenu
             onRename={() => onRename(module.id, module.title, courseId)}
             onDelete={() => onDelete(module.id, courseId)}
           />
-        </div>
-      </div>
+        }
+      />
 
-      {isExpanded && (
-        <div className="ml-[14px] pl-2.5 border-l border-sidebar-border/30 space-y-px mt-px">
-          {rootModuleNotes?.map((note) => (
-            <SidebarNote
-              key={note._id}
-              note={note}
-              isActive={note._id === activeNoteId}
-              isDraggable={false}
-              onRename={() => onRenameNote(note._id, note.title)}
-              onDelete={() => onDeleteNote(note._id)}
-              onArchive={() => onArchiveNote(note._id)}
-            />
-          ))}
-        </div>
+      {isOpen && (
+        <SidebarRowGroup className="mt-px">
+          {rootModuleNotes?.length ? (
+            rootModuleNotes.map((note) => (
+              <SidebarNote
+                key={note._id}
+                note={note}
+                isActive={note._id === activeNoteId}
+                isDraggable={false}
+                onRename={() => onRenameNote(note._id, note.title)}
+                onDelete={() => onDeleteNote(note._id)}
+                onArchive={() => onArchiveNote(note._id)}
+              />
+            ))
+          ) : (
+            <p className="px-2 py-1 text-[12px] text-muted-foreground/70">No notes yet</p>
+          )}
+        </SidebarRowGroup>
       )}
     </div>
   );

@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Id } from "@/types/data-model";
@@ -116,9 +116,6 @@ export function Sidebar() {
   const { updateTag, deleteTag } = useTagActions();
   const { deleteFile, renameFile } = useFileActions();
 
-  const [expandedCourses, setExpandedCourses] = useState<
-    Record<string, boolean>
-  >({});
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
@@ -215,9 +212,6 @@ export function Sidebar() {
   useAppCommand("search", useCallback(() => setIsSearchOpen((open) => !open), []));
   useAppCommand("new-note", handleCreateNote);
 
-  const toggleCourse = (courseId: string) =>
-    setExpandedCourses((prev) => ({ ...prev, [courseId]: !prev[courseId] }));
-
   const openRename = (
     id: string,
     type: RenameTarget["type"],
@@ -260,10 +254,6 @@ export function Sidebar() {
   };
 
   const courses = userData?.courses ?? [];
-  const courseCodes = useMemo(
-    () => courses.map((course) => course.code),
-    [courses],
-  );
 
   const dueTodayCount = todayQueue?.cardIds?.length ?? 0;
   const nextDeadline = upcomingDeadlines?.[0];
@@ -443,9 +433,6 @@ export function Sidebar() {
               key={course.id}
               course={course}
               isCompact
-              peerCodes={courseCodes}
-              isExpanded={!!expandedCourses[course.id]}
-              onToggle={() => toggleCourse(course.id)}
               onRename={(id, name) => openRename(id, "course", name)}
               onDelete={(id) => deleteCourse({ courseId: id })}
               onRenameModule={(id, name, parentId) =>
@@ -568,9 +555,6 @@ export function Sidebar() {
             <SidebarCourse
               key={course.id}
               course={course}
-              peerCodes={courseCodes}
-              isExpanded={!!expandedCourses[course.id]}
-              onToggle={() => toggleCourse(course.id)}
               onRename={(id, name) => openRename(id, "course", name)}
               onDelete={(id) => deleteCourse({ courseId: id })}
               onRenameModule={(id, name, parentId) =>
