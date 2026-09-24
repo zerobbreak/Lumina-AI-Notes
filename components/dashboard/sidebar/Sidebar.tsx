@@ -2,7 +2,6 @@
 
 import {
   Calendar,
-  File,
   FolderOpen,
   Layers,
   Loader2,
@@ -36,8 +35,6 @@ import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
 import { formatShortcut } from "@/hooks/useKeyboardShortcut";
 import { useAppCommand } from "@/lib/appCommands";
 import { shortcutFor } from "@/constants/shortcuts";
-import { DraggableDocument } from "@/components/documents";
-import { ActionMenu } from "@/components/shared/ActionMenu";
 import { AppearanceSwitcher } from "@/components/shared/AppearanceSwitcher";
 import { SpotlightCard } from "@/components/dashboard/announcements/SpotlightCard";
 import { WhatsNew } from "@/components/dashboard/announcements/WhatsNew";
@@ -60,11 +57,7 @@ import { SidebarNote } from "./SidebarNote";
 import { SidebarRow } from "./SidebarRow";
 import { SidebarSection, SidebarSectionAction } from "./SidebarSection";
 import { SidebarTags } from "./SidebarTags";
-import {
-  PinContextButton,
-  SessionsCleanupAction,
-  SidebarStudio,
-} from "./SidebarStudio";
+import { SessionsCleanupAction, SidebarCapture } from "./SidebarCapture";
 import { useSidebarListData } from "@/lib/hooks/sidebar/useSidebarListData";
 
 type RenameTarget = {
@@ -583,53 +576,24 @@ export function Sidebar() {
         </SidebarSection>
 
         <SidebarSection
-          id="sessions"
-          label="Sessions"
-          action={<SessionsCleanupAction />}
-        >
-          <SidebarStudio />
-        </SidebarSection>
-
-        <SidebarSection
-          id="resources"
-          count={recentFiles?.length}
-          label="Resources"
-          isEmpty={!recentFiles?.length}
-          emptyLabel="No files yet"
+          id="capture"
+          label="Capture"
           action={
-            <SidebarSectionAction
-              icon={Upload}
-              label="Upload a file"
-              onClick={() => setIsUploadOpen(true)}
-            />
+            <>
+              <SessionsCleanupAction />
+              <SidebarSectionAction
+                icon={Upload}
+                label="Upload a file"
+                onClick={() => setIsUploadOpen(true)}
+              />
+            </>
           }
         >
-          {recentFiles?.slice(0, 5).map((file) => (
-            <DraggableDocument
-              key={file._id}
-              documentId={file._id}
-              documentName={file.name}
-              processingStatus={file.processingStatus}
-              showDragIndicator={false}
-            >
-              <div className="group/file relative flex items-center">
-                <button
-                  type="button"
-                  className="flex h-7 w-full items-center gap-2 rounded-md px-2 text-[13px] text-sidebar-foreground/75 transition-colors duration-100 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar"
-                >
-                  <File className="h-[14px] w-[14px] shrink-0 opacity-60" />
-                  <span className="flex-1 truncate text-left">{file.name}</span>
-                </button>
-                <div className="absolute right-1 flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/file:opacity-100">
-                  <PinContextButton fileId={file._id} fileName={file.name} />
-                  <ActionMenu
-                    onRename={() => openRename(file._id, "file", file.name)}
-                    onDelete={() => deleteFile({ fileId: file._id as Id<"files"> })}
-                  />
-                </div>
-              </div>
-            </DraggableDocument>
-          ))}
+          <SidebarCapture
+            files={recentFiles}
+            onRenameFile={(id, name) => openRename(id, "file", name)}
+            onDeleteFile={(id) => deleteFile({ fileId: id as Id<"files"> })}
+          />
         </SidebarSection>
       </div>
     </ScrollArea>
