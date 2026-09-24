@@ -6,20 +6,14 @@ import { useCurrentUser } from "@/lib/queries/users/useCurrentUser";
 import { useGamification } from "@/lib/queries/users/useGamification";
 import { useRecentNotes } from "@/lib/queries/notes/useRecentNotes";
 import { usePinnedNotes } from "@/lib/queries/notes/usePinnedNotes";
-import { useTodayQueue } from "@/lib/queries/flashcards/useTodayQueue";
 import { useUpdateTourProgress } from "@/lib/mutations/users/useUpdateTourProgress";
 import { useCreateCourse } from "@/lib/mutations/courses/useCreateCourse";
 import { useDeleteCourse } from "@/lib/mutations/courses/useDeleteCourse";
 import { useRenameCourse } from "@/lib/mutations/courses/useRenameCourse";
 import { Button } from "@/components/ui/button";
-import {
-  Plus,
-  Clock,
-  ArrowRight,
-  Layers,
-  Loader2,
-  Layout,
-} from "lucide-react";
+import { Plus, Loader2, Layout } from "lucide-react";
+import { useHomeSummary } from "@/lib/queries/home/useHomeSummary";
+import { planHeadline } from "@/lib/home/planCopy";
 import { getCourseIcon } from "@/lib/courseDisplay";
 import { Course } from "@/types";
 import { ActionMenu } from "@/components/shared/ActionMenu";
@@ -28,9 +22,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { motion } from "framer-motion";
 import { NotesRail } from "@/components/dashboard/home/NotesRail";
-import { StudyNextActions } from "@/components/dashboard/home/StudyNextActions";
 import { ProductivityPanel } from "@/components/dashboard/home/ProductivityPanel";
 import { AcademicPipeline } from "@/components/dashboard/home/AcademicPipeline";
+import { TodayPlan } from "@/components/dashboard/home/TodayPlan";
+import { ResumeCard } from "@/components/dashboard/home/ResumeCard";
 
 const TourOverlay = lazy(() => import("@/components/dashboard/TourOverlay").then(m => ({ default: m.TourOverlay })));
 import type { TourStep } from "@/components/dashboard/TourOverlay";
@@ -74,8 +69,8 @@ export default function SmartFolderHub() {
   const deleteCourse = useDeleteCourse();
   const renameCourse = useRenameCourse();
   const { data: recentNotes } = useRecentNotes();
-  const { data: todayQueue } = useTodayQueue();
   const { data: gamification } = useGamification();
+  const home = useHomeSummary();
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -158,9 +153,9 @@ export default function SmartFolderHub() {
     () => [
       {
         id: "dashboard",
-        title: "Your Learning Hub",
+        title: "Your plan for today",
         description:
-          "This is your personalized dashboard with analytics, streaks, and daily review counts.",
+          "What's overdue, what's due soon and which cards to review, ranked so you know where to start.",
         selector: '[data-tour="dashboard-overview"]',
       },
       {
@@ -194,8 +189,15 @@ export default function SmartFolderHub() {
 
   if (!userData) return null;
 
-  // Calculate statistics
-  const dueTodayCount = todayQueue?.cardIds?.length ?? 0;
+  const courseById = new Map(((userData.courses ?? []) as Course[]).map((c) => [c.id, c]));
+  const courseOf = (courseId: string | null | undefined) =>
+    courseId ? courseById.get(courseId) : undefined;
+  const summary = home.data;
+  const now = summary?.generatedAt ?? 0;
+  const heading = summary
+    ? planHeadline(summary, courseById.size > 0, now)
+    : undefined;
+  const streak = gamification?.currentStreak ?? 0;
 
   const closeTour = async (completed: boolean) => {
     setSuppressTourOverlay(true);
@@ -216,91 +218,75 @@ export default function SmartFolderHub() {
         </Suspense>
       )}
       <div className="p-6 lg:p-8 max-w-[1600px] mx-auto space-y-10">
-        {/* Hero Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-          className="relative rounded-3xl p-7 lg:p-8 overflow-hidden border border-border/60 bg-card/40 shadow-sm dark:bg-foreground/[0.02]"
-          data-tour="dashboard-overview"
-        >
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl dark:bg-cyan-500/12" />
-            <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl dark:bg-primary/12" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
-            <div className="noise-overlay absolute inset-0" />
-          </div>
-          <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="flex items-start gap-4 min-w-0">
-              <div className="hidden sm:flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-cyan-500/20 to-primary-alt/20 border border-border/60 text-lg font-bold text-foreground dark:border-border">
-                {(userData.name?.trim()?.[0] || "S").toUpperCase()}
-              </div>
-              <div className="space-y-2 min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                  {new Date().toLocaleDateString(undefined, {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                  })}
+        {/* Today: the plan replaces the greeting hero */}
+        <header className="space-y-2" data-tour="dashboard-overview">
+          <p className="flex flex-wrap items-center gap-x-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            <span>
+              {new Date().toLocaleDateString(undefined, {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+              })}
+            </span>
+            <span aria-hidden>·</span>
+            <span className="normal-case tracking-normal font-medium">
+              {getGreeting(new Date().getHours())}, {userData.name?.split(" ")[0] || "there"}
+            </span>
+            {streak > 0 && (
+              <>
+                <span aria-hidden>·</span>
+                <span className="normal-case tracking-normal font-medium">
+                  {streak}-day study streak
+                </span>
+              </>
+            )}
+          </p>
+          {heading ? (
+            <>
+              <h1 className="max-w-3xl font-reading text-3xl font-medium leading-tight tracking-tight text-foreground text-balance lg:text-4xl">
+                {heading.headline}
+              </h1>
+              {heading.lead && (
+                <p className="max-w-2xl text-base text-muted-foreground">{heading.lead}</p>
+              )}
+            </>
+          ) : (
+            <div aria-hidden className="h-10 max-w-md animate-pulse rounded-lg bg-muted" />
+          )}
+        </header>
+
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+            {summary ? (
+              <TodayPlan
+                plan={summary.plan}
+                planMinutes={summary.planMinutes}
+                pulses={summary.courses}
+                courseOf={courseOf}
+                now={now}
+              />
+            ) : home.isError ? (
+              <div className="rounded-2xl border border-border bg-card p-6 dark:bg-inset">
+                <p className="text-sm font-medium text-foreground">Today&apos;s plan didn&apos;t load.</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Check your connection, then try again.
                 </p>
-                <h1 className="text-4xl lg:text-5xl font-bold text-foreground tracking-tight">
-                  {getGreeting(new Date().getHours())},{" "}
-                  <span className="text-transparent bg-clip-text bg-linear-to-r from-cyan-700 to-blue-700 dark:from-cyan-400 dark:to-blue-500">
-                    {userData.name?.split(" ")[0] || "Student"}
-                  </span>
-                </h1>
-                <p className="text-muted-foreground text-lg max-w-xl">
-                  Your academic workspace is ready. Pick up where you left off or
-                  start something new.
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-4 shrink-0">
-              <div className="group rounded-2xl border border-border bg-card text-card-foreground px-5 py-4 min-w-[200px] shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md dark:bg-inset dark:shadow-none dark:ring-0 dark:backdrop-blur-md">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400">
-                    <Layers className="w-3.5 h-3.5 shrink-0" aria-hidden />
-                  </span>
-                  <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                    Cards Due Today
-                  </span>
-                </div>
-                <div className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
-                  {dueTodayCount}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => router.push("/dashboard?view=flashcards")}
-                  className="mt-3 -ml-2 h-8 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent dark:hover:bg-foreground/5"
-                >
-                  Start reviewing
-                  <ArrowRight className="w-3 h-3 ml-1" aria-hidden />
+                <Button variant="outline" size="sm" className="mt-3" onClick={() => void home.refetch()}>
+                  Try again
                 </Button>
               </div>
-              <div className="group rounded-2xl border border-border bg-card text-card-foreground px-5 py-4 min-w-[200px] shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md dark:bg-inset dark:shadow-none dark:ring-0 dark:backdrop-blur-md">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-700 dark:text-cyan-400">
-                    <Clock className="w-3.5 h-3.5 shrink-0" aria-hidden />
-                  </span>
-                  <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                    Study Streak
-                  </span>
-                </div>
-                <div className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
-                  {gamification?.currentStreak ?? 0}
-                  <span className="ml-1 text-sm font-normal text-muted-foreground">days</span>
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Longest: {gamification?.longestStreak ?? 0} days
-                </div>
-              </div>
+            ) : (
+              <div aria-hidden className="h-72 animate-pulse rounded-2xl border border-border bg-card dark:bg-inset" />
+            )}
+
+            <div className="space-y-6">
+              {summary?.resume && (
+                <ResumeCard resume={summary.resume} course={courseOf(summary.resume.courseId)} now={now} />
+              )}
+              <AcademicPipeline />
             </div>
           </div>
-        </motion.div>
 
-        {/* Workspace (stacked sections) */}
-        <div className="space-y-6">
           <NotesRail
             recentNotes={recentNotes}
             pinnedNotes={pinnedNotes}
@@ -309,42 +295,30 @@ export default function SmartFolderHub() {
             lookupLabels={labelLookup}
           />
 
-          <StudyNextActions
-            dueTodayCount={dueTodayCount}
-            streakDays={gamification?.currentStreak ?? 0}
-            recentNote={recentNotes?.[0]}
-            onStartFlashcards={() => router.push("/dashboard?view=flashcards")}
-            onOpenRecentNote={(id) => router.push(`/dashboard?noteId=${id}`)}
-          />
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-            <ProductivityPanel
-              showAnalytics={showAnalytics}
-              onToggle={() => setShowAnalytics((prev) => !prev)}
-              headlineMetric={{
-                value: `${gamification?.currentStreak ?? 0}d`,
-                label: "Study streak",
-              }}
+          <ProductivityPanel
+            showAnalytics={showAnalytics}
+            onToggle={() => setShowAnalytics((prev) => !prev)}
+            headlineMetric={{
+              value: `${streak}d`,
+              label: "Study streak",
+            }}
+          >
+            <Suspense
+              fallback={
+                <div className="rounded-2xl border border-border bg-card p-6 text-center shadow-sm dark:bg-inset">
+                  <Loader2
+                    className="w-6 h-6 animate-spin mx-auto text-muted-foreground"
+                    aria-hidden
+                  />
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Loading analytics...
+                  </p>
+                </div>
+              }
             >
-              <Suspense
-                fallback={
-                  <div className="rounded-2xl border border-border bg-card p-6 text-center shadow-sm dark:bg-inset">
-                    <Loader2
-                      className="w-6 h-6 animate-spin mx-auto text-muted-foreground"
-                      aria-hidden
-                    />
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Loading analytics...
-                    </p>
-                  </div>
-                }
-              >
-                <AnalyticsCharts showAnalytics={showAnalytics} />
-              </Suspense>
-            </ProductivityPanel>
-
-            <AcademicPipeline className="lg:sticky lg:top-6" />
-          </div>
+              <AnalyticsCharts showAnalytics={showAnalytics} />
+            </Suspense>
+          </ProductivityPanel>
         </div>
 
         {/* Courses Grid */}

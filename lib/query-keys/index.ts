@@ -17,3 +17,4 @@ export { publicKeys } from "./public";
 export { jobKeys } from "./jobs";
 export { announcementKeys } from "./announcements";
 export { integrationKeys } from "./integrations";
+export { homeKeys } from "./home";

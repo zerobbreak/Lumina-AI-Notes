@@ -4,6 +4,7 @@ import { chatKeys } from "@/lib/query-keys/chats";
 import { collaborationKeys } from "@/lib/query-keys/collaboration";
 import { deadlineKeys } from "@/lib/query-keys/deadlines";
 import { fileKeys } from "@/lib/query-keys/files";
+import { homeKeys } from "@/lib/query-keys/home";
 import { integrationKeys } from "@/lib/query-keys/integrations";
 import { flashcardKeys } from "@/lib/query-keys/flashcards";
 import { noteKeys } from "@/lib/query-keys/notes";
@@ -12,12 +13,19 @@ import { recordingKeys } from "@/lib/query-keys/recordings";
 import { tagKeys } from "@/lib/query-keys/tags";
 import { userKeys } from "@/lib/query-keys/users";
 
+/** The home summary is built from notes, cards, quizzes, deadlines and courses. */
+function invalidateHome(queryClient: QueryClient) {
+  void queryClient.invalidateQueries({ queryKey: homeKeys.all });
+}
+
 export function invalidateNotes(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: noteKeys.all });
+  invalidateHome(queryClient);
 }
 
 export function invalidateUser(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: userKeys.me() });
+  invalidateHome(queryClient);
 }
 
 export function invalidateTags(queryClient: QueryClient) {
@@ -30,6 +38,7 @@ export function invalidateFiles(queryClient: QueryClient) {
 
 export function invalidateDeadlines(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: deadlineKeys.all });
+  invalidateHome(queryClient);
 }
 
 export function invalidateRecordings(queryClient: QueryClient) {
@@ -47,10 +56,12 @@ export function refreshChats(queryClient: QueryClient) {
 
 export function invalidateFlashcards(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: flashcardKeys.all });
+  invalidateHome(queryClient);
 }
 
 export function invalidateQuizzes(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: quizKeys.all });
+  invalidateHome(queryClient);
 }
 
 export function invalidateCollaboration(queryClient: QueryClient, noteId?: string) {

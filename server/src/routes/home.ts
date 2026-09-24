@@ -11,11 +11,14 @@ import {
   quizDecks,
   quizResults,
 } from "../db/schema/index.js";
-import { buildHomeSummary, RUNWAY_DAYS, TREND_WEEKS } from "../home/summary.js";
+import { buildHomeSummary, RUNWAY_DAYS, TREND_WEEKS, type HomeResume } from "../home/summary.js";
 import { currentUser } from "../middleware/user.js";
+import { toPreview } from "./note-lists.js";
 import { parse, tzOffsetMinutes } from "./validation.js";
 
 const DAY = 24 * 60 * 60 * 1000;
+/** A note last opened longer ago than this isn't offered as "pick up where you left off". */
+const RESUME_WINDOW = 14 * DAY;
 
 const homeQuery = z.object({
   /** `Date#getTimezoneOffset()`: minutes to add to local time to get UTC. */
@@ -39,7 +42,7 @@ export function createHomeRouter(db: Db) {
     const dayEnd = localDayEnd(now, offset);
     const dayEndIso = new Date(dayEnd).toISOString();
 
-    const [deadlineRows, cardStats, quizDeckRows, latestResults, reviewRows, noteStats] = await Promise.all([
+    const [deadlineRows, cardStats, quizDeckRows, latestResults, reviewRows, noteStats, [lastNote]] = await Promise.all([
       db
         .select()
         .from(deadlines)
@@ -106,12 +109,30 @@ export function createHomeRouter(db: Db) {
         .from(notes)
         .where(and(eq(notes.userId, user.id), eq(notes.isArchived, false), isNotNull(notes.courseId)))
         .groupBy(notes.courseId),
+      db
+        .select({
+          id: notes.id,
+          title: notes.title,
+          courseId: notes.courseId,
+          moduleId: notes.moduleId,
+          lastAccessedAt: notes.lastAccessedAt,
+          contentHead: sql<string | null>`left(${notes.content}, 4000)`,
+        })
+        .from(notes)
+        .where(
+          and(
+            eq(notes.userId, user.id),
+            eq(notes.isArchived, false),
+            gte(notes.lastAccessedAt, new Date(now - RESUME_WINDOW)),
+          ),
+        )
+        .orderBy(desc(notes.lastAccessedAt))
+        .limit(1),
     ]);
 
     const time = (d: Date | string | null) => (d ? new Date(d).getTime() : null);
 
-    res.json(
-      buildHomeSummary({
+    const summary = buildHomeSummary({
         now,
         dayEnd,
         courses: user.courses ?? [],
@@ -130,8 +151,20 @@ export function createHomeRouter(db: Db) {
         reviews: reviewRows.map((r) => ({ ...r, reviewedAt: r.reviewedAt.getTime() })),
         // max() comes back as a string from the driver, not a Date.
         noteStats: noteStats.map((n) => ({ ...n, lastUpdatedAt: time(n.lastUpdatedAt) })),
-      }),
-    );
+    });
+
+    const resume: HomeResume | null = lastNote
+      ? {
+          noteId: lastNote.id,
+          title: lastNote.title,
+          preview: toPreview(lastNote.contentHead),
+          courseId: lastNote.courseId ?? undefined,
+          moduleId: lastNote.moduleId ?? undefined,
+          lastAccessedAt: lastNote.lastAccessedAt!.getTime(),
+        }
+      : null;
+
+    res.json({ ...summary, resume });
   });
 
   return router;

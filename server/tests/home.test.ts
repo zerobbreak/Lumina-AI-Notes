@@ -72,6 +72,32 @@ describe("GET /api/v1/home", () => {
   it("returns an empty summary for a new user", async () => {
     const res = await as(ALICE).get("/api/v1/home");
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ plan: [], planMinutes: 0, courses: [], runway: { deadlines: [], overdue: [] } });
+    expect(res.body).toMatchObject({
+      plan: [],
+      planMinutes: 0,
+      courses: [],
+      runway: { deadlines: [], overdue: [] },
+      resume: null,
+    });
+  });
+
+  it("offers the last opened note to pick up again, with a plain-text preview", async () => {
+    const courseId = (await as(ALICE).post("/api/v1/courses").send({ name: "Databases", code: "DATA6211" })).body
+      .id as string;
+    await as(ALICE).post("/api/v1/notes").send({ title: "Older", content: "<p>old</p>" });
+    const noteId = (
+      await as(ALICE)
+        .post("/api/v1/notes")
+        .send({ title: "Lecture 7", content: "<h2>Joins</h2><p>A LEFT JOIN keeps&nbsp;every row</p>", courseId })
+    ).body.id as string;
+
+    const res = await as(ALICE).get("/api/v1/home");
+    expect(res.body.resume).toMatchObject({
+      noteId,
+      title: "Lecture 7",
+      preview: "Joins A LEFT JOIN keeps every row",
+      courseId,
+      lastAccessedAt: expect.any(Number),
+    });
   });
 });

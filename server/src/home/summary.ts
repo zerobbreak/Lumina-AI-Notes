@@ -97,6 +97,16 @@ export type CoursePulse = {
   overdueCount: number;
 };
 
+/** The note to pick up again; the route adds it next to the summary. */
+export type HomeResume = {
+  noteId: string;
+  title: string;
+  preview: string;
+  courseId?: string;
+  moduleId?: string;
+  lastAccessedAt: number;
+};
+
 export type HomeSummary = {
   generatedAt: number;
   plan: PlanItem[];
