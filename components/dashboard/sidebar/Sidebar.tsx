@@ -382,27 +382,25 @@ export function Sidebar() {
   /* ────────────────────────────────────────────── zone 2: fixed destinations */
 
   const destinations = (
-    <TooltipProvider delayDuration={300}>
-      <nav
-        aria-label="Dashboard"
-        className={cn(
-          "shrink-0 space-y-px pb-2",
-          isRail ? "flex flex-col items-center gap-1 px-2" : "px-2",
-        )}
-      >
-        {DASHBOARD_NAV.map((item) => (
-          <SidebarNavItem
-            key={item.id}
-            label={item.label}
-            icon={item.icon}
-            isRail={isRail}
-            isActive={activeNavId === item.id}
-            onClick={() => handleNavigate(item.href)}
-            onPrefetch={() => preloadView(viewForParam(item.view))}
-          />
-        ))}
-      </nav>
-    </TooltipProvider>
+    <nav
+      aria-label="Dashboard"
+      className={cn(
+        "shrink-0 space-y-px px-2 pb-2",
+        isRail && "flex flex-col items-center gap-1",
+      )}
+    >
+      {DASHBOARD_NAV.map((item) => (
+        <SidebarNavItem
+          key={item.id}
+          label={item.label}
+          icon={item.icon}
+          isRail={isRail}
+          isActive={activeNavId === item.id}
+          onClick={() => handleNavigate(item.href)}
+          onPrefetch={() => preloadView(viewForParam(item.view))}
+        />
+      ))}
+    </nav>
   );
 
   /* ─────────────────────────────────────────── zone 3: workspace tree (rail) */
@@ -473,7 +471,7 @@ export function Sidebar() {
   /* ─────────────────────────────────────────── zone 3: workspace tree (open) */
 
   const tree = (
-    <ScrollArea className="min-h-0 min-w-0 flex-1 px-1 py-2">
+    <ScrollArea className="min-h-0 min-w-0 flex-1 px-2 py-2.5">
       <div className="space-y-3">
         {(dueTodayCount > 0 || nextDeadlineLabel) && (
           <button
@@ -508,6 +506,7 @@ export function Sidebar() {
 
         <SidebarSection
           id="favorites"
+          count={pinnedNotes?.length}
           label="Favorites"
           isEmpty={!pinnedNotes?.length}
           emptyLabel="Pin a note to keep it here"
@@ -526,6 +525,7 @@ export function Sidebar() {
 
         <SidebarSection
           id="recent"
+          count={quickNotes?.length}
           label="Recent"
           isEmpty={!quickNotes?.length}
           emptyLabel="No recent notes"
@@ -552,6 +552,7 @@ export function Sidebar() {
 
         <SidebarSection
           id="courses"
+          count={courses.length}
           label="Courses"
           isEmpty={courses.length === 0}
           emptyLabel="No courses yet"
@@ -589,6 +590,7 @@ export function Sidebar() {
 
         <SidebarSection
           id="tags"
+          count={tags?.length}
           label="Tags"
           isEmpty={!tags?.length}
           emptyLabel="No tags yet"
@@ -625,6 +627,7 @@ export function Sidebar() {
 
         <SidebarSection
           id="resources"
+          count={recentFiles?.length}
           label="Resources"
           isEmpty={!recentFiles?.length}
           emptyLabel="No files yet"
@@ -746,13 +749,15 @@ export function Sidebar() {
   );
 
   const sidebarInner = (
-    <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-sidebar">
-      {header}
-      {destinations}
-      <div className="mx-2 h-px shrink-0 bg-sidebar-border/60" />
-      {isRail ? railTree : tree}
-      {footer}
-    </div>
+    <TooltipProvider delayDuration={300}>
+      <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-sidebar">
+        {header}
+        {destinations}
+        <div className="mx-2 h-px shrink-0 bg-sidebar-border/60" />
+        {isRail ? railTree : tree}
+        {footer}
+      </div>
+    </TooltipProvider>
   );
 
   return (

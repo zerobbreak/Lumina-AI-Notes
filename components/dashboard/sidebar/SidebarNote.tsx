@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useCallback, memo } from "react";
-import { FileText, GripVertical, ArrowUpRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { FileText } from "lucide-react";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { useRouter } from "next/navigation";
 import { Id } from "@/types/data-model";
 import { cn } from "@/lib/utils";
 import { preloadView } from "@/components/dashboard/viewLoaders";
 import { usePrefetchNote } from "@/lib/queries/notes/useNoteDetail";
+import { SidebarRow } from "./SidebarRow";
 
 interface SidebarNoteProps {
   note: {
@@ -26,18 +26,16 @@ interface SidebarNoteProps {
   onRename: () => void;
   onDelete: () => void;
   onArchive?: () => void;
-  onExpand?: () => void;
 }
 
 function SidebarNoteComponent({
   note,
-  isActive,
+  isActive = false,
   isDraggable = true,
   isCompact = false,
   onRename,
   onDelete,
   onArchive,
-  onExpand,
 }: SidebarNoteProps) {
   const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
@@ -69,82 +67,38 @@ function SidebarNoteComponent({
     prefetchNote(note._id);
   }, [isActive, prefetchNote, note._id]);
 
+  const isVoice = note.quickCaptureType === "voice";
+
   return (
-    <div
-      className={cn(
-        "relative group/note flex items-center",
-        isDragging && "opacity-40",
-        isCompact && "px-0"
-      )}
-      draggable={isDraggable}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <button
-        aria-current={isActive ? "page" : undefined}
-        className={cn(
-          "w-full flex items-center h-7 px-2 text-[13px] gap-2 transition-colors duration-100 rounded-md relative",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar",
-          isActive
-            ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-            : "text-sidebar-foreground/75 hover:text-sidebar-foreground hover:bg-sidebar-accent/50",
-          isCompact && "w-8 h-8 justify-center px-0"
-        )}
-        onClick={handleClick}
-        onPointerEnter={handlePrefetch}
-        onFocus={handlePrefetch}
-        title={isCompact ? note.title : undefined}
-      >
-        {isActive && (
-          <span
-            aria-hidden
-            className="absolute inset-y-1 left-0 w-[2px] rounded-r-full bg-primary"
-          />
-        )}
-        {isDraggable && !isCompact && (
-          <div className="absolute left-0.5 opacity-0 group-hover/note:opacity-30 cursor-grab active:cursor-grabbing transition-opacity">
-            <GripVertical className="w-3 h-3" />
-          </div>
-        )}
-        <FileText
-          className={cn(
-            "w-[14px] h-[14px] shrink-0 transition-opacity",
-            isActive ? "opacity-100" : "opacity-60",
-          )}
-        />
-        {!isCompact && (
-          <span className="truncate flex-1 text-left">{note.title}</span>
-        )}
-        {note.quickCaptureType === "voice" && !isCompact && (
-          <span className="text-[9px] font-semibold uppercase tracking-tight text-primary/60 bg-primary/8 px-1 py-0.5 rounded shrink-0">
+    <SidebarRow
+      label={note.title}
+      icon={<FileText className={isCompact ? "h-[15px] w-[15px]" : "h-[14px] w-[14px]"} />}
+      isActive={isActive}
+      isRail={isCompact}
+      onClick={handleClick}
+      onPrefetch={handlePrefetch}
+      className={cn(isDragging && "opacity-40")}
+      meta={
+        isVoice ? (
+          <span className="rounded bg-primary/10 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-tight text-primary/80">
             Voice
           </span>
-        )}
-      </button>
-      {!isCompact && (
-        <div className="absolute right-1 opacity-0 group-hover/note:opacity-100 transition-opacity flex items-center gap-0.5">
-          {onExpand && (
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-5 w-5 text-muted-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                onExpand();
-              }}
-            >
-              <ArrowUpRight className="w-3 h-3" />
-            </Button>
-          )}
-          <ActionMenu
-            onRename={onRename}
-            onDelete={onDelete}
-            onArchive={onArchive}
-            isArchived={note.isArchived}
-          />
-        </div>
-      )}
-    </div>
+        ) : undefined
+      }
+      actions={
+        <ActionMenu
+          onRename={onRename}
+          onDelete={onDelete}
+          onArchive={onArchive}
+          isArchived={note.isArchived}
+        />
+      }
+      dragProps={
+        isDraggable
+          ? { draggable: true, onDragStart: handleDragStart, onDragEnd: handleDragEnd }
+          : undefined
+      }
+    />
   );
 }
 
@@ -157,7 +111,8 @@ export const SidebarNote = memo(
       prevProps.note.isArchived === nextProps.note.isArchived &&
       prevProps.note.quickCaptureType === nextProps.note.quickCaptureType &&
       prevProps.isActive === nextProps.isActive &&
-      prevProps.isDraggable === nextProps.isDraggable
+      prevProps.isDraggable === nextProps.isDraggable &&
+      prevProps.isCompact === nextProps.isCompact
     );
   },
 );

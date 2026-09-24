@@ -5,7 +5,7 @@ import { ArrowRight, RotateCcw, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AnnouncementAction } from "@/lib/announcements/registry";
 import { useAnnouncements } from "@/lib/announcements/useAnnouncements";
 import { useResetAnnouncementEvents } from "@/lib/mutations/announcements/useResetAnnouncementEvents";
@@ -79,14 +79,12 @@ export function WhatsNew({
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       {isRail ? (
-        <TooltipProvider delayDuration={300}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-            </TooltipTrigger>
-            <TooltipContent side="right">What&apos;s new</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="right">What&apos;s new</TooltipContent>
+        </Tooltip>
       ) : (
         <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       )}

@@ -1,58 +1,29 @@
 "use client";
 
-import { useCallback, useState, type ReactNode } from "react";
-import { ChevronDown, type LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
+import { ChevronRight, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const STORAGE_PREFIX = "lumina.sidebar.section.";
-
-/**
- * Disclosure state that survives reloads, so a student who keeps Courses open
- * and Resources closed comes back to that arrangement.
- *
- * Read during initialization rather than in an effect: the sidebar is mounted
- * client-side only, so there is no server render to mismatch against.
- */
-function usePersistedDisclosure(id: string, defaultOpen: boolean) {
-  const [isOpen, setIsOpen] = useState(() => {
-    if (typeof window === "undefined") return defaultOpen;
-    try {
-      const stored = window.localStorage.getItem(STORAGE_PREFIX + id);
-      return stored === null ? defaultOpen : stored === "1";
-    } catch {
-      // Private mode or a full quota — the default is a fine fallback.
-      return defaultOpen;
-    }
-  });
-
-  const toggle = useCallback(() => {
-    setIsOpen((prev) => {
-      const next = !prev;
-      try {
-        window.localStorage.setItem(STORAGE_PREFIX + id, next ? "1" : "0");
-      } catch {
-        // Ignore: losing the preference is better than breaking the click.
-      }
-      return next;
-    });
-  }, [id]);
-
-  return { isOpen, toggle };
-}
+import { usePersistedDisclosure } from "./usePersistedDisclosure";
 
 interface SidebarSectionProps {
   /** Stable key for the persisted open state. */
   id: string;
   label: string;
   children: ReactNode;
-  /** Right-aligned control revealed on hover, e.g. a create button. */
+  /** Right-aligned control, e.g. a create button. */
   action?: ReactNode;
   /** Shown in place of the children when the group has nothing in it. */
   emptyLabel?: string;
   isEmpty?: boolean;
+  /** Shown beside a closed header, so it still says what's inside. */
+  count?: number;
   defaultOpen?: boolean;
 }
 
+/**
+ * A collapsible group. The label sits on the rows' icon column; the chevron,
+ * count and action sit on the right, so the left edge stays one straight line.
+ */
 export function SidebarSection({
   id,
   label,
@@ -60,40 +31,44 @@ export function SidebarSection({
   action,
   emptyLabel,
   isEmpty = false,
+  count,
   defaultOpen = true,
 }: SidebarSectionProps) {
-  const { isOpen, toggle } = usePersistedDisclosure(id, defaultOpen);
+  const { isOpen, toggle } = usePersistedDisclosure(`section.${id}`, defaultOpen);
   const contentId = `sidebar-section-${id}`;
 
   return (
     <div className="min-w-0">
-      <div className="group/section flex items-center gap-1 pr-1">
+      {/* An empty section keeps its action visible: it's the obvious next step. */}
+      <div className={cn("group/section flex h-6 items-center", isEmpty && "is-empty")}>
         <button
           type="button"
           onClick={toggle}
           aria-expanded={isOpen}
           aria-controls={contentId}
-          className="flex min-w-0 flex-1 items-center gap-1 rounded px-2 py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar"
+          className="flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-md px-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar"
         >
-          <ChevronDown
-            className={cn(
-              "h-2.5 w-2.5 shrink-0 text-muted-foreground/50 transition-transform duration-150",
-              !isOpen && "-rotate-90",
-            )}
-          />
-          <span className="select-none truncate text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/70">
+          <span className="flex-1 select-none truncate text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
             {label}
           </span>
+          {!isOpen && count !== undefined && count > 0 && (
+            <span className="text-[11px] tabular-nums text-muted-foreground/70">{count}</span>
+          )}
+          <ChevronRight
+            aria-hidden
+            className={cn(
+              "h-3 w-3 shrink-0 text-muted-foreground/55 transition-transform duration-150",
+              isOpen && "rotate-90",
+            )}
+          />
         </button>
         {action}
       </div>
 
       {isOpen && (
-        <div id={contentId} className="space-y-px">
+        <div id={contentId} className="mt-0.5 space-y-px">
           {isEmpty && emptyLabel ? (
-            <p className="px-2 py-1 text-[12px] text-muted-foreground/50">
-              {emptyLabel}
-            </p>
+            <p className="px-2 py-1 text-[12px] text-muted-foreground/70">{emptyLabel}</p>
           ) : (
             children
           )}
@@ -110,7 +85,10 @@ interface SidebarSectionActionProps {
   disabled?: boolean;
 }
 
-/** Hover-revealed create/upload control for a section header. */
+/**
+ * A section header's create/upload control. Hover-revealed, except in an empty
+ * section (see `is-empty` above) and on touch screens, where it always shows.
+ */
 export function SidebarSectionAction({
   icon: Icon,
   label,
@@ -124,7 +102,7 @@ export function SidebarSectionAction({
       disabled={disabled}
       aria-label={label}
       title={label}
-      className="shrink-0 rounded p-1 text-muted-foreground/50 opacity-0 transition-all hover:bg-sidebar-accent/60 hover:text-sidebar-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-hover/section:opacity-100 disabled:opacity-40"
+      className="mr-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground/70 opacity-0 transition-opacity hover:bg-sidebar-accent/60 hover:text-sidebar-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-hover/section:opacity-100 group-[.is-empty]/section:opacity-100 disabled:opacity-40 [@media(hover:none)]:opacity-100"
     >
       <Icon className="h-3 w-3" />
     </button>
