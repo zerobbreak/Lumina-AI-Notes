@@ -39,6 +39,9 @@ import { shortcutFor } from "@/constants/shortcuts";
 import { DraggableDocument } from "@/components/documents";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { AppearanceSwitcher } from "@/components/shared/AppearanceSwitcher";
+import { SpotlightCard } from "@/components/dashboard/announcements/SpotlightCard";
+import { WhatsNew } from "@/components/dashboard/announcements/WhatsNew";
+import type { AnnouncementAction } from "@/lib/announcements/registry";
 import { CourseAccentSync } from "./CourseAccentSync";
 import { SearchDialog } from "@/components/dashboard/search/SearchDialog";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
@@ -196,6 +199,18 @@ export function Sidebar() {
       setIsCreatingNote(false);
     }
   }, [createNoteFlow, userData?.major, router, currentNoteId, openNote, openNoteLoading]);
+
+  const runAnnouncementAction = useCallback(
+    (action: AnnouncementAction) => {
+      if (action.type === "open-settings") {
+        setSettingsTab(action.tab);
+        setIsSettingsOpen(true);
+      } else {
+        handleNavigate(action.href);
+      }
+    },
+    [handleNavigate],
+  );
 
   useAppCommand("search", useCallback(() => setIsSearchOpen((open) => !open), []));
   useAppCommand("new-note", handleCreateNote);
@@ -663,6 +678,7 @@ export function Sidebar() {
     >
       {isRail ? (
         <>
+          <WhatsNew isRail onAction={runAnnouncementAction} />
           {mounted ? (
             <UserButton
               appearance={{
@@ -687,41 +703,44 @@ export function Sidebar() {
           </Button>
         </>
       ) : (
-        <div className="flex items-center gap-2">
-          {mounted ? (
-            <UserButton
-              appearance={{
-                elements: {
-                  avatarBox:
-                    "w-7 h-7 rounded-md ring-1 ring-sidebar-border hover:ring-sidebar-foreground/20 transition-all",
-                },
-              }}
-            />
-          ) : (
-            <div className="h-7 w-7 shrink-0 animate-pulse rounded-md bg-sidebar-accent" />
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-medium leading-tight text-sidebar-foreground">
-              {user?.fullName || "Student"}
-            </p>
-            {user?.primaryEmailAddress?.emailAddress && (
-              <p className="truncate text-[11px] leading-tight text-muted-foreground/60">
-                {user.primaryEmailAddress.emailAddress}
-              </p>
+        <>
+          <WhatsNew isRail={false} onAction={runAnnouncementAction} />
+          <div className="flex items-center gap-2">
+            {mounted ? (
+              <UserButton
+                appearance={{
+                  elements: {
+                    avatarBox:
+                      "w-7 h-7 rounded-md ring-1 ring-sidebar-border hover:ring-sidebar-foreground/20 transition-all",
+                  },
+                }}
+              />
+            ) : (
+              <div className="h-7 w-7 shrink-0 animate-pulse rounded-md bg-sidebar-accent" />
             )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[13px] font-medium leading-tight text-sidebar-foreground">
+                {user?.fullName || "Student"}
+              </p>
+              {user?.primaryEmailAddress?.emailAddress && (
+                <p className="truncate text-[11px] leading-tight text-muted-foreground/60">
+                  {user.primaryEmailAddress.emailAddress}
+                </p>
+              )}
+            </div>
+            <AppearanceSwitcher onOpenSettings={() => openSettings("appearance")} />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0 rounded-md text-muted-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+              onClick={() => openSettings()}
+              aria-label="Settings"
+              title="Settings"
+            >
+              <Settings className="h-[14px] w-[14px]" />
+            </Button>
           </div>
-          <AppearanceSwitcher onOpenSettings={() => openSettings("appearance")} />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 shrink-0 rounded-md text-muted-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
-            onClick={() => openSettings()}
-            aria-label="Settings"
-            title="Settings"
-          >
-            <Settings className="h-[14px] w-[14px]" />
-          </Button>
-        </div>
+        </>
       )}
     </div>
   );
@@ -821,6 +840,7 @@ export function Sidebar() {
       )}
       <SearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
       <CourseAccentSync />
+      <SpotlightCard onAction={runAnnouncementAction} />
       <SettingsDialog
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}

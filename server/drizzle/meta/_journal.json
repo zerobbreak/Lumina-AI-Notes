@@ -71,6 +71,13 @@
       "when": 1790209547608,
       "tag": "0009_course_colors",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790236753616,
+      "tag": "0010_announcement_events",
+      "breakpoints": true
     }
   ]
 }

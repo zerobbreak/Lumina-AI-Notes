@@ -19,5 +19,6 @@ export function toUserData(dto: UserDto): UserData {
     enabledBlocks: dto.enabledBlocks,
     tourCompleted: dto.tourCompleted,
     tourStep: dto.tourStep,
+    _creationTime: dto.createdAt,
   };
 }

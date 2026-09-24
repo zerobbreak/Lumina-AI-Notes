@@ -97,6 +97,7 @@ export interface UserData {
   dailyGoalCards?: number;
   tourCompleted?: boolean;
   tourStep?: number;
+  _creationTime?: number;
 }
 
 // Flashcard deck type - represents a collection of flashcards

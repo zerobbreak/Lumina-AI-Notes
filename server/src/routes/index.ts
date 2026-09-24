@@ -4,6 +4,7 @@ import { authenticate } from "../middleware/auth.js";
 import { loadUser } from "../middleware/user.js";
 import { createAccountRouter } from "./account.js";
 import { createAiRouter } from "./ai.js";
+import { createAnnouncementsRouter } from "./announcements.js";
 import { createAnalyticsRouter } from "./analytics.js";
 import { createAuthRouter } from "./auth.js";
 import { createCalendarRouter } from "./calendar.js";
@@ -36,6 +37,7 @@ export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken, 
   router.use(authenticate(verifyToken), loadUser(db, clerkProfiles));
 
   router.use("/analytics", createAnalyticsRouter(db));
+  router.use("/announcements", createAnnouncementsRouter(db));
   router.use("/auth", createAuthRouter(db, clerkProfiles));
   router.use("/uploads", createUploadsRouter(db, storage, {
       maxUploadBytes: env.MAX_UPLOAD_BYTES,
