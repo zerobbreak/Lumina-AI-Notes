@@ -92,6 +92,41 @@ describe("QueryProvider", () => {
     expect(first).toBeDefined();
   });
 
+  // Hooks such as useQuery keep the client they first rendered with. Swapping
+  // the cache when Clerk finished loading left root providers (appearance)
+  // reading a cleared cache, so saved changes never showed.
+  it("keeps the same client when Clerk finishes loading", () => {
+    auth = { isLoaded: false, userId: null };
+    const { rerender } = renderProvider();
+    const first = seen.client;
+    act(() => {
+      auth = { isLoaded: true, userId: "user_a" };
+      rerender();
+    });
+    expect(seen.client).toBe(first);
+  });
+
+  it("remounts everything below on a user switch, so no hook reads the old cache", () => {
+    let mounts = 0;
+    function Counter() {
+      useEffect(() => {
+        mounts += 1;
+      }, []);
+      return null;
+    }
+    const tree = () => (
+      <QueryProvider>
+        <Counter />
+      </QueryProvider>
+    );
+    const view = render(tree());
+    act(() => {
+      auth = { isLoaded: true, userId: "user_b" };
+      view.rerender(tree());
+    });
+    expect(mounts).toBe(2);
+  });
+
   it("wires apiFetch's session recovery to Clerk", async () => {
     renderProvider();
     await expect(freshToken()).resolves.toBe("fresh");
