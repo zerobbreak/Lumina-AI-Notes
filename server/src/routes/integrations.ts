@@ -1,4 +1,4 @@
-import { and, count, eq, inArray } from "drizzle-orm";
+import { and, count, eq, inArray, isNull } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
 import { clientMessage, UserFacingError } from "../ai/errors.js";
@@ -11,6 +11,7 @@ import {
   type FeedFetcher,
   type SyncResult,
 } from "../integrations/brightspace/sync.js";
+import { ensureCourses } from "../integrations/brightspace/courses.js";
 import type { SecretBox } from "../integrations/secretBox.js";
 import { HttpError } from "../middleware/errors.js";
 import { currentUser, type User } from "../middleware/user.js";
@@ -183,6 +184,39 @@ export function createBrightspaceRouter(
 
     const result = await sync(connection);
     res.json({ ...(await status(user)), sync: result });
+  });
+
+  // "Create courses from Brightspace": every unmatched, synced course gets a
+  // Lumina course (reusing one with the same code), then a sync re-files deadlines.
+  router.post("/courses/import", async (_req, res) => {
+    const user = currentUser(res);
+    const connection = await requireConnection(user.id);
+
+    const created = await db.transaction(async (tx) => {
+      const unmatched = await tx
+        .select()
+        .from(lmsCourseLinks)
+        .where(
+          and(
+            eq(lmsCourseLinks.connectionId, connection.id),
+            isNull(lmsCourseLinks.courseId),
+            eq(lmsCourseLinks.ignored, false),
+          ),
+        );
+      const placed = await ensureCourses(
+        tx,
+        user.id,
+        unmatched.map((link) => ({ key: link.externalKey, name: link.externalName })),
+      );
+      for (const link of unmatched) {
+        const courseId = placed.get(link.externalKey);
+        if (courseId) await tx.update(lmsCourseLinks).set({ courseId }).where(eq(lmsCourseLinks.id, link.id));
+      }
+      return placed.size;
+    });
+
+    const result = await sync(connection);
+    res.json({ ...(await status(user)), sync: result, imported: created });
   });
 
   // Disconnect: the connection, its course links and every deadline it synced go.

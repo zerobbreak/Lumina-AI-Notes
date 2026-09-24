@@ -37,8 +37,9 @@ export const DASHBOARD_NAV: readonly DashboardNavItem[] = [
   {
     id: "home",
     label: "Home",
-    view: null,
-    href: "/dashboard",
+    // Explicit: bare /dashboard resumes the last note instead of showing Home.
+    view: "home",
+    href: "/dashboard?view=home",
     icon: LayoutGrid,
     description: "Your courses and recent work",
     keywords: ["home", "dashboard", "hub", "overview", "main"],

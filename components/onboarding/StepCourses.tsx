@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { UploadCloud, FileText, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BrightspaceStep } from "./BrightspaceStep";
 
 interface StepCoursesProps {
   value: File[];
@@ -37,9 +38,11 @@ export function StepCourses({ value, onChange }: StepCoursesProps) {
 
   return (
     <div className="flex flex-col gap-6 flex-1 min-h-0">
+      <BrightspaceStep />
+
       <p className="text-sm text-muted-foreground leading-relaxed">
-        Optional but powerful: each PDF becomes a course shell with your file
-        attached. Skip for now if you prefer to add materials later.
+        You can also add syllabus PDFs: each one becomes a course with the file
+        attached. Both are optional; skip for now if you prefer to add them later.
       </p>
 
       <div

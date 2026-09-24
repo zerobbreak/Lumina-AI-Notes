@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { AlertTriangle, GraduationCap, Link2, Loader2, RefreshCw, Unplug } from "lucide-react";
+import { AlertTriangle, FolderPlus, GraduationCap, Link2, Loader2, RefreshCw, Unplug } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -27,6 +27,7 @@ import {
 import { ApiError } from "@/lib/api/errors";
 import { useConnectBrightspace } from "@/lib/mutations/integrations/useConnectBrightspace";
 import { useDisconnectBrightspace } from "@/lib/mutations/integrations/useDisconnectBrightspace";
+import { useImportBrightspaceCourses } from "@/lib/mutations/integrations/useImportBrightspaceCourses";
 import { useSaveBrightspaceCourses } from "@/lib/mutations/integrations/useSaveBrightspaceCourses";
 import { useSyncBrightspace } from "@/lib/mutations/integrations/useSyncBrightspace";
 import { useBrightspaceStatus } from "@/lib/queries/integrations/useBrightspaceStatus";
@@ -92,7 +93,13 @@ function BrightspaceCard() {
   );
 }
 
-function ConnectForm({ onDone, submitLabel = "Connect" }: { onDone?: () => void; submitLabel?: string }) {
+export function ConnectForm({
+  onDone,
+  submitLabel = "Connect",
+}: {
+  onDone?: () => void;
+  submitLabel?: string;
+}) {
   const connect = useConnectBrightspace();
   const [url, setUrl] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
@@ -271,6 +278,7 @@ const choiceValue = (choice: Choice) =>
 function CourseMatching({ courses }: { courses: BrightspaceCourseLinkDto[] }) {
   const { data: userData } = useCurrentUser();
   const save = useSaveBrightspaceCourses();
+  const importCourses = useImportBrightspaceCourses();
   // Only the rows the student has changed; everything else shows the saved value.
   const [edits, setEdits] = useState<Record<string, Choice>>({});
   const own = userData?.courses ?? [];
@@ -290,6 +298,19 @@ function CourseMatching({ courses }: { courses: BrightspaceCourseLinkDto[] }) {
     return edit && choiceValue(edit) !== choiceValue(course);
   });
 
+  const unmatched = courses.filter((course) => !course.courseId && !course.ignored).length;
+
+  const createCourses = async () => {
+    try {
+      const response = await importCourses.mutateAsync();
+      setEdits({});
+      const made = response.imported ?? 0;
+      toast.success(made === 1 ? "Added 1 course from Brightspace" : `Added ${made} courses from Brightspace`);
+    } catch (err) {
+      toast.error(errorMessage(err, "Couldn't create the courses"));
+    }
+  };
+
   const submit = async () => {
     try {
       const response = await save.mutateAsync(
@@ -304,11 +325,23 @@ function CourseMatching({ courses }: { courses: BrightspaceCourseLinkDto[] }) {
 
   return (
     <div className="space-y-3">
-      <div>
-        <h4 className="text-sm font-semibold text-foreground">Courses</h4>
-        <p className="text-xs text-muted-foreground">
-          Match each Brightspace course to one of yours so its deadlines land in the right place.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h4 className="text-sm font-semibold text-foreground">Courses</h4>
+          <p className="text-xs text-muted-foreground">
+            Match each Brightspace course to one of yours so its deadlines land in the right place.
+          </p>
+        </div>
+        {unmatched > 0 && (
+          <Button size="sm" variant="outline" onClick={createCourses} disabled={importCourses.isPending}>
+            {importCourses.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden />
+            ) : (
+              <FolderPlus className="w-4 h-4 mr-2" aria-hidden />
+            )}
+            {unmatched === 1 ? "Create 1 course" : `Create ${unmatched} courses`} from Brightspace
+          </Button>
+        )}
       </div>
       <ul className="divide-y divide-border/60 rounded-xl border border-border/60">
         {courses.map((course) => (

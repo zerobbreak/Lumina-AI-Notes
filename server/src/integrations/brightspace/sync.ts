@@ -1,10 +1,11 @@
 import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { clientMessage, UserFacingError } from "../../ai/errors.js";
 import type { Db } from "../../db/client.js";
-import { deadlines, lmsConnections, lmsCourseLinks, users, type Course } from "../../db/schema/index.js";
+import { deadlines, lmsConnections, lmsCourseLinks } from "../../db/schema/index.js";
 import { createRemindersForDeadline, deleteRemindersForDeadline } from "../../deadlines/reminders.js";
 import { safeGet, type FetchPolicy } from "../../net/safeGet.js";
 import type { SecretBox } from "../secretBox.js";
+import { ensureCourses } from "./courses.js";
 import { parseFeed, parseFeedUrl, type FeedItem } from "./feed.js";
 
 const FEED_MAX_BYTES = 5 * 1024 * 1024;
@@ -52,7 +53,8 @@ type Connection = typeof lmsConnections.$inferSelect;
  *
  * - Items become deadlines keyed by (connection, iCal UID); a re-sync updates
  *   title, time, kind, course and link, never the student's completedAt or notes.
- * - New courses get an unmapped course link; mapped ones set courseId.
+ * - A course seen for the first time is matched to the student's course
+ *   with the same code, or a Lumina course is created for it; mapped ones set courseId.
  *   Items in ignored courses aren't synced.
  * - A future, unfinished deadline that's gone from the feed (or whose course
  *   is now ignored) is removed. Past ones stay: feeds drop old items.
@@ -91,11 +93,20 @@ export async function applyFeedItems(
   return db.transaction(async (tx) => {
     const courses = new Map(items.map((item) => [item.course.key, item.course]));
     if (courses.size > 0) {
-      const [owner] = await tx
-        .select({ courses: users.courses })
-        .from(users)
-        .where(eq(users.id, connection.userId));
-      const own = owner?.courses ?? [];
+      // Courses seen for the first time get a Lumina course: an existing one
+      // with the same code, or a new one. Known links keep the student's choice,
+      // including "No course" and "Don't sync".
+      const known = new Set(
+        (
+          await tx
+            .select({ key: lmsCourseLinks.externalKey })
+            .from(lmsCourseLinks)
+            .where(eq(lmsCourseLinks.connectionId, connection.id))
+        ).map((row) => row.key),
+      );
+      const fresh = [...courses.values()].filter((course) => !known.has(course.key));
+      const placed = await ensureCourses(tx, connection.userId, fresh);
+
       await tx
         .insert(lmsCourseLinks)
         .values(
@@ -104,8 +115,7 @@ export async function applyFeedItems(
             connectionId: connection.id,
             externalKey: course.key,
             externalName: course.name,
-            // Only a new link takes this; the update below leaves the student's choice alone.
-            courseId: matchCourse(course.name, own),
+            courseId: placed.get(course.key) ?? null,
           })),
         )
         .onConflictDoUpdate({
@@ -196,20 +206,4 @@ export async function applyFeedItems(
 
     return { ok: true, added, updated, removed: gone.length, courses: links.size };
   });
-}
-
-const normalize = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, "");
-
-/**
- * Pre-maps a Brightspace course to the student's Lumina course whose code
- * appears in its name ("HIST101 - History of Africa" -> code "HIST 101").
- * Only a single, reasonably specific match counts; otherwise the student picks.
- */
-export function matchCourse(externalName: string, own: Course[]): string | null {
-  const name = normalize(externalName);
-  const matches = own.filter((course) => {
-    const code = normalize(course.code ?? "");
-    return code.length >= 4 && name.includes(code);
-  });
-  return matches.length === 1 ? matches[0]!.id : null;
 }

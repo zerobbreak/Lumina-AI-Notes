@@ -4,7 +4,8 @@ import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "../src/db/client.js";
 import { deadlines, lmsConnections, lmsCourseLinks, users } from "../src/db/schema/index.js";
-import { matchCourse, type FeedFetcher } from "../src/integrations/brightspace/sync.js";
+import { type FeedFetcher } from "../src/integrations/brightspace/sync.js";
+import { matchCourse, parseCourseName } from "../src/integrations/brightspace/courses.js";
 import { createSecretBox } from "../src/integrations/secretBox.js";
 import { syncBrightspaceFeeds } from "../src/workers/jobs/brightspaceSync.js";
 import { bearer, buildApp, createTestDb, testEnv } from "./helpers.js";
@@ -225,6 +226,60 @@ describe("Brightspace routes", () => {
     const res = await request(keyless).get(BASE).set("Authorization", bearer(ALICE));
     expect(res.status).toBe(503);
     expect(res.body.error.code).toBe("integration_unavailable");
+  });
+});
+
+describe("parseCourseName", () => {
+  it.each([
+    ["Programming 3B PROG7312 2026 FT BCAD0701 EMGPMD Term2 GR02", "Programming 3B", "PROG7312"],
+    ["Information Systems 3D INSY7314 2026 FT BCAD0701 EMGPMD Term2 GR02", "Information Systems 3D", "INSY7314"],
+    ["HIST101 - History of Africa", "History of Africa", "HIST101"],
+    ["MATH201: Calculus", "Calculus", "MATH201"],
+    ["Academic Writing", "Academic Writing", ""],
+  ])("%s -> %s / %s", (external, name, code) => {
+    expect(parseCourseName(external)).toEqual({ name, code });
+  });
+});
+
+describe("POST /courses/import", () => {
+  it("creates courses for unmatched links, reuses a matching code, skips ignored ones, and re-files deadlines", async () => {
+    await withCourses(ALICE);
+    // Links that predate auto-creation: all unmatched.
+    await as(ALICE).post(`${BASE}/feed`).send({ url: FEED });
+    await db.update(lmsCourseLinks).set({ courseId: null });
+    await db.update(users).set({ courses: [{ id: "c-math", name: "Maths", code: "MATH201" }] }).where(eq(users.clerkUserId, ALICE));
+    feed = calendar(essay, quiz, { uid: "lab@d2l", summary: "Lab 1 - Due", days: 8, location: "CHEM101 - Chemistry", ou: "333" });
+    await db.update(lmsConnections).set({ lastSyncedAt: new Date(0) });
+    await as(ALICE).post(`${BASE}/sync`);
+    await db.update(lmsCourseLinks).set({ courseId: null, ignored: true }).where(eq(lmsCourseLinks.externalKey, "ou:333"));
+    await db.update(lmsCourseLinks).set({ courseId: null });
+    await db.update(users).set({ courses: [{ id: "c-math", name: "Maths", code: "MATH201" }] }).where(eq(users.clerkUserId, ALICE));
+    await db.update(deadlines).set({ courseId: null });
+
+    const res = await as(ALICE).post(`${BASE}/courses/import`);
+    expect(res.status).toBe(200);
+    expect(res.body.imported).toBe(2);
+
+    const [owner] = await db.select().from(users).where(eq(users.clerkUserId, ALICE));
+    expect(owner!.courses!.map((c) => [c.name, c.code])).toEqual([
+      ["Maths", "MATH201"],
+      ["History of Africa", "HIST101"],
+    ]);
+    const hist = owner!.courses!.find((c) => c.code === "HIST101")!.id;
+    expect(res.body.courses.map((c: { name: string; courseId: string | null; ignored: boolean }) => [c.name, c.courseId, c.ignored])).toEqual([
+      ["CHEM101 - Chemistry", null, true],
+      ["HIST101 - History of Africa", hist, false],
+      ["MATH201 - Calculus", "c-math", false],
+    ]);
+    const rows = await db.select().from(deadlines).orderBy(deadlines.dueAt);
+    expect(rows.map((row) => [row.title, row.courseId])).toEqual([
+      ["Essay 1", hist],
+      ["Quiz 2", "c-math"],
+    ]);
+  });
+
+  it("needs a connection", async () => {
+    expect((await as(ALICE).post(`${BASE}/courses/import`)).status).toBe(404);
   });
 });
 

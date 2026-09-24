@@ -60,6 +60,13 @@ beforeEach(() => {
         server.status = connected;
         return json(201, { ...connected, sync: { ok: true, added: 2, updated: 0, removed: 0, courses: 2 } });
       }
+      if (path === "/integrations/brightspace/courses/import") {
+        server.status = {
+          ...connected,
+          courses: connected.courses.map((course) => ({ ...course, courseId: course.courseId ?? "c-new" })),
+        };
+        return json(200, { ...server.status, sync: { ok: true, added: 0, updated: 1, removed: 0, courses: 2 }, imported: 1 });
+      }
       if (path === "/integrations/brightspace" && method === "DELETE") {
         server.status = { connected: false };
         return json(204, null);
@@ -144,5 +151,31 @@ describe("IntegrationsTab", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Disconnect" }));
     await waitFor(() => expect(server.calls.some((call) => call.method === "DELETE")).toBe(true));
     expect(await screen.findByLabelText("Calendar link")).toBeInTheDocument();
+  });
+
+  it("creates Lumina courses for unmatched Brightspace courses", async () => {
+    server.status = connected;
+    renderTab();
+    fireEvent.click(await screen.findByRole("button", { name: "Create 1 course from Brightspace" }));
+
+    await waitFor(() =>
+      expect(server.calls).toContainEqual({ method: "POST", path: "/integrations/brightspace/courses/import", body: undefined }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /from Brightspace/ })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("offers nothing to create when every course is matched or skipped", async () => {
+    server.status = {
+      ...connected,
+      courses: [
+        { id: "l1", name: "HIST101", courseId: "c-hist", ignored: false },
+        { id: "l2", name: "MATH201", courseId: null, ignored: true },
+      ],
+    };
+    renderTab();
+    await screen.findByText("school.brightspace.com");
+    expect(screen.queryByRole("button", { name: /from Brightspace/ })).not.toBeInTheDocument();
   });
 });

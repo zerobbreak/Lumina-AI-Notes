@@ -31,6 +31,14 @@ export const brightspaceApi = {
     });
   },
 
+  /** Gives every unmatched Brightspace course a Lumina course, then re-syncs. */
+  importCourses(token: string) {
+    return apiFetch<BrightspaceSyncResponseDto>(apiPath`/integrations/brightspace/courses/import`, {
+      method: "POST",
+      token,
+    });
+  },
+
   disconnect(token: string) {
     return apiFetch<void>(apiPath`/integrations/brightspace`, { method: "DELETE", token });
   },

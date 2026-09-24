@@ -244,26 +244,47 @@ describe("syncFeedConnection", () => {
     (await db.select().from(lmsConnections).where(eq(lmsConnections.id, id)))[0]!;
   const synced = () => db.select().from(deadlines).where(eq(deadlines.userId, userId)).orderBy(deadlines.dueAt);
 
-  it("imports items as deadlines with reminders and records each course", async () => {
+  it("imports items as deadlines with reminders, creating a Lumina course for each new course", async () => {
     const connection = await connect();
     const result = await syncFeedConnection(db, box, connection, fetcher, NOW);
     expect(result).toEqual({ ok: true, added: 2, updated: 0, removed: 0, courses: 2 });
 
+    const [owner] = await db.select().from(users).where(eq(users.id, userId));
+    const created = owner!.courses!.map((course) => [course.name, course.code, typeof course.color]);
+    expect(created).toEqual([
+      ["History of Africa", "HIST101", "string"],
+      ["Calculus", "MATH201", "string"],
+    ]);
+    const idByCode = new Map(owner!.courses!.map((course) => [course.code, course.id]));
+
     const rows = await synced();
     expect(rows.map((row) => [row.title, row.kind, row.source, row.courseId])).toEqual([
-      ["Essay 1", "assignment", "brightspace", null],
-      ["Quiz 2", "exam", "brightspace", null],
+      ["Essay 1", "assignment", "brightspace", idByCode.get("HIST101")],
+      ["Quiz 2", "exam", "brightspace", idByCode.get("MATH201")],
     ]);
     expect(await db.select().from(deadlineReminders).where(eq(deadlineReminders.deadlineId, rows[0]!.id))).not.toHaveLength(0);
 
     const links = await db.select().from(lmsCourseLinks).orderBy(lmsCourseLinks.externalKey);
     expect(links.map((link) => [link.externalKey, link.externalName, link.courseId])).toEqual([
-      ["ou:12345", "HIST101 - History of Africa", null],
-      ["ou:67890", "MATH201 - Calculus", null],
+      ["ou:12345", "HIST101 - History of Africa", idByCode.get("HIST101")],
+      ["ou:67890", "MATH201 - Calculus", idByCode.get("MATH201")],
     ]);
     const after = await reload(connection.id);
     expect(after.status).toBe("active");
     expect(after.lastSyncedAt).toEqual(NOW);
+  });
+
+  it("leaves a known course's choice alone, even \"No course\"", async () => {
+    const connection = await connect();
+    await syncFeedConnection(db, box, connection, fetcher, NOW);
+    await db.update(lmsCourseLinks).set({ courseId: null }).where(eq(lmsCourseLinks.externalKey, "ou:12345"));
+    await db.update(users).set({ courses: [] }).where(eq(users.id, userId));
+
+    await syncFeedConnection(db, box, connection, fetcher, NOW);
+    const [owner] = await db.select().from(users).where(eq(users.id, userId));
+    expect(owner!.courses).toEqual([]);
+    const [link] = await db.select().from(lmsCourseLinks).where(eq(lmsCourseLinks.externalKey, "ou:12345"));
+    expect(link!.courseId).toBeNull();
   });
 
   it("re-syncing is idempotent, and updates a moved due date without touching completion", async () => {

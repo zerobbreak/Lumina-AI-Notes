@@ -8,6 +8,8 @@ import { useCompleteOnboarding } from "@/lib/hooks/users/useCompleteOnboarding";
 import { useUserData } from "@/lib/hooks/users/useUserData";
 import { useCreateFileAction } from "@/lib/hooks/files/useCreateFileAction";
 import { useStorageUpload } from "@/lib/hooks/uploads/useStorageUpload";
+import { usersApi } from "@/lib/api/domains/users.api";
+import { useApiToken } from "@/lib/api/use-api-token";
 import { Button } from "@/components/ui/button";
 import {
   ChevronRight,
@@ -55,7 +57,7 @@ const STEP_HINTS: Record<
   },
   4: {
     title: "Ground your courses",
-    body: "Syllabus PDFs give Lumina context—dates, terms, and structure—for smarter answers.",
+    body: "Brightspace brings in your courses and due dates; syllabus PDFs give Lumina context for smarter answers.",
     icon: FolderOpen,
   },
   5: {
@@ -77,6 +79,7 @@ export default function OnboardingPage() {
   const uploadToStorage = useStorageUpload();
   const uploadFile = useCreateFileAction();
   const userData = useUserData();
+  const { getApiToken } = useApiToken();
 
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -134,7 +137,14 @@ export default function OnboardingPage() {
           };
         });
 
-        const courses = await Promise.all(coursePromises);
+        const fromPdfs = await Promise.all(coursePromises);
+        // Onboarding replaces the course list, so keep the ones Brightspace
+        // already set up (read fresh: a sync may have added some just now).
+        const existing = (await usersApi.getMe(await getApiToken())).courses ?? [];
+        const courses = [
+          ...existing.map(({ id, name, code }) => ({ id, name, code })),
+          ...fromPdfs,
+        ];
         const defaultTemplate = getStyleRecommendation(formData.major).primary;
         const coursesWithDefaults = courses.map((c) => ({
           ...c,
@@ -240,14 +250,14 @@ export default function OnboardingPage() {
                       {step === 1 && "Welcome"}
                       {step === 2 && "Your focus"}
                       {step === 3 && "Your look"}
-                      {step === 4 && "Materials"}
+                      {step === 4 && "Your courses"}
                       {step === 5 && "Permissions"}
                     </p>
                     <h1 className="text-xl md:text-2xl font-semibold text-foreground tracking-tight">
                       {step === 1 && "Start your workspace"}
                       {step === 2 && "What do you study?"}
                       {step === 3 && "Pick your look"}
-                      {step === 4 && "Add syllabus PDFs"}
+                      {step === 4 && "Bring in your courses"}
                       {step === 5 && "Enable microphone"}
                     </h1>
                   </motion.div>

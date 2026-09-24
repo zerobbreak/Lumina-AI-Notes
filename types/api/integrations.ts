@@ -28,4 +28,6 @@ export type BrightspaceStatusDto = { connected: false } | BrightspaceConnectionD
 /** What connect, sync and course saves return: the new status plus how the sync went. */
 export type BrightspaceSyncResponseDto = BrightspaceConnectionDto & {
   sync: BrightspaceSyncResultDto;
+  /** Course imports only: how many Brightspace courses got a Lumina course. */
+  imported?: number;
 };

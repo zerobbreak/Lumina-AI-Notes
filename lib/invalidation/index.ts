@@ -63,7 +63,8 @@ export function invalidateCollaboration(queryClient: QueryClient, noteId?: strin
 
 /**
  * Brightspace mutations answer with the new connection status, so it goes
- * straight into the cache; a sync can add, move or remove deadlines anywhere.
+ * straight into the cache. A sync can add, move or remove deadlines anywhere,
+ * and create courses for new Brightspace courses.
  */
 export function applyBrightspaceStatus(
   queryClient: QueryClient,
@@ -74,4 +75,5 @@ export function applyBrightspaceStatus(
   delete status.sync;
   queryClient.setQueryData<BrightspaceStatusDto>(integrationKeys.brightspace(), status);
   invalidateDeadlines(queryClient);
+  invalidateUser(queryClient);
 }
