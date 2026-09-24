@@ -16,6 +16,8 @@ export type AppCommandId =
   | "show-shortcuts"
   | "toggle-sidebar"
   | `go:${string}`
+  /** Opens settings on the tab after the colon, e.g. "settings:integrations". */
+  | `settings:${string}`
   | "note:export-pdf"
   | "note:flashcards"
   | "note:quiz"

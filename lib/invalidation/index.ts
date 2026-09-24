@@ -1,8 +1,10 @@
 import type { QueryClient } from "@tanstack/react-query";
+import type { BrightspaceStatusDto } from "@/types/api/integrations";
 import { chatKeys } from "@/lib/query-keys/chats";
 import { collaborationKeys } from "@/lib/query-keys/collaboration";
 import { deadlineKeys } from "@/lib/query-keys/deadlines";
 import { fileKeys } from "@/lib/query-keys/files";
+import { integrationKeys } from "@/lib/query-keys/integrations";
 import { flashcardKeys } from "@/lib/query-keys/flashcards";
 import { noteKeys } from "@/lib/query-keys/notes";
 import { quizKeys } from "@/lib/query-keys/quizzes";
@@ -57,4 +59,19 @@ export function invalidateCollaboration(queryClient: QueryClient, noteId?: strin
     return;
   }
   void queryClient.invalidateQueries({ queryKey: collaborationKeys.all });
+}
+
+/**
+ * Brightspace mutations answer with the new connection status, so it goes
+ * straight into the cache; a sync can add, move or remove deadlines anywhere.
+ */
+export function applyBrightspaceStatus(
+  queryClient: QueryClient,
+  response: BrightspaceStatusDto & { sync?: unknown },
+) {
+  // The sync summary is a one-off report, not part of the cached status.
+  const status = { ...response };
+  delete status.sync;
+  queryClient.setQueryData<BrightspaceStatusDto>(integrationKeys.brightspace(), status);
+  invalidateDeadlines(queryClient);
 }

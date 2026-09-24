@@ -32,6 +32,7 @@ import {
   Target,
   Database,
   Palette,
+  Plug,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
@@ -41,6 +42,7 @@ import { InAppNotificationsPanel } from "@/components/dashboard/settings/InAppNo
 import { StudyGoalsTab } from "@/components/dashboard/settings/StudyGoalsTab";
 import { AccountDataTab } from "@/components/dashboard/settings/AccountDataTab";
 import { AppearanceTab } from "@/components/dashboard/settings/AppearanceTab";
+import { IntegrationsTab } from "@/components/dashboard/settings/IntegrationsTab";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -168,6 +170,12 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
       label: "Notifications",
       icon: Bell,
       description: "Deadline reminders and other in-app alerts.",
+    },
+    {
+      id: "integrations",
+      label: "Integrations",
+      icon: Plug,
+      description: "Bring deadlines in from Brightspace.",
     },
     {
       id: "study",
@@ -487,6 +495,8 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
               )}
 
               {activeTab === "appearance" && <AppearanceTab />}
+
+              {activeTab === "integrations" && <IntegrationsTab />}
 
               {activeTab === "study" && <StudyGoalsTab />}
 

@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lt, lte } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
 import { createRemindersForDeadline, deleteRemindersForDeadline } from "../deadlines/reminders.js";
@@ -41,6 +41,12 @@ const upcomingQuery = z.object({
     .enum(["true", "false"])
     .optional()
     .transform((v) => v === "true"),
+});
+
+const overdueQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+  // Past this, an unfinished deadline is history rather than something to act on.
+  windowDays: z.coerce.number().int().min(1).max(90).optional(),
 });
 
 async function requireOwnedDeadline(db: Db, deadlineId: string, userId: string) {
@@ -103,6 +109,29 @@ export function createDeadlinesRouter(db: Db) {
       .from(deadlines)
       .where(and(...conditions))
       .orderBy(deadlines.dueAt)
+      .limit(limit);
+
+    res.json(rows.map(toDeadlineResponse));
+  });
+
+  // Unfinished deadlines that have already passed, most recent first.
+  router.get("/overdue", async (req, res) => {
+    const user = currentUser(res);
+    const { limit = 8, windowDays = 14 } = parse(overdueQuery, req.query);
+    const now = Date.now();
+
+    const rows = await db
+      .select()
+      .from(deadlines)
+      .where(
+        and(
+          eq(deadlines.userId, user.id),
+          isNull(deadlines.completedAt),
+          lt(deadlines.dueAt, new Date(now)),
+          gte(deadlines.dueAt, new Date(now - windowDays * 24 * 60 * 60 * 1000)),
+        ),
+      )
+      .orderBy(desc(deadlines.dueAt))
       .limit(limit);
 
     res.json(rows.map(toDeadlineResponse));

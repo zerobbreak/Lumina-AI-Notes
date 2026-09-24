@@ -11,6 +11,18 @@ export const deadlinesApi = {
     return apiFetch<DeadlineDto[]>(apiPath`/deadlines/upcoming`, { query: params ?? {}, token });
   },
 
+  getOverdue(token: string, params?: { limit?: number; windowDays?: number }) {
+    return apiFetch<DeadlineDto[]>(apiPath`/deadlines/overdue`, { query: params ?? {}, token });
+  },
+
+  setCompleted(token: string, id: string, completed: boolean) {
+    return apiFetch<DeadlineDto>(apiPath`/deadlines/${id}`, {
+      method: "PATCH",
+      token,
+      body: { completed },
+    });
+  },
+
   create(
     token: string,
     body: {

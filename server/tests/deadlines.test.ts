@@ -119,4 +119,22 @@ describe("deadlines", () => {
     expect(sent).toBe(1);
     expect(await db.select().from(notifications).where(eq(notifications.userId, aliceId))).toHaveLength(1);
   });
+
+  it("lists unfinished overdue deadlines, most recent first, within the window", async () => {
+    const day = 24 * 60 * 60 * 1000;
+    const make = (title: string, dueAt: number) =>
+      as(ALICE).post("/api/v1/deadlines").send({ title, dueAt, kind: "assignment" });
+    await make("Yesterday", Date.now() - day);
+    await make("Last week", Date.now() - 7 * day);
+    await make("Long ago", Date.now() - 30 * day);
+    await make("Tomorrow", Date.now() + day);
+    const done = await make("Done", Date.now() - 2 * day);
+    await as(ALICE).patch(`/api/v1/deadlines/${done.body.id}`).send({ completed: true });
+    await as(BOB).post("/api/v1/deadlines").send({ title: "Bob's", dueAt: Date.now() - day, kind: "task" });
+
+    const res = await as(ALICE).get("/api/v1/deadlines/overdue");
+    expect(res.status).toBe(200);
+    expect(res.body.map((d: { title: string }) => d.title)).toEqual(["Yesterday", "Last week"]);
+    expect(res.body[0].source).toBe("manual");
+  });
 });

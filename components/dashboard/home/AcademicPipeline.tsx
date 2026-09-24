@@ -1,7 +1,14 @@
-import { CalendarClock } from "lucide-react";
+import { AlertTriangle, CalendarClock, ExternalLink, GraduationCap } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useDeadlineActions } from "@/lib/hooks/mutations/useDeadlineActions";
 import { useUpcomingDeadlines } from "@/lib/queries/deadlines/useUpcomingDeadlines";
+import { useOverdueDeadlines } from "@/lib/queries/deadlines/useOverdueDeadlines";
+import { useBrightspaceStatus } from "@/lib/queries/integrations/useBrightspaceStatus";
+import { useSetDeadlineCompleted } from "@/lib/mutations/deadlines/useSetDeadlineCompleted";
+import type { DeadlineModel } from "@/lib/api/adapters/deadline";
+import { dispatchAppCommand } from "@/lib/appCommands";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -57,9 +64,115 @@ function formatWhenLabel(dueAt: number) {
   return new Date(dueAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+function formatOverdueLabel(dueAt: number, now: number) {
+  const hours = Math.floor((now - dueAt) / 3_600_000);
+  if (hours < 1) return "Just passed";
+  if (hours < 24) return `${hours} hr overdue`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} overdue`;
+}
+
+function DeadlineRow({
+  deadline,
+  when,
+  overdue = false,
+}: {
+  deadline: DeadlineModel;
+  when: string;
+  overdue?: boolean;
+}) {
+  const setCompleted = useSetDeadlineCompleted();
+  const tone = kindToTone(deadline.kind as DeadlineKind);
+  const fromBrightspace = deadline.source === "brightspace";
+
+  return (
+    <div className="flex items-start gap-3">
+      <Checkbox
+        className="mt-0.5"
+        checked={setCompleted.isPending}
+        disabled={setCompleted.isPending}
+        aria-label={`Mark ${deadline.title} done`}
+        onCheckedChange={() =>
+          setCompleted.mutate(
+            { id: deadline._id, completed: true },
+            { onError: () => toast.error("Couldn't mark it done") },
+          )
+        }
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-foreground truncate">{deadline.title}</p>
+        <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span className={overdue ? "text-destructive" : undefined}>{when}</span>
+          {fromBrightspace && (
+            <>
+              <span aria-hidden>·</span>
+              {deadline.externalUrl ? (
+                <a
+                  href={deadline.externalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 hover:text-foreground hover:underline"
+                >
+                  Brightspace
+                  <ExternalLink className="w-3 h-3" aria-hidden />
+                  <span className="sr-only">(opens in a new tab)</span>
+                </a>
+              ) : (
+                <span>Brightspace</span>
+              )}
+            </>
+          )}
+        </p>
+      </div>
+      <span
+        className={cn(
+          "shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold tracking-wide",
+          pillClasses(tone),
+        )}
+      >
+        {kindLabel(deadline.kind as DeadlineKind)}
+      </span>
+    </div>
+  );
+}
+
+/** Nudges toward connecting Brightspace, or flags a connection that stopped syncing. */
+function BrightspaceHint() {
+  const { data: status } = useBrightspaceStatus();
+  if (!status) return null;
+  const open = () => dispatchAppCommand("settings:integrations");
+
+  if (!status.connected) {
+    return (
+      <button
+        type="button"
+        onClick={open}
+        className="mt-4 flex w-full items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-left text-xs text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-foreground/5"
+      >
+        <GraduationCap className="w-4 h-4 shrink-0 text-primary" aria-hidden />
+        Use Brightspace? Bring your due dates in automatically.
+      </button>
+    );
+  }
+  if (status.status === "error") {
+    return (
+      <button
+        type="button"
+        onClick={open}
+        className="mt-4 flex w-full items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-left text-xs text-foreground hover:bg-destructive/10"
+      >
+        <AlertTriangle className="w-4 h-4 shrink-0 text-destructive" aria-hidden />
+        Brightspace stopped syncing. Fix it in settings.
+      </button>
+    );
+  }
+  return null;
+}
+
 export function AcademicPipeline({ className }: { className?: string }) {
   const { createDeadline } = useDeadlineActions();
   const { data: upcoming } = useUpcomingDeadlines({ limit: 6, windowDays: 30 });
+  const { data: overdue } = useOverdueDeadlines({ limit: 5 });
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftKind, setDraftKind] = useState<DeadlineKind>("assignment");
@@ -96,7 +209,23 @@ export function AcademicPipeline({ className }: { className?: string }) {
         </Button>
       </div>
 
+      {overdue && overdue.length > 0 && (
+        <div className="mt-4 space-y-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-destructive">
+            Overdue
+          </p>
+          {overdue.map((d) => (
+            <DeadlineRow key={d._id} deadline={d} when={formatOverdueLabel(d.dueAt, nowMs)} overdue />
+          ))}
+        </div>
+      )}
+
       <div className="mt-4 space-y-2.5">
+        {overdue && overdue.length > 0 && upcoming && upcoming.length > 0 && (
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Coming up
+          </p>
+        )}
         {upcoming === undefined ? (
           <div className="text-xs text-muted-foreground">Loading…</div>
         ) : upcoming.length === 0 ? (
@@ -107,32 +236,13 @@ export function AcademicPipeline({ className }: { className?: string }) {
             </p>
           </div>
         ) : (
-          upcoming.map((d) => {
-            const tone = kindToTone(d.kind as DeadlineKind);
-            return (
-              <div key={d._id} className="flex items-start gap-3">
-                <div className="mt-1 h-2 w-2 rounded-full bg-muted-foreground/25" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {d.title}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {formatWhenLabel(d.dueAt)}
-                  </p>
-                </div>
-                <span
-                  className={cn(
-                    "shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold tracking-wide",
-                    pillClasses(tone),
-                  )}
-                >
-                  {kindLabel(d.kind as DeadlineKind)}
-                </span>
-              </div>
-            );
-          })
+          upcoming.map((d) => (
+            <DeadlineRow key={d._id} deadline={d} when={formatWhenLabel(d.dueAt)} />
+          ))
         )}
       </div>
+
+      <BrightspaceHint />
 
       <Dialog
         open={isAddOpen}

@@ -31,7 +31,7 @@ import { DASHBOARD_NAV, activeDashboardNavId } from "@/constants/dashboardNav";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
 import { formatShortcut } from "@/hooks/useKeyboardShortcut";
-import { useAppCommand } from "@/lib/appCommands";
+import { useAppCommand, useAppCommands } from "@/lib/appCommands";
 import { shortcutFor } from "@/constants/shortcuts";
 import { AppearanceSwitcher } from "@/components/shared/AppearanceSwitcher";
 import { SpotlightCard } from "@/components/dashboard/announcements/SpotlightCard";
@@ -204,6 +204,9 @@ export function Sidebar() {
 
   useAppCommand("search", useCallback(() => setIsSearchOpen((open) => !open), []));
   useAppCommand("new-note", handleCreateNote);
+  useAppCommands((id) => {
+    if (id.startsWith("settings:")) openSettings(id.slice("settings:".length));
+  });
 
   const openRename = (
     id: string,
