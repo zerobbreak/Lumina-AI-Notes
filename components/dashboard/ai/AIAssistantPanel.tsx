@@ -23,6 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAiActions } from "@/lib/hooks/ai/useAiActions";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface AIAssistantPanelProps {
   isOpen: boolean;
@@ -31,6 +32,8 @@ interface AIAssistantPanelProps {
   contextType?: "note" | "transcript" | "general";
   contextTitle?: string;
   onInsertToNote?: (content: string) => void;
+  /** Positioning; defaults to above the floating Ask AI button. */
+  className?: string;
 }
 
 interface Message {
@@ -70,6 +73,7 @@ export function AIAssistantPanel({
   contextType = "general",
   contextTitle,
   onInsertToNote,
+  className,
 }: AIAssistantPanelProps) {
   const [inputValue, setInputValue] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -186,7 +190,10 @@ export function AIAssistantPanel({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="absolute bottom-16 right-0 w-[380px] max-h-[600px] h-[70vh] bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50"
+            className={cn(
+              "absolute bottom-16 right-0 w-[380px] max-h-[600px] h-[70vh] bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50",
+              className,
+            )}
           >
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-border/60">

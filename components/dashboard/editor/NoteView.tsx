@@ -44,6 +44,7 @@ import { ActionMenu } from "@/components/shared/ActionMenu";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { EditableTitle } from "@/components/shared/EditableTitle";
 import { AskAI } from "@/components/dashboard/ai/AskAI";
+import { NoteDock } from "./dock/NoteDock";
 import { useDashboard } from "@/hooks/useDashboard";
 import { usePDF } from "@/hooks/usePDF";
 import { AIBubbleMenu } from "./AIBubbleMenu";
@@ -929,13 +930,33 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
         </div>
       </ScrollArea>
 
-      {/* AI Assistant Bar */}
-      <AskAI
-        context={note.content || ""}
-        contextType="note"
-        contextTitle={note.title}
+      {/* Study dock: outline, study, source, connected and Ask, floating on
+          the right. Narrower screens keep the round Ask AI button instead. */}
+      <NoteDock
+        noteId={noteId}
+        contentId="note-content-area"
+        note={{
+          title: note.title,
+          content: note.content,
+          courseId: note.courseId,
+          sourceRecordingId: note.sourceRecordingId,
+        }}
+        courseName={courseName}
+        subPages={childNotes ?? []}
+        canEdit={canEdit}
         onInsertToNote={canEdit ? handleInsertFromAI : undefined}
+        onMakeFlashcards={() => setIsFlashcardsOpen(true)}
+        onMakeQuiz={() => setIsQuizOpen(true)}
+        onCreateSubPage={handleCreateSubPage}
       />
+      <div className="lg:hidden">
+        <AskAI
+          context={note.content || ""}
+          contextType="note"
+          contextTitle={note.title}
+          onInsertToNote={canEdit ? handleInsertFromAI : undefined}
+        />
+      </div>
 
       <RenameDialog
         open={isRenameOpen}
