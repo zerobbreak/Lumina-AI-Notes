@@ -59,7 +59,7 @@ import { SidebarJumpBackIn } from "./SidebarJumpBackIn";
 import { SidebarNote } from "./SidebarNote";
 import { SidebarRow } from "./SidebarRow";
 import { SidebarSection, SidebarSectionAction } from "./SidebarSection";
-import { SidebarTag } from "./SidebarTag";
+import { SidebarTags } from "./SidebarTags";
 import {
   PinContextButton,
   SessionsCleanupAction,
@@ -571,19 +571,15 @@ export function Sidebar() {
             />
           }
         >
-          {tags?.map((tag) => (
-            <SidebarTag
-              key={tag._id}
-              tag={tag}
-              onRename={(id, name) => openRename(id, "tag", name)}
-              onDelete={(id) => deleteTag({ tagId: id })}
-              onRenameNote={(id, title) => openRename(id, "note", title)}
-              onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
-              onArchiveNote={(id) =>
-                toggleArchiveNote({ noteId: id as Id<"notes"> })
-              }
-            />
-          ))}
+          <SidebarTags
+            tags={tags ?? []}
+            activeNoteId={currentNoteId}
+            onRename={(id, name) => openRename(id, "tag", name)}
+            onDelete={(id) => deleteTag({ tagId: id })}
+            onRenameNote={(id, title) => openRename(id, "note", title)}
+            onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
+            onArchiveNote={(id) => toggleArchiveNote({ noteId: id as Id<"notes"> })}
+          />
         </SidebarSection>
 
         <SidebarSection
