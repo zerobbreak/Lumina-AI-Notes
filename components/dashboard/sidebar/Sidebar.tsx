@@ -2,13 +2,11 @@
 
 import {
   Calendar,
-  FolderOpen,
   Layers,
   Loader2,
   PanelLeft,
   PanelLeftClose,
   PanelLeftOpen,
-  Pin,
   Plus,
   Search,
   Settings,
@@ -295,41 +293,33 @@ export function Sidebar() {
 
       {isRail ? (
         <div className="flex flex-col items-center gap-1 pt-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 rounded-md text-muted-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+          <SidebarRow
+            isRail
+            label="Expand sidebar"
+            icon={<PanelLeft className="h-[15px] w-[15px]" />}
             onClick={toggleLeftSidebarRail}
-            aria-label="Expand sidebar"
-            title="Expand sidebar"
-          >
-            <PanelLeft className="h-[15px] w-[15px]" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 rounded-md text-muted-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+          />
+          <SidebarRow
+            isRail
+            label={`${openNote ? "New sub-page" : "New note"} · ${formatShortcut(shortcutFor("new-note")!)}`}
+            ariaLabel={openNote ? "New sub-page" : "New note"}
+            icon={
+              isCreatingNote ? (
+                <Loader2 className="h-[15px] w-[15px] animate-spin" />
+              ) : (
+                <Plus className="h-[15px] w-[15px]" strokeWidth={2.25} />
+              )
+            }
             onClick={handleCreateNote}
-            disabled={isCreatingNote}
-            aria-label="New note"
-            title={`New note · ${formatShortcut(shortcutFor("new-note")!)}`}
-          >
-            {isCreatingNote ? (
-              <Loader2 className="h-[15px] w-[15px] animate-spin" />
-            ) : (
-              <Plus className="h-[15px] w-[15px]" />
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 rounded-md text-muted-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+          />
+          <SidebarRow
+            isRail
+            label={`Search · ${formatShortcut(shortcutFor("search")!)}`}
+            ariaLabel="Search"
+            icon={<Search className="h-[15px] w-[15px]" />}
             onClick={() => setIsSearchOpen(true)}
-            aria-label="Search"
-            title={`Search · ${formatShortcut(shortcutFor("search")!)}`}
-          >
-            <Search className="h-[15px] w-[15px]" />
-          </Button>
+          />
         </div>
       ) : (
         <div className="flex items-center gap-1.5">
@@ -399,58 +389,54 @@ export function Sidebar() {
     <ScrollArea className="min-h-0 min-w-0 flex-1 px-2 py-2">
       <div className="flex flex-col items-center gap-1">
         {dueTodayCount > 0 && (
-          <button
-            type="button"
-            className="relative w-9 h-9 flex items-center justify-center rounded-lg bg-primary/[0.13] text-primary hover:bg-primary/20 transition-colors"
+          <SidebarRow
+            isRail
+            label={`Review · ${dueTodayCount} due`}
+            icon={
+              <>
+                <Layers className="h-[15px] w-[15px] text-primary" />
+                <span className="absolute -right-1 -top-1 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-semibold tabular-nums text-primary-foreground">
+                  {dueTodayCount}
+                </span>
+              </>
+            }
             onClick={() => router.push("/dashboard?view=flashcards")}
-            title={`${dueTodayCount} card${dueTodayCount === 1 ? "" : "s"} due`}
-          >
-            <Layers className="w-[15px] h-[15px]" />
-            <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-0.5 rounded-full bg-primary text-primary-foreground text-[9px] font-medium flex items-center justify-center tabular-nums">
-              {dueTodayCount}
-            </span>
-          </button>
+          />
         )}
-        {pinnedNotes?.length ? (
-          pinnedNotes.map((note) => (
-            <SidebarNote
-              key={note._id}
-              note={note}
-              isCompact
-              isActive={note._id === currentNoteId}
-              onRename={() => openRename(note._id, "note", note.title)}
-              onDelete={() => deleteNote({ noteId: note._id })}
-              onArchive={() => toggleArchiveNote({ noteId: note._id })}
-            />
-          ))
-        ) : (
-          <Pin className="h-4 w-4 text-muted-foreground/25" />
+        {pinnedNotes?.map((note) => (
+          <SidebarNote
+            key={note._id}
+            note={note}
+            isCompact
+            isActive={note._id === currentNoteId}
+            onRename={() => openRename(note._id, "note", note.title)}
+            onDelete={() => deleteNote({ noteId: note._id })}
+            onArchive={() => toggleArchiveNote({ noteId: note._id })}
+          />
+        ))}
+        {(pinnedNotes?.length ?? 0) > 0 && courses.length > 0 && (
+          <div className="my-1 h-px w-6 bg-sidebar-border/70" />
         )}
-        <div className="my-1 h-px w-6 bg-sidebar-border/70" />
-        {courses.length ? (
-          courses.map((course: Course) => (
-            <SidebarCourse
-              key={course.id}
-              course={course}
-              isCompact
-              onRename={(id, name) => openRename(id, "course", name)}
-              onDelete={(id) => deleteCourse({ courseId: id })}
-              onRenameModule={(id, name, parentId) =>
-                openRename(id, "module", name, parentId)
-              }
-              onDeleteModule={(id, parentId) =>
-                deleteModule({ courseId: parentId, moduleId: id })
-              }
-              onRenameNote={(id, title) => openRename(id, "note", title)}
-              onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
-              onArchiveNote={(id) =>
-                toggleArchiveNote({ noteId: id as Id<"notes"> })
-              }
-            />
-          ))
-        ) : (
-          <FolderOpen className="h-4 w-4 text-muted-foreground/25" />
-        )}
+        {courses.map((course: Course) => (
+          <SidebarCourse
+            key={course.id}
+            course={course}
+            isCompact
+            onRename={(id, name) => openRename(id, "course", name)}
+            onDelete={(id) => deleteCourse({ courseId: id })}
+            onRenameModule={(id, name, parentId) =>
+              openRename(id, "module", name, parentId)
+            }
+            onDeleteModule={(id, parentId) =>
+              deleteModule({ courseId: parentId, moduleId: id })
+            }
+            onRenameNote={(id, title) => openRename(id, "note", title)}
+            onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
+            onArchiveNote={(id) =>
+              toggleArchiveNote({ noteId: id as Id<"notes"> })
+            }
+          />
+        ))}
       </div>
     </ScrollArea>
   );
@@ -601,6 +587,19 @@ export function Sidebar() {
 
   /* ───────────────────────────────────────────────────── zone 4: the footer */
 
+  const avatar = (size: "h-6 w-6" | "h-7 w-7") =>
+    mounted ? (
+      <UserButton
+        appearance={{
+          elements: {
+            avatarBox: `${size} rounded-md ring-1 ring-sidebar-border hover:ring-sidebar-foreground/20 transition-all`,
+          },
+        }}
+      />
+    ) : (
+      <div className={cn(size, "shrink-0 animate-pulse rounded-md bg-sidebar-accent")} />
+    );
+
   const footer = (
     <div
       className={cn(
@@ -611,68 +610,46 @@ export function Sidebar() {
       {isRail ? (
         <>
           <WhatsNew isRail onAction={runAnnouncementAction} />
-          {mounted ? (
-            <UserButton
-              appearance={{
-                elements: {
-                  avatarBox:
-                    "w-7 h-7 rounded-md ring-1 ring-sidebar-border hover:ring-sidebar-foreground/20 transition-all",
-                },
-              }}
-            />
-          ) : (
-            <div className="h-7 w-7 animate-pulse rounded-md bg-sidebar-accent" />
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 rounded-md text-muted-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+          <div className="my-1">{avatar("h-7 w-7")}</div>
+          <SidebarRow
+            isRail
+            label="Settings"
+            icon={<Settings className="h-[15px] w-[15px]" />}
             onClick={() => openSettings()}
-            aria-label="Settings"
-            title="Settings"
-          >
-            <Settings className="h-[15px] w-[15px]" />
-          </Button>
+          />
         </>
       ) : (
-        <>
-          <WhatsNew isRail={false} onAction={runAnnouncementAction} />
-          <div className="flex items-center gap-2">
-            {mounted ? (
-              <UserButton
-                appearance={{
-                  elements: {
-                    avatarBox:
-                      "w-7 h-7 rounded-md ring-1 ring-sidebar-border hover:ring-sidebar-foreground/20 transition-all",
-                  },
-                }}
-              />
-            ) : (
-              <div className="h-7 w-7 shrink-0 animate-pulse rounded-md bg-sidebar-accent" />
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-medium leading-tight text-sidebar-foreground">
-                {user?.fullName || "Student"}
+        // The avatar centres on the rows' icon column (x=23) and the name
+        // starts on their label column (x=40).
+        <div className="flex items-center gap-0.5 pl-[3px]">
+          <div className="flex shrink-0">{avatar("h-6 w-6")}</div>
+          <div className="ml-[5px] min-w-0 flex-1">
+            <p className="truncate text-[13px] font-medium leading-tight text-sidebar-foreground">
+              {user?.fullName || "Student"}
+            </p>
+            {user?.primaryEmailAddress?.emailAddress && (
+              <p className="truncate text-[11px] leading-tight text-muted-foreground/70">
+                {user.primaryEmailAddress.emailAddress}
               </p>
-              {user?.primaryEmailAddress?.emailAddress && (
-                <p className="truncate text-[11px] leading-tight text-muted-foreground/60">
-                  {user.primaryEmailAddress.emailAddress}
-                </p>
-              )}
-            </div>
-            <AppearanceSwitcher onOpenSettings={() => openSettings("appearance")} />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 shrink-0 rounded-md text-muted-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
-              onClick={() => openSettings()}
-              aria-label="Settings"
-              title="Settings"
-            >
-              <Settings className="h-[14px] w-[14px]" />
-            </Button>
+            )}
           </div>
-        </>
+          <WhatsNew isRail={false} onAction={runAnnouncementAction} />
+          <AppearanceSwitcher onOpenSettings={() => openSettings("appearance")} />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 rounded-md text-muted-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+                onClick={() => openSettings()}
+                aria-label="Settings"
+              >
+                <Settings className="h-[14px] w-[14px]" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Settings</TooltipContent>
+          </Tooltip>
+        </div>
       )}
     </div>
   );
