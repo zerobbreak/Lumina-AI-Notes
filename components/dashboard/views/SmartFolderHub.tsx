@@ -2,67 +2,37 @@
 
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { useCurrentUser } from "@/lib/queries/users/useCurrentUser";
 import { useGamification } from "@/lib/queries/users/useGamification";
 import { useRecentNotes } from "@/lib/queries/notes/useRecentNotes";
 import { usePinnedNotes } from "@/lib/queries/notes/usePinnedNotes";
+import { useHomeSummary } from "@/lib/queries/home/useHomeSummary";
 import { useUpdateTourProgress } from "@/lib/mutations/users/useUpdateTourProgress";
 import { useCreateCourse } from "@/lib/mutations/courses/useCreateCourse";
 import { useDeleteCourse } from "@/lib/mutations/courses/useDeleteCourse";
 import { useRenameCourse } from "@/lib/mutations/courses/useRenameCourse";
+import { usePlanChecklist } from "@/lib/home/planChecklist";
+import { planAction, planHeadline } from "@/lib/home/planCopy";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Layout } from "lucide-react";
-import { useHomeSummary } from "@/lib/queries/home/useHomeSummary";
-import { planHeadline } from "@/lib/home/planCopy";
-import { getCourseIcon } from "@/lib/courseDisplay";
 import { Course } from "@/types";
-import { ActionMenu } from "@/components/shared/ActionMenu";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-import { motion } from "framer-motion";
 import { NotesRail } from "@/components/dashboard/home/NotesRail";
 import { ProductivityPanel } from "@/components/dashboard/home/ProductivityPanel";
-import { AcademicPipeline } from "@/components/dashboard/home/AcademicPipeline";
+import { HomeHeader } from "@/components/dashboard/home/HomeHeader";
+import { RunwayStrip } from "@/components/dashboard/home/RunwayStrip";
 import { TodayPlan } from "@/components/dashboard/home/TodayPlan";
 import { ResumeCard } from "@/components/dashboard/home/ResumeCard";
+import { ComingUpCard } from "@/components/dashboard/home/ComingUpCard";
+import { StudyStreakCard } from "@/components/dashboard/home/StudyStreakCard";
+import { QuickCaptureCard } from "@/components/dashboard/home/QuickCaptureCard";
+import { CoursePulseGrid } from "@/components/dashboard/home/CoursePulseGrid";
 
 const TourOverlay = lazy(() => import("@/components/dashboard/TourOverlay").then(m => ({ default: m.TourOverlay })));
 import type { TourStep } from "@/components/dashboard/TourOverlay";
 const AnalyticsCharts = lazy(() => import("./AnalyticsCharts"));
 
-function getGreeting(hour: number) {
-  if (hour < 5) return "Still up";
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
-}
-
-const getIcon = getCourseIcon;
-
-// Animation Variants
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      type: "spring" as const,
-      stiffness: 300,
-      damping: 24,
-    },
-  },
-};
 export default function SmartFolderHub() {
   const { data: userData } = useCurrentUser();
   const createCourse = useCreateCourse();
@@ -71,6 +41,10 @@ export default function SmartFolderHub() {
   const { data: recentNotes } = useRecentNotes();
   const { data: gamification } = useGamification();
   const home = useHomeSummary();
+  const summary = home.data;
+  const [mountedAt] = useState(() => Date.now());
+  const now = summary?.generatedAt ?? mountedAt;
+  const checklist = usePlanChecklist(summary?.plan ?? [], now);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -189,15 +163,30 @@ export default function SmartFolderHub() {
 
   if (!userData) return null;
 
-  const courseById = new Map(((userData.courses ?? []) as Course[]).map((c) => [c.id, c]));
+  const courses = (userData.courses ?? []) as Course[];
+  const courseById = new Map(courses.map((c) => [c.id, c]));
   const courseOf = (courseId: string | null | undefined) =>
     courseId ? courseById.get(courseId) : undefined;
-  const summary = home.data;
-  const now = summary?.generatedAt ?? 0;
-  const heading = summary
-    ? planHeadline(summary, courseById.size > 0, now)
-    : undefined;
   const streak = gamification?.currentStreak ?? 0;
+
+  const rows = checklist.rows;
+  const nextUp = rows.find((r) => !r.done)?.item;
+  const headline = summary
+    ? planHeadline(
+        {
+          total: rows.length,
+          done: rows.filter((r) => r.done).length,
+          minutesLeft: rows.filter((r) => !r.done).reduce((n, r) => n + r.item.minutes, 0),
+          next: nextUp,
+        },
+        courses.length > 0,
+        now,
+      )
+    : undefined;
+  const overdueInPlan = rows.filter((r) => r.item.kind === "overdue").length;
+  const hiddenOverdue = summary
+    ? Math.max(0, summary.runway.overdue.filter((d) => d.kind !== "event").length - overdueInPlan)
+    : 0;
 
   const closeTour = async (completed: boolean) => {
     setSuppressTourOverlay(true);
@@ -217,235 +206,112 @@ export default function SmartFolderHub() {
           />
         </Suspense>
       )}
-      <div className="p-6 lg:p-8 max-w-[1600px] mx-auto space-y-10">
-        {/* Today: the plan replaces the greeting hero */}
-        <header className="space-y-2" data-tour="dashboard-overview">
-          <p className="flex flex-wrap items-center gap-x-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            <span>
-              {new Date().toLocaleDateString(undefined, {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-              })}
-            </span>
-            <span aria-hidden>·</span>
-            <span className="normal-case tracking-normal font-medium">
-              {getGreeting(new Date().getHours())}, {userData.name?.split(" ")[0] || "there"}
-            </span>
-            {streak > 0 && (
-              <>
-                <span aria-hidden>·</span>
-                <span className="normal-case tracking-normal font-medium">
-                  {streak}-day study streak
-                </span>
-              </>
-            )}
-          </p>
-          {heading ? (
-            <>
-              <h1 className="max-w-3xl font-reading text-3xl font-medium leading-tight tracking-tight text-foreground text-balance lg:text-4xl">
-                {heading.headline}
-              </h1>
-              {heading.lead && (
-                <p className="max-w-2xl text-base text-muted-foreground">{heading.lead}</p>
-              )}
-            </>
-          ) : (
-            <div aria-hidden className="h-10 max-w-md animate-pulse rounded-lg bg-muted" />
-          )}
-        </header>
+      <div className="mx-auto max-w-[1400px] space-y-8 p-6 lg:p-8">
+        <HomeHeader
+          now={now}
+          firstName={userData.name?.split(" ")[0]}
+          headline={headline}
+          action={nextUp ? planAction(nextUp) : null}
+        />
 
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
-            {summary ? (
+        {summary ? (
+          <>
+            <RunwayStrip
+              deadlines={summary.runway.deadlines}
+              overdue={summary.runway.overdue}
+              pulses={summary.courses}
+              courseOf={courseOf}
+              now={now}
+            />
+
+            <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
               <TodayPlan
-                plan={summary.plan}
-                planMinutes={summary.planMinutes}
+                rows={rows}
+                onToggle={checklist.setDone}
+                hiddenOverdue={hiddenOverdue}
                 pulses={summary.courses}
                 courseOf={courseOf}
                 now={now}
               />
-            ) : home.isError ? (
-              <div className="rounded-2xl border border-border bg-card p-6 dark:bg-inset">
-                <p className="text-sm font-medium text-foreground">Today&apos;s plan didn&apos;t load.</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Check your connection, then try again.
-                </p>
-                <Button variant="outline" size="sm" className="mt-3" onClick={() => void home.refetch()}>
-                  Try again
-                </Button>
+              <div className="flex flex-col gap-4">
+                {summary.resume && (
+                  <ResumeCard resume={summary.resume} course={courseOf(summary.resume.courseId)} now={now} />
+                )}
+                <ComingUpCard
+                  overdue={summary.runway.overdue}
+                  upcoming={summary.runway.deadlines}
+                  courseOf={courseOf}
+                  now={now}
+                />
+                {/* Absent from an API deployed before the strip existed. */}
+                {summary.studyDays && <StudyStreakCard days={summary.studyDays} streak={streak} now={now} />}
+                <QuickCaptureCard />
               </div>
-            ) : (
-              <div aria-hidden className="h-72 animate-pulse rounded-2xl border border-border bg-card dark:bg-inset" />
-            )}
-
-            <div className="space-y-6">
-              {summary?.resume && (
-                <ResumeCard resume={summary.resume} course={courseOf(summary.resume.courseId)} now={now} />
-              )}
-              <AcademicPipeline />
             </div>
-          </div>
 
-          <NotesRail
-            recentNotes={recentNotes}
-            pinnedNotes={pinnedNotes}
-            onRequestPinned={() => setWantsPinnedNotes(true)}
-            onOpenNote={(id) => router.push(`/dashboard?noteId=${id}`)}
-            lookupLabels={labelLookup}
-          />
-
-          <ProductivityPanel
-            showAnalytics={showAnalytics}
-            onToggle={() => setShowAnalytics((prev) => !prev)}
-            headlineMetric={{
-              value: `${streak}d`,
-              label: "Study streak",
-            }}
-          >
-            <Suspense
-              fallback={
-                <div className="rounded-2xl border border-border bg-card p-6 text-center shadow-sm dark:bg-inset">
-                  <Loader2
-                    className="w-6 h-6 animate-spin mx-auto text-muted-foreground"
-                    aria-hidden
-                  />
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Loading analytics...
-                  </p>
-                </div>
-              }
-            >
-              <AnalyticsCharts showAnalytics={showAnalytics} />
-            </Suspense>
-          </ProductivityPanel>
-        </div>
-
-        {/* Courses Grid */}
-        <div>
-          <div className="flex items-center justify-between mb-6 px-1">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
-              <Layout className="w-4 h-4 text-cyan-600 dark:text-cyan-500 shrink-0" aria-hidden />
-              Your Courses
-            </h2>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCreateCourse}
-              className="border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground dark:bg-foreground/5 dark:hover:bg-foreground/10 dark:hover:text-cyan-400 dark:hover:border-cyan-500/30 transition-colors"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Course
-            </Button>
-          </div>
-
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-          >
-            {userData.courses?.map((course: Course) => {
-              const Icon = getIcon(course.code);
-
-              return (
-                <motion.div
-                  key={course.id}
-                  variants={itemVariants}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() =>
-                    router.push(
-                      `/dashboard?contextId=${course.id}&contextType=course`,
-                    )
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      router.push(
-                        `/dashboard?contextId=${course.id}&contextType=course`,
-                      );
-                    }
-                  }}
-                  whileHover={{ scale: 1.02 }}
-                  className="group relative rounded-xl border border-border bg-card text-card-foreground shadow-sm hover:shadow-md dark:bg-inset dark:shadow-none dark:backdrop-blur-md hover:bg-accent/40 dark:hover:bg-foreground/10 hover:border-border/80 dark:hover:border-foreground/20 cursor-pointer transition-all duration-300 p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                >
-                  {/* Icon in top-left */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="w-10 h-10 rounded-lg bg-cyan-100 dark:bg-foreground/5 flex items-center justify-center">
-                      <Icon className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
-                    </div>
-
-                    {/* Three-dot menu in top-right */}
-                    <div
-                      className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <ActionMenu
-                        onRename={() =>
-                          setRenameTarget({
-                            id: course.id,
-                            name: course.name,
-                          })
-                        }
-                        onDelete={() => {
-                          if (
-                            confirm(
-                              "Are you sure you want to delete this course?",
-                            )
-                          ) {
-                            void handleDeleteCourse(course.id);
-                          }
-                        }}
-                        align="right"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Title */}
-                  <h3 className="font-bold text-lg text-foreground mb-3 line-clamp-2 group-hover:text-cyan-600 dark:group-hover:text-cyan-200 transition-colors">
-                    {course.name}
-                  </h3>
-
-                  {/* Identifier badge and module count */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-cyan-700 dark:text-cyan-400 bg-cyan-100 dark:bg-cyan-950/40 px-2 py-1 rounded border border-cyan-300 dark:border-cyan-500/20">
-                      {course.code}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {course.modules?.length || 0}{" "}
-                      {course.modules?.length === 1 ? "Module" : "Modules"}
-                    </span>
-                  </div>
-                </motion.div>
-              );
-            })}
-
-            {/* Create New Course Card */}
-            <motion.div
-              variants={itemVariants}
-              role="button"
-              tabIndex={0}
-              onClick={handleCreateCourse}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  void handleCreateCourse();
+            <CoursePulseGrid
+              courses={courses}
+              pulses={summary.courses}
+              now={now}
+              onCreate={() => void handleCreateCourse()}
+              onRename={(course) => setRenameTarget({ id: course.id, name: course.name })}
+              onDelete={(course) => {
+                if (confirm(`Delete ${course.name}? This can't be undone.`)) {
+                  void handleDeleteCourse(course.id);
                 }
               }}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="rounded-xl border border-dashed border-border bg-card/50 hover:bg-cyan-50/90 hover:border-cyan-600/40 dark:hover:border-cyan-500/30 dark:hover:bg-cyan-500/5 cursor-pointer transition-all duration-300 flex flex-col items-center justify-center gap-3 p-8 min-h-[180px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              <div className="w-16 h-16 rounded-full bg-cyan-100 dark:bg-cyan-500/10 flex items-center justify-center">
-                <Plus className="w-8 h-8 text-cyan-600 dark:text-cyan-400" />
+            />
+          </>
+        ) : home.isError ? (
+          <div className="rounded-xl border border-border bg-card p-6 dark:bg-inset">
+            <p className="text-sm font-medium text-foreground">Today&apos;s plan didn&apos;t load.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Check your connection, then try again.</p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => void home.refetch()}>
+              Try again
+            </Button>
+          </div>
+        ) : (
+          <div aria-hidden className="space-y-6">
+            <div className="h-48 animate-pulse rounded-xl border border-border bg-card dark:bg-inset" />
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+              <div className="h-80 animate-pulse rounded-xl border border-border bg-card dark:bg-inset" />
+              <div className="h-80 animate-pulse rounded-xl border border-border bg-card dark:bg-inset" />
+            </div>
+          </div>
+        )}
+
+        <NotesRail
+          recentNotes={recentNotes}
+          pinnedNotes={pinnedNotes}
+          onRequestPinned={() => setWantsPinnedNotes(true)}
+          onOpenNote={(id) => router.push(`/dashboard?noteId=${id}`)}
+          lookupLabels={labelLookup}
+        />
+
+        <ProductivityPanel
+          showAnalytics={showAnalytics}
+          onToggle={() => setShowAnalytics((prev) => !prev)}
+          headlineMetric={{
+            value: `${streak}d`,
+            label: "Study streak",
+          }}
+        >
+          <Suspense
+            fallback={
+              <div className="rounded-2xl border border-border bg-card p-6 text-center shadow-sm dark:bg-inset">
+                <Loader2
+                  className="w-6 h-6 animate-spin mx-auto text-muted-foreground"
+                  aria-hidden
+                />
+                <p className="text-sm text-muted-foreground mt-2">
+                  Loading analytics...
+                </p>
               </div>
-              <span className="text-sm font-medium text-cyan-600 dark:text-cyan-400">
-                Create New Course
-              </span>
-            </motion.div>
-          </motion.div>
-        </div>
+            }
+          >
+            <AnalyticsCharts showAnalytics={showAnalytics} />
+          </Suspense>
+        </ProductivityPanel>
 
         <RenameDialog
           open={!!renameTarget}

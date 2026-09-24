@@ -1,48 +1,18 @@
 "use client";
 
-import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { useId, useState } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CourseTile } from "@/components/dashboard/sidebar/CourseTile";
 import { useSetDeadlineCompleted } from "@/lib/mutations/deadlines/useSetDeadlineCompleted";
-import { isPlaceholderCourseCode } from "@/lib/courseDisplay";
-import { dueLabel, dueSoonChip, formatMinutes, overdueLabel, timeAgo } from "@/lib/home/planCopy";
+import type { ChecklistRow } from "@/lib/home/planChecklist";
+import { dueLabel, dueSoonChip, formatMinutes, overdueLabel, planAction, timeAgo } from "@/lib/home/planCopy";
 import { cn } from "@/lib/utils";
-import type { Course } from "@/types";
-import type { CoursePulseDto, HomeDeadlineDto, PlanItemDto } from "@/types/api/home";
+import type { CoursePulseDto, PlanItemDto } from "@/types/api/home";
+import { ActionButton, Chip, CourseMark, HomeCard, courseLabel, type CourseLookup, type Tone } from "./parts";
 
-type CourseLookup = (courseId: string | null | undefined) => Course | undefined;
+const DAY = 86_400_000;
 
-const courseLabel = (course: Course) => (isPlaceholderCourseCode(course.code) ? course.name : course.code);
-
-function Chip({ tone = "neutral", children }: { tone?: "critical" | "warning" | "neutral"; children: React.ReactNode }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
-        tone === "critical" && "bg-destructive/10 text-destructive",
-        tone === "warning" && "bg-warning/10 text-warning",
-        tone === "neutral" && "bg-muted text-muted-foreground dark:bg-foreground/5",
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
-function CourseMark({ course }: { course?: Course }) {
-  if (!course) return null;
-  return (
-    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-      <CourseTile name={course.name} code={course.code} color={course.color} />
-      {courseLabel(course)}
-    </span>
-  );
-}
-
-/** What an item says and offers, by kind. */
+/** What an item says, by kind. */
 function describe(item: PlanItemDto, courseOf: CourseLookup, pulses: CoursePulseDto[], now: number) {
   switch (item.kind) {
     case "overdue":
@@ -51,31 +21,32 @@ function describe(item: PlanItemDto, courseOf: CourseLookup, pulses: CoursePulse
       const readiness = d.readiness === null ? null : Math.round(d.readiness * 100);
       const detail =
         item.kind === "overdue"
-          ? `It was due ${dueLabel(d.dueAt, now)}.`
+          ? `It was due ${dueLabel(d.dueAt, now)}. Tick it off if you've already handed it in.`
           : `Due ${dueLabel(d.dueAt, now)}.` +
-            (readiness === null ? "" : ` Your cards and quizzes for this course put you about ${readiness}% ready.`);
-      const chip =
+            (readiness === null ? "" : ` Your cards and quizzes put you about ${readiness}% ready.`);
+      const chip: { tone: Tone; text: string | null } =
         item.kind === "overdue"
-          ? { tone: "critical" as const, text: overdueLabel(d.dueAt, now) }
-          : { tone: d.dueAt - now < 2 * 86_400_000 ? ("critical" as const) : ("warning" as const), text: dueSoonChip(d.dueAt, now) ?? "" };
+          ? { tone: "critical", text: overdueLabel(d.dueAt, now) }
+          : { tone: d.dueAt - now < 2 * DAY ? "critical" : "warning", text: dueSoonChip(d.dueAt, now) };
       return { title: d.title, detail, chip, course: courseOf(d.courseId) };
     }
     case "review": {
-      const urgent = item.urgentCourseId ? courseOf(item.urgentCourseId) : undefined;
+      const urgent = courseOf(item.urgentCourseId);
       const urgentCount = item.byCourse.find((c) => c.courseId === item.urgentCourseId)?.count ?? 0;
       const next = pulses.find((p) => p.courseId === item.urgentCourseId)?.nextDeadline;
       const top = item.byCourse[0];
-      const topCourse = top ? courseOf(top.courseId) : undefined;
+      const topCourse = courseOf(top?.courseId);
       let detail = "Spaced repetition has these due today.";
       if (urgent && next) {
-        detail = `${urgentCount === item.dueCount ? "All" : urgentCount} of them ${urgentCount === 1 ? "is" : "are"} ${courseLabel(urgent)}, ahead of ${next.title} ${dueLabel(next.dueAt, now)}.`;
-      } else if (topCourse && item.byCourse.length > 1) {
-        detail = `Mostly ${courseLabel(topCourse)}: ${top!.count} of ${item.dueCount}.`;
+        const which = urgentCount === item.dueCount ? "All" : String(urgentCount);
+        detail = `${which} of them ${urgentCount === 1 ? "is" : "are"} ${courseLabel(urgent)}, ahead of ${next.title} ${dueLabel(next.dueAt, now)}.`;
+      } else if (topCourse && top && item.byCourse.length > 1) {
+        detail = `Mostly ${courseLabel(topCourse)}: ${top.count} of ${item.dueCount}.`;
       }
       return {
         title: `Review ${item.dueCount} flashcard${item.dueCount === 1 ? "" : "s"}`,
         detail,
-        chip: { tone: "warning" as const, text: `${item.dueCount} due` },
+        chip: { tone: "warning" as Tone, text: `${item.dueCount} due` },
         course: urgent ?? (item.byCourse.length === 1 ? topCourse : undefined),
       };
     }
@@ -83,90 +54,80 @@ function describe(item: PlanItemDto, courseOf: CourseLookup, pulses: CoursePulse
       return {
         title: `Retake ${item.title}`,
         detail: `You scored ${item.scorePercent}% ${timeAgo(item.takenAt, now)}. A retake shows whether it has stuck.`,
-        chip: { tone: "warning" as const, text: `Last score ${item.scorePercent}%` },
+        chip: { tone: "warning" as Tone, text: "Weak topic" },
         course: courseOf(item.courseId),
       };
   }
 }
 
-function DeadlineDone({ deadline }: { deadline: HomeDeadlineDto }) {
+function DoneBox({
+  item,
+  done,
+  onChange,
+}: {
+  item: PlanItemDto;
+  done: boolean;
+  onChange: (done: boolean) => void;
+}) {
   const setCompleted = useSetDeadlineCompleted();
+  const title = item.kind === "overdue" || item.kind === "deadline" ? item.deadline.title : describeTitle(item);
   return (
     <Checkbox
-      checked={setCompleted.isPending}
+      checked={done}
       disabled={setCompleted.isPending}
-      aria-label={`Mark ${deadline.title} done`}
-      onCheckedChange={() =>
-        setCompleted.mutate(
-          { id: deadline.id, completed: true },
-          { onError: () => toast.error("Couldn't mark it done. Try again.") },
-        )
-      }
+      aria-label={done ? `Mark ${title} not done` : `Mark ${title} done`}
+      onCheckedChange={(checked) => {
+        const next = checked === true;
+        onChange(next);
+        // A deadline is really finished (or reopened), not just ticked here.
+        if (item.kind === "overdue" || item.kind === "deadline") {
+          setCompleted.mutate(
+            { id: item.deadline.id, completed: next },
+            {
+              onError: () => {
+                onChange(!next);
+                toast.error(`Couldn't update ${item.deadline.title}. Try again.`);
+              },
+            },
+          );
+        }
+      }}
     />
   );
 }
 
-function ItemAction({ item }: { item: PlanItemDto }) {
-  if (item.kind === "review") {
-    return (
-      <Button asChild size="sm" className="h-8">
-        <Link href="/dashboard?view=flashcards">Start review</Link>
-      </Button>
-    );
-  }
-  if (item.kind === "weak-quiz") {
-    return (
-      <Button asChild size="sm" variant="outline" className="h-8">
-        <Link href={`/dashboard?view=quizzes&deckId=${item.quizDeckId}`}>Retake</Link>
-      </Button>
-    );
-  }
-  const d = item.deadline;
-  if (d.externalUrl) {
-    return (
-      <Button asChild size="sm" variant="outline" className="h-8">
-        <a href={d.externalUrl} target="_blank" rel="noopener noreferrer">
-          Brightspace
-          <ExternalLink className="ml-1 h-3 w-3" aria-hidden />
-          <span className="sr-only">(opens in a new tab)</span>
-        </a>
-      </Button>
-    );
-  }
-  if (d.courseId) {
-    return (
-      <Button asChild size="sm" variant="outline" className="h-8">
-        <Link href={`/dashboard?contextId=${d.courseId}&contextType=course`}>Open course</Link>
-      </Button>
-    );
-  }
-  return null;
-}
+const describeTitle = (item: PlanItemDto) =>
+  item.kind === "review" ? "the flashcard review" : item.kind === "weak-quiz" ? `the ${item.title} retake` : "";
 
 export function TodayPlan({
-  plan,
-  planMinutes,
+  rows,
+  onToggle,
+  hiddenOverdue,
   pulses,
   courseOf,
   now,
   className,
 }: {
-  plan: PlanItemDto[];
-  planMinutes: number;
+  rows: ChecklistRow[];
+  onToggle: (item: PlanItemDto, index: number, done: boolean) => void;
+  /** Overdue items left out of the plan; they're listed in "Coming up". */
+  hiddenOverdue: number;
   pulses: CoursePulseDto[];
   courseOf: CourseLookup;
   now: number;
   className?: string;
 }) {
+  const [showWhy, setShowWhy] = useState(false);
+  const whyId = useId();
+  const doneCount = rows.filter((r) => r.done).length;
+  const minutesLeft = rows.filter((r) => !r.done).reduce((n, r) => n + r.item.minutes, 0);
+
   return (
-    <section
-      aria-labelledby="today-plan-heading"
-      className={cn("rounded-2xl border border-border bg-card shadow-sm dark:bg-inset dark:shadow-none", className)}
-    >
+    <HomeCard aria-labelledby="today-plan-heading" className={cn("flex flex-col", className)}>
       <h2 id="today-plan-heading" className="sr-only">
         Today&apos;s plan
       </h2>
-      {plan.length === 0 ? (
+      {rows.length === 0 ? (
         <div className="p-6">
           <p className="text-sm font-medium text-foreground">You&apos;re clear for today.</p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -175,42 +136,91 @@ export function TodayPlan({
         </div>
       ) : (
         <ol>
-          {plan.map((item, index) => {
+          {rows.map(({ item, done }, index) => {
             const { title, detail, chip, course } = describe(item, courseOf, pulses, now);
             const isDeadline = item.kind === "overdue" || item.kind === "deadline";
             return (
               <li
                 key={item.id}
-                className="grid grid-cols-[1.75rem_1fr] gap-x-3 gap-y-3 border-b border-border/70 px-5 py-4 last:border-b-0 sm:grid-cols-[1.75rem_1fr_auto]"
+                className="grid grid-cols-[1.75rem_1fr] items-start gap-x-3.5 gap-y-3 border-b border-border/70 px-5 py-4 last:border-b-0 sm:grid-cols-[1.75rem_1fr_auto]"
               >
-                <span aria-hidden className="pt-0.5 font-reading text-xl leading-none text-muted-foreground tabular-nums">
+                <span
+                  aria-hidden
+                  className={cn(
+                    "pt-0.5 font-reading text-[22px] leading-none tabular-nums",
+                    done ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground",
+                  )}
+                >
                   {index + 1}
                 </span>
                 <div className="min-w-0">
-                  <h3 className="text-[15px] font-semibold leading-snug text-foreground">{title}</h3>
-                  <p className="mt-0.5 text-sm text-muted-foreground">{detail}</p>
+                  <h3
+                    className={cn(
+                      "text-[15px] font-semibold leading-snug",
+                      done ? "text-muted-foreground line-through" : "text-foreground",
+                    )}
+                  >
+                    {title}
+                  </h3>
+                  <p className="mt-0.5 text-[13px] text-muted-foreground">{detail}</p>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    {chip.text && <Chip tone={chip.tone}>{chip.text}</Chip>}
+                    {chip.text && !done && <Chip tone={chip.tone}>{chip.text}</Chip>}
+                    {done && <Chip tone="good">Done</Chip>}
                     <CourseMark course={course} />
                     <Chip>About {formatMinutes(item.minutes)}</Chip>
                     {isDeadline && item.deadline.source === "brightspace" && <Chip>From Brightspace</Chip>}
                   </div>
                 </div>
-                <div className="col-start-2 flex items-center gap-3 sm:col-start-3 sm:flex-col sm:items-end">
-                  {isDeadline && <DeadlineDone deadline={item.deadline} />}
-                  <ItemAction item={item} />
+                <div className="col-start-2 flex items-center gap-3 sm:col-start-3 sm:flex-col sm:items-end sm:gap-2">
+                  <DoneBox item={item} done={done} onChange={(next) => onToggle(item, index, next)} />
+                  {!done && <ActionButton action={planAction(item)} />}
                 </div>
               </li>
             );
           })}
         </ol>
       )}
-      {plan.length > 0 && (
-        <p className="rounded-b-2xl border-t border-border/70 bg-muted/40 px-5 py-3 text-xs text-muted-foreground dark:bg-foreground/[0.02]">
-          {plan.length} item{plan.length === 1 ? "" : "s"}, about {formatMinutes(planMinutes)}. Ranked by
-          what&apos;s overdue, what&apos;s due soonest, how ready you are, and what you&apos;re starting to forget.
-        </p>
+
+      {rows.length > 0 && (
+        <div className="mt-auto rounded-b-xl border-t border-border/70 bg-muted/40 dark:bg-foreground/[0.02]">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
+            <span className="text-[13px] text-foreground tabular-nums">
+              {doneCount} of {rows.length} done
+              {" · "}
+              {minutesLeft > 0 ? `${formatMinutes(minutesLeft)} left` : "all done for today"}
+            </span>
+            <div
+              className="h-1.5 min-w-20 max-w-56 flex-1 overflow-hidden rounded-full bg-muted"
+              role="progressbar"
+              aria-label="Plan progress"
+              aria-valuemin={0}
+              aria-valuemax={rows.length}
+              aria-valuenow={doneCount}
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-300 motion-reduce:transition-none"
+                style={{ width: `${(doneCount / rows.length) * 100}%` }}
+              />
+            </div>
+            <button
+              type="button"
+              aria-expanded={showWhy}
+              aria-controls={whyId}
+              onClick={() => setShowWhy((v) => !v)}
+              className="ml-auto rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-inset"
+            >
+              Why this order?
+            </button>
+          </div>
+          <div id={whyId} hidden={!showWhy} className="border-t border-border/70 px-5 py-3 text-xs leading-relaxed text-muted-foreground">
+            Overdue work comes first, then deadlines due this week (sooner and less prepared rank higher), then
+            the cards due today, then quizzes from the last month you scored under 60%. A course with a deadline
+            this week pushes its cards and quizzes up.
+            {hiddenOverdue > 0 &&
+              ` Only the most recent overdue item is here; the other ${hiddenOverdue} are in Coming up.`}
+          </div>
+        </div>
       )}
-    </section>
+    </HomeCard>
   );
 }
