@@ -55,6 +55,7 @@ import {
   preloadView,
   viewForParam,
 } from "@/components/dashboard/viewLoaders";
+import { SidebarJumpBackIn } from "./SidebarJumpBackIn";
 import { SidebarNote } from "./SidebarNote";
 import { SidebarRow } from "./SidebarRow";
 import { SidebarSection, SidebarSectionAction } from "./SidebarSection";
@@ -494,49 +495,31 @@ export function Sidebar() {
         )}
 
         <SidebarSection
-          id="favorites"
-          count={pinnedNotes?.length}
-          label="Favorites"
-          isEmpty={!pinnedNotes?.length}
-          emptyLabel="Pin a note to keep it here"
-        >
-          {pinnedNotes?.map((note) => (
-            <SidebarNote
-              key={note._id}
-              note={note}
-              isActive={note._id === currentNoteId}
-              onRename={() => openRename(note._id, "note", note.title)}
-              onDelete={() => deleteNote({ noteId: note._id })}
-              onArchive={() => toggleArchiveNote({ noteId: note._id })}
-            />
-          ))}
-        </SidebarSection>
-
-        <SidebarSection
-          id="recent"
-          count={quickNotes?.length}
-          label="Recent"
-          isEmpty={!quickNotes?.length}
-          emptyLabel="No recent notes"
+          id="jump-back-in"
+          label="Jump back in"
           action={
             <SidebarSectionAction
               icon={Plus}
-              label="New note"
+              label={openNote ? "New sub-page" : "New note"}
               onClick={handleCreateNote}
               disabled={isCreatingNote}
             />
           }
         >
-          {quickNotes?.map((note) => (
-            <SidebarNote
-              key={note._id}
-              note={note}
-              isActive={note._id === currentNoteId}
-              onRename={() => openRename(note._id, "note", note.title)}
-              onDelete={() => deleteNote({ noteId: note._id })}
-              onArchive={() => toggleArchiveNote({ noteId: note._id })}
-            />
-          ))}
+          <SidebarJumpBackIn
+            pinned={pinnedNotes}
+            recent={quickNotes}
+            renderNote={(note) => (
+              <SidebarNote
+                key={note._id}
+                note={note}
+                isActive={note._id === currentNoteId}
+                onRename={() => openRename(note._id, "note", note.title)}
+                onDelete={() => deleteNote({ noteId: note._id })}
+                onArchive={() => toggleArchiveNote({ noteId: note._id })}
+              />
+            )}
+          />
         </SidebarSection>
 
         <SidebarSection
