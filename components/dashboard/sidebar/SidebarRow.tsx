@@ -156,7 +156,9 @@ export function SidebarRow({
       )}
 
       {actions && (
-        <div className="absolute right-1 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100">
+        // Without a pointer to hover, the actions stay visible and take their
+        // own space, so they never cover the label.
+        <div className="absolute right-1 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:static [@media(hover:none)]:pr-1 [@media(hover:none)]:opacity-100">
           {actions}
         </div>
       )}
