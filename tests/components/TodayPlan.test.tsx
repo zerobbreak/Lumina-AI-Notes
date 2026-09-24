@@ -38,6 +38,8 @@ const pulse = (courseId: string, nextDeadline: CoursePulseDto["nextDeadline"]): 
   noteCount: 0,
   cardCount: 0,
   dueToday: 0,
+  quizCount: 0,
+  quizScore: null,
   lastStudiedAt: null,
   nextDeadline,
   overdueCount: 0,
@@ -96,18 +98,24 @@ const plan: PlanItemDto[] = [
   },
 ];
 
-const renderPlan = (items = plan) =>
+const onToggle = vi.fn();
+
+const renderPlan = (items = plan, done: string[] = [], hiddenOverdue = 0) =>
   render(
     <TodayPlan
-      plan={items}
-      planMinutes={items.reduce((n, p) => n + p.minutes, 0)}
+      rows={items.map((item) => ({ item, done: done.includes(item.id) }))}
+      onToggle={onToggle}
+      hiddenOverdue={hiddenOverdue}
       pulses={[pulse("data", classTest)]}
       courseOf={courseOf}
       now={NOW}
     />,
   );
 
-beforeEach(() => setCompleted.mockReset());
+beforeEach(() => {
+  setCompleted.mockReset();
+  onToggle.mockReset();
+});
 afterEach(cleanup);
 
 describe("TodayPlan", () => {
@@ -120,12 +128,12 @@ describe("TodayPlan", () => {
     expect(screen.getByText(/about 62% ready/)).toBeTruthy();
     expect(screen.getByText(/12 of them are DATA6211, ahead of Class test 2/)).toBeTruthy();
     expect(screen.getByText(/You scored 48% 6 days ago/)).toBeTruthy();
-    expect(screen.getByText(/4 items, about 1 hr 38 min/)).toBeTruthy();
+    expect(screen.getByText(/0 of 4 done · 1 hr 38 min left/)).toBeTruthy();
   });
 
   it("links each item to where the work happens", () => {
     renderPlan();
-    expect(screen.getByRole("link", { name: /Brightspace/ }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: /Open in Brightspace/ }).getAttribute("href")).toBe(
       "https://lms.example.test/d2l/le/1",
     );
     expect(screen.getByRole("link", { name: "Open course" }).getAttribute("href")).toBe(
@@ -137,12 +145,31 @@ describe("TodayPlan", () => {
     );
   });
 
-  it("marks a deadline done, and only deadlines get a checkbox", () => {
+  it("ticks any item off, and finishes a deadline for real", () => {
     renderPlan();
-    const boxes = screen.getAllByRole("checkbox");
-    expect(boxes).toHaveLength(2);
+    expect(screen.getAllByRole("checkbox")).toHaveLength(4);
+
     fireEvent.click(screen.getByRole("checkbox", { name: "Mark Class test 2 done" }));
+    expect(onToggle).toHaveBeenCalledWith(plan[1], 1, true);
     expect(setCompleted).toHaveBeenCalledWith({ id: "ct2", completed: true }, expect.anything());
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Mark the flashcard review done" }));
+    expect(onToggle).toHaveBeenLastCalledWith(plan[2], 2, true);
+    expect(setCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it("strikes through done items and counts progress", () => {
+    renderPlan(plan, ["review"]);
+    expect(screen.getByText(/1 of 4 done · 1 hr 24 min left/)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Review 34 flashcards" }).className).toContain("line-through");
+    expect(screen.queryByRole("link", { name: "Start review" })).toBeNull();
+    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("1");
+  });
+
+  it("explains the order, including overdue work left out of the plan", () => {
+    renderPlan(plan, [], 4);
+    fireEvent.click(screen.getByRole("button", { name: "Why this order?" }));
+    expect(screen.getByText(/the other 4 are in Coming up/)).toBeTruthy();
   });
 
   it("says so when there's nothing to do", () => {

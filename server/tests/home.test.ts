@@ -63,7 +63,18 @@ describe("GET /api/v1/home", () => {
     expect(res.body.runway.overdue).toEqual([expect.objectContaining({ title: "Reflection" })]);
 
     const [pulse] = res.body.courses;
-    expect(pulse).toMatchObject({ courseId, status: "behind", cardCount: 2, dueToday: 1, overdueCount: 1 });
+    expect(pulse).toMatchObject({
+      courseId,
+      status: "behind",
+      cardCount: 2,
+      dueToday: 1,
+      overdueCount: 1,
+      quizCount: 1,
+      quizScore: 0.25,
+    });
+    // Today had a review and a quiz.
+    expect(res.body.studyDays).toHaveLength(14);
+    expect(res.body.studyDays[13]).toBe(true);
     expect(pulse.lastStudiedAt).toEqual(expect.any(Number));
     // One card of two is due and neither is mastered; the quiz scored 25%.
     expect(pulse.readiness).toBeCloseTo(0.4 * 0.25);

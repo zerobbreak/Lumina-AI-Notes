@@ -1,4 +1,4 @@
-import type { HomeSummaryDto, PlanItemDto } from "@/types/api/home";
+import type { CoursePulseDto, PlanItemDto } from "@/types/api/home";
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -68,28 +68,72 @@ export function timeAgo(at: number, now: number) {
   return `${days} days ago`;
 }
 
-/** The headline that replaces the greeting: how much there is, and where to start. */
+export type Headline = { before: string; emphasis?: string; after?: string };
+
+/**
+ * The headline that replaces the greeting: how much is left, and where to
+ * start. The time is split out so it can be set in the accent.
+ */
 export function planHeadline(
-  summary: Pick<HomeSummaryDto, "plan" | "planMinutes">,
+  { total, done, minutesLeft, next }: { total: number; done: number; minutesLeft: number; next?: PlanItemDto },
   hasCourses: boolean,
   now: number,
-): { headline: string; lead?: string } {
-  const { plan, planMinutes } = summary;
-  if (plan.length === 0) {
+): Headline {
+  if (total === 0) {
     return hasCourses
-      ? { headline: "Nothing is due today.", lead: "A good day to get ahead on something." }
-      : { headline: "Add a course to get a plan for your day." };
+      ? { before: "Nothing is due today. A good day to get ahead on something." }
+      : { before: "Add a course to get a plan for your day." };
   }
+  if (done >= total) return { before: "That's everything for today. Nice work." };
 
-  const count = COUNT_WORDS[plan.length] ?? String(plan.length);
-  const headline = `${count} thing${plan.length === 1 ? "" : "s"} today, about ${formatMinutes(planMinutes)}.`;
-  return { headline, lead: leadFor(plan[0]!, now) };
+  const left = total - done;
+  const count = COUNT_WORDS[left] ?? String(left);
+  const lead = next ? leadFor(next, now) : undefined;
+  return {
+    before: `${count} thing${left === 1 ? "" : "s"} ${done > 0 ? "left" : "today"}, about `,
+    emphasis: formatMinutes(minutesLeft),
+    after: `.${lead ? ` ${lead}` : ""}`,
+  };
 }
 
 function leadFor(first: PlanItemDto, now: number) {
   if (first.kind === "overdue") return `Start with ${first.deadline.title}. It's overdue.`;
   if (first.kind === "deadline" && first.deadline.dueAt - now < 2 * DAY) {
-    return `${first.deadline.title} is due ${dueLabel(first.deadline.dueAt, now)}, so start there.`;
+    return `${first.deadline.title} is the one that can't wait.`;
   }
   return undefined;
+}
+
+export type PlanAction = { label: string; href: string; external?: boolean };
+
+/** Where a plan item's work happens. */
+export function planAction(item: PlanItemDto): PlanAction | null {
+  if (item.kind === "review") return { label: "Start review", href: "/dashboard?view=flashcards" };
+  if (item.kind === "weak-quiz") return { label: "Retake", href: `/dashboard?view=quizzes&deckId=${item.quizDeckId}` };
+  const d = item.deadline;
+  if (d.externalUrl) return { label: "Open in Brightspace", href: d.externalUrl, external: true };
+  if (d.courseId) return { label: "Open course", href: `/dashboard?contextId=${d.courseId}&contextType=course` };
+  return null;
+}
+
+/** One sentence on why a course has its status. */
+export function pulseReason(pulse: CoursePulseDto, now: number) {
+  const next = pulse.nextDeadline;
+  const readiness = pulse.readiness === null ? null : Math.round(pulse.readiness * 100);
+  switch (pulse.reasons[0]) {
+    case "overdue":
+      return `${pulse.overdueCount} overdue item${pulse.overdueCount === 1 ? "" : "s"}${next ? `, and ${next.title} is due ${dueLabel(next.dueAt, now)}` : ""}.`;
+    case "low-readiness":
+      return `${next!.title} is due ${dueLabel(next!.dueAt, now)} and you're about ${readiness}% ready.`;
+    case "deadline-soon":
+      return `${next!.title} is due ${dueLabel(next!.dueAt, now)}.`;
+    case "low-recall":
+      return `Recall is down to ${Math.round((pulse.recall ?? 0) * 100)}% over the last 4 weeks.`;
+    case "quiet":
+      return pulse.lastStudiedAt === null
+        ? "Nothing studied here yet."
+        : `No study for ${dayDiff(now, pulse.lastStudiedAt)} days.`;
+    default:
+      return next ? `Next up: ${next.title}, ${dueLabel(next.dueAt, now)}.` : "Nothing due in the next two weeks.";
+  }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildHomeSummary, type HomeInput } from "../src/home/summary.js";
+import { buildHomeSummary, studyDays, type HomeInput } from "../src/home/summary.js";
 import { localDayEnd } from "../src/routes/home.js";
 
 const DAY = 86_400_000;
@@ -18,6 +18,7 @@ function input(overrides: Partial<HomeInput> = {}): HomeInput {
     latestQuizResults: [],
     reviews: [],
     noteStats: [],
+    activity: [],
     ...overrides,
   };
 }
@@ -34,14 +35,15 @@ const deadline = (id: string, dueAt: number, extra: Partial<HomeInput["deadlines
 });
 
 describe("buildHomeSummary plan", () => {
-  it("puts an overdue deadline above everything else", () => {
+  it("puts the most recent overdue deadline above everything else, and only that one", () => {
     const summary = buildHomeSummary(
       input({
-        deadlines: [deadline("late", NOW - 2 * DAY), deadline("tomorrow", NOW + DAY)],
+        deadlines: [deadline("older", NOW - 5 * DAY), deadline("late", NOW - 2 * DAY), deadline("tomorrow", NOW + DAY)],
         cardStats: [{ deckId: "d", courseId: "prog", total: 40, mastered: 0, dueToday: 40, lastStudiedAt: null }],
       }),
     );
     expect(summary.plan.map((p) => p.id)).toEqual(["deadline:late", "deadline:tomorrow", "review"]);
+    expect(summary.runway.overdue.map((d) => d.id)).toEqual(["late", "older"]);
   });
 
   it("ranks a sooner deadline above a later one and skips events", () => {
@@ -118,7 +120,9 @@ describe("buildHomeSummary course pulse", () => {
         latestQuizResults: [{ deckId: "q", score: 10, totalQuestions: 10, completedAt: NOW - DAY }],
       }),
     );
-    expect(summary.courses.find((c) => c.courseId === "prog")?.readiness).toBeCloseTo(0.6 * 0.5 + 0.4 * 1);
+    const prog = summary.courses.find((c) => c.courseId === "prog");
+    expect(prog?.readiness).toBeCloseTo(0.6 * 0.5 + 0.4 * 1);
+    expect(prog).toMatchObject({ quizCount: 1, quizScore: 1 });
     expect(summary.courses.find((c) => c.courseId === "data")?.readiness).toBeNull();
   });
 
@@ -183,6 +187,22 @@ describe("buildHomeSummary course pulse", () => {
       ["b", "quiet"],
       ["a", "on-track"],
     ]);
+  });
+});
+
+describe("studyDays", () => {
+  it("flags each local day with any activity, oldest first, today last", () => {
+    const dayEnd = NOW + 12 * 3_600_000 - 1;
+    const days = studyDays([NOW, NOW - DAY, NOW - 13 * DAY, NOW - 14 * DAY, NOW + DAY], dayEnd);
+    expect(days).toHaveLength(14);
+    expect(days.map((d, i) => (d ? i : -1)).filter((i) => i >= 0)).toEqual([0, 12, 13]);
+  });
+
+  it("counts reviews, quizzes and recordings", () => {
+    const summary = buildHomeSummary(
+      input({ activity: [NOW - 2 * DAY], reviews: [{ deckId: "a", rating: "easy", reviewedAt: NOW }] }),
+    );
+    expect(summary.studyDays.slice(-3)).toEqual([true, false, true]);
   });
 });
 

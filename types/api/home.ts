@@ -51,6 +51,9 @@ export type CoursePulseDto = {
   noteCount: number;
   cardCount: number;
   dueToday: number;
+  quizCount: number;
+  /** Average latest score across the course's quizzes, 0–1. */
+  quizScore: number | null;
   lastStudiedAt: number | null;
   nextDeadline: HomeDeadlineDto | null;
   overdueCount: number;
@@ -71,5 +74,7 @@ export type HomeSummaryDto = {
   planMinutes: number;
   runway: { start: number; days: number; deadlines: HomeDeadlineDto[]; overdue: HomeDeadlineDto[] };
   courses: CoursePulseDto[];
+  /** One flag per local day, oldest first; the last is today. */
+  studyDays: boolean[];
   resume: HomeResumeDto | null;
 };

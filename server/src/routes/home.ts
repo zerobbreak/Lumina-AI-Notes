@@ -10,8 +10,9 @@ import {
   notes,
   quizDecks,
   quizResults,
+  recordings,
 } from "../db/schema/index.js";
-import { buildHomeSummary, RUNWAY_DAYS, TREND_WEEKS, type HomeResume } from "../home/summary.js";
+import { buildHomeSummary, RUNWAY_DAYS, STREAK_DAYS, TREND_WEEKS, type HomeResume } from "../home/summary.js";
 import { currentUser } from "../middleware/user.js";
 import { toPreview } from "./note-lists.js";
 import { parse, tzOffsetMinutes } from "./validation.js";
@@ -42,7 +43,10 @@ export function createHomeRouter(db: Db) {
     const dayEnd = localDayEnd(now, offset);
     const dayEndIso = new Date(dayEnd).toISOString();
 
-    const [deadlineRows, cardStats, quizDeckRows, latestResults, reviewRows, noteStats, [lastNote]] = await Promise.all([
+    const streakStart = new Date(dayEnd + 1 - STREAK_DAYS * DAY);
+    const [
+      deadlineRows, cardStats, quizDeckRows, latestResults, reviewRows, noteStats, [lastNote], quizTimes, recordingTimes,
+    ] = await Promise.all([
       db
         .select()
         .from(deadlines)
@@ -128,6 +132,14 @@ export function createHomeRouter(db: Db) {
         )
         .orderBy(desc(notes.lastAccessedAt))
         .limit(1),
+      db
+        .select({ at: quizResults.completedAt })
+        .from(quizResults)
+        .where(and(eq(quizResults.userId, user.id), gte(quizResults.completedAt, streakStart))),
+      db
+        .select({ at: recordings.createdAt })
+        .from(recordings)
+        .where(and(eq(recordings.userId, user.id), gte(recordings.createdAt, streakStart))),
     ]);
 
     const time = (d: Date | string | null) => (d ? new Date(d).getTime() : null);
@@ -151,6 +163,7 @@ export function createHomeRouter(db: Db) {
         reviews: reviewRows.map((r) => ({ ...r, reviewedAt: r.reviewedAt.getTime() })),
         // max() comes back as a string from the driver, not a Date.
         noteStats: noteStats.map((n) => ({ ...n, lastUpdatedAt: time(n.lastUpdatedAt) })),
+        activity: [...quizTimes, ...recordingTimes].map((r) => r.at.getTime()),
     });
 
     const resume: HomeResume | null = lastNote

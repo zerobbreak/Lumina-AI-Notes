@@ -5,10 +5,12 @@ import {
   dueSoonChip,
   formatMinutes,
   overdueLabel,
+  planAction,
   planHeadline,
+  pulseReason,
   timeAgo,
 } from "@/lib/home/planCopy";
-import type { PlanItemDto } from "@/types/api/home";
+import type { CoursePulseDto, PlanItemDto } from "@/types/api/home";
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -68,30 +70,92 @@ describe("date labels", () => {
 });
 
 describe("planHeadline", () => {
-  it("counts the plan and totals its time", () => {
-    const plan = [deadlineItem("deadline", NOW + 5 * DAY), deadlineItem("deadline", NOW + 6 * DAY, "Essay")];
-    expect(planHeadline({ plan, planMinutes: 90 }, true, NOW)).toEqual({
-      headline: "Two things today, about 1 hr 30 min.",
-      lead: undefined,
+  const plan = [deadlineItem("deadline", NOW + 5 * DAY), deadlineItem("deadline", NOW + 6 * DAY, "Essay")];
+
+  it("counts the plan and sets the time apart for emphasis", () => {
+    expect(planHeadline({ total: 2, done: 0, minutesLeft: 90, next: plan[0] }, true, NOW)).toEqual({
+      before: "Two things today, about ",
+      emphasis: "1 hr 30 min",
+      after: ".",
+    });
+  });
+
+  it("says what's left once something is ticked off", () => {
+    expect(planHeadline({ total: 3, done: 1, minutesLeft: 45, next: plan[0] }, true, NOW).before).toBe(
+      "Two things left, about ",
+    );
+    expect(planHeadline({ total: 2, done: 2, minutesLeft: 0 }, true, NOW)).toEqual({
+      before: "That's everything for today. Nice work.",
     });
   });
 
   it("leads with an overdue item", () => {
-    const { lead } = planHeadline({ plan: [deadlineItem("overdue", NOW - DAY)], planMinutes: 45 }, true, NOW);
-    expect(lead).toBe("Start with POE Part 2. It's overdue.");
+    const { after } = planHeadline({ total: 1, done: 0, minutesLeft: 45, next: deadlineItem("overdue", NOW - DAY) }, true, NOW);
+    expect(after).toBe(". Start with POE Part 2. It's overdue.");
   });
 
   it("leads with a deadline due within two days", () => {
-    const dueAt = new Date(2026, 8, 25, 23, 59).getTime();
-    const { headline, lead } = planHeadline({ plan: [deadlineItem("deadline", dueAt)], planMinutes: 45 }, true, NOW);
-    expect(headline).toBe("One thing today, about 45 min.");
-    expect(lead).toMatch(/^POE Part 2 is due tomorrow at 23:59, so start there\.$/);
+    const next = deadlineItem("deadline", new Date(2026, 8, 25, 23, 59).getTime());
+    const headline = planHeadline({ total: 1, done: 0, minutesLeft: 45, next }, true, NOW);
+    expect(headline.before + headline.emphasis + headline.after).toBe(
+      "One thing today, about 45 min. POE Part 2 is the one that can't wait.",
+    );
   });
 
   it("has something to say when the plan is empty", () => {
-    expect(planHeadline({ plan: [], planMinutes: 0 }, true, NOW).headline).toBe("Nothing is due today.");
-    expect(planHeadline({ plan: [], planMinutes: 0 }, false, NOW).headline).toBe(
+    expect(planHeadline({ total: 0, done: 0, minutesLeft: 0 }, true, NOW).before).toMatch(/^Nothing is due today\./);
+    expect(planHeadline({ total: 0, done: 0, minutesLeft: 0 }, false, NOW).before).toBe(
       "Add a course to get a plan for your day.",
     );
+  });
+});
+
+describe("planAction", () => {
+  it("sends each kind of item to where its work happens", () => {
+    expect(planAction({ kind: "review", id: "review", score: 1, minutes: 5, dueCount: 3, byCourse: [] })).toEqual({
+      label: "Start review",
+      href: "/dashboard?view=flashcards",
+    });
+    const synced = deadlineItem("deadline", NOW + DAY);
+    if (synced.kind === "deadline") synced.deadline.externalUrl = "https://lms.example.test/x";
+    expect(planAction(synced)).toMatchObject({ label: "Open in Brightspace", external: true });
+    const manual = deadlineItem("deadline", NOW + DAY);
+    if (manual.kind === "deadline") manual.deadline.courseId = "c1";
+    expect(planAction(manual)?.href).toBe("/dashboard?contextId=c1&contextType=course");
+    expect(planAction(deadlineItem("deadline", NOW + DAY))).toBeNull();
+  });
+});
+
+describe("pulseReason", () => {
+  const pulse = (overrides: Partial<CoursePulseDto>): CoursePulseDto => ({
+    courseId: "c",
+    status: "on-track",
+    reasons: [],
+    readiness: null,
+    recall: null,
+    recallTrend: [],
+    noteCount: 0,
+    cardCount: 0,
+    dueToday: 0,
+    quizCount: 0,
+    quizScore: null,
+    lastStudiedAt: NOW,
+    nextDeadline: null,
+    overdueCount: 0,
+    ...overrides,
+  });
+  const next = { id: "t", title: "Class test 2", dueAt: new Date(2026, 8, 25, 9, 0).getTime(), kind: "exam" as const, source: "manual" as const, readiness: 0.3 };
+
+  it("explains the most important reason", () => {
+    expect(pulseReason(pulse({ reasons: ["overdue"], overdueCount: 2 }), NOW)).toBe("2 overdue items.");
+    expect(pulseReason(pulse({ reasons: ["low-readiness"], readiness: 0.3, nextDeadline: next }), NOW)).toMatch(
+      /^Class test 2 is due tomorrow at 09:00 and you're about 30% ready\.$/,
+    );
+    expect(pulseReason(pulse({ reasons: ["low-recall"], recall: 0.42 }), NOW)).toBe(
+      "Recall is down to 42% over the last 4 weeks.",
+    );
+    expect(pulseReason(pulse({ reasons: ["quiet"], lastStudiedAt: NOW - 20 * DAY }), NOW)).toBe("No study for 20 days.");
+    expect(pulseReason(pulse({ reasons: ["quiet"], lastStudiedAt: null }), NOW)).toBe("Nothing studied here yet.");
+    expect(pulseReason(pulse({}), NOW)).toBe("Nothing due in the next two weeks.");
   });
 });

@@ -12,6 +12,10 @@ const WEEK = 7 * DAY;
 export const RUNWAY_DAYS = 14;
 export const PLAN_SIZE = 4;
 export const TREND_WEEKS = 8;
+/** Days in the study strip, today included. */
+export const STREAK_DAYS = 14;
+/** Brightspace's calendar feed can't say what's been submitted, so old items pile up; the rest wait in "Coming up". */
+const MAX_OVERDUE_IN_PLAN = 1;
 
 type DeadlineKind = "assignment" | "exam" | "event" | "task";
 
@@ -38,6 +42,8 @@ export type HomeInput = {
   /** Flashcard reviews from the last TREND_WEEKS weeks. */
   reviews: Array<{ deckId: string; rating: string; reviewedAt: number }>;
   noteStats: Array<{ courseId: string; count: number; lastUpdatedAt: number | null }>;
+  /** Quiz completions and recordings from the last STREAK_DAYS days; reviews come from `reviews`. */
+  activity: number[];
 };
 
 export type HomeDeadline = {
@@ -92,6 +98,9 @@ export type CoursePulse = {
   noteCount: number;
   cardCount: number;
   dueToday: number;
+  quizCount: number;
+  /** Average of the latest score on each of the course's quizzes, 0–1. */
+  quizScore: number | null;
   lastStudiedAt: number | null;
   nextDeadline: HomeDeadline | null;
   overdueCount: number;
@@ -113,6 +122,8 @@ export type HomeSummary = {
   planMinutes: number;
   runway: { start: number; days: number; deadlines: HomeDeadline[]; overdue: HomeDeadline[] };
   courses: CoursePulse[];
+  /** One flag per local day, oldest first; the last is today. */
+  studyDays: boolean[];
 };
 
 const MIN_RECALL_REVIEWS = 5;
@@ -170,8 +181,7 @@ export function buildHomeSummary(input: HomeInput): HomeSummary {
   // ---- plan ----
   const candidates: PlanItem[] = [];
 
-  for (const d of overdue) {
-    if (d.kind === "event") continue;
+  for (const d of overdue.filter((o) => o.kind !== "event").slice(0, MAX_OVERDUE_IN_PLAN)) {
     const daysLate = (now - d.dueAt) / DAY;
     candidates.push({ kind: "overdue", id: `deadline:${d.id}`, score: 100 - Math.min(daysLate, 10), minutes: d.kind === "task" ? 20 : 45, deadline: d });
   }
@@ -251,6 +261,10 @@ export function buildHomeSummary(input: HomeInput): HomeSummary {
 
     const notes = input.noteStats.find((n) => n.courseId === course.id);
     const quizzes = input.quizDecks.filter((q) => q.courseId === course.id);
+    const quizIds = new Set(quizzes.map((q) => q.id));
+    const quizScores = input.latestQuizResults
+      .filter((r) => quizIds.has(r.deckId) && r.totalQuestions > 0)
+      .map((r) => r.score / r.totalQuestions);
     const lastStudiedAt = Math.max(
       notes?.lastUpdatedAt ?? 0,
       ...decks.map((d) => d.lastStudiedAt ?? 0),
@@ -285,6 +299,8 @@ export function buildHomeSummary(input: HomeInput): HomeSummary {
       noteCount: notes?.count ?? 0,
       cardCount: decks.reduce((n, d) => n + d.total, 0),
       dueToday: decks.reduce((n, d) => n + d.dueToday, 0),
+      quizCount: quizzes.length,
+      quizScore: quizScores.length ? quizScores.reduce((a, b) => a + b, 0) / quizScores.length : null,
       lastStudiedAt,
       nextDeadline,
       overdueCount,
@@ -304,5 +320,17 @@ export function buildHomeSummary(input: HomeInput): HomeSummary {
     planMinutes: plan.reduce((n, p) => n + p.minutes, 0),
     runway: { start: now, days: RUNWAY_DAYS, deadlines: upcoming, overdue },
     courses,
+    studyDays: studyDays([...input.activity, ...input.reviews.map((r) => r.reviewedAt)], input.dayEnd),
   };
+}
+
+/** Which of the last STREAK_DAYS local days had any study, oldest first. */
+export function studyDays(timestamps: number[], dayEnd: number) {
+  const firstDay = dayEnd + 1 - STREAK_DAYS * DAY;
+  const days: boolean[] = Array.from({ length: STREAK_DAYS }, () => false);
+  for (const t of timestamps) {
+    const index = Math.floor((t - firstDay) / DAY);
+    if (index >= 0 && index < STREAK_DAYS) days[index] = true;
+  }
+  return days;
 }
