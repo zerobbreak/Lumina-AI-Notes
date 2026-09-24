@@ -11,6 +11,7 @@ import { createTokenVerifier, type TokenVerifier } from "../src/auth/verify-toke
 import { createDb, type Db } from "../src/db/client.js";
 import * as schema from "../src/db/schema/index.js";
 import { loadEnv } from "../src/env.js";
+import type { FeedFetcher } from "../src/integrations/brightspace/sync.js";
 import type { JobQueue } from "../src/queue/queues.js";
 import type { Storage } from "../src/storage/s3.js";
 
@@ -130,9 +131,17 @@ export function fakeQueue() {
 }
 
 export function buildApp(
-  options: { storage?: Storage; db?: Db; verifyToken?: TokenVerifier; env?: typeof testEnv; queue?: JobQueue } = {},
+  options: {
+    storage?: Storage;
+    db?: Db;
+    verifyToken?: TokenVerifier;
+    env?: typeof testEnv;
+    queue?: JobQueue;
+    feedFetcher?: FeedFetcher;
+  } = {},
 ) {
   return createApp({
+    feedFetcher: options.feedFetcher,
     queue: options.queue ?? fakeQueue(),
     env: options.env ?? testEnv,
     db: options.db ?? createDb(testEnv.DATABASE_URL).db,

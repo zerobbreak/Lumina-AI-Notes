@@ -1,6 +1,8 @@
 import { sendDueReminders } from "../deadlines/sendReminders.js";
 import { recomputeFileQueuePositions } from "../files/processing.js";
+import { createFeedFetcher } from "../integrations/brightspace/sync.js";
 import type { WorkerContext, WorkerJob } from "./context.js";
+import { syncBrightspaceFeeds } from "./jobs/brightspaceSync.js";
 import { buildDailyQueues } from "./jobs/buildDailyQueues.js";
 import { cleanupStalePresence } from "./jobs/cleanupPresence.js";
 import { cleanupStaleNotesAndFiles } from "./jobs/cleanupStale.js";
@@ -45,6 +47,12 @@ export const workerJobs = {
     description: "Delete stale note presence rows",
     intervalMs: 6 * HOUR,
     run: async ({ db }) => cleanupStalePresence(db),
+  },
+  "brightspace-sync": {
+    description: "Re-read students' Brightspace calendar feeds into their deadlines",
+    intervalMs: 3 * HOUR,
+    run: async ({ db, lmsBox }) =>
+      lmsBox ? syncBrightspaceFeeds(db, lmsBox, createFeedFetcher()) : { skipped: "LMS_ENCRYPTION_KEY not set" },
   },
   "streak-reset": {
     description: "Zero out study streaks when the user missed yesterday",

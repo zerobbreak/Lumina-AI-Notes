@@ -1,7 +1,7 @@
 import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { clientMessage, UserFacingError } from "../../ai/errors.js";
 import type { Db } from "../../db/client.js";
-import { deadlines, lmsConnections, lmsCourseLinks } from "../../db/schema/index.js";
+import { deadlines, lmsConnections, lmsCourseLinks, users, type Course } from "../../db/schema/index.js";
 import { createRemindersForDeadline, deleteRemindersForDeadline } from "../../deadlines/reminders.js";
 import { safeGet, type FetchPolicy } from "../../net/safeGet.js";
 import type { SecretBox } from "../secretBox.js";
@@ -78,10 +78,24 @@ export async function syncFeedConnection(
       .where(eq(lmsConnections.id, connection.id));
     return { ok: false, error: message };
   }
+  return applyFeedItems(db, connection, items, now);
+}
 
+/** The write half of a sync, for items already fetched (connecting reads the feed to validate it). */
+export async function applyFeedItems(
+  db: Db,
+  connection: Connection,
+  items: FeedItem[],
+  now = new Date(),
+): Promise<SyncResult> {
   return db.transaction(async (tx) => {
     const courses = new Map(items.map((item) => [item.course.key, item.course]));
     if (courses.size > 0) {
+      const [owner] = await tx
+        .select({ courses: users.courses })
+        .from(users)
+        .where(eq(users.id, connection.userId));
+      const own = owner?.courses ?? [];
       await tx
         .insert(lmsCourseLinks)
         .values(
@@ -90,6 +104,8 @@ export async function syncFeedConnection(
             connectionId: connection.id,
             externalKey: course.key,
             externalName: course.name,
+            // Only a new link takes this; the update below leaves the student's choice alone.
+            courseId: matchCourse(course.name, own),
           })),
         )
         .onConflictDoUpdate({
@@ -180,4 +196,20 @@ export async function syncFeedConnection(
 
     return { ok: true, added, updated, removed: gone.length, courses: links.size };
   });
+}
+
+const normalize = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/**
+ * Pre-maps a Brightspace course to the student's Lumina course whose code
+ * appears in its name ("HIST101 - History of Africa" -> code "HIST 101").
+ * Only a single, reasonably specific match counts; otherwise the student picks.
+ */
+export function matchCourse(externalName: string, own: Course[]): string | null {
+  const name = normalize(externalName);
+  const matches = own.filter((course) => {
+    const code = normalize(course.code ?? "");
+    return code.length >= 4 && name.includes(code);
+  });
+  return matches.length === 1 ? matches[0]!.id : null;
 }

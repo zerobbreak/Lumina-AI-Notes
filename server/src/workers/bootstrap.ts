@@ -1,5 +1,6 @@
 import { createDb } from "../db/client.js";
 import { loadEnv } from "../env.js";
+import { createSecretBox } from "../integrations/secretBox.js";
 import { createStorage } from "../storage/s3.js";
 import type { WorkerContext } from "./context.js";
 
@@ -13,5 +14,6 @@ export function createWorkerContext(): { ctx: WorkerContext; pool: { end: () => 
     accessKeyId: env.S3_ACCESS_KEY_ID,
     secretAccessKey: env.S3_SECRET_ACCESS_KEY,
   });
-  return { ctx: { db, storage }, pool };
+  const lmsBox = env.LMS_ENCRYPTION_KEY ? createSecretBox(env.LMS_ENCRYPTION_KEY) : undefined;
+  return { ctx: { db, storage, lmsBox }, pool };
 }

@@ -14,6 +14,9 @@ import { createDeadlinesRouter } from "./deadlines.js";
 import { createCoursesRouter } from "./courses.js";
 import { createFilesRouter } from "./files.js";
 import { createFlashcardsRouter } from "./flashcards.js";
+import { createBrightspaceRouter } from "./integrations.js";
+import { createFeedFetcher } from "../integrations/brightspace/sync.js";
+import { createSecretBox } from "../integrations/secretBox.js";
 import { createJobsRouter } from "./jobs.js";
 import { createKnowledgeGraphRouter } from "./knowledgeGraph.js";
 import { createNoteListsRouter } from "./note-lists.js";
@@ -31,7 +34,7 @@ import { createUsersRouter } from "./users.js";
  * Everything under /api/v1 needs a verified Clerk session token, resolved to
  * the caller's `users` row. Mount one router per Convex module as it's ported.
  */
-export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken, queue }: AppDeps) {
+export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken, queue, feedFetcher }: AppDeps) {
   const router = Router();
 
   router.use(authenticate(verifyToken), loadUser(db, clerkProfiles));
@@ -45,6 +48,12 @@ export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken, 
     }));
   router.use("/files", createFilesRouter(db, storage, queue));
   router.use("/flashcards", createFlashcardsRouter(db));
+  router.use(
+    "/integrations/brightspace",
+    createBrightspaceRouter(db, createSecretBox(env.LMS_ENCRYPTION_KEY), feedFetcher ?? createFeedFetcher(), {
+      hasKey: Boolean(env.LMS_ENCRYPTION_KEY),
+    }),
+  );
   router.use("/jobs", createJobsRouter(db, queue));
   router.use("/knowledge-graph", createKnowledgeGraphRouter(db));
   router.use("/quizzes", createQuizzesRouter(db));
