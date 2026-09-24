@@ -14,6 +14,7 @@ import { createDeadlinesRouter } from "./deadlines.js";
 import { createCoursesRouter } from "./courses.js";
 import { createFilesRouter } from "./files.js";
 import { createFlashcardsRouter } from "./flashcards.js";
+import { createHomeRouter } from "./home.js";
 import { createBrightspaceRouter } from "./integrations.js";
 import { createFeedFetcher } from "../integrations/brightspace/sync.js";
 import { createSecretBox } from "../integrations/secretBox.js";
@@ -48,6 +49,7 @@ export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken, 
     }));
   router.use("/files", createFilesRouter(db, storage, queue));
   router.use("/flashcards", createFlashcardsRouter(db));
+  router.use("/home", createHomeRouter(db));
   router.use(
     "/integrations/brightspace",
     createBrightspaceRouter(db, createSecretBox(env.LMS_ENCRYPTION_KEY), feedFetcher ?? createFeedFetcher(), {

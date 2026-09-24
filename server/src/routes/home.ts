@@ -1,0 +1,138 @@
+import { and, desc, eq, gte, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import { Router } from "express";
+import { z } from "zod";
+import type { Db } from "../db/client.js";
+import {
+  deadlines,
+  flashcardDecks,
+  flashcardReviewEvents,
+  flashcards,
+  notes,
+  quizDecks,
+  quizResults,
+} from "../db/schema/index.js";
+import { buildHomeSummary, RUNWAY_DAYS, TREND_WEEKS } from "../home/summary.js";
+import { currentUser } from "../middleware/user.js";
+import { parse, tzOffsetMinutes } from "./validation.js";
+
+const DAY = 24 * 60 * 60 * 1000;
+
+const homeQuery = z.object({
+  /** `Date#getTimezoneOffset()`: minutes to add to local time to get UTC. */
+  tzOffsetMinutes: z.coerce.number().pipe(tzOffsetMinutes).default(0),
+});
+
+/** Last millisecond of the user's local day, as a UTC timestamp. */
+export function localDayEnd(now: number, offsetMinutes: number) {
+  const offset = offsetMinutes * 60_000;
+  return Math.floor((now - offset) / DAY) * DAY + DAY - 1 + offset;
+}
+
+export function createHomeRouter(db: Db) {
+  const router = Router();
+
+  router.get("/", async (req, res) => {
+    const user = currentUser(res);
+    const { tzOffsetMinutes: offset } = parse(homeQuery, req.query);
+    const now = Date.now();
+    const nowIso = new Date(now).toISOString();
+    const dayEnd = localDayEnd(now, offset);
+    const dayEndIso = new Date(dayEnd).toISOString();
+
+    const [deadlineRows, cardStats, quizDeckRows, latestResults, reviewRows, noteStats] = await Promise.all([
+      db
+        .select()
+        .from(deadlines)
+        .where(
+          and(
+            eq(deadlines.userId, user.id),
+            isNull(deadlines.completedAt),
+            gte(deadlines.dueAt, new Date(now - RUNWAY_DAYS * DAY)),
+            lte(deadlines.dueAt, new Date(now + RUNWAY_DAYS * DAY)),
+          ),
+        ),
+      db
+        .select({
+          deckId: flashcardDecks.id,
+          courseId: flashcardDecks.courseId,
+          lastStudiedAt: flashcardDecks.lastStudiedAt,
+          total: sql<number>`count(${flashcards.id})::int`,
+          mastered: sql<number>`(count(*) filter (where ${flashcards.repetitions} >= 2 and ${flashcards.nextReviewAt} > ${nowIso}::timestamptz))::int`,
+          dueToday: sql<number>`(count(*) filter (where ${flashcards.nextReviewAt} <= ${dayEndIso}::timestamptz))::int`,
+        })
+        .from(flashcardDecks)
+        .leftJoin(flashcards, eq(flashcards.deckId, flashcardDecks.id))
+        .where(eq(flashcardDecks.userId, user.id))
+        .groupBy(flashcardDecks.id),
+      db
+        .select({
+          id: quizDecks.id,
+          title: quizDecks.title,
+          courseId: quizDecks.courseId,
+          questionCount: quizDecks.questionCount,
+          lastTakenAt: quizDecks.lastTakenAt,
+        })
+        .from(quizDecks)
+        .where(eq(quizDecks.userId, user.id)),
+      db
+        .selectDistinctOn([quizResults.deckId], {
+          deckId: quizResults.deckId,
+          score: quizResults.score,
+          totalQuestions: quizResults.totalQuestions,
+          completedAt: quizResults.completedAt,
+        })
+        .from(quizResults)
+        .where(eq(quizResults.userId, user.id))
+        .orderBy(quizResults.deckId, desc(quizResults.completedAt)),
+      db
+        .select({
+          deckId: flashcardReviewEvents.deckId,
+          rating: flashcardReviewEvents.rating,
+          reviewedAt: flashcardReviewEvents.reviewedAt,
+        })
+        .from(flashcardReviewEvents)
+        .where(
+          and(
+            eq(flashcardReviewEvents.userId, user.id),
+            gte(flashcardReviewEvents.reviewedAt, new Date(now - TREND_WEEKS * 7 * DAY)),
+          ),
+        ),
+      db
+        .select({
+          courseId: sql<string>`${notes.courseId}`,
+          count: sql<number>`count(*)::int`,
+          lastUpdatedAt: sql<Date | null>`max(${notes.updatedAt})`,
+        })
+        .from(notes)
+        .where(and(eq(notes.userId, user.id), eq(notes.isArchived, false), isNotNull(notes.courseId)))
+        .groupBy(notes.courseId),
+    ]);
+
+    const time = (d: Date | string | null) => (d ? new Date(d).getTime() : null);
+
+    res.json(
+      buildHomeSummary({
+        now,
+        dayEnd,
+        courses: user.courses ?? [],
+        deadlines: deadlineRows.map((d) => ({
+          id: d.id,
+          title: d.title,
+          dueAt: d.dueAt.getTime(),
+          kind: d.kind,
+          courseId: d.courseId,
+          source: d.source,
+          externalUrl: d.externalUrl,
+        })),
+        cardStats: cardStats.map((s) => ({ ...s, lastStudiedAt: time(s.lastStudiedAt) })),
+        quizDecks: quizDeckRows.map((q) => ({ ...q, lastTakenAt: time(q.lastTakenAt) })),
+        latestQuizResults: latestResults.map((r) => ({ ...r, completedAt: r.completedAt.getTime() })),
+        reviews: reviewRows.map((r) => ({ ...r, reviewedAt: r.reviewedAt.getTime() })),
+        // max() comes back as a string from the driver, not a Date.
+        noteStats: noteStats.map((n) => ({ ...n, lastUpdatedAt: time(n.lastUpdatedAt) })),
+      }),
+    );
+  });
+
+  return router;
+}
