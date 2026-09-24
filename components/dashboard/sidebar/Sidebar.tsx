@@ -27,7 +27,7 @@ import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
 import { useTagActions } from "@/lib/hooks/mutations/useTagActions";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { Course } from "@/types";
 import { DASHBOARD_NAV, activeDashboardNavId } from "@/constants/dashboardNav";
@@ -56,6 +56,7 @@ import {
   viewForParam,
 } from "@/components/dashboard/viewLoaders";
 import { SidebarNote } from "./SidebarNote";
+import { SidebarRow } from "./SidebarRow";
 import { SidebarSection, SidebarSectionAction } from "./SidebarSection";
 import { SidebarTag } from "./SidebarTag";
 import {
@@ -337,34 +338,39 @@ export function Sidebar() {
           </Button>
         </div>
       ) : (
-        <>
-          <button
-            type="button"
-            onClick={handleCreateNote}
-            disabled={isCreatingNote}
-            className="flex h-7 w-full items-center justify-center gap-1.5 rounded-md bg-primary text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar disabled:opacity-60"
-          >
-            {isCreatingNote ? (
-              <Loader2 className="h-[13px] w-[13px] animate-spin" />
-            ) : (
-              <Plus className="h-[13px] w-[13px]" />
-            )}
-            <span>{openNote ? "New sub-page" : "New note"}</span>
-          </button>
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => setIsSearchOpen(true)}
-            className="group/search flex h-7 w-full items-center justify-between rounded-md border border-sidebar-border/70 bg-sidebar-accent/25 px-2 transition-colors hover:bg-sidebar-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar"
+            className="group/search flex h-7 min-w-0 flex-1 items-center gap-2.5 rounded-md border border-sidebar-border/70 bg-sidebar-accent/25 px-2 transition-colors hover:bg-sidebar-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar"
           >
-            <span className="flex items-center gap-2 text-[13px] text-muted-foreground/80">
-              <Search className="h-[13px] w-[13px]" />
-              <span>Search</span>
-            </span>
-            <span className="text-[10px] text-muted-foreground/50 transition-colors group-hover/search:text-muted-foreground/80">
+            <Search className="h-[13px] w-[13px] shrink-0 text-muted-foreground/80" />
+            <span className="flex-1 truncate text-left text-[13px] text-muted-foreground/80">Search</span>
+            <span className="text-[10px] text-muted-foreground/55 transition-colors group-hover/search:text-muted-foreground/80">
               {formatShortcut(shortcutFor("search")!)}
             </span>
           </button>
-        </>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={handleCreateNote}
+                disabled={isCreatingNote}
+                aria-label={openNote ? "New sub-page" : "New note"}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar disabled:opacity-60"
+              >
+                {isCreatingNote ? (
+                  <Loader2 className="h-[14px] w-[14px] animate-spin" />
+                ) : (
+                  <Plus className="h-[15px] w-[15px]" strokeWidth={2.25} />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {openNote ? "New sub-page" : "New note"} · {formatShortcut(shortcutFor("new-note")!)}
+            </TooltipContent>
+          </Tooltip>
+        </div>
       )}
     </div>
   );
@@ -460,35 +466,31 @@ export function Sidebar() {
   const tree = (
     <ScrollArea className="min-h-0 min-w-0 flex-1 px-2 py-2.5">
       <div className="space-y-3">
-        {(dueTodayCount > 0 || nextDeadlineLabel) && (
-          <button
-            type="button"
-            className="w-full rounded-lg border border-primary/20 bg-primary/[0.07] hover:bg-primary/[0.11] transition-colors overflow-hidden text-left"
-            onClick={() => router.push("/dashboard?view=flashcards")}
-          >
+        {(dueTodayCount > 0 || nextDeadline) && (
+          // -mx-[3px] cancels the border + padding, so the rows inside keep the
+          // same icon and label columns as every other row.
+          <div className="-mx-[3px] space-y-px rounded-lg border border-sidebar-border/70 bg-sidebar-accent/20 p-[2px]">
             {dueTodayCount > 0 && (
-              <div className="h-[34px] px-2 flex items-center gap-2.5 rounded-lg bg-primary/[0.13]">
-                <Layers className="w-[14px] h-[14px] text-primary shrink-0" />
-                <span className="flex-1 text-[13px] font-medium text-sidebar-foreground">
-                  Review
-                </span>
-                <span className="text-[11px] font-medium text-primary-foreground bg-primary px-1.5 py-0.5 rounded-full tabular-nums">
-                  {dueTodayCount} due
-                </span>
-              </div>
+              <SidebarRow
+                label="Review"
+                icon={<Layers className="h-[14px] w-[14px] text-primary" />}
+                onClick={() => router.push("/dashboard?view=flashcards")}
+                meta={
+                  <span className="rounded-full bg-primary px-1.5 py-0.5 font-medium text-primary-foreground">
+                    {dueTodayCount} due
+                  </span>
+                }
+              />
             )}
-            {nextDeadlineLabel && (
-              <div className="h-[30px] px-2 flex items-center gap-2.5 text-muted-foreground">
-                <Calendar className="w-[14px] h-[14px] shrink-0 opacity-80" />
-                <span className="flex-1 text-[12px] truncate">
-                  {nextDeadline!.title}
-                </span>
-                <span className="text-[11px] text-amber-600 dark:text-amber-400 tabular-nums shrink-0">
-                  {nextDeadlineLabel}
-                </span>
-              </div>
+            {nextDeadline && (
+              <SidebarRow
+                label={nextDeadline.title}
+                icon={<Calendar className="h-[14px] w-[14px]" />}
+                onClick={() => router.push("/dashboard?view=calendar")}
+                meta={<span className="text-warning">{nextDeadlineLabel}</span>}
+              />
             )}
-          </button>
+          </div>
         )}
 
         <SidebarSection

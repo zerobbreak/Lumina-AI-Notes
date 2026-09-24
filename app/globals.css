@@ -158,6 +158,7 @@
   --color-accent: hsl(var(--accent));
   --color-accent-foreground: hsl(var(--accent-foreground));
   --color-destructive: hsl(var(--destructive));
+  --color-warning: hsl(var(--warning));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
@@ -222,6 +223,7 @@
   --sidebar-border: 220 13% 91%;
   --sidebar-ring: 217.2 91.2% 59.8%;
   --inset: 240 5% 95%;
+  --warning: 32 90% 36%;
 
   /* Look defaults; the appearance attributes on <html> override these. */
   --ui-font: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
@@ -264,6 +266,7 @@
   --sidebar-border: 240 3.7% 19%;
   --sidebar-ring: 217.2 91.2% 59.8%;
   --inset: 0 0% 6%;
+  --warning: 38 92% 62%;
 
   /* Holographic Tokens */
   --holo-cyan: 180 100% 50%;
@@ -515,6 +518,14 @@
   --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent-foreground: var(--sidebar-foreground);
   --sidebar-ring: var(--ring);
+}
+
+/* Due-soon and needs-attention text: dark amber on light, bright amber on dark. */
+[data-world][data-mode="light"] {
+  --warning: 32 90% 36%;
+}
+[data-world][data-mode="dark"] {
+  --warning: 38 92% 62%;
 }
 
 /* Paper: warm stock and ink, with a faint grain. */
