@@ -29,6 +29,17 @@ export type Announcement = {
  */
 export const ANNOUNCEMENTS: readonly Announcement[] = [
   {
+    id: "brightspace-calendar",
+    title: "Your Brightspace due dates, in Lumina",
+    body: "Paste your Brightspace calendar link once and your assignment and quiz due dates show up in your deadlines, with reminders and an overdue list. Lumina checks for changes every few hours.",
+    publishedAt: Date.UTC(2026, 8, 24, 17, 0),
+    priority: "major",
+    cta: {
+      label: "Connect Brightspace",
+      action: { type: "open-settings", tab: "integrations" },
+    },
+  },
+  {
     id: "appearance-launch",
     title: "Make Lumina yours",
     body: "Pick a world (Paper, Observatory, Focus or Riso), then tune the accent, fonts, reading size and density. Courses can have their own colours too.",
