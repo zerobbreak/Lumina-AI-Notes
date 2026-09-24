@@ -3,7 +3,7 @@
  * These types match the Convex schema definitions
  */
 
-import type { Appearance } from "@/lib/appearance/model";
+import type { AccentSwatch, Appearance } from "@/lib/appearance/model";
 
 // Module type - represents a module within a course
 export interface Module {
@@ -18,6 +18,8 @@ export interface Course {
   code: string;
   defaultNoteStyle?: string;
   templatePromptDisabled?: boolean;
+  /** Sidebar dot; an accent swatch id, assigned by the server. */
+  color?: AccentSwatch;
   modules?: Module[];
 }
 

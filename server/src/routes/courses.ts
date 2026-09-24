@@ -19,6 +19,7 @@ import {
 import { HttpError } from "../middleware/errors.js";
 import { currentUser } from "../middleware/user.js";
 import type { Storage } from "../storage/s3.js";
+import { COURSE_COLORS, pickCourseColor } from "../users/courseColors.js";
 import { noteStyle } from "./users.js";
 import { parse } from "./validation.js";
 
@@ -33,6 +34,7 @@ const updateCourseBody = z.object({
   name: z.string().trim().min(1).max(200).optional(),
   defaultNoteStyle: noteStyle.optional(),
   templatePromptDisabled: z.boolean().optional(),
+  color: z.enum(COURSE_COLORS).optional(),
 });
 
 const moduleBody = z.object({ title: z.string().trim().min(1).max(200) });
@@ -173,14 +175,19 @@ export function createCoursesRouter(db: Db, storage: Storage) {
       if (courses.length >= MAX_COURSES) {
         throw new HttpError(400, `You can have at most ${MAX_COURSES} courses`, "too_many_courses");
       }
-      const created: Course = { id: randomUUID(), ...body, modules: [] };
+      const created: Course = {
+        id: randomUUID(),
+        ...body,
+        color: pickCourseColor(courses),
+        modules: [],
+      };
       courses.push(created);
       return created;
     });
     res.status(201).json(course);
   });
 
-  // renameCourse / updateCourseStyle
+  // renameCourse / updateCourseStyle / recolour
   router.patch("/:courseId", async (req, res) => {
     const body = parse(updateCourseBody, req.body);
     const course = await withCourses(db, currentUser(res).id, (courses) =>

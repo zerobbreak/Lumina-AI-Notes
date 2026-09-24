@@ -5,6 +5,7 @@ import type { Db } from "../db/client.js";
 import { users } from "../db/schema/index.js";
 import { toGamificationStats } from "../gamification/stats.js";
 import { appearancePatchSchema, normalizeAppearance } from "../users/appearance.js";
+import { withCourseColors } from "../users/courseColors.js";
 import { updateStudyStreak } from "../gamification/streaks.js";
 import { HttpError } from "../middleware/errors.js";
 import { currentUser, type User } from "../middleware/user.js";
@@ -109,7 +110,10 @@ export function createUsersRouter(db: Db) {
     const body = parse(onboardingBody, req.body);
     const updated = await update(currentUser(res), {
       ...body,
-      courses: body.courses.map((c) => ({ ...c, modules: [] })),
+      courses: withCourseColors(
+        [],
+        body.courses.map((c) => ({ ...c, modules: [] })),
+      ),
       onboardingComplete: true,
     });
     res.json(toUserResponse(updated));

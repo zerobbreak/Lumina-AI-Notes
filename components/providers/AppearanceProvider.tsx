@@ -21,6 +21,7 @@ import {
   isBrandRoute,
   normalizeAppearance,
   resolveMode,
+  type AccentSwatch,
   type Appearance,
   type ResolvedMode,
 } from "@/lib/appearance/model";
@@ -35,6 +36,11 @@ type AppearanceContextValue = {
   accentAdjusted: boolean;
   /** Applies at once, then saves to the account when signed in. */
   updateAppearance: (patch: Partial<Appearance>) => void;
+  /**
+   * The colour of the course on screen, or null outside one. Shown as the
+   * accent while accentFollowsCourse is on; never saved.
+   */
+  setCourseAccent: (color: AccentSwatch | null) => void;
 };
 
 const AppearanceContext = createContext<AppearanceContextValue | null>(null);
@@ -106,26 +112,36 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
 
   const appearance = draft ?? user?.appearance ?? cookieAppearance;
 
+  const [courseAccent, setCourseAccent] = useState<AccentSwatch | null>(null);
+  // What goes on <html>: the saved look, with the course colour swapped in.
+  const shown = useMemo<Appearance | null>(
+    () =>
+      appearance?.accentFollowsCourse && courseAccent
+        ? { ...appearance, accent: { kind: "swatch", id: courseAccent } }
+        : appearance,
+    [appearance, courseAccent],
+  );
+
   useEffect(() => {
-    if (!appearance) return;
+    if (!shown) return;
     applyAppearance(
       document.documentElement,
-      appearance,
+      shown,
       systemDark,
       systemReducedMotion,
       isBrandRoute(pathname),
     );
-  }, [appearance, systemDark, systemReducedMotion, pathname]);
+  }, [shown, systemDark, systemReducedMotion, pathname]);
 
   // Worked out on a detached element: the same fitting, no effect needed.
   // appearance is only non-null in the browser.
   const accentAdjusted = useMemo(
     () =>
-      appearance
-        ? applyAppearance(document.createElement("html"), appearance, systemDark, false, false)
+      shown
+        ? applyAppearance(document.createElement("html"), shown, systemDark, false, false)
             .accentAdjusted
         : false,
-    [appearance, systemDark],
+    [shown, systemDark],
   );
 
   useEffect(() => {
@@ -182,6 +198,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       resolvedMode: resolveMode(current.mode, systemDark),
       accentAdjusted,
       updateAppearance,
+      setCourseAccent,
     };
   }, [appearance, systemDark, accentAdjusted, updateAppearance]);
 

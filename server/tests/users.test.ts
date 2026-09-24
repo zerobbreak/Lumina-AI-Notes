@@ -93,8 +93,15 @@ describe("POST /api/v1/users/me/onboarding", () => {
       noteStyle: "outline",
       enabledBlocks: ["diagram", "definition"],
       courses: [
-        { id: "k3j9x", name: "Cell Biology", code: "REQ-001", defaultNoteStyle: "outline", modules: [] },
-        { id: "p0q2z", name: "Genetics", code: "REQ-001", modules: [] },
+        {
+          id: "k3j9x",
+          name: "Cell Biology",
+          code: "REQ-001",
+          defaultNoteStyle: "outline",
+          color: "indigo",
+          modules: [],
+        },
+        { id: "p0q2z", name: "Genetics", code: "REQ-001", color: "emerald", modules: [] },
       ],
     });
     expect((await as(ALICE).get("/api/v1/users/me")).body.courses).toHaveLength(2);
@@ -106,7 +113,10 @@ describe("POST /api/v1/users/me/onboarding", () => {
       .post("/api/v1/users/me/onboarding")
       .send({ ...onboarding, courses: [{ id: "new01", name: "Ecology", code: "BIO-210" }] });
     expect(res.status).toBe(200);
-    expect(res.body.courses).toEqual([{ id: "new01", name: "Ecology", code: "BIO-210", modules: [] }]);
+    // Replacing the list starts the colours over.
+    expect(res.body.courses).toEqual([
+      { id: "new01", name: "Ecology", code: "BIO-210", color: "indigo", modules: [] },
+    ]);
   });
 
   it("rejects an unknown note style", async () => {

@@ -1,5 +1,6 @@
 import { boolean, index, integer, jsonb, pgTable, text } from "drizzle-orm/pg-core";
 import type { Appearance } from "../../users/appearance.js";
+import type { CourseColor } from "../../users/courseColors.js";
 import { createdAt, id, timestamptz, updatedAt } from "./columns.js";
 
 export type CourseModule = { id: string; title: string };
@@ -11,6 +12,8 @@ export type Course = {
   /** "standard" | "outline" | "mindmap" */
   defaultNoteStyle?: string;
   templatePromptDisabled?: boolean;
+  /** Dot in the sidebar; an accent swatch id. Assigned when the course is made. */
+  color?: CourseColor;
   modules?: CourseModule[];
 };
 

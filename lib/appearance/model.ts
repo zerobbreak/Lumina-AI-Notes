@@ -44,6 +44,8 @@ export type Appearance = {
   density: (typeof DENSITIES)[number];
   radius: (typeof RADII)[number];
   motion: (typeof MOTION)[number];
+  /** Inside a course, the accent takes the course's colour (not saved as the accent). */
+  accentFollowsCourse: boolean;
 };
 
 export const DEFAULT_APPEARANCE: Appearance = {
@@ -58,6 +60,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   density: "comfortable",
   radius: "soft",
   motion: "system",
+  accentFollowsCourse: false,
 };
 
 /** Mirrors the look so the pre-paint script can apply it before React loads. */
@@ -92,6 +95,7 @@ const CHECKS: { [K in keyof Appearance]: (v: unknown) => boolean } = {
   density: oneOf(DENSITIES),
   radius: oneOf(RADII),
   motion: oneOf(MOTION),
+  accentFollowsCourse: (v) => typeof v === "boolean",
 };
 
 /** Keeps each valid field and falls back to the default for the rest. */

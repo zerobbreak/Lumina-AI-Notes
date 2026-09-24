@@ -46,6 +46,7 @@ export const DEFAULT_APPEARANCE = {
   density: "comfortable",
   radius: "soft",
   motion: "system",
+  accentFollowsCourse: false,
 } as const satisfies Appearance;
 
 const fields = {
@@ -61,6 +62,8 @@ const fields = {
   density: z.enum(DENSITIES),
   radius: z.enum(RADII),
   motion: z.enum(MOTION),
+  /** Inside a course, the accent takes the course's colour (not saved as the accent). */
+  accentFollowsCourse: z.boolean(),
 };
 
 export const appearanceSchema = z.object(fields);

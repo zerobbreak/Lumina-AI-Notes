@@ -1,4 +1,5 @@
-import { eq } from "drizzle-orm";
+import { readFileSync } from "node:fs";
+import { eq, sql } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "../src/db/client.js";
@@ -255,5 +256,48 @@ describe("course limits", () => {
     const res = await as(ALICE).post("/api/v1/courses/c1/modules").send({ title: "Week 101" });
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe("too_many_modules");
+  });
+});
+
+describe("course colours", () => {
+  it("gives each new course the least-used colour", async () => {
+    const colors = [];
+    for (const name of ["A", "B", "C"]) {
+      colors.push((await as(ALICE).post("/api/v1/courses").send({ name, code: "X" })).body.color);
+    }
+    expect(colors).toEqual(["indigo", "emerald", "amber"]);
+
+    // Freed colours come back first.
+    const courses = (await me(ALICE)).courses as { id: string; color: string }[];
+    await as(ALICE).delete(`/api/v1/courses/${courses[1].id}`);
+    expect((await as(ALICE).post("/api/v1/courses").send({ name: "D", code: "X" })).body.color).toBe(
+      "emerald",
+    );
+  });
+
+  it("recolours a course and rejects colours outside the palette", async () => {
+    const course = await createCourse(ALICE);
+    const res = await as(ALICE).patch(`/api/v1/courses/${course.id}`).send({ color: "rose" });
+    expect(res.status).toBe(200);
+    expect((await me(ALICE)).courses[0].color).toBe("rose");
+
+    const bad = await as(ALICE).patch(`/api/v1/courses/${course.id}`).send({ color: "chartreuse" });
+    expect(bad.status).toBe(400);
+  });
+
+  it("backfills courses from before colours existed (0009_course_colors.sql)", async () => {
+    await createCourse(ALICE);
+    const { id } = await me(ALICE);
+    const old = ["A", "B", "C"].map((name) => ({ id: name, name, code: "X", modules: [] }));
+    await db
+      .update(users)
+      .set({ courses: [...old, { id: "D", name: "D", code: "X", color: "slate", modules: [] }] })
+      .where(eq(users.id, id));
+
+    const migration = readFileSync(new URL("../drizzle/0009_course_colors.sql", import.meta.url), "utf8");
+    await db.execute(sql.raw(migration));
+
+    const colors = ((await me(ALICE)).courses as { color: string }[]).map((c) => c.color);
+    expect(colors).toEqual(["indigo", "emerald", "amber", "slate"]);
   });
 });

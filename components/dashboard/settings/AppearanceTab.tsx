@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { BookOpen, LayoutGrid, Palette, RotateCcw, Sparkles, Type } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useAppearance } from "@/components/providers/AppearanceProvider";
 import {
@@ -258,6 +259,21 @@ function AccentSection() {
           {worldName} so buttons and links stay readable against the background.
         </p>
       )}
+
+      <label className="flex items-start gap-3 rounded-xl border border-border/60 p-3 cursor-pointer">
+        <Checkbox
+          checked={appearance.accentFollowsCourse}
+          onCheckedChange={(checked) => updateAppearance({ accentFollowsCourse: checked === true })}
+          className="mt-0.5"
+        />
+        <span>
+          <span className="block text-sm font-medium text-foreground">Accent follows course</span>
+          <span className="block text-xs text-muted-foreground">
+            Inside a course or one of its notes, use that course&rsquo;s colour. Change a course&rsquo;s colour
+            from its menu in the sidebar.
+          </span>
+        </span>
+      </label>
     </Section>
   );
 }

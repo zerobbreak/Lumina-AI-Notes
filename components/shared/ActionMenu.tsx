@@ -16,6 +16,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { ACCENT_INFO } from "@/lib/appearance/catalog";
+import type { AccentSwatch } from "@/lib/appearance/model";
+import { cn } from "@/lib/utils";
 
 interface ActionMenuProps {
   onRename?: () => void;
@@ -29,6 +32,9 @@ interface ActionMenuProps {
   isPinned?: boolean;
   showRetry?: boolean;
   align?: "right" | "left";
+  /** Shows a colour row at the top when set, e.g. for a course. */
+  color?: AccentSwatch;
+  onColorChange?: (color: AccentSwatch) => void;
 }
 
 export function ActionMenu({
@@ -43,6 +49,8 @@ export function ActionMenu({
   isPinned,
   showRetry,
   align = "right",
+  color,
+  onColorChange,
 }: ActionMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -65,6 +73,32 @@ export function ActionMenu({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-col gap-0.5">
+          {onColorChange && (
+            <>
+              <div className="grid grid-cols-5 gap-1.5 px-2 py-1.5" role="radiogroup" aria-label="Colour">
+                {ACCENT_INFO.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={color === a.id}
+                    aria-label={a.label}
+                    title={a.label}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onColorChange(a.id);
+                    }}
+                    className={cn(
+                      "h-4 w-4 rounded-full ring-offset-1 ring-offset-popover transition-transform",
+                      color === a.id ? "ring-2 ring-foreground/60" : "hover:scale-110",
+                    )}
+                    style={{ background: `hsl(${a.swatch})` }}
+                  />
+                ))}
+              </div>
+              <div className="h-px bg-border my-1" />
+            </>
+          )}
           {onGenerateFlashcards && (
             <button
               onClick={(e) => {

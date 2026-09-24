@@ -64,6 +64,13 @@
       "when": 1790203903740,
       "tag": "0008_drop_theme",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790209547608,
+      "tag": "0009_course_colors",
+      "breakpoints": true
     }
   ]
 }

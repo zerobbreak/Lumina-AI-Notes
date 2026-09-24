@@ -39,6 +39,7 @@ import { shortcutFor } from "@/constants/shortcuts";
 import { DraggableDocument } from "@/components/documents";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { AppearanceSwitcher } from "@/components/shared/AppearanceSwitcher";
+import { CourseAccentSync } from "./CourseAccentSync";
 import { SearchDialog } from "@/components/dashboard/search/SearchDialog";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { SettingsDialog } from "@/components/dashboard/dialogs/SettingsDialog";
@@ -819,6 +820,7 @@ export function Sidebar() {
         />
       )}
       <SearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
+      <CourseAccentSync />
       <SettingsDialog
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}

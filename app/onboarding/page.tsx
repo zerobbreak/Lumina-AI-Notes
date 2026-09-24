@@ -16,10 +16,12 @@ import {
   GraduationCap,
   FolderOpen,
   Mic2,
+  Palette,
   type LucideIcon,
 } from "lucide-react";
 
 import { StepMajor } from "@/components/onboarding/StepMajor";
+import { StepLook } from "@/components/onboarding/StepLook";
 import { StepCourses } from "@/components/onboarding/StepCourses";
 import { StepPermissions } from "@/components/onboarding/StepPermissions";
 import { InitializationScreen } from "@/components/onboarding/InitializationScreen";
@@ -47,11 +49,16 @@ const STEP_HINTS: Record<
     icon: GraduationCap,
   },
   3: {
+    title: "Make it yours",
+    body: "Pick the world you’ll study in. It changes right away, and you can switch any time from the sidebar.",
+    icon: Palette,
+  },
+  4: {
     title: "Ground your courses",
     body: "Syllabus PDFs give Lumina context—dates, terms, and structure—for smarter answers.",
     icon: FolderOpen,
   },
-  4: {
+  5: {
     title: "Capture lectures in the moment",
     body: "Microphone access unlocks voice capture and transcription when you’re ready to record.",
     icon: Mic2,
@@ -94,7 +101,7 @@ export default function OnboardingPage() {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  const totalSteps = 4;
+  const totalSteps = 5;
 
   const handleNext = async () => {
     if (step === totalSteps) {
@@ -232,14 +239,16 @@ export default function OnboardingPage() {
                     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/90 mb-1">
                       {step === 1 && "Welcome"}
                       {step === 2 && "Your focus"}
-                      {step === 3 && "Materials"}
-                      {step === 4 && "Permissions"}
+                      {step === 3 && "Your look"}
+                      {step === 4 && "Materials"}
+                      {step === 5 && "Permissions"}
                     </p>
                     <h1 className="text-xl md:text-2xl font-semibold text-foreground tracking-tight">
                       {step === 1 && "Start your workspace"}
                       {step === 2 && "What do you study?"}
-                      {step === 3 && "Add syllabus PDFs"}
-                      {step === 4 && "Enable microphone"}
+                      {step === 3 && "Pick your look"}
+                      {step === 4 && "Add syllabus PDFs"}
+                      {step === 5 && "Enable microphone"}
                     </h1>
                   </motion.div>
                 </AnimatePresence>
@@ -288,7 +297,8 @@ export default function OnboardingPage() {
                         }
                       />
                     )}
-                    {step === 3 && (
+                    {step === 3 && <StepLook />}
+                    {step === 4 && (
                       <StepCourses
                         value={formData.files}
                         onChange={(val) =>
@@ -296,7 +306,7 @@ export default function OnboardingPage() {
                         }
                       />
                     )}
-                    {step === 4 && (
+                    {step === 5 && (
                       <StepPermissions
                         onPermissionGranted={() =>
                           setFormData({ ...formData, permissionsGranted: true })
@@ -324,7 +334,7 @@ export default function OnboardingPage() {
                   onClick={handleNext}
                   disabled={
                     (step === 2 && !formData.major) ||
-                    (step === 4 && !formData.permissionsGranted)
+                    (step === 5 && !formData.permissionsGranted)
                   }
                   className="rounded-xl bg-linear-to-r from-primary to-primary-alt hover:from-primary/90 hover:to-primary-alt/90 text-primary-foreground px-7 shadow-lg shadow-primary/25 border border-border"
                 >
@@ -401,7 +411,7 @@ export default function OnboardingPage() {
                           : "—"}
                       </p>
                       <p className="text-[11px] text-muted-foreground/80 mt-0.5">
-                        {step >= 3 ? "Syllabus files" : "Course files"}
+                        {step >= 4 ? "Syllabus files" : "Course files"}
                       </p>
                     </div>
                   </div>

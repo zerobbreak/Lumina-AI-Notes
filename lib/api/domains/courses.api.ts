@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api/client";
 import { apiPath } from "@/lib/api/path";
+import type { AccentSwatch } from "@/lib/appearance/model";
 import type { Course } from "@/types";
 
 export const coursesApi = {
@@ -12,6 +13,14 @@ export const coursesApi = {
       method: "PATCH",
       token,
       body: { name },
+    });
+  },
+
+  recolor(token: string, courseId: string, color: AccentSwatch) {
+    return apiFetch<Course>(apiPath`/courses/${courseId}`, {
+      method: "PATCH",
+      token,
+      body: { color },
     });
   },
 

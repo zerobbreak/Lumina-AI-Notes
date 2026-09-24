@@ -6,6 +6,9 @@ import { ActionMenu } from "@/components/shared/ActionMenu";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useNotesByContextData } from "@/lib/hooks/notes/useNotesByContextData";
 import { useCourseActions } from "@/lib/hooks/mutations/useCourseActions";
+import { useRecolorCourse } from "@/lib/mutations/courses/useRecolorCourse";
+import { ACCENT_INFO } from "@/lib/appearance/catalog";
+import type { AccentSwatch } from "@/lib/appearance/model";
 import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
 import { Id } from "@/types/data-model";
 import { cn } from "@/lib/utils";
@@ -57,6 +60,17 @@ function SidebarCourseComponent({
 
   const { addModuleToCourse } = useCourseActions();
   const { moveNoteToFolder } = useNoteActions();
+  const { mutate: recolorCourse } = useRecolorCourse();
+  const swatch = ACCENT_INFO.find((a) => a.id === course.color)?.swatch;
+
+  const handleRecolor = useCallback(
+    (color: AccentSwatch) =>
+      recolorCourse(
+        { courseId: course.id, color },
+        { onError: () => toast.error("Couldn't change the course colour") },
+      ),
+    [recolorCourse, course.id],
+  );
 
   const handleCreateModule = useCallback(
     async (e: React.MouseEvent) => {
@@ -197,6 +211,13 @@ function SidebarCourseComponent({
                 code={course.code}
                 isActive={isActive || isDragOver}
               />
+              {swatch && (
+                <span
+                  aria-hidden
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ background: `hsl(${swatch})` }}
+                />
+              )}
               <span className="min-w-0 flex-1 truncate">{course.name}</span>
               {showCode && (
                 <span
@@ -235,7 +256,12 @@ function SidebarCourseComponent({
 
         {!isCompact && (
           <div className="absolute right-1 opacity-0 group-hover/course:opacity-100 transition-opacity">
-            <ActionMenu onRename={handleRename} onDelete={handleDelete} />
+            <ActionMenu
+              onRename={handleRename}
+              onDelete={handleDelete}
+              color={course.color}
+              onColorChange={handleRecolor}
+            />
           </div>
         )}
       </div>
