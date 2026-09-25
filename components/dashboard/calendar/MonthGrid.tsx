@@ -25,7 +25,8 @@ const FULL_BAR_MINUTES = 90;
 
 const ARROW_STEP: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
 
-function Chip({ deadline, courseOf, now }: { deadline: DeadlineModel; courseOf: CourseLookup; now: number }) {
+/** A deadline as a small coloured label: filled for exams, struck through once done. */
+export function DeadlineChip({ deadline, courseOf, now }: { deadline: DeadlineModel; courseOf: CourseLookup; now: number }) {
   const color = courseColor(courseOf(deadline.courseId));
   const done = isDone(deadline);
   const overdue = isOverdue(deadline, now);
@@ -132,7 +133,7 @@ function DayCell({
       )}
       <span className="hidden min-w-0 flex-col gap-0.5 sm:flex" aria-hidden>
         {deadlines.slice(0, MAX_CHIPS).map((d) => (
-          <Chip key={d._id} deadline={d} courseOf={courseOf} now={now} />
+          <DeadlineChip key={d._id} deadline={d} courseOf={courseOf} now={now} />
         ))}
         {extra > 0 && <span className="pl-0.5 text-[11px] text-muted-foreground">+{extra} more</span>}
       </span>

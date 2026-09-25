@@ -23,6 +23,7 @@ export const READING_WIDTHS = ["narrow", "medium", "wide"] as const;
 export const DENSITIES = ["compact", "comfortable", "spacious"] as const;
 export const RADII = ["sharp", "soft", "round"] as const;
 export const MOTION = ["system", "reduce", "full"] as const;
+export const CALENDAR_LAYOUTS = ["month", "week"] as const;
 
 export const accentSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("swatch"), id: z.enum(ACCENT_SWATCHES) }),
@@ -47,6 +48,7 @@ export const DEFAULT_APPEARANCE = {
   radius: "soft",
   motion: "system",
   accentFollowsCourse: false,
+  calendarLayout: "month",
 } as const satisfies Appearance;
 
 const fields = {
@@ -64,6 +66,8 @@ const fields = {
   motion: z.enum(MOTION),
   /** Inside a course, the accent takes the course's colour (not saved as the accent). */
   accentFollowsCourse: z.boolean(),
+  /** What the calendar opens on: the month grid or the week planner. */
+  calendarLayout: z.enum(CALENDAR_LAYOUTS),
 };
 
 export const appearanceSchema = z.object(fields);

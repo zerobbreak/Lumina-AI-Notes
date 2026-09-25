@@ -21,6 +21,7 @@ export const READING_WIDTHS = ["narrow", "medium", "wide"] as const;
 export const DENSITIES = ["compact", "comfortable", "spacious"] as const;
 export const RADII = ["sharp", "soft", "round"] as const;
 export const MOTION = ["system", "reduce", "full"] as const;
+export const CALENDAR_LAYOUTS = ["month", "week"] as const;
 
 export type World = (typeof WORLDS)[number];
 export type Mode = (typeof MODES)[number];
@@ -46,6 +47,8 @@ export type Appearance = {
   motion: (typeof MOTION)[number];
   /** Inside a course, the accent takes the course's colour (not saved as the accent). */
   accentFollowsCourse: boolean;
+  /** What the calendar opens on: the month grid or the week planner. */
+  calendarLayout: (typeof CALENDAR_LAYOUTS)[number];
 };
 
 export const DEFAULT_APPEARANCE: Appearance = {
@@ -61,6 +64,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   radius: "soft",
   motion: "system",
   accentFollowsCourse: false,
+  calendarLayout: "month",
 };
 
 /** Mirrors the look so the pre-paint script can apply it before React loads. */
@@ -96,6 +100,7 @@ const CHECKS: { [K in keyof Appearance]: (v: unknown) => boolean } = {
   radius: oneOf(RADII),
   motion: oneOf(MOTION),
   accentFollowsCourse: (v) => typeof v === "boolean",
+  calendarLayout: oneOf(CALENDAR_LAYOUTS),
 };
 
 /** Keeps each valid field and falls back to the default for the rest. */

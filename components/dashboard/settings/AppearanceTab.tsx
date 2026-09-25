@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useAppearance } from "@/components/providers/AppearanceProvider";
 import {
   ACCENT_INFO,
+  CALENDAR_LAYOUT_INFO,
   DENSITY_INFO,
   MODE_INFO,
   MOTION_INFO,
@@ -80,6 +81,13 @@ export function AppearanceTab() {
             options={MOTION_INFO}
             value={appearance.motion}
             onChange={(motion) => updateAppearance({ motion })}
+          />
+        </Field>
+        <Field label="Calendar" hint="The week planner lays each day out by the hour, with study blocks fitted around your classes.">
+          <Segmented
+            options={CALENDAR_LAYOUT_INFO}
+            value={appearance.calendarLayout}
+            onChange={(calendarLayout) => updateAppearance({ calendarLayout })}
           />
         </Field>
       </Section>

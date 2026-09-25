@@ -229,6 +229,11 @@ export const MOTION_INFO: Option<(typeof MOTION)[number]>[] = [
   { id: "full", label: "Full" },
 ];
 
+export const CALENDAR_LAYOUT_INFO: Option<Appearance["calendarLayout"]>[] = [
+  { id: "month", label: "Month" },
+  { id: "week", label: "Week planner" },
+];
+
 export const MODE_INFO: Option<Appearance["mode"]>[] = [
   { id: "light", label: "Light" },
   { id: "dark", label: "Dark" },

@@ -2,20 +2,24 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Flame, Loader2 } from "lucide-react";
+import { useAppearance } from "@/components/providers/AppearanceProvider";
 import { CalendarToolbar } from "@/components/dashboard/calendar/CalendarToolbar";
 import { DayPanel } from "@/components/dashboard/calendar/DayPanel";
 import { MonthGrid } from "@/components/dashboard/calendar/MonthGrid";
+import { WeekGrid } from "@/components/dashboard/calendar/WeekGrid";
 import {
   DEFAULT_FILTERS,
+  addDays,
   applyFilters,
   bundleByDay,
   dayKey,
   fromDayKey,
-  monthTotals,
   monthWeeks,
+  periodTotals,
   weeksRange,
   type CalendarFilters,
 } from "@/lib/calendar/month";
+import { weekOf } from "@/lib/calendar/week";
 import { useCalendarActivity } from "@/lib/queries/calendar/useCalendarActivity";
 import { useDeadlinesInRange } from "@/lib/queries/deadlines/useDeadlinesInRange";
 import { useHomeSummary } from "@/lib/queries/home/useHomeSummary";
@@ -35,11 +39,20 @@ function Stat({ value, label, tone }: { value: number | string; label: string; t
   );
 }
 
+/** "September 20 – 26, 2026" or "20–26 September 2026", in the user's locale. */
+function weekTitle(days: Date[]) {
+  const format = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "long", year: "numeric" });
+  return format.formatRange(days[0]!, days[6]!);
+}
+
 /**
- * The month: what's due each day in its module's colour, how heavy each week
- * is and how much you studied, with the selected day's detail beside it.
+ * The calendar: the month grid by default, or the week planner when the
+ * user picked it under Appearance. Either way the selected day's detail
+ * sits beside it.
  */
 export default function CalendarView() {
+  const { appearance } = useAppearance();
+  const layout = appearance.calendarLayout;
   const { data: userData } = useCurrentUser();
   const { data: gamification } = useGamification();
   const { data: home } = useHomeSummary();
@@ -54,10 +67,17 @@ export default function CalendarView() {
   const selected = fromDayKey(selectedKey);
   const year = selected.getFullYear();
   const month = selected.getMonth();
-  const monthStart = new Date(year, month, 1);
+  const weekStartKey = dayKey(weekOf(selected)[0]!);
 
-  const weeks = useMemo(() => monthWeeks(year, month), [year, month]);
+  const weeks = useMemo(
+    () => (layout === "week" ? [weekOf(fromDayKey(weekStartKey))] : monthWeeks(year, month)),
+    [layout, weekStartKey, year, month],
+  );
   const range = useMemo(() => weeksRange(weeks), [weeks]);
+  const periodDays = useMemo(
+    () => (layout === "week" ? weeks[0]! : weeks.flat().filter((d) => d.getMonth() === month)),
+    [layout, weeks, month],
+  );
 
   const { data: activity, isLoading: activityLoading } = useCalendarActivity(range);
   const { data: deadlines, isLoading: deadlinesLoading } = useDeadlinesInRange(range);
@@ -78,10 +98,15 @@ export default function CalendarView() {
       }),
     [activity, deadlines, filters],
   );
-  const totals = useMemo(() => monthTotals(year, month, byDay, now), [year, month, byDay, now]);
+  const totals = useMemo(() => periodTotals(periodDays, byDay, now), [periodDays, byDay, now]);
+  const plan = useMemo(() => home?.plan ?? [], [home]);
 
   const selectDate = useCallback((date: Date) => setSelectedKey(dayKey(date)), []);
-  const shiftMonth = (delta: number) => {
+  const shift = (delta: number) => {
+    if (layout === "week") {
+      setSelectedKey(dayKey(addDays(selected, delta * 7)));
+      return;
+    }
     const target = new Date(year, month + delta, 1);
     const today = new Date(now);
     // Land on today in the current month, else on the 1st.
@@ -89,15 +114,22 @@ export default function CalendarView() {
     setSelectedKey(dayKey(sameMonth ? today : target));
   };
 
+  const title =
+    layout === "week"
+      ? weekTitle(weeks[0]!)
+      : new Date(year, month, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const period = layout === "week" ? "this week" : "this month";
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-background">
       <CalendarToolbar
-        monthStart={monthStart}
+        title={title}
+        unit={layout}
         courses={courses}
         filters={filters}
         brightspace={brightspace}
         now={now}
-        onMonth={shiftMonth}
+        onShift={shift}
         onToday={() => setSelectedKey(todayKey)}
         onAdd={() => quickAddRef.current?.focus()}
         onFilters={setFilters}
@@ -108,22 +140,36 @@ export default function CalendarView() {
           {(activityLoading || deadlinesLoading) && (
             <p className="flex items-center gap-2 text-xs text-muted-foreground" role="status" aria-live="polite">
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-              Loading your month…
+              Loading your {layout}…
             </p>
           )}
-          <MonthGrid
-            weeks={weeks}
-            month={month}
-            byDay={byDay}
-            selectedKey={selectedKey}
-            todayKey={todayKey}
-            showActivity={filters.activity}
-            courseOf={courseOf}
-            now={now}
-            onSelect={selectDate}
-          />
+          {layout === "week" ? (
+            <WeekGrid
+              days={weeks[0]!}
+              byDay={byDay}
+              selectedKey={selectedKey}
+              todayKey={todayKey}
+              showActivity={filters.activity}
+              plan={plan}
+              courseOf={courseOf}
+              now={now}
+              onSelect={selectDate}
+            />
+          ) : (
+            <MonthGrid
+              weeks={weeks}
+              month={month}
+              byDay={byDay}
+              selectedKey={selectedKey}
+              todayKey={todayKey}
+              showActivity={filters.activity}
+              courseOf={courseOf}
+              now={now}
+              onSelect={selectDate}
+            />
+          )}
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl bg-muted/60 px-4 py-3 text-xs text-muted-foreground">
-            <Stat value={totals.due} label="due this month" />
+            <Stat value={totals.due} label={`due ${period}`} />
             <Stat value={totals.done} label="handed in" />
             <Stat value={totals.overdue} label="overdue" tone="critical" />
             <Stat value={totals.studyDays} label="days studied" />
@@ -144,7 +190,7 @@ export default function CalendarView() {
             isToday={selectedKey === todayKey}
             bundle={byDay.get(selectedKey)}
             showActivity={filters.activity}
-            plan={home?.plan ?? []}
+            plan={plan}
             pulses={home?.courses ?? []}
             courses={courses}
             courseOf={courseOf}

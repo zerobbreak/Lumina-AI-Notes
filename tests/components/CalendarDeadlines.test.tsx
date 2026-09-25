@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DeadlineModel } from "@/lib/api/adapters/deadline";
 
 let deadlines: DeadlineModel[] = [];
+let calendarLayout: "month" | "week" = "month";
 const setCompleted = vi.fn();
 const rangeCalls: Array<{ startMs: number; endMs: number }> = [];
 
@@ -20,6 +21,9 @@ vi.mock("@/lib/queries/users/useCurrentUser", () => ({
 }));
 vi.mock("@/lib/queries/users/useGamification", () => ({
   useGamification: () => ({ data: { currentStreak: 1, longestStreak: 1 } }),
+}));
+vi.mock("@/components/providers/AppearanceProvider", () => ({
+  useAppearance: () => ({ appearance: { calendarLayout } }),
 }));
 vi.mock("@/lib/queries/home/useHomeSummary", () => ({
   useHomeSummary: () => ({ data: undefined }),
@@ -55,6 +59,7 @@ beforeEach(() => {
   setCompleted.mockReset();
   rangeCalls.length = 0;
   deadlines = [];
+  calendarLayout = "month";
 });
 afterEach(cleanup);
 
@@ -121,5 +126,38 @@ describe("CalendarView deadlines", () => {
   it("says so when a day has nothing", () => {
     render(<CalendarView />);
     expect(screen.getByText("Nothing due and no activity on this day.")).toBeInTheDocument();
+  });
+});
+
+describe("CalendarView as a week planner", () => {
+  beforeEach(() => {
+    calendarLayout = "week";
+  });
+
+  it("asks for this week, Sunday to Saturday", () => {
+    render(<CalendarView />);
+    const { startMs, endMs } = rangeCalls.at(-1)!;
+    const sunday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay());
+    expect(new Date(startMs)).toEqual(sunday);
+    expect(endMs - startMs).toBe(7 * 86_400_000 - 1);
+    expect(screen.getByRole("button", { name: "Next week" })).toBeInTheDocument();
+  });
+
+  it("draws an event as a block and puts work in the due row", () => {
+    deadlines = [
+      deadline({ _id: "lab", title: "Lab session", kind: "event", dueAt: at(10) }),
+      deadline({ _id: "essay", title: "Essay", dueAt: at(23) }),
+    ];
+    render(<CalendarView />);
+    // The event is in the hours grid; the essay is in the due row and the day panel.
+    expect(screen.getAllByText("Lab session").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Essay")).toHaveLength(2);
+  });
+
+  it("moves a week at a time", () => {
+    render(<CalendarView />);
+    const before = rangeCalls.at(-1)!.startMs;
+    fireEvent.click(screen.getByRole("button", { name: "Next week" }));
+    expect(rangeCalls.at(-1)!.startMs - before).toBeGreaterThanOrEqual(6.9 * 86_400_000);
   });
 });

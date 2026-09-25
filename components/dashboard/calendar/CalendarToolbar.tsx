@@ -54,24 +54,27 @@ function SyncStatus({ status, now }: { status?: BrightspaceStatusDto; now: numbe
   );
 }
 
-/** Month name and navigation, then the filters. */
+/** The period's name and navigation, then the filters. */
 export function CalendarToolbar({
-  monthStart,
+  title,
+  unit,
   courses,
   filters,
   brightspace,
   now,
-  onMonth,
+  onShift,
   onToday,
   onAdd,
   onFilters,
 }: {
-  monthStart: Date;
+  title: string;
+  /** What the arrows step by. */
+  unit: "month" | "week";
   courses: Course[];
   filters: CalendarFilters;
   brightspace?: BrightspaceStatusDto;
   now: number;
-  onMonth: (delta: number) => void;
+  onShift: (delta: number) => void;
   onToday: () => void;
   onAdd: () => void;
   onFilters: (next: CalendarFilters) => void;
@@ -89,13 +92,13 @@ export function CalendarToolbar({
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-3 pt-4 md:px-8">
         <div className="flex items-center gap-3">
           <h1 className="font-reading text-[28px] font-medium leading-none tracking-[-0.01em] text-foreground">
-            {monthStart.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+            {title}
           </h1>
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-8 w-8" aria-label="Previous month" onClick={() => onMonth(-1)}>
+            <Button variant="outline" size="icon" className="h-8 w-8" aria-label={`Previous ${unit}`} onClick={() => onShift(-1)}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" className="h-8 w-8" aria-label="Next month" onClick={() => onMonth(1)}>
+            <Button variant="outline" size="icon" className="h-8 w-8" aria-label={`Next ${unit}`} onClick={() => onShift(1)}>
               <ChevronRight className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="sm" className="h-8" onClick={onToday}>

@@ -151,12 +151,12 @@ export function applyFilters(deadlines: DeadlineModel[], filters: CalendarFilter
 
 export type MonthTotals = { due: number; done: number; overdue: number; studyDays: number };
 
-/** Totals for the days of one month (not the neighbouring days the grid also shows). */
-export function monthTotals(year: number, month: number, byDay: Map<string, DayBundle>, now: number): MonthTotals {
+/** Totals over a set of days. */
+export function periodTotals(days: Date[], byDay: Map<string, DayBundle>, now: number): MonthTotals {
   const totals: MonthTotals = { due: 0, done: 0, overdue: 0, studyDays: 0 };
-  for (const [key, day] of byDay) {
-    const date = fromDayKey(key);
-    if (date.getFullYear() !== year || date.getMonth() !== month) continue;
+  for (const date of days) {
+    const day = byDay.get(dayKey(date));
+    if (!day) continue;
     const work = day.deadlines.filter(isWork);
     totals.due += work.length;
     totals.done += work.filter(isDone).length;
@@ -164,4 +164,10 @@ export function monthTotals(year: number, month: number, byDay: Map<string, DayB
     if (studyMinutes(day.study) > 0 || day.notes.length > 0) totals.studyDays += 1;
   }
   return totals;
+}
+
+/** Totals for the days of one month (not the neighbouring days the grid also shows). */
+export function monthTotals(year: number, month: number, byDay: Map<string, DayBundle>, now: number): MonthTotals {
+  const days = Array.from({ length: new Date(year, month + 1, 0).getDate() }, (_, i) => new Date(year, month, i + 1));
+  return periodTotals(days, byDay, now);
 }

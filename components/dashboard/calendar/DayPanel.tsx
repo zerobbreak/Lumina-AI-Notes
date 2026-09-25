@@ -7,6 +7,7 @@ import { DeadlineRow } from "@/components/dashboard/deadlines/DeadlineRow";
 import { Button } from "@/components/ui/button";
 import type { DeadlineModel } from "@/lib/api/adapters/deadline";
 import { isDone, isOverdue, isWork, studyLine, type DayBundle } from "@/lib/calendar/month";
+import { planCourseId, planTitle } from "@/lib/calendar/planItems";
 import { dueSoonChip, formatMinutes, overdueLabel, planAction } from "@/lib/home/planCopy";
 import { cn } from "@/lib/utils";
 import type { Course } from "@/types";
@@ -74,18 +75,6 @@ function DueCard({
       )}
     </li>
   );
-}
-
-function planTitle(item: PlanItemDto) {
-  if (item.kind === "review") return `Review ${item.dueCount} flashcard${item.dueCount === 1 ? "" : "s"}`;
-  if (item.kind === "weak-quiz") return `Retake ${item.title}`;
-  return item.kind === "overdue" ? `Catch up: ${item.deadline.title}` : item.deadline.title;
-}
-
-function planCourseId(item: PlanItemDto) {
-  if (item.kind === "review") return item.urgentCourseId ?? (item.byCourse.length === 1 ? item.byCourse[0]!.courseId : null);
-  if (item.kind === "weak-quiz") return item.courseId;
-  return item.deadline.courseId;
 }
 
 function PlanRow({ item, courseOf }: { item: PlanItemDto; courseOf: CourseLookup }) {
