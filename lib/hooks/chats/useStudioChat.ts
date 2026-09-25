@@ -80,10 +80,32 @@ export function useStudioChat() {
     setSelectedNotes([]);
   };
 
+  // A create that's still in flight. Callers that need a chat while one is
+  // being made (a double click on a node, send right after "New") share it
+  // instead of each creating their own.
+  const pendingCreate = useRef<Promise<Id<"chatSessions">> | null>(null);
+
+  const createAndSelect = (title: string) => {
+    if (!pendingCreate.current) {
+      pendingCreate.current = createSession({ title })
+        .then((id) => {
+          setActiveSessionId(id);
+          return id;
+        })
+        .finally(() => {
+          pendingCreate.current = null;
+        });
+    }
+    return pendingCreate.current;
+  };
+
+  /** The active chat, creating one titled `title` when there is none. */
+  const ensureSession = async (title: string) =>
+    pendingCreate.current ?? activeSessionId ?? createAndSelect(title);
+
   const newChat = async () => {
-    const newSessionId = await createSession({ title: "New Chat" });
-    setActiveSessionId(newSessionId);
     resetDraft();
+    await createAndSelect("New Chat");
   };
 
   const selectSession = (sessionId: Id<"chatSessions">) => {
@@ -92,18 +114,13 @@ export function useStudioChat() {
 
   const removeSession = async (sessionId: Id<"chatSessions">) => {
     // Move off the chat before it's gone, so its messages aren't fetched.
-    const remaining = sessions.filter((s) => s._id !== sessionId);
+    // With none left the Studio shows its empty state; sending a message
+    // creates a chat then, so there's no need to make one here.
     if (activeSessionId === sessionId) {
-      setActiveSessionId(remaining[0]?._id ?? null);
+      const next = sessions.find((s) => s._id !== sessionId);
+      setActiveSessionId(next?._id ?? null);
     }
-
     await deleteSession({ sessionId });
-    if (remaining.length > 0) return;
-
-    // No chats left — auto-spin up a new one.
-    const newSessionId = await createSession({ title: "New Chat" });
-    setActiveSessionId(newSessionId);
-    resetDraft();
   };
 
   const removeAllSessions = async () => {
@@ -122,13 +139,7 @@ export function useStudioChat() {
     const question = override ?? input;
     if (!question.trim() && selectedNotes.length === 0) return;
 
-    let targetSessionId = activeSessionId;
-
-    // Create a new session on the fly if none exists
-    if (!targetSessionId) {
-      targetSessionId = await createSession({ title: question.slice(0, 30) || "New Chat" });
-      setActiveSessionId(targetSessionId);
-    }
+    const targetSessionId = await ensureSession(question.slice(0, 30) || "New Chat");
 
     const contextNoteIds = selectedNotes.map((n) => n._id);
     const mergedContextIds = Array.from(new Set([...pinnedIds, ...contextNoteIds]));
@@ -177,11 +188,7 @@ export function useStudioChat() {
    */
   const pinNotes = async (noteIds: Id<"notes">[], newTitle = "Graph discussion") => {
     if (noteIds.length === 0) return;
-    let targetSessionId = activeSessionId;
-    if (!targetSessionId) {
-      targetSessionId = await createSession({ title: newTitle });
-      setActiveSessionId(targetSessionId);
-    }
+    const targetSessionId = await ensureSession(newTitle);
     await pinNotesToSession({ sessionId: targetSessionId, noteIds });
   };
 

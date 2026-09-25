@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Maximize2, MessageSquare, PanelRightClose, Plus, Sparkles } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -15,6 +15,8 @@ import { StudioMessageList } from "./StudioMessageList";
 
 interface GraphChatDockProps {
   chat: StudioChat;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   selected: KnowledgeGraphNodeDto | null;
   neighbours: GraphNeighbour[];
   /** True once the selected note and its neighbours are all pinned. */
@@ -27,9 +29,14 @@ interface GraphChatDockProps {
 
 const RECENT_CHATS = 5;
 
+/** Width of the open dock plus its margin, which the graph keeps clear. */
+export const GRAPH_DOCK_WIDTH = 412;
+
 /** Floating chat on the graph: the same active session as Chat mode. */
 export function GraphChatDock({
   chat,
+  open,
+  onOpenChange,
   selected,
   neighbours,
   grounded,
@@ -38,19 +45,18 @@ export function GraphChatDock({
   onOpenNote,
   onOpenFullChat,
 }: GraphChatDockProps) {
-  const [collapsed, setCollapsed] = useState(false);
   const { messages, isThinking, mode, activeSession, activeSessionId, sessions, selectSession, send } = chat;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, isThinking, collapsed]);
+  }, [messages, isThinking, open]);
 
-  if (collapsed) {
+  if (!open) {
     return (
       <Button
         type="button"
-        onClick={() => setCollapsed(false)}
+        onClick={() => onOpenChange(true)}
         className="absolute right-3 top-3 z-20 gap-2 rounded-full shadow-md"
       >
         <MessageSquare className="h-4 w-4" />
@@ -86,7 +92,7 @@ export function GraphChatDock({
           type="button"
           variant="ghost"
           size="icon"
-          onClick={() => setCollapsed(true)}
+          onClick={() => onOpenChange(false)}
           className="h-7 w-7 text-muted-foreground"
           aria-label="Collapse chat"
           title="Collapse chat"

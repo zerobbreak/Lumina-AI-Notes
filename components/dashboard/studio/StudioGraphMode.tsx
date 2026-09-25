@@ -1,17 +1,18 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import type { Id } from "@/types/data-model";
 import type { StudioChat } from "@/lib/hooks/chats/useStudioChat";
-import { useKnowledgeGraphData } from "@/lib/hooks/knowledgeGraph/useKnowledgeGraphData";
+import type { KnowledgeGraphDto } from "@/types/api/knowledgeGraph";
 import { nodeNeighbours } from "@/lib/studio/neighbourhood";
-import { GraphChatDock } from "./GraphChatDock";
+import { GRAPH_DOCK_WIDTH, GraphChatDock } from "./GraphChatDock";
 import { KnowledgeGraph } from "./KnowledgeGraph";
-import { StudioModeToggle, type StudioMode } from "./StudioModeToggle";
+import type { StudioMode } from "./StudioModeToggle";
 
 interface StudioGraphModeProps {
   chat: StudioChat;
+  graph: KnowledgeGraphDto | undefined;
   selectedId: string | null;
   onSelectedIdChange: (id: string | null) => void;
   focus: { id: string; nonce: number } | null;
@@ -22,13 +23,14 @@ interface StudioGraphModeProps {
 /** Graph mode — the graph fills the Studio, with the chat docked on the right. */
 export function StudioGraphMode({
   chat,
+  graph,
   selectedId,
   onSelectedIdChange,
   focus,
   onModeChange,
   onOpenNote,
 }: StudioGraphModeProps) {
-  const graph = useKnowledgeGraphData();
+  const [dockOpen, setDockOpen] = useState(true);
 
   const selected = useMemo(
     () => (selectedId ? graph?.nodes.find((n) => n.id === selectedId) ?? null : null),
@@ -68,15 +70,12 @@ export function StudioGraphMode({
         onSelect={selectAndPin}
         highlightIds={highlightIds}
         focus={focus}
-        toolbarStart={
-          <>
-            <span className="pl-2 pr-1 text-sm font-semibold tracking-tight">Studio</span>
-            <StudioModeToggle value="graph" onChange={onModeChange} />
-          </>
-        }
+        reservedRight={dockOpen ? GRAPH_DOCK_WIDTH : 0}
       />
       <GraphChatDock
         chat={chat}
+        open={dockOpen}
+        onOpenChange={setDockOpen}
         selected={selected}
         neighbours={neighbours}
         grounded={grounded}

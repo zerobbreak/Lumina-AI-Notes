@@ -9,17 +9,19 @@ import {
   Handle,
   Position,
   useReactFlow,
+  useNodesInitialized,
   type Node,
   type Edge,
   type NodeProps,
   type NodeMouseHandler,
+  type FitViewOptions,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Search, Workflow, Sparkles } from "lucide-react";
 
 import type { KnowledgeGraphDto } from "@/types/api/knowledgeGraph";
 import { cn } from "@/lib/utils";
-import { applyForceLayout } from "@/components/diagram/layouts";
+import { graphNodeSize, layoutGraph } from "@/lib/studio/graphLayout";
 
 /** Index 0 is the neutral/orphan color; real clusters start at 1. */
 const CLUSTER_COLORS = ["hsl(var(--muted-foreground))", "hsl(var(--primary))", "#a649df", "#0ea5e9", "#f59e0b", "#22c55e"];
@@ -40,7 +42,7 @@ interface GraphNodeData {
 
 function GraphNodeView({ data }: NodeProps) {
   const d = data as unknown as GraphNodeData;
-  const size = Math.min(76, 32 + d.connectionCount * 8);
+  const size = graphNodeSize(d.connectionCount);
 
   return (
     <div
@@ -78,17 +80,31 @@ function GraphNodeView({ data }: NodeProps) {
 
 const nodeTypes = { graphNode: GraphNodeView };
 
-/** Pans the canvas to a note when asked; must live inside the provider. */
-function FocusOnNode({ focus, ready }: { focus: { id: string; nonce: number } | null; ready: boolean }) {
+/**
+ * Fits the whole map on screen once its nodes are measured, and again when
+ * the set of notes changes. React Flow's own `fitView` only fires once and
+ * can miss when measuring is slow, which left the map sitting at the origin.
+ */
+function FitOnLayout({ layoutKey, options }: { layoutKey: string; options: FitViewOptions }) {
   const { fitView } = useReactFlow();
+  const measured = useNodesInitialized();
   useEffect(() => {
-    if (!focus || !ready) return;
-    // Let React Flow measure the nodes first.
-    const t = setTimeout(() => {
-      void fitView({ nodes: [{ id: focus.id }], duration: 400, maxZoom: 1.2, padding: 0.8 });
-    }, 50);
-    return () => clearTimeout(t);
-  }, [focus, ready, fitView]);
+    if (!layoutKey || !measured) return;
+    void fitView(options);
+    // Refit on a new layout only, not on every render's fresh options object.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layoutKey, measured, fitView]);
+  return null;
+}
+
+/** Pans the canvas to a note when asked; must live inside the provider. */
+function FocusOnNode({ focus }: { focus: { id: string; nonce: number } | null }) {
+  const { fitView } = useReactFlow();
+  const measured = useNodesInitialized();
+  useEffect(() => {
+    if (!focus || !measured) return;
+    void fitView({ nodes: [{ id: focus.id }], duration: 400, maxZoom: 1.2, padding: 0.8 });
+  }, [focus, measured, fitView]);
   return null;
 }
 
@@ -100,8 +116,8 @@ interface KnowledgeGraphProps {
   highlightIds?: Set<string> | null;
   /** Centre the canvas on this note; bump `nonce` to re-centre. */
   focus?: { id: string; nonce: number } | null;
-  /** Rendered first in the floating toolbar (title, view toggle). */
-  toolbarStart?: React.ReactNode;
+  /** Pixels on the right covered by an overlay (the chat dock); fitting keeps clear of them. */
+  reservedRight?: number;
 }
 
 /** Full-bleed note graph with a floating toolbar and legend. */
@@ -111,7 +127,7 @@ export function KnowledgeGraph({
   onSelect,
   highlightIds,
   focus = null,
-  toolbarStart,
+  reservedRight = 0,
 }: KnowledgeGraphProps) {
   const [clusterByTopic, setClusterByTopic] = useState(true);
   const [search, setSearch] = useState("");
@@ -119,18 +135,16 @@ export function KnowledgeGraph({
   const laidOutNodes = useMemo(() => {
     if (!graph || graph.nodes.length === 0) return [] as Node[];
 
-    const rfNodes: Node[] = graph.nodes.map((n) => ({
+    const positions = layoutGraph(
+      graph.nodes.map((n) => ({ id: n.id, size: graphNodeSize(n.connectionCount) })),
+      graph.edges,
+    );
+    return graph.nodes.map<Node>((n) => ({
       id: n.id,
       type: "graphNode",
-      position: { x: 0, y: 0 },
+      position: positions.get(n.id) ?? { x: 0, y: 0 },
       data: { title: n.title, connectionCount: n.connectionCount },
     }));
-    const rfEdges: Edge[] = graph.edges.map((e) => ({
-      id: `${e.source}-${e.target}`,
-      source: e.source,
-      target: e.target,
-    }));
-    return applyForceLayout(rfNodes, rfEdges);
     // Re-run layout only when the underlying node/edge set actually changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graph?.nodes.length, graph?.edges.length]);
@@ -191,37 +205,32 @@ export function KnowledgeGraph({
     [graph],
   );
 
-  const toolbar = (
+  const toolbar = graph && graph.nodes.length > 0 && (
     <div className="absolute left-3 top-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-2xl border bg-background/90 p-1.5 shadow-sm backdrop-blur">
-      {toolbarStart}
-      {graph && graph.nodes.length > 0 && (
-        <>
-          <div className="flex h-8 min-w-[180px] items-center gap-2 rounded-full border border-border bg-muted/50 px-3">
-            <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search notes…"
-              aria-label="Search notes"
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => setClusterByTopic((v) => !v)}
-            aria-pressed={clusterByTopic}
-            className={cn(
-              "flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors",
-              clusterByTopic
-                ? "border-primary/30 bg-primary/10 text-primary"
-                : "border-border bg-muted/50 text-muted-foreground",
-            )}
-          >
-            <Workflow className="h-3.5 w-3.5" />
-            Cluster by topic
-          </button>
-        </>
-      )}
+      <div className="flex h-8 min-w-[180px] items-center gap-2 rounded-full border border-border bg-muted/50 px-3">
+        <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search notes…"
+          aria-label="Search notes"
+          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+        />
+      </div>
+      <button
+        type="button"
+        onClick={() => setClusterByTopic((v) => !v)}
+        aria-pressed={clusterByTopic}
+        className={cn(
+          "flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors",
+          clusterByTopic
+            ? "border-primary/30 bg-primary/10 text-primary"
+            : "border-border bg-muted/50 text-muted-foreground",
+        )}
+      >
+        <Workflow className="h-3.5 w-3.5" />
+        Cluster by topic
+      </button>
     </div>
   );
 
@@ -244,6 +253,11 @@ export function KnowledgeGraph({
     );
   }
 
+  const layoutKey = laidOutNodes.map((n) => n.id).join(",");
+  const fitOptions: FitViewOptions = {
+    maxZoom: 1.1,
+    padding: { top: "72px", bottom: "72px", left: "48px", right: `${reservedRight + 48}px` },
+  };
   const orphanCount = graph.nodes.filter((n) => n.orphan).length;
 
   return (
@@ -256,11 +270,15 @@ export function KnowledgeGraph({
           onNodeClick={handleNodeClick}
           onPaneClick={() => onSelect(null)}
           fitView
+          fitViewOptions={fitOptions}
+          minZoom={0.2}
           proOptions={{ hideAttribution: true }}
         >
           <Background gap={24} />
           <Controls showInteractive={false} position="bottom-left" />
-          <FocusOnNode focus={focus} ready={displayNodes.length > 0} />
+          {/* Before FocusOnNode, so a requested focus wins over the fit. */}
+          <FitOnLayout layoutKey={layoutKey} options={fitOptions} />
+          <FocusOnNode focus={focus} />
         </ReactFlow>
       </ReactFlowProvider>
 

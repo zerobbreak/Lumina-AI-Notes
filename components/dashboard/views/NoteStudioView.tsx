@@ -5,17 +5,23 @@ import { useRouter } from "next/navigation";
 
 import type { Id } from "@/types/data-model";
 import { useStudioChat } from "@/lib/hooks/chats/useStudioChat";
+import { useKnowledgeGraphData } from "@/lib/hooks/knowledgeGraph/useKnowledgeGraphData";
+import { pluralNotes } from "@/lib/studio/sessions";
 import { StudioChatDesk } from "@/components/dashboard/studio/StudioChatDesk";
 import { StudioGraphMode } from "@/components/dashboard/studio/StudioGraphMode";
+import { StudioHeader } from "@/components/dashboard/studio/StudioHeader";
 import type { StudioMode } from "@/components/dashboard/studio/StudioModeToggle";
 
 /**
- * Note Studio shell. Both views share one chat (useStudioChat), so switching
- * between Graph and Chat keeps the active session and draft.
+ * Note Studio shell. Both views share one chat (useStudioChat) and one header,
+ * so switching between Graph and Chat keeps the active session, the draft and
+ * the page frame.
  */
 export default function NoteStudioView() {
   const router = useRouter();
   const chat = useStudioChat();
+  // Loaded here, not only in Graph mode, so switching to the graph is instant.
+  const graph = useKnowledgeGraphData();
   const [studioMode, setStudioMode] = useState<StudioMode>("chat");
   const [graphSelectedId, setGraphSelectedId] = useState<string | null>(null);
   const [graphFocus, setGraphFocus] = useState<{ id: string; nonce: number } | null>(null);
@@ -29,25 +35,35 @@ export default function NoteStudioView() {
     setStudioMode("graph");
   };
 
-  if (studioMode === "graph") {
-    return (
-      <StudioGraphMode
-        chat={chat}
-        selectedId={graphSelectedId}
-        onSelectedIdChange={setGraphSelectedId}
-        focus={graphFocus}
-        onModeChange={setStudioMode}
-        onOpenNote={openNote}
-      />
-    );
-  }
+  const header =
+    studioMode === "graph"
+      ? {
+          title: "Knowledge graph",
+          subtitle: graph ? `${pluralNotes(graph.nodes.length)} · ${graph.edges.length} links` : "",
+        }
+      : {
+          title: chat.activeSession?.title ?? "New conversation",
+          subtitle: chat.activeSession ? `grounded in ${pluralNotes(chat.pinnedIds.length)}` : "Your second brain",
+        };
 
   return (
-    <StudioChatDesk
-      chat={chat}
-      onModeChange={setStudioMode}
-      onOpenNote={openNote}
-      onOpenInGraph={openInGraph}
-    />
+    <div className="flex h-full w-full flex-col overflow-hidden bg-background text-foreground">
+      <StudioHeader mode={studioMode} onModeChange={setStudioMode} {...header} />
+      <div className="min-h-0 flex-1">
+        {studioMode === "graph" ? (
+          <StudioGraphMode
+            chat={chat}
+            graph={graph}
+            selectedId={graphSelectedId}
+            onSelectedIdChange={setGraphSelectedId}
+            focus={graphFocus}
+            onModeChange={setStudioMode}
+            onOpenNote={openNote}
+          />
+        ) : (
+          <StudioChatDesk chat={chat} onOpenNote={openNote} onOpenInGraph={openInGraph} />
+        )}
+      </div>
+    </div>
   );
 }

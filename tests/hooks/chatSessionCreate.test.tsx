@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useChatActions } from "@/lib/hooks/chats/useChatActions";
+import { useStudioChat } from "@/lib/hooks/chats/useStudioChat";
 import { useChatSessions } from "@/lib/queries/chats/useChatSessions";
 import { chatKeys } from "@/lib/query-keys/chats";
 
@@ -176,5 +177,38 @@ describe("chat session actions", () => {
     });
     expect(serverSessions).toEqual([]);
     expect(cachedIds()).toEqual([]);
+  });
+});
+
+describe("studio chat", () => {
+  it("deleting the last chat leaves the Studio empty instead of making a new one", async () => {
+    const { result } = renderHook(useStudioChat, { wrapper });
+    await waitFor(() => expect(result.current.activeSessionId).toBe("s0"));
+
+    await act(async () => {
+      await result.current.removeSession("s0" as never);
+    });
+
+    expect(posts).toBe(0);
+    expect(serverSessions).toEqual([]);
+    expect(result.current.activeSessionId).toBeNull();
+  });
+
+  // Picking two graph nodes quickly, with no chat yet, used to create a
+  // "Graph: …" chat for each.
+  it("concurrent callers needing a chat share one create", async () => {
+    serverSessions = [];
+    const { result } = renderHook(useStudioChat, { wrapper });
+    await waitFor(() => expect(result.current.sessions).toEqual([]));
+
+    await act(async () => {
+      await Promise.all([
+        result.current.pinNotes(["n1" as never], "Graph: A"),
+        result.current.pinNotes(["n2" as never], "Graph: B"),
+      ]);
+    });
+
+    expect(posts).toBe(1);
+    expect(result.current.activeSessionId).toBe("s1");
   });
 });

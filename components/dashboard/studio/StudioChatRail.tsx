@@ -24,7 +24,7 @@ export function StudioChatRail({ chat }: { chat: StudioChat }) {
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r bg-muted/20 md:flex">
       <div className="flex items-center justify-between gap-2 px-4 pb-2 pt-4">
-        <span className="text-sm font-semibold tracking-tight">Studio</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Chats</span>
         <Button onClick={() => void newChat()} variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs">
           <Plus className="h-3.5 w-3.5" />
           New
