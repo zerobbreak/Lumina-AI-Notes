@@ -1,5 +1,5 @@
 import type { Id } from "@/types/data-model";
-import type { CalendarActivityDto } from "@/types/api/calendar";
+import type { CalendarActivityDto, CalendarStudyDayDto } from "@/types/api/calendar";
 
 export type CalendarRecording = {
   _id: Id<"recordings">;
@@ -17,6 +17,8 @@ export type CalendarNote = {
   quickCaptureStatus?: string;
   createdAt: number;
 };
+
+export type CalendarStudyDay = CalendarStudyDayDto;
 
 export function toCalendarActivity(dto: CalendarActivityDto) {
   return {
@@ -39,5 +41,6 @@ export function toCalendarActivity(dto: CalendarActivityDto) {
         createdAt: n.createdAt,
       }),
     ),
+    study: dto.study ?? [],
   };
 }

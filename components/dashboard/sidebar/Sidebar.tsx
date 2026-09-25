@@ -317,6 +317,7 @@ export function Sidebar() {
           <button
             type="button"
             onClick={() => setIsSearchOpen(true)}
+            data-tour="search"
             className="group/search flex h-7 min-w-0 flex-1 items-center gap-2.5 rounded-md border border-sidebar-border/70 bg-sidebar-accent/25 px-2 transition-colors hover:bg-sidebar-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar"
           >
             <Search className="h-[13px] w-[13px] shrink-0 text-muted-foreground/80" />
@@ -332,6 +333,7 @@ export function Sidebar() {
                 onClick={handleCreateNote}
                 disabled={isCreatingNote}
                 aria-label={openNote ? "New sub-page" : "New note"}
+                data-tour="new-note"
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar disabled:opacity-60"
               >
                 {isCreatingNote ? (
@@ -355,6 +357,7 @@ export function Sidebar() {
   const destinations = (
     <nav
       aria-label="Dashboard"
+      data-tour="destinations"
       className={cn(
         "shrink-0 space-y-px px-2 pb-2",
         isRail && "flex flex-col items-center gap-1",
@@ -488,6 +491,7 @@ export function Sidebar() {
 
         <SidebarSection
           id="courses"
+          tourId="modules"
           count={courses.length}
           label="Modules"
           isEmpty={courses.length === 0}
@@ -542,6 +546,7 @@ export function Sidebar() {
 
         <SidebarSection
           id="capture"
+          tourId="capture"
           label="Capture"
           action={
             <>
@@ -622,6 +627,7 @@ export function Sidebar() {
                 className="h-7 w-7 shrink-0 rounded-md text-muted-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
                 onClick={() => openSettings()}
                 aria-label="Settings"
+                data-tour="settings"
               >
                 <Settings className="h-[14px] w-[14px]" />
               </Button>

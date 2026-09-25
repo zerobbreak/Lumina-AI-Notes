@@ -7,25 +7,19 @@ import { useNoteActions } from "@/lib/hooks/mutations/useNoteActions";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import {
-  ChevronRight,
-  BookOpen,
-  FileText,
-  Plus,
-  File,
-} from "lucide-react";
+import { ChevronRight, BookOpen, Plus, File, Upload } from "lucide-react";
 import { Id } from "@/types/data-model";
 import { Course } from "@/types";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { EditableTitle } from "@/components/shared/EditableTitle";
 import { DraggableDocument, DocumentStatusBadge } from "@/components/documents";
-import { EmptyState } from "@/components/shared/EmptyState";
 import { useState } from "react";
 import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
 import { NoteCard } from "@/components/dashboard/home/NoteCard";
 import { CourseOverview } from "@/components/dashboard/course/CourseOverview";
+import { Eyebrow, HomeCard } from "@/components/dashboard/home/parts";
+import { UploadDialog } from "@/components/dashboard/dialogs/UploadDialog";
 
 interface FolderViewProps {
   contextId: string;
@@ -78,12 +72,20 @@ export default function FolderView({
     title: string;
     type: "file" | "note";
   } | null>(null);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
 
   // --- Helpers ---
   const currentCourse = courseId
     ? userData?.courses?.find((c: Course) => c.id === courseId)
     : undefined;
   const contextName = currentCourse?.name ?? (courseId ? "Module" : "Smart Folder");
+
+  /** "3 notes in this module", "1 file here", "No notes yet". */
+  const countHeading = (count: number | undefined, noun: string, where: string) => {
+    if (count === undefined) return `${noun[0]!.toUpperCase()}${noun.slice(1)}s`;
+    if (count === 0) return `No ${noun}s yet`;
+    return `${count} ${noun}${count === 1 ? "" : "s"} ${where}`;
+  };
 
   // --- Handlers ---
   const handleCreateNoteInContext = async () => {
@@ -174,61 +176,51 @@ export default function FolderView({
                 </h1>
               )}
             </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {courseId && (
+                <Button variant="outline" className="h-10 rounded-lg px-4" onClick={() => setIsUploadOpen(true)}>
+                  <Upload className="mr-2 h-4 w-4" aria-hidden />
+                  Upload
+                </Button>
+              )}
+              <Button className="h-10 rounded-lg px-4" onClick={handleCreateNoteInContext}>
+                <Plus className="mr-2 h-4 w-4" aria-hidden />
+                New note
+              </Button>
+            </div>
           </motion.div>
         </div>
       </motion.div>
 
       <ScrollArea className="flex-1 bg-sidebar">
         <div className="max-w-[1600px] mx-auto py-12 px-12 space-y-12">
-          {currentCourse && (
-            <>
-              <CourseOverview course={currentCourse} />
-              <Separator className="bg-sidebar-border" />
-            </>
-          )}
+          {currentCourse && <CourseOverview course={currentCourse} />}
 
-          {/* NOTES SECTION */}
-          <section>
-            <div className="flex items-center justify-between mb-6 px-1">
-              <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                <FileText className="w-4 h-4 text-sidebar-primary" />
-                Notes
+          <section aria-labelledby="folder-notes-heading" className="space-y-3">
+            <div className="space-y-1">
+              <Eyebrow>Notes</Eyebrow>
+              <h2 id="folder-notes-heading" className="font-reading text-xl font-medium text-foreground">
+                {countHeading(contextNotes?.length, "note", courseId ? "in this module" : "here")}
               </h2>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="rounded-full bg-sidebar-accent border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent/80 hover:text-sidebar-foreground hover:border-sidebar-border transition-all duration-300"
-                  onClick={handleCreateNoteInContext}
-                >
-                  <Plus className="w-3.5 h-3.5 mr-2" />
-                  New Note
-                </Button>
-              </div>
             </div>
-
-            <motion.div
-              variants={containerVariants}
-              initial="hidden"
-              animate="show"
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-            >
-              {/* Create New Card */}
+            {!contextNotes ? (
+              <div aria-busy="true" className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="h-[180px] animate-pulse rounded-xl bg-muted motion-reduce:animate-none" />
+                ))}
+              </div>
+            ) : contextNotes.length === 0 ? (
+              <HomeCard className="p-5 text-sm text-muted-foreground">
+                Start one with <b className="font-medium text-foreground">New note</b> above, or upload your lecture
+                slides and turn them into notes.
+              </HomeCard>
+            ) : (
               <motion.div
-                variants={itemVariants}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleCreateNoteInContext}
-                className="rounded-xl border border-dashed border-sidebar-border hover:border-sidebar-primary/40 hover:bg-sidebar-accent/40 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-3 p-8 min-h-[180px]"
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
               >
-                <div className="w-16 h-16 rounded-full bg-sidebar-accent flex items-center justify-center">
-                  <Plus className="w-8 h-8 text-sidebar-primary" />
-                </div>
-                <span className="text-sm font-medium text-sidebar-primary">
-                  Create New Note
-                </span>
-              </motion.div>
-
               {contextNotes
                 ?.slice()
                 .sort((a, b) => {
@@ -270,37 +262,37 @@ export default function FolderView({
                   </motion.div>
                 ))}
 
-              {(!contextNotes || contextNotes.length === 0) && (
-                <div className="col-span-full">
-                  <EmptyState
-                    icon={<FileText className="w-8 h-8 text-sidebar-primary" />}
-                    title="No notes yet"
-                    description="Create your first note to start organizing your thoughts and ideas"
-                    action={{
-                      label: "Create Note",
-                      onClick: handleCreateNoteInContext,
-                    }}
-                  />
-                </div>
-              )}
-            </motion.div>
+              </motion.div>
+            )}
           </section>
 
-          <Separator className="bg-sidebar-border" />
-
-          {/* FILES SECTION */}
-          <section>
-            <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2 mb-6 px-1">
-              <File className="w-4 h-4 text-sidebar-primary" />
-              Files & Resources
-            </h2>
-
-            <motion.div
-              variants={containerVariants}
-              initial="hidden"
-              animate="show"
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
-            >
+          <section aria-labelledby="folder-files-heading" className="space-y-3">
+            <div className="space-y-1">
+              <Eyebrow>Files</Eyebrow>
+              <h2 id="folder-files-heading" className="font-reading text-xl font-medium text-foreground">
+                {countHeading(contextFiles?.length, "file", courseId ? "in this module" : "here")}
+              </h2>
+            </div>
+            {!contextFiles ? (
+              <div aria-busy="true" className="h-20 animate-pulse rounded-xl bg-muted motion-reduce:animate-none" />
+            ) : contextFiles.length === 0 ? (
+              <HomeCard className="p-5 text-sm text-muted-foreground">
+                {courseId ? (
+                  <>
+                    Add slides, readings or past papers with <b className="font-medium text-foreground">Upload</b>{" "}
+                    above. Once a file is processed, drag it onto a note to generate notes from it.
+                  </>
+                ) : (
+                  "Files filed here show up in this list."
+                )}
+              </HomeCard>
+            ) : (
+              <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+              >
               {contextFiles?.map((f) => (
                 <DraggableDocument
                   key={f._id}
@@ -379,18 +371,13 @@ export default function FolderView({
                 </DraggableDocument>
               ))}
 
-              {(!contextFiles || contextFiles.length === 0) && (
-                <EmptyState
-                  icon={<File className="w-8 h-8 text-sidebar-primary" />}
-                  title="No files yet"
-                  description="Upload files to enhance your notes with additional resources"
-                  className="py-8"
-                />
-              )}
-            </motion.div>
+              </motion.div>
+            )}
           </section>
         </div>
       </ScrollArea>
+
+      {courseId && <UploadDialog open={isUploadOpen} onOpenChange={setIsUploadOpen} courseId={courseId} />}
 
       <RenameDialog
         open={!!renameTarget}

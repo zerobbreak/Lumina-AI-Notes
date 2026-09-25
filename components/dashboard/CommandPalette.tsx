@@ -25,6 +25,7 @@ import {
   CornerDownLeft,
   ArrowUp,
   ArrowDown,
+  Compass,
 } from "lucide-react";
 import { DASHBOARD_NAV } from "@/constants/dashboardNav";
 import { NOTE_COMMANDS, SHORTCUTS, shortcutFor } from "@/constants/shortcuts";
@@ -191,6 +192,32 @@ export function CommandPalette({ open, onOpenChange, initialQuery = "" }: Comman
         shortcut: s.keys[0],
       });
     });
+
+    // The walkthroughs. A fresh tour value each time, so Home opens it again
+    // even when the last one was closed on this same page.
+    cmds.push({
+      id: "tour-home",
+      title: "Take the Tour",
+      subtitle: "A walkthrough of Home, the sidebar and what everything does",
+      icon: Compass,
+      category: "actions",
+      action: () => {
+        onOpenChange(false);
+        router.push(`/dashboard?view=home&tour=${Date.now()}`);
+      },
+      keywords: ["tour", "walkthrough", "help", "guide", "onboarding", "tutorial", "how"],
+    });
+    if (openNote) {
+      cmds.push({
+        id: "tour-note",
+        title: "Tour the Note Editor",
+        subtitle: "Writing, Ask AI, the study dock and note actions",
+        icon: Compass,
+        category: "note",
+        action: run("tour:note"),
+        keywords: ["tour", "walkthrough", "help", "guide", "editor", "tutorial"],
+      });
+    }
 
     // Navigation commands — same source of truth as the sidebar.
     DASHBOARD_NAV.forEach((item) => {

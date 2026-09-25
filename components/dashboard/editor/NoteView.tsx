@@ -44,6 +44,7 @@ import { ActionMenu } from "@/components/shared/ActionMenu";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { EditableTitle } from "@/components/shared/EditableTitle";
 import { AskAI } from "@/components/dashboard/ai/AskAI";
+import { NoteTour } from "@/components/dashboard/tour/NoteTour";
 import { NoteDock } from "./dock/NoteDock";
 import { useDashboard } from "@/hooks/useDashboard";
 import { usePDF } from "@/hooks/usePDF";
@@ -732,14 +733,16 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             </span>
           )}
 
-          <ActionMenu
-            onRename={canEdit ? () => setIsRenameOpen(true) : undefined}
-            onDelete={isOwner ? handleDelete : undefined}
-            onArchive={isOwner ? handleArchive : undefined}
-            onGenerateFlashcards={() => setIsFlashcardsOpen(true)}
-            onGenerateQuiz={() => setIsQuizOpen(true)}
-            isArchived={note.isArchived}
-          />
+          <div className="flex" data-tour="note-actions">
+            <ActionMenu
+              onRename={canEdit ? () => setIsRenameOpen(true) : undefined}
+              onDelete={isOwner ? handleDelete : undefined}
+              onArchive={isOwner ? handleArchive : undefined}
+              onGenerateFlashcards={() => setIsFlashcardsOpen(true)}
+              onGenerateQuiz={() => setIsQuizOpen(true)}
+              isArchived={note.isArchived}
+            />
+          </div>
 
         </div>
       </div>
@@ -748,7 +751,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
       <ScrollArea className="flex-1">
         <div className="max-w-reading mx-auto py-6 sm:py-8 px-4 sm:px-8 lg:px-16">
           {/* Header Section - Not included in PDF export */}
-          <div className="mb-5 sm:mb-6" data-html2canvas-ignore>
+          <div className="mb-5 sm:mb-6" data-html2canvas-ignore data-tour="note-editor">
             {/* Title & Actions */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex-1 min-w-0">
@@ -929,6 +932,8 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
           {/* End PDF Export Area */}
         </div>
       </ScrollArea>
+
+      <NoteTour enabled={canEdit} />
 
       {/* Study dock: outline, study, source, connected and Ask, floating on
           the right. Narrower screens keep the round Ask AI button instead. */}

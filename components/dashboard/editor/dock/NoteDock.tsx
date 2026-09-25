@@ -114,7 +114,10 @@ export function NoteDock({
         }}
         className="absolute right-4 top-20 z-30 hidden lg:block"
       >
-        <div className="flex w-11 flex-col items-center gap-1 rounded-2xl border border-border bg-popover/90 py-2.5 shadow-lg backdrop-blur-sm">
+        <div
+          data-tour="note-dock"
+          className="flex w-11 flex-col items-center gap-1 rounded-2xl border border-border bg-popover/90 py-2.5 shadow-lg backdrop-blur-sm"
+        >
           {ticks.length > 0 && (
             <>
               <nav

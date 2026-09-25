@@ -114,7 +114,7 @@ export function RunwayStrip({
 
   if (all.length === 0) {
     return (
-      <HomeCard className="px-5 py-4">
+      <HomeCard className="px-5 py-4" data-tour="runway">
         <p className="text-[13px] text-muted-foreground">
           Nothing is due in the next two weeks. Deadlines you add, or sync from Brightspace, show up here.
         </p>
@@ -123,7 +123,7 @@ export function RunwayStrip({
   }
 
   return (
-    <section aria-labelledby="runway-heading" className="space-y-3">
+    <section aria-labelledby="runway-heading" className="space-y-3" data-tour="runway">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h2 id="runway-heading" className="font-reading text-xl font-medium leading-snug text-foreground">
           {work.length === 1 ? "One deadline" : `${work.length} deadlines`} in the next two weeks.

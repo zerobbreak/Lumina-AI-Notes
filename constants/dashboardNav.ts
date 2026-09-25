@@ -41,7 +41,7 @@ export const DASHBOARD_NAV: readonly DashboardNavItem[] = [
     view: "home",
     href: "/dashboard?view=home",
     icon: LayoutGrid,
-    description: "Your courses and recent work",
+    description: "Your modules and recent work",
     keywords: ["home", "dashboard", "hub", "overview", "main"],
   },
   {

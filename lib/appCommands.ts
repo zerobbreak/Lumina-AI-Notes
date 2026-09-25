@@ -25,7 +25,9 @@ export type AppCommandId =
   | "note:insert-image"
   | "note:new-subpage"
   | "note:pin"
-  | "editor:ask-ai";
+  | "editor:ask-ai"
+  /** Replays the note-screen walkthrough. */
+  | "tour:note";
 
 const APP_COMMAND_EVENT = "lumina:command";
 

@@ -18,6 +18,8 @@ interface SidebarSectionProps {
   /** Shown beside a closed header, so it still says what's inside. */
   count?: number;
   defaultOpen?: boolean;
+  /** Anchor for the product tour (see lib/tour/tours.ts). */
+  tourId?: string;
 }
 
 /**
@@ -33,12 +35,13 @@ export function SidebarSection({
   isEmpty = false,
   count,
   defaultOpen = true,
+  tourId,
 }: SidebarSectionProps) {
   const { isOpen, toggle } = usePersistedDisclosure(`section.${id}`, defaultOpen);
   const contentId = `sidebar-section-${id}`;
 
   return (
-    <div className="min-w-0">
+    <div className="min-w-0" data-tour={tourId}>
       {/* An empty section keeps its action visible: it's the obvious next step. */}
       <div className={cn("group/section flex h-6 items-center", isEmpty && "is-empty")}>
         <button

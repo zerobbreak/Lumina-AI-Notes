@@ -168,7 +168,7 @@ export function CoursePulseGrid({
         : `${needYou === 1 ? "One module needs" : `${needYou} modules need`} you this week.`;
 
   return (
-    <section aria-labelledby="pulse-heading" className="space-y-4">
+    <section aria-labelledby="pulse-heading" className="space-y-4" data-tour="modules-pulse">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
           <Eyebrow>Your modules</Eyebrow>

@@ -473,7 +473,7 @@ export function TranscriptionPill() {
         aria-hidden
       />
 
-      <div className="pointer-events-auto flex w-full max-w-[min(560px,100%)] flex-col items-center gap-2">
+      <div className="pointer-events-auto flex w-full max-w-[min(560px,100%)] flex-col items-center gap-2" data-tour="record">
         {/* Results surface — rises above the pill so the pill never moves. */}
         <AnimatePresence>
           {isSearchOpen && query.trim().length >= 2 && (

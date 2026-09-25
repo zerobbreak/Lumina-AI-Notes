@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { BrightspaceStatusDto } from "@/types/api/integrations";
+import { calendarKeys } from "@/lib/query-keys/calendar";
 import { chatKeys } from "@/lib/query-keys/chats";
 import { collaborationKeys } from "@/lib/query-keys/collaboration";
 import { deadlineKeys } from "@/lib/query-keys/deadlines";
@@ -18,9 +19,15 @@ function invalidateHome(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: homeKeys.all });
 }
 
+/** The calendar's activity: notes and recordings made, cards reviewed, quizzes taken. */
+function invalidateCalendar(queryClient: QueryClient) {
+  void queryClient.invalidateQueries({ queryKey: calendarKeys.all });
+}
+
 export function invalidateNotes(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: noteKeys.all });
   invalidateHome(queryClient);
+  invalidateCalendar(queryClient);
 }
 
 export function invalidateUser(queryClient: QueryClient) {
@@ -43,6 +50,7 @@ export function invalidateDeadlines(queryClient: QueryClient) {
 
 export function invalidateRecordings(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: recordingKeys.all });
+  invalidateCalendar(queryClient);
 }
 
 export function invalidateChats(queryClient: QueryClient) {
@@ -57,11 +65,13 @@ export function refreshChats(queryClient: QueryClient) {
 export function invalidateFlashcards(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: flashcardKeys.all });
   invalidateHome(queryClient);
+  invalidateCalendar(queryClient);
 }
 
 export function invalidateQuizzes(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: quizKeys.all });
   invalidateHome(queryClient);
+  invalidateCalendar(queryClient);
 }
 
 export function invalidateCollaboration(queryClient: QueryClient, noteId?: string) {

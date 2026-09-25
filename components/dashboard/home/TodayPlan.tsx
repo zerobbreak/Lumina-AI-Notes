@@ -126,7 +126,7 @@ export function TodayPlan({
   const minutesLeft = rows.filter((r) => !r.done).reduce((n, r) => n + r.item.minutes, 0);
 
   return (
-    <HomeCard aria-labelledby="today-plan-heading" className={cn("flex flex-col", className)}>
+    <HomeCard aria-labelledby="today-plan-heading" className={cn("flex flex-col", className)} data-tour="today-plan">
       <h2 id="today-plan-heading" className="sr-only">
         Today&apos;s plan
       </h2>
