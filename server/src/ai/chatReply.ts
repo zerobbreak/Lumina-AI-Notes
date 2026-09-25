@@ -18,60 +18,68 @@ function formatContextNotesForPrompt(notesForPrompt: ContextNote[]) {
     .join("\n\n---\n\n");
 }
 
-function modeInstructions(mode: ChatMode) {
+/** A section of a mode's answer: the heading to print, and how to fill it. */
+type Section = { heading: string; guidance: string };
+
+/**
+ * Lists a mode's sections with the heading and the guidance kept apart, so
+ * the model prints clean headings. Putting the guidance inside the heading
+ * ("## 2) Intuition (2–4 bullets)") made it copy the guidance into answers.
+ */
+function sectionTemplate(sections: Section[], extra = "") {
+  const lines = sections.map((s) => `- Heading "## ${s.heading}" — in it: ${s.guidance}`);
+  const rules = `Print each heading exactly as quoted. The text after "in it:" is guidance for you; never print it.`;
+  return ["Use these sections, in this order:", ...lines, rules, extra].filter(Boolean).join("\n");
+}
+
+export function modeInstructions(mode: ChatMode) {
   switch (mode) {
     case "explain":
-      return `Return markdown with exactly these sections:
-## 1) One-sentence definition
-## 2) Intuition (2–4 bullets)
-## 3) Worked example (use the notes’ example, or say what's missing)
-## 4) Common pitfalls (3 bullets)
-## 5) Exam/assignment takeaway (2 bullets)`;
+      return sectionTemplate([
+        { heading: "Definition", guidance: "one sentence defining the topic" },
+        { heading: "Intuition", guidance: "2–4 bullets on why it works this way" },
+        { heading: "Worked example", guidance: "walk through the notes' example" },
+        { heading: "Common pitfalls", guidance: "3 bullets" },
+        { heading: "Exam takeaway", guidance: "2 bullets on what to remember for a test or assignment" },
+      ]);
     case "synthesize":
-      return `Return markdown with:
-## Cheat sheet
-- 6–10 bullets (definitions + key relationships)
-## Key takeaways
-- 4 bullets
-## Exam cues
-- 3 bullets (what lecturers like to test, based on the notes)`;
+      return sectionTemplate([
+        { heading: "Cheat sheet", guidance: "6–10 bullets of definitions and key relationships" },
+        { heading: "Key takeaways", guidance: "4 bullets" },
+        { heading: "Exam cues", guidance: "3 bullets on what lecturers are likely to test, based on the notes" },
+      ]);
     case "compare":
-      return `Return markdown with:
-## Comparison table
-Make a table with columns: Aspect | A | B (use the terms from the question).
-## How to tell them apart
-- 4 short heuristics
-## Typical question types
-- 3 bullets (what you'd be asked to do with A vs B)`;
+      return sectionTemplate([
+        {
+          heading: "Comparison",
+          guidance: "a table with columns Aspect | A | B, using the terms from the question in place of A and B",
+        },
+        { heading: "How to tell them apart", guidance: "4 short heuristics" },
+        { heading: "Typical questions", guidance: "3 bullets on what you'd be asked to do with each" },
+      ]);
     case "apply":
-      return `Return markdown with:
-## Method (step-by-step)
-1. …
-## Worked example
-Use numbers/terms from the notes if present; otherwise state what is missing and provide a skeleton example.
-## Check your answer
-- 3 bullets (sanity checks, common mistakes)`;
+      return sectionTemplate([
+        { heading: "Method", guidance: "numbered steps" },
+        {
+          heading: "Worked example",
+          guidance: "use numbers and terms from the notes; if they have none, give a skeleton example",
+        },
+        { heading: "Check your answer", guidance: "3 bullets of sanity checks and common mistakes" },
+      ]);
     case "quiz":
-      return `Return markdown with:
-## Quiz (answer first)
-1. …
-2. …
-3. …
-4. …
-5. …
-
-Then end with:
+      return sectionTemplate(
+        [{ heading: "Quiz", guidance: "5 numbered questions, without answers" }],
+        `Then end with:
 **Reply with your answers (1–5). I’ll grade you and show model answers.**
 
-Do NOT grade yet in this message.`;
+Do NOT grade or give answers in this message.`,
+      );
     case "fill_gaps":
-      return `Return markdown with:
-## What the notes cover
-- 3 bullets
-## What’s missing to answer confidently
-- 5 bullets (specific missing definitions, examples, steps, assumptions)
-## What to add
-- 3 bullets (which note/doc to pin or what excerpt to paste)`;
+      return sectionTemplate([
+        { heading: "What the notes cover", guidance: "3 bullets" },
+        { heading: "What’s missing", guidance: "5 bullets of specific missing definitions, examples, steps or assumptions" },
+        { heading: "What to add", guidance: "3 bullets on which note to pin or what excerpt to paste" },
+      ]);
     default:
       return `Answer the question using the notes.`;
   }
@@ -250,7 +258,7 @@ Rules:
 - Be concise but complete. Prefer structured markdown (bullets, short sections).
 - When you use information from a note, cite it inline using [#N] where N is the note number shown below.
 - Do NOT invent citations. If you cannot cite a claim to a note, phrase it as a question or a suggestion to add that note.
-- IMPORTANT: You must follow the mode template exactly (headings/sections). If the notes do not support a required section, write "Missing in notes: <what’s needed>" for that section.
+- Structure the answer with the mode's sections below. Leave out a section that doesn't fit the question. If the question needs a section the notes can't support, say in one line what's missing from the notes.
 
 Mode:
 ${mode.toUpperCase()} — ${modeInstructions(mode)}

@@ -14,6 +14,21 @@ import { modeLabel } from "@/lib/studio/sessions";
 
 type MessageNote = { id: Id<"notes">; title: string };
 
+/**
+ * Strips answer-template text the model used to copy into headings, e.g.
+ * "## 2) Intuition (2–4 bullets)" → "## Intuition". The prompt no longer
+ * invites it, but replies saved before that still carry it.
+ */
+export function cleanTemplateHeadings(content: string) {
+  return content.replace(/^(#{1,6})[ \t]+(.+)$/gm, (_m, hashes: string, text: string) => {
+    const cleaned = text
+      .replace(/^\d+\)\s*/, "")
+      .replace(/\s*\([^()]*(?:bullets?|notes[’']|what's missing|what’s missing|step-by-step|answer first)[^()]*\)\s*$/i, "")
+      .trim();
+    return `${hashes} ${cleaned || text}`;
+  });
+}
+
 /** Keeps our `note-cite:` links, which react-markdown would otherwise blank as unsafe. */
 const keepCitations = (url: string) => (url.startsWith("note-cite:") ? url : defaultUrlTransform(url));
 
@@ -31,7 +46,7 @@ function AssistantMarkdown({
 }) {
   // Convert [#1] citations, and grouped ones like [#1, #2], into special
   // links we can render as chips.
-  const withCitations = content.replace(/\[#\d+(?:\s*,\s*#?\d+)*\]/g, (match) =>
+  const withCitations = cleanTemplateHeadings(content).replace(/\[#\d+(?:\s*,\s*#?\d+)*\]/g, (match) =>
     (match.match(/\d+/g) ?? [])
       .map(Number)
       .map((n) => (n < 1 ? `[#${n}]` : `[[#${n}]](note-cite:${n})`))

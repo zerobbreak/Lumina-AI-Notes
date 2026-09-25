@@ -3,7 +3,7 @@ import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "../src/db/client.js";
 import { chatMessages, chatSessions, users } from "../src/db/schema/index.js";
-import { shouldAutoTitle, titleFromQuestion } from "../src/ai/chatReply.js";
+import { modeInstructions, shouldAutoTitle, titleFromQuestion } from "../src/ai/chatReply.js";
 import { bearer, buildApp, createTestDb } from "./helpers.js";
 
 const ALICE = "user_alice";
@@ -183,4 +183,19 @@ describe("chat titles", () => {
       "Summarise the setup steps, with a small…",
     );
   });
+});
+
+describe("mode templates", () => {
+  // Guidance inside a heading ("## 2) Intuition (2–4 bullets)") got copied
+  // into answers, so headings must be plain names.
+  it.each(["explain", "synthesize", "compare", "apply", "quiz", "fill_gaps"] as const)(
+    "%s headings carry no numbering or instructions",
+    (mode) => {
+      const headings = [...modeInstructions(mode).matchAll(/"## ([^"]+)"/g)].map((m) => m[1]);
+      expect(headings.length).toBeGreaterThan(0);
+      for (const h of headings) {
+        expect(h).not.toMatch(/^\d+\)|[()]|bullets/i);
+      }
+    },
+  );
 });

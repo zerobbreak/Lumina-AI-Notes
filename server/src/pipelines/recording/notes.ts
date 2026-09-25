@@ -167,7 +167,7 @@ export async function validateDraft(
     summary: typeof working.summary === "string" ? working.summary : "",
     sections,
     actionItems: strings(working.actionItems),
-    reviewQuestions: strings(working.reviewQuestions),
+    reviewQuestions: strings(working.reviewQuestions).map(stripQuestionLabel).filter(Boolean),
     diagramData: buildDiagramData(diagramNodes, diagramEdges),
   };
   if (!notes.summary.trim() && notes.sections.length === 0) {
@@ -206,6 +206,16 @@ function normalizeSections(draft: Draft): NoteSection[] {
       level: section.level,
     }))
     .filter((section) => section.content.length > 0);
+}
+
+/**
+ * Drops a type label the model copied from an older prompt example, e.g.
+ * "Definition question: What is…" → "What is…".
+ */
+export function stripQuestionLabel(question: string): string {
+  return question
+    .replace(/^(?:definition|mechanism|application|comparison|analysis|recall|evaluation|synthesis)\s+question\s*:\s*/i, "")
+    .trim();
 }
 
 function strings(value: unknown): string[] {
@@ -267,11 +277,9 @@ Generate a JSON response with this EXACT structure (Notion-like section-based fo
   ],
   "actionItems": ["Specific task 1 with deadline if mentioned", "Task 2"],
   "reviewQuestions": [
-    "Definition question: What is [concept] and what are its key characteristics?",
-    "Mechanism question: Explain the process/mechanism of [concept] step by step.",
-    "Application question: How would you apply [concept] to [specific real-world scenario]?",
-    "Comparison question: Compare and contrast [concept A] with [concept B]. What are the key differences?",
-    "Analysis question: Why does [phenomenon] occur? What factors contribute to it?"
+    "<a question asking what a concept from the transcript is>",
+    "<a question asking how a process from the transcript works>",
+    "<a question applying a concept to a scenario>"
   ],
   "diagramNodes": [
     {"label": "Central Topic", "kind": "concept"},
@@ -294,7 +302,7 @@ MANDATORY QUALITY REQUIREMENTS:
 ${getDepthRequirements(wordCountFn(enrichedTranscript))}
 - Each heading should be a specific term, concept name, or topic — NOT a vague phrase
 - Bullets: Use for key points, important explanations, and lists of related items
-- reviewQuestions: Create 3-7 varied questions spanning Bloom's taxonomy levels, scaled to how many distinct concepts the transcript actually covers
+- reviewQuestions: Create 3-7 varied questions spanning Bloom's taxonomy levels (define, explain a mechanism, apply, compare, analyse), scaled to how many distinct concepts the transcript actually covers. Each is a plain question the student reads as-is: no type label or prefix like "Definition question:", and no placeholders in angle or square brackets
 - diagramNodes: One label per distinct concept actually discussed (typically 4-10, max ~80 characters each). Each entry is EITHER a plain string label OR an object {"label": "...", "kind": "..."} where kind is one of "concept", "topic", "subtopic", "note". Index 0 MUST be the single central topic (root) for the mind map and MUST have kind "concept"; exactly one node may be "concept".
 - diagramNodes kind: kind reflects IMPORTANCE TO THE MATERIAL, not tree position — a genuinely central idea several hops from the root is still "topic", never "note". kind is optional; omit it to fall back to depth-based styling.
 - diagramEdges: Use "sourceIndex-targetIndex" with valid indices into diagramNodes, optionally followed by ":label" describing the relationship (e.g. "0-1: causes", "1-3: example of"). The bare "0-1" form is still valid. Build a tree or sparse DAG from the root: every node except index 0 must be reachable from node 0. No self-loops; avoid redundant duplicate connections between the same two nodes.

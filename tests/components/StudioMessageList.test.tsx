@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { StudioMessageList } from "@/components/dashboard/studio/StudioMessageList";
+import { cleanTemplateHeadings, StudioMessageList } from "@/components/dashboard/studio/StudioMessageList";
 import type { ChatMessageModel } from "@/lib/api/adapters/chat";
 
 afterEach(cleanup);
@@ -27,7 +27,7 @@ const renderReply = (content: string, cited?: string[], notes?: Note[]) => {
 describe("studio chat replies", () => {
   it("renders the AI's markdown as headings and lists", () => {
     renderReply("## 1) Definition\nA thing.\n\n## 2) Intuition\n- first point\n- second point\n\n1. step one\n2. step two");
-    expect(screen.getByRole("heading", { level: 2, name: "1) Definition" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Definition" })).toBeTruthy();
     const lists = screen.getAllByRole("list");
     expect(lists.map((l) => l.tagName)).toEqual(["UL", "OL"]);
     expect(screen.getAllByRole("listitem")).toHaveLength(4);
@@ -71,5 +71,29 @@ describe("studio chat replies", () => {
   it("keeps a code block without a language as a block", () => {
     const { container } = renderReply("```\nnpm run dev\n```");
     expect(container.querySelector("pre > code")?.textContent).toBe("npm run dev\n");
+  });
+});
+
+describe("template headings in older replies", () => {
+  it("strips numbering and instructions copied from the prompt", () => {
+    const old = [
+      "## 1) One-sentence definition",
+      "## 2) Intuition (2–4 bullets)",
+      "## 3) Worked example (use the notes’ example, or say what's missing)",
+      "## 4) Common pitfalls (3 bullets)",
+      "## 5) Exam/assignment takeaway (2 bullets)",
+    ].join("\n");
+    expect(cleanTemplateHeadings(old).split("\n")).toEqual([
+      "## One-sentence definition",
+      "## Intuition",
+      "## Worked example",
+      "## Common pitfalls",
+      "## Exam/assignment takeaway",
+    ]);
+  });
+
+  it("leaves ordinary headings and body text alone", () => {
+    const text = "## Photosynthesis (C3 vs C4)\n1) keep this list item (3 bullets)";
+    expect(cleanTemplateHeadings(text)).toBe(text);
   });
 });

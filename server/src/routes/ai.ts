@@ -128,7 +128,7 @@ CLEANING INSTRUCTIONS:
 2. **Mark Repetitions** - Professors repeat key concepts for emphasis:
    - First mention: Keep as is
    - Second mention: Append [REPEAT]
-   - Third+ mention: Append [REPEAT X\${count}]
+   - Third+ mention: Append [REPEAT X<n>], where <n> is how many times it has come up (e.g. [REPEAT X3])
    - Example: "Mitochondria is the powerhouse. The mitochondria generates ATP [REPEAT]. Mitochondria, remember, is where energy is made [REPEAT X3]"
 
 3. **Mark Emphasis** - When professor clearly emphasizes:
