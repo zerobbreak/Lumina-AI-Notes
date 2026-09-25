@@ -4,7 +4,9 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
-    extraResource: ['out'],
+    // The shell loads the deployed web app (see electron/main.js), so it needs
+    // nothing but its own main/preload scripts — not the Next app or node_modules.
+    ignore: (file) => Boolean(file) && !/^\/(electron(\/|$)|package\.json$)/.test(file),
   },
   rebuildConfig: {},
   makers: [

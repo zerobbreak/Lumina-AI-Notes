@@ -1,6 +1,6 @@
 # Lumina Notes AI
 
-Lumina Notes AI is a Next.js study workspace for AI-assisted notes, structured capture from audio and PDFs, flashcards, quizzes, search, and sharing. The frontend talks to an **Express + Postgres REST API** (`server/`) via TanStack Query. The app targets **version 0.1.0** and ships as a **web app** with an **optional Electron desktop shell** (static export + packaged window) for local use and custom-protocol sign-in.
+Lumina Notes AI is a Next.js study workspace for AI-assisted notes, structured capture from audio and PDFs, flashcards, quizzes, search, and sharing. The frontend talks to an **Express + Postgres REST API** (`server/`) via TanStack Query. The app targets **version 0.1.0** and ships as a **web app** with an **optional Electron desktop shell** (a native window onto the deployed web app, with custom-protocol sign-in).
 
 ## Current application status
 
@@ -141,11 +141,14 @@ npm run dev
 
 The repo includes an Electron wrapper for development and packaging:
 
-- **`npm run electron:dev`** — Runs Next.js dev server and opens an Electron window pointed at `http://localhost:3000`.
-- **`npm run build:static`** — Next.js static export (`STATIC_EXPORT=true`) for embedding in the packaged app.
-- **`npm run make`** — Builds static output and runs Electron Forge makers (see `forge.config.js`).
+- **`npm run electron:dev`** — Runs the Next.js dev server and opens an Electron window at `http://localhost:3000/sign-in`. Run the API too (`npm run server:dev`).
+- **`npm run electron:start`** — Same, but through `electron-forge start`.
+- **`npm run package`** / **`npm run make`** — Electron Forge package / installers (see `forge.config.js`). No Next.js build is involved.
+- **`npm run test:electron`** — Playwright smoke tests for the shell (preload bridge, deep-link ticket relay).
 
-Custom protocol handling and the `/electron-auth` route support bringing Clerk session tokens into the desktop shell. Treat the desktop target as **experimental** unless you have verified packaging on your OS.
+The packaged app bundles no web code: `electron/main.js` loads the deployed web app (`https://lumina-web-production-e6ce.up.railway.app`, override with `LUMINA_APP_URL`), which reaches the Express API through its `/api/v1` rewrite. That keeps `CLERK_SECRET_KEY` and `UPLOADTHING_TOKEN` out of the installer, and web deploys reach desktop users without a new build. It needs a connection; when the site can't load, the window shows a retry page.
+
+Sign-in happens in the window with Clerk's `<SignIn/>`. For providers that block embedded browsers, the "log in with browser" button opens `/electron-auth` in the system browser, which mints a 60-second Clerk sign-in ticket (`POST /api/electron/ticket`) and hands it back through `lumina-notes://auth?ticket=…`; the window redeems it with `signIn.create({ strategy: "ticket" })`. Treat the desktop target as **experimental** unless you have verified packaging on your OS.
 
 ## Scripts
 
@@ -153,7 +156,6 @@ Custom protocol handling and the `/electron-auth` route support bringing Clerk s
 - `npm run server:dev` — Start Express REST API
 - `npm run server:test` — Run server tests
 - `npm run build` — Production build (web)
-- `npm run build:static` — Static export for Electron
 - `npm run start` — Run production server
 - `npm run electron:dev` — Dev Electron + Next
 - `npm run package` / `npm run make` — Electron Forge package / make installers

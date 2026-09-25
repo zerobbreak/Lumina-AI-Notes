@@ -22,8 +22,7 @@ export function LoginButton({ mode = "signin", children, ...props }: LoginButton
   const handleLogin = (e: React.MouseEvent) => {
     if (isElectron) {
       e.preventDefault();
-      // @ts-ignore
-      window.electronAPI.loginInBrowser();
+      window.electronAPI?.loginInBrowser();
     }
   };
 

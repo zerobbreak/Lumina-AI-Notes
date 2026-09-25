@@ -1,30 +1,41 @@
 "use client";
 
-import { ClerkProvider } from "@clerk/nextjs";
+import { ClerkProvider, useSignIn } from "@clerk/nextjs";
 import { ReactNode, useEffect } from "react";
 import { QueryProvider } from "./QueryProvider";
 
-export function AppProvider({ children }: { children: ReactNode }) {
+/**
+ * Redeems the sign-in ticket relayed from the electron-auth browser tab
+ * (see electron/main.js `handleAuthUrl`) to establish a Clerk session
+ * inside the Electron window itself. Must render under <ClerkProvider>.
+ */
+function ElectronAuthBridge() {
+  const { isLoaded, signIn, setActive } = useSignIn();
+
   useEffect(() => {
-    const isElectron = typeof window !== "undefined" && "electronAPI" in window;
+    if (!isLoaded || !window.electronAPI) return;
 
-    if (isElectron) {
-      // @ts-expect-error electron preload API
-      window.electronAPI.onAuthToken(async (token: string) => {
-        try {
-          if (process.env.NODE_ENV === "development") {
-            console.log("Received auth token from Electron:", token);
-          }
-          window.location.reload();
-        } catch (error) {
-          console.error("Failed to handle auth token:", error);
+    return window.electronAPI.onAuthTicket(async (ticket) => {
+      try {
+        const result = await signIn.create({ strategy: "ticket", ticket });
+        if (result.status === "complete") {
+          await setActive({ session: result.createdSessionId });
+        } else {
+          console.error("Electron sign-in did not complete:", result.status);
         }
-      });
-    }
-  }, []);
+      } catch (error) {
+        console.error("Failed to redeem electron auth ticket:", error);
+      }
+    });
+  }, [isLoaded, signIn, setActive]);
 
+  return null;
+}
+
+export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <ClerkProvider>
+      <ElectronAuthBridge />
       <QueryProvider>{children}</QueryProvider>
     </ClerkProvider>
   );
