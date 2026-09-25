@@ -70,7 +70,7 @@ export function GraphChatDock({
   return (
     <aside
       aria-label="Graph chat"
-      className="absolute bottom-3 right-3 top-3 z-20 flex w-[400px] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-2xl border bg-background/95 shadow-xl backdrop-blur"
+      className="absolute bottom-3 right-3 top-3 z-20 flex w-[400px] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-2xl border bg-background shadow-xl"
     >
       <header className="flex items-center gap-2 border-b px-4 py-2.5">
         <div className="min-w-0 flex-1">

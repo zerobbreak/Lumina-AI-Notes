@@ -57,6 +57,17 @@ describe("studio chat replies", () => {
     expect(onOpenNote).toHaveBeenCalledWith("note_2");
   });
 
+  it("splits grouped citations like [#1, #2] into one chip per note", () => {
+    renderReply("Both notes agree [#1, #2].", ["note_1", "note_2"], [
+      { id: "note_1", title: "Opus 5.5" },
+      { id: "note_2", title: "Untitled Note" },
+    ]);
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "[#1]· Opus 5.5",
+      "[#2]· Untitled Note",
+    ]);
+  });
+
   it("keeps a code block without a language as a block", () => {
     const { container } = renderReply("```\nnpm run dev\n```");
     expect(container.querySelector("pre > code")?.textContent).toBe("npm run dev\n");

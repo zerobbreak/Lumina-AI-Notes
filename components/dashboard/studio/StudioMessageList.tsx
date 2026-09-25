@@ -29,12 +29,14 @@ function AssistantMarkdown({
   onOpenNote: (noteId: Id<"notes">) => void;
   compact?: boolean;
 }) {
-  // Convert [#1] citations into special links we can render as chips.
-  const withCitations = content.replace(/\[#(\d+)\]/g, (_m, nStr) => {
-    const n = Number(nStr);
-    if (!Number.isFinite(n) || n < 1) return `[#${nStr}]`;
-    return `[[#${n}]](note-cite:${n})`;
-  });
+  // Convert [#1] citations, and grouped ones like [#1, #2], into special
+  // links we can render as chips.
+  const withCitations = content.replace(/\[#\d+(?:\s*,\s*#?\d+)*\]/g, (match) =>
+    (match.match(/\d+/g) ?? [])
+      .map(Number)
+      .map((n) => (n < 1 ? `[#${n}]` : `[[#${n}]](note-cite:${n})`))
+      .join(" "),
+  );
 
   return (
     <div className={cn("chat-md", compact ? "reading-surface-compact" : "reading-surface")}>

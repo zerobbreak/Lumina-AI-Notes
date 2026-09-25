@@ -206,7 +206,7 @@ export function KnowledgeGraph({
   );
 
   const toolbar = graph && graph.nodes.length > 0 && (
-    <div className="absolute left-3 top-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-2xl border bg-background/90 p-1.5 shadow-sm backdrop-blur">
+    <div className="absolute left-3 top-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-2xl border bg-background p-1.5 shadow-sm">
       <div className="flex h-8 min-w-[180px] items-center gap-2 rounded-full border border-border bg-muted/50 px-3">
         <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         <input
@@ -285,7 +285,7 @@ export function KnowledgeGraph({
       {toolbar}
 
       {/* Legend, beside the zoom controls */}
-      <div className="pointer-events-none absolute bottom-3 left-14 z-10 max-w-[calc(100%-5rem)] rounded-xl border bg-background/90 px-3 py-2 text-[11px] text-muted-foreground shadow-sm backdrop-blur">
+      <div className="pointer-events-none absolute bottom-3 left-14 z-10 max-w-[calc(100%-5rem)] rounded-xl border bg-background px-3 py-2 text-[11px] text-muted-foreground shadow-sm">
         {clusterByTopic && clusters.length > 0 && (
           <div className="mb-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
             {clusters.slice(0, 6).map((c) => (
