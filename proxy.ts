@@ -7,6 +7,8 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up(.*)",
   "/electron-auth(.*)",
   "/api/uploadthing(.*)",
+  // Rewritten to the Express API (see next.config.ts), which verifies its own Bearer tokens.
+  "/api/v1(.*)",
 ]);
 export default clerkMiddleware(async (auth, req) => {
   if (!isPublicRoute(req)) {
