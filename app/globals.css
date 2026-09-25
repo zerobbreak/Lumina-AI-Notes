@@ -757,6 +757,84 @@ body::after {
   line-height: calc(var(--reading-line-height) - 0.1);
 }
 
+/*
+ * Markdown in Studio chat replies. The typography plugin isn't loaded, so
+ * `prose` classes do nothing; these rules give headings, lists, tables and
+ * code their shape. Sizes are in em so the compact dock scales with them.
+ */
+.chat-md {
+  color: hsl(var(--foreground));
+  overflow-wrap: anywhere;
+}
+.chat-md > :first-child { margin-top: 0; }
+.chat-md > :last-child { margin-bottom: 0; }
+.chat-md p { margin: 0.6em 0; }
+.chat-md h1,
+.chat-md h2,
+.chat-md h3,
+.chat-md h4 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1.3em 0 0.4em;
+  letter-spacing: -0.01em;
+}
+.chat-md h1 { font-size: 1.35em; }
+.chat-md h2 { font-size: 1.18em; }
+.chat-md h3 { font-size: 1.05em; }
+.chat-md h4 { font-size: 1em; color: hsl(var(--muted-foreground)); }
+.chat-md ul,
+.chat-md ol { margin: 0.5em 0; padding-left: 1.4em; }
+.chat-md ul { list-style: disc; }
+.chat-md ol { list-style: decimal; }
+.chat-md ul ul { list-style: circle; }
+.chat-md li { margin: 0.3em 0; padding-left: 0.15em; }
+.chat-md li > p { margin: 0.25em 0; }
+.chat-md li::marker { color: hsl(var(--muted-foreground)); }
+.chat-md strong { font-weight: 600; }
+.chat-md a { color: hsl(var(--primary)); text-decoration: underline; text-underline-offset: 3px; }
+.chat-md hr { margin: 1.2em 0; border-color: hsl(var(--border) / 0.6); }
+.chat-md blockquote {
+  margin: 0.8em 0;
+  padding-left: 0.9em;
+  border-left: 3px solid hsl(var(--primary) / 0.4);
+  color: hsl(var(--muted-foreground));
+}
+.chat-md :not(pre) > code {
+  font-family: var(--mono-font);
+  font-size: 0.85em;
+  padding: 0.1em 0.35em;
+  border-radius: 0.3em;
+  background: hsl(var(--muted) / 0.6);
+}
+.chat-md pre {
+  margin: 0.8em 0;
+  padding: 0.7em 0.9em;
+  overflow-x: auto;
+  border: 1px solid hsl(var(--border) / 0.6);
+  border-radius: 0.6em;
+  background: hsl(var(--muted) / 0.35);
+  font-family: var(--mono-font);
+  font-size: 0.82em;
+  line-height: 1.5;
+}
+.chat-md table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 0.8em 0;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+.chat-md th,
+.chat-md td {
+  padding: 0.35em 0.7em;
+  border: 1px solid hsl(var(--border));
+  text-align: left;
+  vertical-align: top;
+}
+.chat-md th { font-weight: 600; background: hsl(var(--muted) / 0.5); }
+.chat-md .katex-display { overflow-x: auto; overflow-y: hidden; }
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

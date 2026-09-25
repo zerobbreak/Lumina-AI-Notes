@@ -81,10 +81,24 @@ function wordCount(text: string) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-function shouldAutoTitle(title: unknown) {
+/**
+ * True while a chat still has a placeholder name: "New Chat", or the start of
+ * the question it was created with (older clients named chats that way).
+ */
+export function shouldAutoTitle(title: unknown, question: string) {
   if (typeof title !== "string") return true;
   const t = title.trim().toLowerCase();
-  return t === "" || t === "new chat" || t.startsWith("new chat");
+  if (t === "" || t.startsWith("new chat")) return true;
+  return question.trim().toLowerCase().startsWith(t);
+}
+
+/** A readable title from the question itself, cut at a word boundary. */
+export function titleFromQuestion(question: string, max = 42) {
+  const q = question.replace(/\s+/g, " ").trim();
+  if (q.length <= max) return q;
+  const cut = q.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > max / 2 ? cut.slice(0, lastSpace) : cut).replace(/[\s,.;:!?-]+$/, "")}…`;
 }
 
 async function maybeGenerateSessionTitle(
@@ -136,15 +150,24 @@ async function getContextNotes(db: Db, userId: string, noteIds: string[]): Promi
     .select()
     .from(notes)
     .where(and(eq(notes.userId, userId), inArray(notes.id, uniqueIds)));
-  return rows.map((d) => ({ id: d.id, title: d.title, content: d.content ?? "" }));
+  // In the order asked for (pins first), which is how [#N] numbers them.
+  const byId = new Map(rows.map((d) => [d.id, d]));
+  return uniqueIds
+    .map((id) => byId.get(id))
+    .filter((d) => d !== undefined)
+    .map((d) => ({ id: d.id, title: d.title, content: d.content ?? "" }));
 }
 
-async function insertAssistantMessage(db: Db, sessionId: string, content: string) {
+/**
+ * Saves a reply. `contextNoteIds` are the notes it was grounded in, in [#N]
+ * order, so the client can turn each citation back into its note.
+ */
+async function insertAssistantMessage(db: Db, sessionId: string, content: string, contextNoteIds: string[]) {
   const now = new Date();
   await db.update(chatSessions).set({ updatedAt: now }).where(eq(chatSessions.id, sessionId));
   const [message] = await db
     .insert(chatMessages)
-    .values({ sessionId, role: "assistant", content: content.trim() })
+    .values({ sessionId, role: "assistant", content: content.trim(), contextNoteIds })
     .returning({ id: chatMessages.id });
   return message!.id;
 }
@@ -170,21 +193,27 @@ export async function generateAssistantReply(
   const recent = await getRecentMessages(db, args.sessionId, 20);
   const contextNotes = await getContextNotes(db, userId, noteIds);
 
-  if (shouldAutoTitle(session.title) && apiKey) {
-    try {
-      const generated = await maybeGenerateSessionTitle(apiKey, {
-        mode,
-        question: args.question,
-        contextNotes,
-      });
-      if (generated) {
-        await db
-          .update(chatSessions)
-          .set({ title: generated.slice(0, 80), updatedAt: new Date() })
-          .where(eq(chatSessions.id, args.sessionId));
+  if (shouldAutoTitle(session.title, args.question)) {
+    let title: string | null = null;
+    if (apiKey) {
+      try {
+        title = await maybeGenerateSessionTitle(apiKey, {
+          mode,
+          question: args.question,
+          contextNotes,
+        });
+      } catch {
+        // Non-critical: title generation shouldn't block answering.
       }
-    } catch {
-      // Non-critical: title generation shouldn't block answering.
+    }
+    // Without a generated title, name it after the question rather than
+    // leaving "New Chat" or a mid-word cut.
+    title ??= args.question.trim() ? titleFromQuestion(args.question) : null;
+    if (title && title !== session.title) {
+      await db
+        .update(chatSessions)
+        .set({ title: title.slice(0, 80), updatedAt: new Date() })
+        .where(eq(chatSessions.id, args.sessionId));
     }
   }
 
@@ -206,7 +235,7 @@ export async function generateAssistantReply(
 
 If you want, switch the mode (Explain / Synthesize / Compare / Apply / Quiz / Fill gaps) and I’ll respond in that format once there’s enough note context.`;
 
-    const messageId = await insertAssistantMessage(db, args.sessionId, reply);
+    const messageId = await insertAssistantMessage(db, args.sessionId, reply, contextNotes.map((n) => n.id));
     return { messageId, content: reply };
   }
 
@@ -241,6 +270,6 @@ ${formatContextNotesForPrompt(contextNotes)}
   const model = getGeminiModel(apiKey);
   const result = await model.generateContent(prompt);
   const text = result.response.text().trim();
-  const messageId = await insertAssistantMessage(db, args.sessionId, text);
+  const messageId = await insertAssistantMessage(db, args.sessionId, text, contextNotes.map((n) => n.id));
   return { messageId, content: text };
 }

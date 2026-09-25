@@ -139,7 +139,8 @@ export function useStudioChat() {
     const question = override ?? input;
     if (!question.trim() && selectedNotes.length === 0) return;
 
-    const targetSessionId = await ensureSession(question.slice(0, 30) || "New Chat");
+    // The server names the chat from this first question once it replies.
+    const targetSessionId = await ensureSession("New Chat");
 
     const contextNoteIds = selectedNotes.map((n) => n._id);
     const mergedContextIds = Array.from(new Set([...pinnedIds, ...contextNoteIds]));

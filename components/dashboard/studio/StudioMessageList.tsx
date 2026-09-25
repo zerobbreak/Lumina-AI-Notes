@@ -2,7 +2,8 @@
 
 import { forwardRef } from "react";
 import { AtSign, Brain } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 
@@ -13,6 +14,9 @@ import { modeLabel } from "@/lib/studio/sessions";
 
 type MessageNote = { id: Id<"notes">; title: string };
 
+/** Keeps our `note-cite:` links, which react-markdown would otherwise blank as unsafe. */
+const keepCitations = (url: string) => (url.startsWith("note-cite:") ? url : defaultUrlTransform(url));
+
 function AssistantMarkdown({
   content,
   notes,
@@ -20,7 +24,8 @@ function AssistantMarkdown({
   compact,
 }: {
   content: string;
-  notes?: MessageNote[];
+  /** The notes cited as [#1], [#2]…, by position; a gap means the note is gone. */
+  notes: (MessageNote | undefined)[];
   onOpenNote: (noteId: Id<"notes">) => void;
   compact?: boolean;
 }) {
@@ -32,20 +37,16 @@ function AssistantMarkdown({
   });
 
   return (
-    <div
-      className={cn(
-        "reading-surface-compact prose dark:prose-invert font-reading prose-p:leading-relaxed prose-p:my-2 prose-li:my-1 prose-ul:my-2 prose-ol:my-2 prose-hr:my-4 prose-hr:border-border/60 prose-blockquote:border-l-primary/40 prose-blockquote:text-muted-foreground prose-pre:bg-background/60 prose-pre:border prose-pre:border-border/60 prose-pre:rounded-xl prose-pre:px-3 prose-pre:py-2 prose-code:bg-muted/40 prose-code:rounded prose-code:px-1 prose-code:py-0.5 prose-code:before:content-none prose-code:after:content-none max-w-none text-foreground",
-        compact ? "prose-sm" : "prose-base text-[1.05rem]",
-      )}
-    >
+    <div className={cn("chat-md", compact ? "reading-surface-compact" : "reading-surface")}>
       <ReactMarkdown
-        remarkPlugins={[remarkMath]}
+        remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
+        urlTransform={keepCitations}
         components={{
           a: ({ href, children }) => {
             if (href?.startsWith("note-cite:")) {
               const idx = Number(href.slice("note-cite:".length));
-              const note = notes?.[idx - 1];
+              const note = notes[idx - 1];
               if (!note) {
                 return (
                   <span className="inline-flex items-center rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 font-sans text-[11px] text-muted-foreground">
@@ -76,19 +77,20 @@ function AssistantMarkdown({
               </a>
             );
           },
-          code: ({ className, children }) => {
-            const isBlock = typeof className === "string" && className.includes("language-");
-            if (!isBlock) {
-              return <code className="rounded bg-muted/40 px-1 py-0.5 text-[0.9em]">{children}</code>;
-            }
-            return <code className={className}>{children}</code>;
-          },
         }}
       >
         {withCitations}
       </ReactMarkdown>
     </div>
   );
+}
+
+/**
+ * A reply's notes in [#N] order. Looked up by id, since the server leaves
+ * deleted notes out of `notes`, which would shift every later citation.
+ */
+function citedNotes(msg: ChatMessageModel): (MessageNote | undefined)[] {
+  return (msg.contextNoteIds ?? []).map((id) => msg.notes?.find((n) => n.id === id));
 }
 
 interface StudioMessageListProps {
@@ -140,7 +142,7 @@ export const StudioMessageList = forwardRef<HTMLDivElement, StudioMessageListPro
               >
                 <div
                   className={cn(
-                    "max-w-[85%] rounded-2xl rounded-tr-sm bg-primary text-primary-foreground shadow-sm",
+                    "max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-tr-sm bg-primary text-primary-foreground shadow-sm",
                     compact ? "px-3 py-2 text-[13px] leading-relaxed" : "px-4 py-3 text-sm leading-relaxed",
                   )}
                 >
@@ -168,7 +170,7 @@ export const StudioMessageList = forwardRef<HTMLDivElement, StudioMessageListPro
                 </p>
                 <AssistantMarkdown
                   content={msg.content}
-                  notes={msg.notes}
+                  notes={citedNotes(msg)}
                   onOpenNote={onOpenNote}
                   compact={compact}
                 />
