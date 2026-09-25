@@ -136,7 +136,7 @@ describe("TodayPlan", () => {
     expect(screen.getByRole("link", { name: /Open in Brightspace/ }).getAttribute("href")).toBe(
       "https://lms.example.test/d2l/le/1",
     );
-    expect(screen.getByRole("link", { name: "Open course" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: "Open module" }).getAttribute("href")).toBe(
       "/dashboard?contextId=data&contextType=course",
     );
     expect(screen.getByRole("link", { name: "Start review" }).getAttribute("href")).toBe("/dashboard?view=flashcards");

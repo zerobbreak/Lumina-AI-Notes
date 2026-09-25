@@ -223,7 +223,7 @@ export function CommandPalette({ open, onOpenChange, initialQuery = "" }: Comman
             router.push(`/dashboard?contextId=${course.id}&contextType=course`);
             onOpenChange(false);
           },
-          keywords: [course.code, course.name.toLowerCase(), "course"],
+          keywords: [course.code, course.name.toLowerCase(), "course", "module"],
         });
       });
     }

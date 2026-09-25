@@ -23,7 +23,7 @@ export function BrightspaceStep() {
         <div>
           <h3 className="text-sm font-semibold text-foreground">Use Brightspace?</h3>
           <p className="text-sm text-muted-foreground">
-            Connect your calendar and Lumina sets up your courses and due dates for you.
+            Connect your calendar and Lumina sets up your modules and due dates for you.
           </p>
         </div>
       </div>
@@ -41,7 +41,7 @@ export function BrightspaceStep() {
             {status.deadlineCount === 1 ? "" : "s"}
           </p>
           {user?.courses && user.courses.length > 0 && (
-            <ul className="flex flex-wrap gap-2" aria-label="Your courses">
+            <ul className="flex flex-wrap gap-2" aria-label="Your modules">
               {user.courses.map((course) => (
                 <li
                   key={course.id}

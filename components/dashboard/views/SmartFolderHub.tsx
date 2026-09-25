@@ -64,30 +64,11 @@ export default function SmartFolderHub() {
 
   const labelLookup = useMemo(() => {
     const courses = (userData?.courses ?? []) as Course[];
-    const courseMap = new Map<
-      string,
-      { code?: string; name: string; modules?: Array<{ id: string; title: string }> }
-    >();
-    courses.forEach((c) => {
-      courseMap.set(c.id, { code: c.code, name: c.name, modules: c.modules });
-    });
-    return ({
-      courseId,
-      moduleId,
-    }: {
-      courseId?: string;
-      moduleId?: string;
-    }) => {
-      if (!courseId) return {};
-      const course = courseMap.get(courseId);
+    const courseMap = new Map(courses.map((c) => [c.id, c]));
+    return ({ courseId }: { courseId?: string }) => {
+      const course = courseId ? courseMap.get(courseId) : undefined;
       if (!course) return {};
-      const moduleEntry = moduleId
-        ? course.modules?.find((m) => m.id === moduleId)
-        : undefined;
-      return {
-        courseLabel: course.code ? `${course.code}` : course.name,
-        moduleLabel: moduleEntry?.title,
-      };
+      return { courseLabel: course.code || course.name };
     };
   }, [userData?.courses]);
 
@@ -110,7 +91,7 @@ export default function SmartFolderHub() {
   } | null>(null);
 
   const handleCreateCourse = async () => {
-    await createCourse.mutateAsync({ name: "New Course", code: "NEW 101" });
+    await createCourse.mutateAsync({ name: "New module", code: "" });
   };
 
   const handleRenameConfirm = async (newName: string) => {
@@ -317,7 +298,7 @@ export default function SmartFolderHub() {
           open={!!renameTarget}
           onOpenChange={(open) => !open && setRenameTarget(null)}
           initialValue={renameTarget?.name || ""}
-          title="Course"
+          title="Module"
           onConfirm={handleRenameConfirm}
         />
       </div>

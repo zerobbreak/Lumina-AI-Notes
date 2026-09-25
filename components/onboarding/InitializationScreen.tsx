@@ -6,7 +6,7 @@ import { OnboardingBackdrop } from "@/components/onboarding/OnboardingChrome";
 
 const STEPS = [
   "Saving your profile…",
-  "Linking course files…",
+  "Linking module files…",
   "Applying workspace theme…",
   "Opening your dashboard…",
 ] as const;

@@ -136,7 +136,7 @@ describe("IntegrationsTab", () => {
     renderTab();
     const hist = await screen.findByRole("combobox", { name: /HIST101/ });
     expect(hist).toHaveTextContent("HIST 101 · History");
-    expect(screen.getByRole("combobox", { name: /MATH201/ })).toHaveTextContent("No course");
+    expect(screen.getByRole("combobox", { name: /MATH201/ })).toHaveTextContent("No module");
   });
 
   it("disconnects only after confirming", async () => {
@@ -156,7 +156,7 @@ describe("IntegrationsTab", () => {
   it("creates Lumina courses for unmatched Brightspace courses", async () => {
     server.status = connected;
     renderTab();
-    fireEvent.click(await screen.findByRole("button", { name: "Create 1 course from Brightspace" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Create 1 module from Brightspace" }));
 
     await waitFor(() =>
       expect(server.calls).toContainEqual({ method: "POST", path: "/integrations/brightspace/courses/import", body: undefined }),

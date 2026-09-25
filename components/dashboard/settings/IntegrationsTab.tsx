@@ -305,9 +305,9 @@ function CourseMatching({ courses }: { courses: BrightspaceCourseLinkDto[] }) {
       const response = await importCourses.mutateAsync();
       setEdits({});
       const made = response.imported ?? 0;
-      toast.success(made === 1 ? "Added 1 course from Brightspace" : `Added ${made} courses from Brightspace`);
+      toast.success(made === 1 ? "Added 1 module from Brightspace" : `Added ${made} modules from Brightspace`);
     } catch (err) {
-      toast.error(errorMessage(err, "Couldn't create the courses"));
+      toast.error(errorMessage(err, "Couldn't create the modules"));
     }
   };
 
@@ -319,7 +319,7 @@ function CourseMatching({ courses }: { courses: BrightspaceCourseLinkDto[] }) {
       setEdits({});
       reportSync(response.sync);
     } catch (err) {
-      toast.error(errorMessage(err, "Couldn't save your course choices"));
+      toast.error(errorMessage(err, "Couldn't save your module choices"));
     }
   };
 
@@ -327,9 +327,9 @@ function CourseMatching({ courses }: { courses: BrightspaceCourseLinkDto[] }) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h4 className="text-sm font-semibold text-foreground">Courses</h4>
+          <h4 className="text-sm font-semibold text-foreground">Modules</h4>
           <p className="text-xs text-muted-foreground">
-            Match each Brightspace course to one of yours so its deadlines land in the right place.
+            Match each Brightspace module to one of yours so its deadlines land in the right place.
           </p>
         </div>
         {unmatched > 0 && (
@@ -339,7 +339,7 @@ function CourseMatching({ courses }: { courses: BrightspaceCourseLinkDto[] }) {
             ) : (
               <FolderPlus className="w-4 h-4 mr-2" aria-hidden />
             )}
-            {unmatched === 1 ? "Create 1 course" : `Create ${unmatched} courses`} from Brightspace
+            {unmatched === 1 ? "Create 1 module" : `Create ${unmatched} modules`} from Brightspace
           </Button>
         )}
       </div>
@@ -365,13 +365,13 @@ function CourseMatching({ courses }: { courses: BrightspaceCourseLinkDto[] }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={NOT_MATCHED}>No course</SelectItem>
+                <SelectItem value={NOT_MATCHED}>No module</SelectItem>
                 {own.map((mine) => (
                   <SelectItem key={mine.id} value={mine.id}>
                     {mine.code ? `${mine.code} · ${mine.name}` : mine.name}
                   </SelectItem>
                 ))}
-                <SelectItem value={IGNORED}>Don&apos;t sync this course</SelectItem>
+                <SelectItem value={IGNORED}>Don&apos;t sync this module</SelectItem>
               </SelectContent>
             </Select>
           </li>
@@ -381,7 +381,7 @@ function CourseMatching({ courses }: { courses: BrightspaceCourseLinkDto[] }) {
         <div className="flex gap-2">
           <Button size="sm" onClick={submit} disabled={save.isPending}>
             {save.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden />}
-            Save courses
+            Save modules
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setEdits({})} disabled={save.isPending}>
             Undo changes

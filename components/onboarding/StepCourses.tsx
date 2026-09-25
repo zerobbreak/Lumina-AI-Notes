@@ -41,7 +41,7 @@ export function StepCourses({ value, onChange }: StepCoursesProps) {
       <BrightspaceStep />
 
       <p className="text-sm text-muted-foreground leading-relaxed">
-        You can also add syllabus PDFs: each one becomes a course with the file
+        You can also add syllabus PDFs: each one becomes a module with the file
         attached. Both are optional; skip for now if you prefer to add them later.
       </p>
 

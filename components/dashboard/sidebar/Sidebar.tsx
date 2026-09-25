@@ -60,9 +60,8 @@ import { useSidebarListData } from "@/lib/hooks/sidebar/useSidebarListData";
 
 type RenameTarget = {
   id: string;
-  type: "note" | "course" | "module" | "file" | "tag";
+  type: "note" | "course" | "file" | "tag";
   name: string;
-  parentId?: string;
 };
 
 function formatDueIn(dueAt: number): string {
@@ -104,8 +103,7 @@ export function Sidebar() {
   } = useSidebarListData(currentNoteId);
 
   const { deleteNote, renameNote, toggleArchiveNote } = useNoteActions();
-  const { createCourse, renameCourse, deleteCourse, renameModule, deleteModule } =
-    useCourseActions();
+  const { createCourse, renameCourse, deleteCourse } = useCourseActions();
   const { updateTag, deleteTag } = useTagActions();
   const { deleteFile, renameFile } = useFileActions();
 
@@ -208,16 +206,12 @@ export function Sidebar() {
     if (id.startsWith("settings:")) openSettings(id.slice("settings:".length));
   });
 
-  const openRename = (
-    id: string,
-    type: RenameTarget["type"],
-    name: string,
-    parentId?: string,
-  ) => setRenameTarget({ id, type, name, parentId });
+  const openRename = (id: string, type: RenameTarget["type"], name: string) =>
+    setRenameTarget({ id, type, name });
 
   const handleRenameConfirm = async (newValue: string) => {
     if (!renameTarget) return;
-    const { id, type, parentId } = renameTarget;
+    const { id, type } = renameTarget;
 
     try {
       if (type === "note")
@@ -226,12 +220,6 @@ export function Sidebar() {
         await renameFile({ fileId: id as Id<"files">, name: newValue });
       else if (type === "course")
         await renameCourse({ courseId: id, name: newValue });
-      else if (type === "module" && parentId)
-        await renameModule({
-          courseId: parentId,
-          moduleId: id,
-          title: newValue,
-        });
       else if (type === "tag")
         await updateTag({ tagId: id as Id<"tags">, name: newValue });
     } catch (e) {
@@ -242,10 +230,10 @@ export function Sidebar() {
 
   const handleCreateCourse = async () => {
     try {
-      await createCourse({ name: "New Course", code: "CSE 101" });
+      await createCourse({ name: "New module", code: "" });
     } catch (e) {
       console.error(e);
-      toast.error("Failed to create course");
+      toast.error("Failed to create module");
     }
   };
 
@@ -427,12 +415,6 @@ export function Sidebar() {
             isCompact
             onRename={(id, name) => openRename(id, "course", name)}
             onDelete={(id) => deleteCourse({ courseId: id })}
-            onRenameModule={(id, name, parentId) =>
-              openRename(id, "module", name, parentId)
-            }
-            onDeleteModule={(id, parentId) =>
-              deleteModule({ courseId: parentId, moduleId: id })
-            }
             onRenameNote={(id, title) => openRename(id, "note", title)}
             onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
             onArchiveNote={(id) =>
@@ -507,13 +489,13 @@ export function Sidebar() {
         <SidebarSection
           id="courses"
           count={courses.length}
-          label="Courses"
+          label="Modules"
           isEmpty={courses.length === 0}
-          emptyLabel="No courses yet"
+          emptyLabel="No modules yet"
           action={
             <SidebarSectionAction
               icon={Plus}
-              label="New course"
+              label="New module"
               onClick={handleCreateCourse}
             />
           }
@@ -524,12 +506,6 @@ export function Sidebar() {
               course={course}
               onRename={(id, name) => openRename(id, "course", name)}
               onDelete={(id) => deleteCourse({ courseId: id })}
-              onRenameModule={(id, name, parentId) =>
-                openRename(id, "module", name, parentId)
-              }
-              onDeleteModule={(id, parentId) =>
-                deleteModule({ courseId: parentId, moduleId: id })
-              }
               onRenameNote={(id, title) => openRename(id, "note", title)}
               onDeleteNote={(id) => deleteNote({ noteId: id as Id<"notes"> })}
               onArchiveNote={(id) =>
@@ -743,11 +719,9 @@ export function Sidebar() {
               ? "Note"
               : renameTarget.type === "file"
                 ? "File"
-                : renameTarget.type === "course"
-                  ? "Course"
-                  : renameTarget.type === "tag"
-                    ? "Tag"
-                    : "Module"
+                : renameTarget.type === "tag"
+                  ? "Tag"
+                  : "Module"
           }
           onConfirm={handleRenameConfirm}
         />

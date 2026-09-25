@@ -267,7 +267,7 @@ function AccentSection() {
           className="mt-0.5"
         />
         <span>
-          <span className="block text-sm font-medium text-foreground">Accent follows course</span>
+          <span className="block text-sm font-medium text-foreground">Accent follows module</span>
           <span className="block text-xs text-muted-foreground">
             Inside a course or one of its notes, use that course&rsquo;s colour. Change a course&rsquo;s colour
             from its menu in the sidebar.

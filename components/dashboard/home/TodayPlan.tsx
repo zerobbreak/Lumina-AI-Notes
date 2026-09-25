@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useSetDeadlineCompleted } from "@/lib/mutations/deadlines/useSetDeadlineCompleted";
 import type { ChecklistRow } from "@/lib/home/planChecklist";
-import { dueLabel, dueSoonChip, formatMinutes, overdueLabel, planAction, timeAgo } from "@/lib/home/planCopy";
+import { dueLabel, dueSoonChip, formatMinutes, overdueLabel, planAction, timeAgo, type PlanAction } from "@/lib/home/planCopy";
 import { cn } from "@/lib/utils";
 import type { CoursePulseDto, PlanItemDto } from "@/types/api/home";
 import { ActionButton, Chip, CourseMark, HomeCard, courseLabel, type CourseLookup, type Tone } from "./parts";
@@ -106,6 +106,7 @@ export function TodayPlan({
   pulses,
   courseOf,
   now,
+  actionFor = planAction,
   className,
 }: {
   rows: ChecklistRow[];
@@ -115,6 +116,8 @@ export function TodayPlan({
   pulses: CoursePulseDto[];
   courseOf: CourseLookup;
   now: number;
+  /** Where each item's button goes; a module page drops links back to itself. */
+  actionFor?: (item: PlanItemDto) => PlanAction | null;
   className?: string;
 }) {
   const [showWhy, setShowWhy] = useState(false);
@@ -173,7 +176,7 @@ export function TodayPlan({
                 </div>
                 <div className="col-start-2 flex items-center gap-3 sm:col-start-3 sm:flex-col sm:items-end sm:gap-2">
                   <DoneBox item={item} done={done} onChange={(next) => onToggle(item, index, next)} />
-                  {!done && <ActionButton action={planAction(item)} />}
+                  {!done && <ActionButton action={actionFor(item)} />}
                 </div>
               </li>
             );
@@ -214,7 +217,7 @@ export function TodayPlan({
           </div>
           <div id={whyId} hidden={!showWhy} className="border-t border-border/70 px-5 py-3 text-xs leading-relaxed text-muted-foreground">
             Overdue work comes first, then deadlines due this week (sooner and less prepared rank higher), then
-            the cards due today, then quizzes from the last month you scored under 60%. A course with a deadline
+            the cards due today, then quizzes from the last month you scored under 60%. A module with a deadline
             this week pushes its cards and quizzes up.
             {hiddenOverdue > 0 &&
               ` Only the most recent overdue item is here; the other ${hiddenOverdue} are in Coming up.`}

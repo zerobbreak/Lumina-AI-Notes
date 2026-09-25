@@ -152,7 +152,7 @@ export function RunwayStrip({
 
       <div className="overflow-x-auto rounded-xl border border-border bg-card dark:bg-inset">
         <div className="grid min-w-[760px] grid-cols-[8rem_repeat(14,minmax(0,1fr))]">
-          <div className="border-b border-border px-3 py-2 text-[11px] text-muted-foreground">Course</div>
+          <div className="border-b border-border px-3 py-2 text-[11px] text-muted-foreground">Module</div>
           {days.map((d, i) => {
             const weekend = d.getDay() === 0 || d.getDay() === 6;
             return (
@@ -228,7 +228,7 @@ function Lane({
         {lane.course ? (
           <CourseMark course={lane.course} className="text-xs font-semibold text-foreground" />
         ) : (
-          <span className="text-xs font-semibold text-muted-foreground">No course</span>
+          <span className="text-xs font-semibold text-muted-foreground">No module</span>
         )}
       </div>
       {days.map((d, i) => {
@@ -351,7 +351,7 @@ function PrepPanel({
         <p className="text-xs text-muted-foreground">
           {deadline.readiness !== null
             ? "Readiness mixes the flashcards you know well with your latest quiz scores for this course."
-            : "Add flashcards or take a quiz for this course to see how ready you are."}
+            : "Add flashcards or take a quiz for this module to see how ready you are."}
         </p>
       </div>
 
@@ -365,12 +365,12 @@ function PrepPanel({
           <X className="h-4 w-4" aria-hidden />
         </button>
         <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.09em] text-muted-foreground">
-          Study material for this course
+          Study material for this module
         </p>
         <MaterialRow
           count={pulse?.noteCount ?? 0}
           label="Notes"
-          detail={course ? `Everything filed under ${courseLabel(course)}` : "No course linked"}
+          detail={course ? `Everything filed under ${courseLabel(course)}` : "No module linked"}
           href={courseHref}
         />
         <MaterialRow

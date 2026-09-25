@@ -2,7 +2,7 @@ const passes = [
   {
     n: "01",
     title: "Capture",
-    body: "Drop in lecture audio, a PDF, or pasted text. Files go through UploadThing, PDFs through the ingestion pipeline, and everything lands against the right course and module from your onboarding.",
+    body: "Drop in lecture audio, a PDF, or pasted text. Files go through UploadThing, PDFs through the ingestion pipeline, and everything lands against the right module from your onboarding.",
     detail: ["Audio recordings", "PDF documents", "Pasted text"],
   },
   {

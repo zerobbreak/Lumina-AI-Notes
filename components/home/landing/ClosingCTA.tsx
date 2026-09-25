@@ -25,7 +25,7 @@ export function ClosingCTA() {
             className="mt-8 text-[1.05rem] leading-relaxed"
             style={{ color: "rgba(242,237,227,0.68)", maxWidth: "38rem" }}
           >
-            Set up your courses and modules once. After that, every recording
+            Set up your modules once. After that, every recording
             and reading you feed it comes back as something you can revise from.
           </p>
 

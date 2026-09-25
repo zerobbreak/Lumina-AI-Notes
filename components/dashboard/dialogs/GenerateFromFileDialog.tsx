@@ -23,7 +23,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { FileText, Sparkles, Brain } from "lucide-react";
-import { Course, Module } from "@/types";
+import { Course } from "@/types";
 import { useRouter } from "next/navigation";
 
 interface GenerateFromFileDialogProps {
@@ -51,23 +51,18 @@ export function GenerateFromFileDialog({
   const [selectedCourse, setSelectedCourse] = useState<string>(
     defaultCourseId || ""
   );
-  const [selectedModule, setSelectedModule] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingMode, setProcessingMode] = useState<
     "note" | "flashcards" | null
   >(null);
 
   const courses = userData?.courses || [];
-  const modules = selectedCourse
-    ? courses.find((c: Course) => c.id === selectedCourse)?.modules || []
-    : [];
 
   const handleClose = () => {
     if (!isProcessing) {
       onOpenChange(false);
       setTimeout(() => {
         if (!defaultCourseId) setSelectedCourse("");
-        setSelectedModule("");
       }, 300);
     }
   };
@@ -187,56 +182,27 @@ export function GenerateFromFileDialog({
             </div>
           </div>
 
-          {/* Course Selection */}
+          {/* Module Selection */}
           <div className="space-y-2">
-            <Label className="text-muted-foreground">Save to Course (Optional)</Label>
+            <Label className="text-muted-foreground">Save to Module (Optional)</Label>
             <Select
               value={selectedCourse}
-              onValueChange={(val) => {
-                setSelectedCourse(val);
-                setSelectedModule("");
-              }}
+              onValueChange={setSelectedCourse}
               disabled={isProcessing}
             >
               <SelectTrigger className="bg-foreground/5 border-border text-foreground w-full">
-                <SelectValue placeholder="Select course (Optional)" />
+                <SelectValue placeholder="Select module (Optional)" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border text-foreground">
-                <SelectItem value="none">No Course</SelectItem>
+                <SelectItem value="none">No Module</SelectItem>
                 {courses.map((course: Course) => (
                   <SelectItem key={course.id} value={course.id}>
-                    {course.code} - {course.name}
+                    {course.code ? `${course.code} - ` : ""}{course.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-
-          {/* Module Selection (if course has modules) */}
-          {selectedCourse &&
-            selectedCourse !== "none" &&
-            modules.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">Module (Optional)</Label>
-                <Select
-                  value={selectedModule}
-                  onValueChange={setSelectedModule}
-                  disabled={isProcessing}
-                >
-                  <SelectTrigger className="bg-foreground/5 border-border text-foreground w-full">
-                    <SelectValue placeholder="Select module (Optional)" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border-border text-foreground">
-                    <SelectItem value="none">No Module</SelectItem>
-                    {modules.map((mod: Module) => (
-                      <SelectItem key={mod.id} value={mod.id}>
-                        {mod.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-2">

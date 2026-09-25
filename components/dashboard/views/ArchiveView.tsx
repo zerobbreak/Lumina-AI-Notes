@@ -110,7 +110,7 @@ export default function ArchiveView() {
                             (note as unknown as { _creationTime: number })._creationTime,
                         )}{" "}
                         ago
-                        {note.courseId && " • Course related"}
+                        {note.courseId && " • In a module"}
                       </p>
                     </div>
                   </div>

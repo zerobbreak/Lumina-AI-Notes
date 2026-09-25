@@ -42,7 +42,7 @@ export const ANNOUNCEMENTS: readonly Announcement[] = [
   {
     id: "appearance-launch",
     title: "Make Lumina yours",
-    body: "Pick a world (Paper, Observatory, Focus or Riso), then tune the accent, fonts, reading size and density. Courses can have their own colours too.",
+    body: "Pick a world (Paper, Observatory, Focus or Riso), then tune the accent, fonts, reading size and density. Modules can have their own colours too.",
     publishedAt: Date.UTC(2026, 8, 24, 8, 0),
     priority: "major",
     media: "appearance-worlds",

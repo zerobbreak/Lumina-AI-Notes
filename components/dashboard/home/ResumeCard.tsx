@@ -9,8 +9,6 @@ import { CourseMark, Eyebrow, HomeCard } from "./parts";
 
 /** The note you last had open, with enough of it to remember where you were. */
 export function ResumeCard({ resume, course, now }: { resume: HomeResumeDto; course?: Course; now: number }) {
-  const moduleTitle = course?.modules?.find((m) => m.id === resume.moduleId)?.title;
-
   return (
     <HomeCard aria-labelledby="resume-heading" className="flex flex-col gap-2 p-5">
       <Eyebrow>Pick up where you left off · {timeAgo(resume.lastAccessedAt, now)}</Eyebrow>
@@ -27,7 +25,6 @@ export function ResumeCard({ resume, course, now }: { resume: HomeResumeDto; cou
           <Link href={`/dashboard?noteId=${resume.noteId}`}>Continue writing</Link>
         </Button>
         <CourseMark course={course} />
-        {moduleTitle && <span className="font-mono text-[11.5px] text-muted-foreground">· {moduleTitle}</span>}
       </div>
     </HomeCard>
   );

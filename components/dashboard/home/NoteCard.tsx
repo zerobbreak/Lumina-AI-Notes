@@ -16,10 +16,7 @@ type NoteLike = {
   wordCount?: number;
 };
 
-export type NoteLabelLookup = (args: {
-  courseId?: string;
-  moduleId?: string;
-}) => { courseLabel?: string; moduleLabel?: string };
+export type NoteLabelLookup = (args: { courseId?: string }) => { courseLabel?: string };
 
 function stripHtmlToText(html: string) {
   const text = html
@@ -70,11 +67,7 @@ export function NoteCard({
   lookupLabels?: NoteLabelLookup;
   className?: string;
 }) {
-  const labels = lookupLabels?.({
-    courseId: note.courseId,
-    moduleId: note.moduleId,
-  });
-  const primaryTag = labels?.moduleLabel || labels?.courseLabel;
+  const primaryTag = lookupLabels?.({ courseId: note.courseId })?.courseLabel;
   const contentText = note.content ? stripHtmlToText(note.content) : "";
   const snippet = contentText ? contentText.slice(0, 120) : "";
   const chips = buildStatusChips(note);

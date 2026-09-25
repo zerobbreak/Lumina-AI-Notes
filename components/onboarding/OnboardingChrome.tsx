@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-const STEP_LABELS = ["Welcome", "Focus", "Courses", "Audio"] as const;
+const STEP_LABELS = ["Welcome", "Focus", "Modules", "Audio"] as const;
 
 export function OnboardingProgress({
   step,

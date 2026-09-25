@@ -42,7 +42,7 @@ const STEP_HINTS: Record<
 > = {
   1: {
     title: "Built for how you study",
-    body: "A calm, focused workspace for notes, courses, and AI help—without the clutter.",
+    body: "A calm, focused workspace for notes, modules, and AI help—without the clutter.",
     icon: Sparkles,
   },
   2: {
@@ -56,8 +56,8 @@ const STEP_HINTS: Record<
     icon: Palette,
   },
   4: {
-    title: "Ground your courses",
-    body: "Brightspace brings in your courses and due dates; syllabus PDFs give Lumina context for smarter answers.",
+    title: "Ground your modules",
+    body: "Brightspace brings in your modules and due dates; syllabus PDFs give Lumina context for smarter answers.",
     icon: FolderOpen,
   },
   5: {
@@ -250,14 +250,14 @@ export default function OnboardingPage() {
                       {step === 1 && "Welcome"}
                       {step === 2 && "Your focus"}
                       {step === 3 && "Your look"}
-                      {step === 4 && "Your courses"}
+                      {step === 4 && "Your modules"}
                       {step === 5 && "Permissions"}
                     </p>
                     <h1 className="text-xl md:text-2xl font-semibold text-foreground tracking-tight">
                       {step === 1 && "Start your workspace"}
                       {step === 2 && "What do you study?"}
                       {step === 3 && "Pick your look"}
-                      {step === 4 && "Bring in your courses"}
+                      {step === 4 && "Bring in your modules"}
                       {step === 5 && "Enable microphone"}
                     </h1>
                   </motion.div>
@@ -292,7 +292,7 @@ export default function OnboardingPage() {
                         </motion.div>
                         <div className="space-y-3 max-w-sm">
                           <p className="text-foreground/80 text-[15px] leading-relaxed">
-                            Notes, courses, and AI assistance in one place—so
+                            Notes, modules, and AI assistance in one place—so
                             you spend less time switching tools and more time
                             learning.
                           </p>
@@ -421,7 +421,7 @@ export default function OnboardingPage() {
                           : "—"}
                       </p>
                       <p className="text-[11px] text-muted-foreground/80 mt-0.5">
-                        {step >= 4 ? "Syllabus files" : "Course files"}
+                        {step >= 4 ? "Syllabus files" : "Module files"}
                       </p>
                     </div>
                   </div>

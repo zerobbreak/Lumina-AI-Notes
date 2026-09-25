@@ -34,7 +34,7 @@ export interface ExpandCaptureTarget {
 }
 
 /**
- * Promotes a quick capture into a full note filed under a course, leaving the
+ * Promotes a quick capture into a full note filed under a module, leaving the
  * original marked as expanded so it isn't promoted twice.
  */
 export function ExpandCaptureDialog({
@@ -50,19 +50,14 @@ export function ExpandCaptureDialog({
   const { createNoteFlow } = useCreateNoteFlow();
 
   const [courseId, setCourseId] = useState("");
-  const [moduleId, setModuleId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // A fresh target is a fresh decision — don't inherit the last selection.
   useEffect(() => {
     if (target) {
       setCourseId("");
-      setModuleId("");
     }
   }, [target]);
-
-  const modules =
-    userData?.courses?.find((c: Course) => c.id === courseId)?.modules ?? [];
 
   const handleExpand = async () => {
     if (!target || !courseId) return;
@@ -72,7 +67,6 @@ export function ExpandCaptureDialog({
         title: target.title || "Quick Capture",
         major: userData?.major || "general",
         courseId,
-        moduleId: moduleId || undefined,
         noteType: "page",
       });
       if (!result?.noteId) return;
@@ -112,44 +106,23 @@ export function ExpandCaptureDialog({
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label htmlFor="expand-course">Course</Label>
+            <Label htmlFor="expand-course">Module</Label>
             <Select
               value={courseId}
-              onValueChange={(value) => {
-                setCourseId(value);
-                setModuleId("");
-              }}
+              onValueChange={setCourseId}
             >
               <SelectTrigger id="expand-course">
-                <SelectValue placeholder="Select course" />
+                <SelectValue placeholder="Select module" />
               </SelectTrigger>
               <SelectContent>
                 {userData?.courses?.map((course: Course) => (
                   <SelectItem key={course.id} value={course.id}>
-                    {course.code} — {course.name}
+                    {course.code ? `${course.code} — ` : ""}{course.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-
-          {courseId && modules.length > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="expand-module">Module (optional)</Label>
-              <Select value={moduleId} onValueChange={setModuleId}>
-                <SelectTrigger id="expand-module">
-                  <SelectValue placeholder="Select module" />
-                </SelectTrigger>
-                <SelectContent>
-                  {modules.map((mod) => (
-                    <SelectItem key={mod.id} value={mod.id}>
-                      {mod.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
         </div>
 
         <DialogFooter>

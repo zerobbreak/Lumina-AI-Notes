@@ -66,7 +66,7 @@ export function Hero() {
             >
               Lumina takes the recording, the slide deck, the PDF you never
               opened — and gives back structured notes, flashcards and quizzes
-              that are actually tied to your courses and modules.
+              that are actually tied to your modules.
             </p>
 
             <div

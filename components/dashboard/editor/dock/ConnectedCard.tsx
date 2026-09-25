@@ -73,7 +73,7 @@ export function ConnectedCard({
 
       {siblings.length > 0 && (
         <div>
-          <p className="mb-0.5 text-[11px] text-muted-foreground">Also in {courseName ?? "this course"}</p>
+          <p className="mb-0.5 text-[11px] text-muted-foreground">Also in {courseName ?? "this module"}</p>
           {siblings.map((n) => (
             <DockRow
               key={n._id}

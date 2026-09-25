@@ -171,7 +171,7 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
     }
   }, [userData, noteQuery, syntheticNote, router, onBack]);
 
-  // Parse context (Course / Module)
+  // The module the note is filed under
   const courseName = useMemo(() => {
     if (!userData?.courses) return "General";
     const cid = displayNote?.courseId;
@@ -439,10 +439,10 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
 
       if (parentId) {
         router.push(`/dashboard?noteId=${parentId}`);
-      } else if (moduleId) {
-        router.push(`/dashboard?contextId=${moduleId}&contextType=module`);
       } else if (courseId) {
         router.push(`/dashboard?contextId=${courseId}&contextType=course`);
+      } else if (moduleId) {
+        router.push(`/dashboard?contextId=${moduleId}&contextType=module`);
       } else {
         router.push("/dashboard");
       }
@@ -645,14 +645,14 @@ export default function NoteView({ noteId, onBack }: NoteViewProps) {
             <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
             <span
               onClick={() => {
-                // Navigate back to course/module context
-                if (note.moduleId) {
-                  router.push(
-                    `/dashboard?contextId=${note.moduleId}&contextType=module`,
-                  );
-                } else if (note.courseId) {
+                // Back to the module the note is filed under
+                if (note.courseId) {
                   router.push(
                     `/dashboard?contextId=${note.courseId}&contextType=course`,
+                  );
+                } else if (note.moduleId) {
+                  router.push(
+                    `/dashboard?contextId=${note.moduleId}&contextType=module`,
                   );
                 } else {
                   onBack();

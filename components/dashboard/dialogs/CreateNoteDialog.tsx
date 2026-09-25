@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Course, Module } from "@/types";
+import { Course } from "@/types";
 import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
 
 interface CreateNoteDialogProps {
@@ -37,13 +37,9 @@ export function CreateNoteDialog({
 
   const [title, setTitle] = useState("");
   const [selectedCourse, setSelectedCourse] = useState<string>("");
-  const [selectedModule, setSelectedModule] = useState<string>("");
   const [isCreating, setIsCreating] = useState(false);
 
   const courses = userData?.courses || [];
-  const modules = selectedCourse
-    ? courses.find((c: Course) => c.id === selectedCourse)?.modules || []
-    : [];
 
   const handleCreate = async () => {
     if (!title) return;
@@ -53,13 +49,11 @@ export function CreateNoteDialog({
         title,
         major: userData?.major || "general",
         courseId: selectedCourse || undefined,
-        moduleId: selectedModule || undefined,
       });
       if (result?.noteId) {
         onOpenChange(false);
         setTitle("");
         setSelectedCourse("");
-        setSelectedModule("");
       }
     } catch (error) {
       console.error("Create note failed:", error);
@@ -74,7 +68,7 @@ export function CreateNoteDialog({
         <DialogHeader>
           <DialogTitle>Create New Note</DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Start a new note and optionally link it to a course context.
+            Start a new note and optionally file it under a module.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -93,65 +87,25 @@ export function CreateNoteDialog({
 
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="course" className="text-right text-muted-foreground">
-              Course
+              Module
             </Label>
             <Select
               value={selectedCourse}
-              onValueChange={(val) => {
-                if (val === "none") {
-                  setSelectedCourse("");
-                  setSelectedModule("");
-                  return;
-                }
-                setSelectedCourse(val);
-                setSelectedModule("");
-              }}
+              onValueChange={(val) => setSelectedCourse(val === "none" ? "" : val)}
             >
               <SelectTrigger className="col-span-3 bg-foreground/5 border-border text-foreground">
-                <SelectValue placeholder="Select course (Optional)" />
+                <SelectValue placeholder="Select module (Optional)" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border text-foreground">
                 <SelectItem value="none">None</SelectItem>
                 {courses.map((course: Course) => (
                   <SelectItem key={course.id} value={course.id}>
-                    {course.code} - {course.name}
+                    {course.code ? `${course.code} - ` : ""}{course.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-
-          {selectedCourse &&
-            selectedCourse !== "none" &&
-            modules.length > 0 && (
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="module" className="text-right text-muted-foreground">
-                  Module
-                </Label>
-                <Select
-                  value={selectedModule}
-                  onValueChange={(val) => {
-                    if (val === "none") {
-                      setSelectedModule("");
-                      return;
-                    }
-                    setSelectedModule(val);
-                  }}
-                >
-                  <SelectTrigger className="col-span-3 bg-foreground/5 border-border text-foreground">
-                    <SelectValue placeholder="Select module (Optional)" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border-border text-foreground">
-                    <SelectItem value="none">None</SelectItem>
-                    {modules.map((mod: Module) => (
-                      <SelectItem key={mod.id} value={mod.id}>
-                        {mod.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
         </div>
         <DialogFooter>
           <Button

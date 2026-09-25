@@ -82,7 +82,7 @@ export function planHeadline(
   if (total === 0) {
     return hasCourses
       ? { before: "Nothing is due today. A good day to get ahead on something." }
-      : { before: "Add a course to get a plan for your day." };
+      : { before: "Add a module to get a plan for your day." };
   }
   if (done >= total) return { before: "That's everything for today. Nice work." };
 
@@ -112,7 +112,7 @@ export function planAction(item: PlanItemDto): PlanAction | null {
   if (item.kind === "weak-quiz") return { label: "Retake", href: `/dashboard?view=quizzes&deckId=${item.quizDeckId}` };
   const d = item.deadline;
   if (d.externalUrl) return { label: "Open in Brightspace", href: d.externalUrl, external: true };
-  if (d.courseId) return { label: "Open course", href: `/dashboard?contextId=${d.courseId}&contextType=course` };
+  if (d.courseId) return { label: "Open module", href: `/dashboard?contextId=${d.courseId}&contextType=course` };
   return null;
 }
 

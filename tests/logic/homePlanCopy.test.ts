@@ -105,7 +105,7 @@ describe("planHeadline", () => {
   it("has something to say when the plan is empty", () => {
     expect(planHeadline({ total: 0, done: 0, minutesLeft: 0 }, true, NOW).before).toMatch(/^Nothing is due today\./);
     expect(planHeadline({ total: 0, done: 0, minutesLeft: 0 }, false, NOW).before).toBe(
-      "Add a course to get a plan for your day.",
+      "Add a module to get a plan for your day.",
     );
   });
 });
