@@ -112,3 +112,50 @@ describe("GET /api/v1/home", () => {
     });
   });
 });
+
+describe("GET /api/v1/courses/:courseId/overview", () => {
+  it("scores only that course's data and switches on exam prep when an exam is close", async () => {
+    const createCourse = async (name: string) =>
+      (await as(ALICE).post("/api/v1/courses").send({ name, code: name.toUpperCase() })).body.id as string;
+    const courseId = await createCourse("Algorithms");
+    const otherId = await createCourse("Databases");
+
+    const deckId = (
+      await as(ALICE)
+        .post("/api/v1/flashcards/decks")
+        .send({ title: "Heaps", courseId, cards: [{ front: "heapify", back: "O(n)" }, { front: "sift", back: "…" }] })
+    ).body.id as string;
+    await as(ALICE).post("/api/v1/flashcards/decks").send({ title: "Joins", courseId: otherId, cards: [{ front: "a", back: "b" }] });
+    const quizId = (
+      await as(ALICE)
+        .post("/api/v1/quizzes/decks")
+        .send({ title: "Trees", courseId, questions: [0, 1].map((n) => ({ question: `Q${n}`, options: ["a", "b", "c", "d"], correctAnswer: 0 })) })
+    ).body.id as string;
+    await as(ALICE).post(`/api/v1/quizzes/decks/${quizId}/results`).send({ score: 1, totalQuestions: 2, answers: [0, 1] });
+
+    await as(ALICE).post("/api/v1/deadlines").send({ title: "Final", dueAt: Date.now() + 5 * DAY, kind: "exam", courseId });
+    await as(ALICE).post("/api/v1/deadlines").send({ title: "Project", dueAt: Date.now() + 30 * DAY, kind: "assignment", courseId });
+    await as(ALICE).post("/api/v1/deadlines").send({ title: "Other test", dueAt: Date.now() + DAY, kind: "exam", courseId: otherId });
+    const noteId = (await as(ALICE).post("/api/v1/notes").send({ title: "Heaps lecture", courseId })).body.id as string;
+
+    const res = await as(ALICE).get(
+      `/api/v1/courses/${courseId}/overview?tzOffsetMinutes=${new Date().getTimezoneOffset()}`,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.pulse).toMatchObject({ courseId, cardCount: 2, quizCount: 1, quizScore: 0.5, noteCount: 1 });
+    expect(res.body.upcoming.map((d: { title: string }) => d.title)).toEqual(["Final", "Project"]);
+    // Both score 0.5 (an untouched deck, a 50% quiz), so title order decides.
+    expect(res.body.studySets.map((s: { id: string }) => s.id)).toEqual([deckId, quizId]);
+    expect(res.body.examPrep).toMatchObject({
+      exam: { title: "Final" },
+      coverage: { solid: 0, shaky: 1, untouched: 1 },
+    });
+    expect(res.body.examPrep.days.length).toBeGreaterThanOrEqual(4);
+    expect(res.body.lastOpened).toMatchObject({ noteId, title: "Heaps lecture" });
+  });
+
+  it("404s for a course that isn't the caller's", async () => {
+    const courseId = (await as(ALICE).post("/api/v1/courses").send({ name: "Algorithms", code: "ALG" })).body.id;
+    expect((await as(BOB).get(`/api/v1/courses/${courseId}/overview`)).status).toBe(404);
+  });
+});

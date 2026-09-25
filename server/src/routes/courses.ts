@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, count, countDistinct, eq, inArray, ne } from "drizzle-orm";
+import { and, count, countDistinct, desc, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
 import { Router } from "express";
 import { z } from "zod";
@@ -16,12 +16,18 @@ import {
   type Course,
   type CourseModule,
 } from "../db/schema/index.js";
+import { buildCourseOverview, UPCOMING_DAYS } from "../home/courseOverview.js";
+import { loadStudyInput } from "../home/loadInput.js";
+import { RUNWAY_DAYS } from "../home/summary.js";
 import { HttpError } from "../middleware/errors.js";
 import { currentUser } from "../middleware/user.js";
 import type { Storage } from "../storage/s3.js";
 import { COURSE_COLORS, pickCourseColor } from "../users/courseColors.js";
+import { homeQuery, localDayEnd } from "./home.js";
 import { noteStyle } from "./users.js";
 import { parse } from "./validation.js";
+
+const DAY = 24 * 60 * 60 * 1000;
 
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
@@ -194,6 +200,44 @@ export function createCoursesRouter(db: Db, storage: Storage) {
       Object.assign(findCourse(courses, req.params.courseId), body),
     );
     res.json(course);
+  });
+
+  // The course page: its plan, deadlines, decks and quizzes, and exam prep when an exam is close.
+  router.get("/:courseId/overview", async (req, res) => {
+    const user = currentUser(res);
+    const course = findCourse(user.courses ?? [], req.params.courseId);
+    const { tzOffsetMinutes: offset } = parse(homeQuery, req.query);
+    const now = Date.now();
+
+    const [input, [lastNote]] = await Promise.all([
+      loadStudyInput(db, user.id, {
+        now,
+        dayEnd: localDayEnd(now, offset),
+        deadlinesFrom: now - RUNWAY_DAYS * DAY,
+        deadlinesTo: now + UPCOMING_DAYS * DAY,
+        courseId: course.id,
+      }),
+      db
+        .select({ id: notes.id, title: notes.title, lastAccessedAt: notes.lastAccessedAt })
+        .from(notes)
+        .where(
+          and(
+            eq(notes.userId, user.id),
+            eq(notes.courseId, course.id),
+            eq(notes.isArchived, false),
+            isNotNull(notes.lastAccessedAt),
+          ),
+        )
+        .orderBy(desc(notes.lastAccessedAt))
+        .limit(1),
+    ]);
+
+    res.json({
+      ...buildCourseOverview(course, input),
+      lastOpened: lastNote
+        ? { noteId: lastNote.id, title: lastNote.title, lastAccessedAt: lastNote.lastAccessedAt!.getTime() }
+        : null,
+    });
   });
 
   router.get("/:courseId/delete-preview", async (req, res) => {

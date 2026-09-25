@@ -51,13 +51,18 @@ function write(key: string, entries: DoneEntry[]) {
   }
 }
 
-export function usePlanChecklist(plan: PlanItemDto[], now: number) {
+/**
+ * Home and each course page share one day's ticks, so ticking an item in one
+ * ticks it in the other. `keep` limits which ticked items a page puts back
+ * (a course page shows only its own).
+ */
+export function usePlanChecklist(plan: PlanItemDto[], now: number, keep?: (item: PlanItemDto) => boolean) {
   const key = STORAGE_PREFIX + dayKey(now);
   const [state, setState] = useState(() => ({ key, done: read(key) }));
   // A new day (or first data) starts from that day's stored ticks.
   const done = state.key === key ? state.done : read(key);
 
-  const rows = mergeChecklist(plan, done);
+  const rows = mergeChecklist(plan, keep ? done.filter((d) => keep(d.item)) : done);
 
   const setDone = useCallback(
     (item: PlanItemDto, index: number, isDone: boolean) => {

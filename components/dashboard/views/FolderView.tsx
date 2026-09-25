@@ -11,13 +11,12 @@ import { Separator } from "@/components/ui/separator";
 import {
   ChevronRight,
   BookOpen,
-  Folder,
   FileText,
   Plus,
   File,
 } from "lucide-react";
 import { Id } from "@/types/data-model";
-import { Course, Module } from "@/types";
+import { Course } from "@/types";
 import { ActionMenu } from "@/components/shared/ActionMenu";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
 import { EditableTitle } from "@/components/shared/EditableTitle";
@@ -26,6 +25,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { useState } from "react";
 import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
 import { NoteCard } from "@/components/dashboard/home/NoteCard";
+import { CourseOverview } from "@/components/dashboard/course/CourseOverview";
 
 interface FolderViewProps {
   contextId: string;
@@ -63,55 +63,27 @@ export default function FolderView({
   contextType,
 }: FolderViewProps) {
   const router = useRouter();
-  const { userData, contextNotes, contextFiles } = useFolderViewData(
+  const { userData, contextNotes, contextFiles, courseId } = useFolderViewData(
     contextId,
     contextType,
   );
 
   const { createNoteFlow } = useCreateNoteFlow();
-  const { addModuleToCourse, renameModule, deleteModule } = useCourseActions();
+  const { renameCourse } = useCourseActions();
   const { deleteFile, renameFile, retryProcessing } = useFileActions();
   const { togglePinNote, deleteNote, renameNote } = useNoteActions();
 
   const [renameTarget, setRenameTarget] = useState<{
     id: string | Id<"files"> | Id<"notes">;
     title: string;
-    type: "module" | "file" | "note";
+    type: "file" | "note";
   } | null>(null);
 
   // --- Helpers ---
-  const getCurrentCourse = () => {
-    if (!userData || contextType !== "course") return null;
-    return userData.courses?.find((c: Course) => c.id === contextId);
-  };
-
-  const getContextName = () => {
-    if (!userData || !contextId) return "Folder";
-    if (contextType === "course") {
-      const course = getCurrentCourse();
-      return course ? `${course.code} - ${course.name}` : "Course";
-    }
-    if (contextType === "module") {
-      for (const c of userData.courses || []) {
-        const mod = c.modules?.find((m: Module) => m.id === contextId);
-        if (mod) return mod.title;
-      }
-      return "Module";
-    }
-    return "Smart Folder";
-  };
-
-  // Get current module and its parent course ID for rename operations
-  const getCurrentModuleData = () => {
-    if (!userData || contextType !== "module") return null;
-    for (const c of userData.courses || []) {
-      const mod = c.modules?.find((m: Module) => m.id === contextId);
-      if (mod) return { module: mod, courseId: c.id };
-    }
-    return null;
-  };
-
-  const currentModuleData = getCurrentModuleData();
+  const currentCourse = courseId
+    ? userData?.courses?.find((c: Course) => c.id === courseId)
+    : undefined;
+  const contextName = currentCourse?.name ?? (courseId ? "Module" : "Smart Folder");
 
   // --- Handlers ---
   const handleCreateNoteInContext = async () => {
@@ -119,8 +91,7 @@ export default function FolderView({
       const result = await createNoteFlow({
         title: "Untitled Note",
         major: userData?.major || "general",
-        courseId: contextType === "course" ? contextId : undefined,
-        moduleId: contextType === "module" ? contextId : undefined,
+        courseId,
       });
       if (result?.noteId) {
         router.push(`/dashboard?noteId=${result.noteId}`);
@@ -130,24 +101,9 @@ export default function FolderView({
     }
   };
 
-  const handleAddModule = async () => {
-    if (contextType !== "course") return;
-    try {
-      await addModuleToCourse({ courseId: contextId, title: "New Module" });
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
   const handleRenameConfirm = async (newTitle: string) => {
     if (!renameTarget) return;
-    if (renameTarget.type === "module") {
-      await renameModule({
-        courseId: contextId,
-        moduleId: renameTarget.id as string,
-        title: newTitle,
-      });
-    } else if (renameTarget.type === "file") {
+    if (renameTarget.type === "file") {
       await renameFile({
         fileId: renameTarget.id as Id<"files">,
         name: newTitle,
@@ -160,8 +116,6 @@ export default function FolderView({
     }
     setRenameTarget(null);
   };
-
-  const currentCourse = getCurrentCourse();
 
   return (
     <div className="h-full flex flex-col relative bg-sidebar text-sidebar-foreground">
@@ -187,7 +141,7 @@ export default function FolderView({
             </span>
             <ChevronRight className="w-4 h-4 text-muted-foreground/60" />
             <span className="font-medium text-sidebar-foreground bg-sidebar-accent px-3 py-1 rounded-full border border-sidebar-border">
-              {getContextName()}
+              {contextName}
             </span>
           </motion.div>
           <motion.div
@@ -198,28 +152,25 @@ export default function FolderView({
           >
             <div className="flex items-center gap-6">
               <div className="w-16 h-16 rounded-2xl bg-sidebar-accent border border-sidebar-border flex items-center justify-center shadow-sm">
-                {contextType === "course" ? (
-                  <BookOpen className="w-8 h-8 text-sidebar-primary" />
-                ) : (
-                  <Folder className="w-8 h-8 text-sidebar-primary" />
-                )}
+                <BookOpen className="w-8 h-8 text-sidebar-primary" />
               </div>
-              {contextType === "module" && currentModuleData ? (
-                <EditableTitle
-                  initialValue={currentModuleData.module.title}
-                  onSave={async (newTitle) => {
-                    await renameModule({
-                      courseId: currentModuleData.courseId,
-                      moduleId: contextId,
-                      title: newTitle,
-                    });
-                  }}
-                  className="text-5xl font-bold text-sidebar-foreground tracking-tight hover:bg-sidebar-accent/50 rounded px-2 -ml-2 transition-colors cursor-text"
-                  placeholder="Untitled Module"
-                />
+              {currentCourse ? (
+                <div>
+                  <EditableTitle
+                    initialValue={currentCourse.name}
+                    onSave={async (name) => {
+                      await renameCourse({ courseId: currentCourse.id, name });
+                    }}
+                    className="text-3xl md:text-4xl font-bold text-sidebar-foreground tracking-tight hover:bg-sidebar-accent/50 rounded px-2 -ml-2 transition-colors cursor-text"
+                    placeholder="Untitled module"
+                  />
+                  {currentCourse.code && (
+                    <p className="mt-1 text-sm font-medium text-muted-foreground">{currentCourse.code}</p>
+                  )}
+                </div>
               ) : (
                 <h1 className="text-3xl md:text-4xl font-bold text-sidebar-foreground tracking-tight line-clamp-2 leading-tight max-w-4xl">
-                  {getContextName()}
+                  {contextName}
                 </h1>
               )}
             </div>
@@ -229,93 +180,12 @@ export default function FolderView({
 
       <ScrollArea className="flex-1 bg-sidebar">
         <div className="max-w-[1600px] mx-auto py-12 px-12 space-y-12">
-          {/* MODULES SECTION (Only for Course context) */}
-          {contextType === "course" && currentCourse && (
-            <section>
-              <div className="flex items-center justify-between mb-6 px-1">
-                <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                  <Folder className="w-4 h-4 text-sidebar-primary" />
-                  Modules ({currentCourse.modules?.length || 0})
-                </h2>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="rounded-full bg-sidebar-accent border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent/80 hover:text-sidebar-foreground hover:border-sidebar-border transition-all duration-300"
-                  onClick={handleAddModule}
-                >
-                  <Plus className="w-3.5 h-3.5 mr-2" />
-                  Add Module
-                </Button>
-              </div>
-
-              <motion.div
-                variants={containerVariants}
-                initial="hidden"
-                animate="show"
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
-              >
-                {currentCourse.modules?.map((mod: Module) => (
-                  <motion.div
-                    key={mod.id}
-                    variants={itemVariants}
-                    onClick={() =>
-                      router.push(
-                        `/dashboard?contextId=${mod.id}&contextType=module`,
-                      )
-                    }
-                    whileHover={{ scale: 1.02 }}
-                    className="group relative flex items-center gap-4 p-4 rounded-2xl border border-sidebar-border bg-sidebar-accent/60 backdrop-blur-sm cursor-pointer transition-all duration-300 hover:bg-sidebar-accent hover:border-sidebar-border"
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-sidebar-accent flex items-center justify-center group-hover:bg-sidebar-accent/80 transition-colors">
-                      <Folder className="w-6 h-6 text-sidebar-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-sidebar-foreground truncate group-hover:text-sidebar-foreground transition-colors">
-                        {mod.title}
-                      </p>
-                    </div>
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <ActionMenu
-                        onRename={() =>
-                          setRenameTarget({
-                            id: mod.id,
-                            title: mod.title,
-                            type: "module",
-                          })
-                        }
-                        onDelete={() => {
-                          if (confirm("Delete this module?")) {
-                            deleteModule({
-                              courseId: contextId,
-                              moduleId: mod.id,
-                            });
-                          }
-                        }}
-                        align="right"
-                      />
-                    </div>
-                  </motion.div>
-                ))}
-
-                {(!currentCourse.modules ||
-                  currentCourse.modules.length === 0) && (
-                  <div className="col-span-full">
-                    <EmptyState
-                      icon={<Folder className="w-8 h-8 text-sidebar-primary" />}
-                      title="No modules yet"
-                      description="Create modules to organize your notes into topics or chapters"
-                      action={{
-                        label: "Add Module",
-                        onClick: handleAddModule,
-                      }}
-                    />
-                  </div>
-                )}
-              </motion.div>
-            </section>
+          {currentCourse && (
+            <>
+              <CourseOverview course={currentCourse} />
+              <Separator className="bg-sidebar-border" />
+            </>
           )}
-
-          {contextType === "course" && <Separator className="bg-sidebar-border" />}
 
           {/* NOTES SECTION */}
           <section>
@@ -526,7 +396,7 @@ export default function FolderView({
         open={!!renameTarget}
         onOpenChange={(open) => !open && setRenameTarget(null)}
         initialValue={renameTarget?.title || ""}
-        title={renameTarget?.type === "file" ? "File" : "Module"}
+        title={renameTarget?.type === "file" ? "File" : "Note"}
         onConfirm={handleRenameConfirm}
       />
     </div>

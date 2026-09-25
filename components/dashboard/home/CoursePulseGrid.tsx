@@ -24,7 +24,7 @@ const RANK: Record<PulseStatus, number> = { behind: 0, attention: 1, quiet: 2, "
 const percent = (v: number | null) => (v === null ? "–" : `${Math.round(v * 100)}%`);
 
 /** Recall per week as a line; gaps where a week had too few reviews. */
-function Sparkline({ trend, color }: { trend: Array<number | null>; color: string }) {
+export function Sparkline({ trend, color }: { trend: Array<number | null>; color: string }) {
   const points = trend.map((v, i) => (v === null ? null : { x: 4 + (i * 252) / (trend.length - 1), y: 40 - v * 36 }));
   const drawn = points.filter((p): p is { x: number; y: number } => p !== null);
   if (drawn.length < 2) {
@@ -125,7 +125,7 @@ function PulseCard({
           {pulse.lastStudiedAt ? `studied ${timeAgo(pulse.lastStudiedAt, now)}` : "not studied yet"}
         </span>
         <Button asChild size="sm" variant="outline" className="h-8">
-          <Link href={href}>Open course</Link>
+          <Link href={href}>Open module</Link>
         </Button>
       </div>
     </article>
@@ -162,26 +162,26 @@ export function CoursePulseGrid({
   const needYou = pulses.filter((p) => p.status === "behind" || p.status === "attention").length;
   const heading =
     courses.length === 0
-      ? "Add your courses to see how each one is going."
+      ? "Add your modules to see how each one is going."
       : needYou === 0
-        ? "Every course is on track."
-        : `${needYou === 1 ? "One course needs" : `${needYou} courses need`} you this week.`;
+        ? "Every module is on track."
+        : `${needYou === 1 ? "One module needs" : `${needYou} modules need`} you this week.`;
 
   return (
     <section aria-labelledby="pulse-heading" className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
-          <Eyebrow>Your courses</Eyebrow>
+          <Eyebrow>Your modules</Eyebrow>
           <h2 id="pulse-heading" className="font-reading text-xl font-medium leading-snug text-foreground">
             {heading}
           </h2>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Sort courses">
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Sort modules">
           {(
             [
               ["attention", "Needs attention"],
               ["deadline", "Next deadline"],
-              ["code", "Course code"],
+              ["code", "Module code"],
             ] as const
           ).map(([mode, label]) => (
             <button
@@ -201,7 +201,7 @@ export function CoursePulseGrid({
           ))}
           <Button variant="outline" size="sm" className="ml-1 h-8" onClick={onCreate}>
             <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-            Add course
+            Add module
           </Button>
         </div>
       </div>
