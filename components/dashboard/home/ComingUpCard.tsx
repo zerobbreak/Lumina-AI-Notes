@@ -12,9 +12,14 @@ const MAX_ROWS = 6;
 /** Old overdue items shouldn't crowd out what's next. */
 const MAX_OVERDUE_ROWS = 3;
 
-const dayTag = (ms: number) => {
+/** "FRI 06" inside two weeks; "06 NOV" further out, where the weekday alone is ambiguous. */
+const dayTag = (ms: number, now: number) => {
   const d = new Date(ms);
-  return `${d.toLocaleDateString(undefined, { weekday: "short" }).toUpperCase()} ${String(d.getDate()).padStart(2, "0")}`;
+  const day = String(d.getDate()).padStart(2, "0");
+  if (Math.abs(ms - now) >= 13 * 86_400_000) {
+    return `${day} ${d.toLocaleDateString(undefined, { month: "short" }).toUpperCase()}`;
+  }
+  return `${d.toLocaleDateString(undefined, { weekday: "short" }).toUpperCase()} ${day}`;
 };
 
 /** Overdue work and the next deadlines, one line each. */
@@ -56,7 +61,7 @@ export function ComingUpCard({
                 key={d.id}
                 className="grid grid-cols-[3.25rem_1fr_auto] items-center gap-2.5 border-b border-border/70 py-2 text-[13px] last:border-b-0"
               >
-                <span className="font-mono text-[11.5px] text-muted-foreground">{dayTag(d.dueAt)}</span>
+                <span className="font-mono text-[11.5px] text-muted-foreground">{dayTag(d.dueAt, now)}</span>
                 {d.externalUrl ? (
                   <a href={d.externalUrl} target="_blank" rel="noopener noreferrer" className="truncate text-foreground hover:underline">
                     {d.title}
