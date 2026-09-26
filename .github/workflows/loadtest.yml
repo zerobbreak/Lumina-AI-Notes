@@ -4,6 +4,7 @@ name: Load test (production)
 on:
   push:
     branches: [loadtest]
+    paths: [scripts/loadtest/load.mjs, .github/workflows/loadtest.yml]
   workflow_dispatch:
 
 jobs:

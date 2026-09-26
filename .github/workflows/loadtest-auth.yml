@@ -1,0 +1,32 @@
+name: Load test (production, signed in)
+
+# 50 virtual users sign in through Clerk, then keep loading the dashboard.
+# Read-only: no AI calls, no note writes. Needs the LOADTEST_ACCOUNTS secret:
+# one "email,password" per line, for test accounts only.
+on:
+  push:
+    branches: [loadtest]
+    paths: [scripts/loadtest/auth-load.mjs, .github/workflows/loadtest-auth.yml]
+  workflow_dispatch:
+
+jobs:
+  loadtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LOADTEST_ACCOUNTS: ${{ secrets.LOADTEST_ACCOUNTS }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 50 users, normal pace (2-6s between dashboard loads)
+        run: node scripts/loadtest/auth-load.mjs 50 120 2000 6000 | tee -a out.txt
+      - name: 50 users, zero think time (stress)
+        run: RAMP_MS=10000 node scripts/loadtest/auth-load.mjs 50 60 0 0 | tee -a out.txt
+      - name: Summary
+        if: always()
+        run: |
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat out.txt >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
