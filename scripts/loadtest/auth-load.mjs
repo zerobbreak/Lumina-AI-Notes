@@ -3,7 +3,7 @@
 //
 //   LOADTEST_ACCOUNTS="email,password\nemail2,password2" node auth-load.mjs <users> <seconds> <thinkMinMs> <thinkMaxMs>
 //
-// Accounts are shared round-robin, so 50 users can run on a few test accounts
+// Accounts are "email-or-username,password", shared round-robin, so 50 users can run on a few test accounts
 // (each virtual user gets its own Clerk client + session). Read-only: no AI
 // calls, no writes to notes.
 const WEB = process.env.WEB_URL ?? "https://lumina-web-production-e6ce.up.railway.app";
@@ -60,7 +60,26 @@ async function signIn(account) {
   if (!db) return null;
   const body = new URLSearchParams({ strategy: "password", identifier: account.email, password: account.password });
   const si = await timed("clerk: sign in (password)", fapi("/client/sign_ins", db), { method: "POST", headers: clerkHeaders, body });
-  const res = json(si.body);
+  let res = json(si.body);
+  // Clerk asks for an email code on a new device. +clerk_test addresses get no
+  // real mail and accept Clerk's fixed test code.
+  if (res?.response?.status === "needs_second_factor") {
+    const id = res.response.id;
+    const factor = res.response.supported_second_factors?.find((x) => x.strategy === "email_code");
+    if (factor) {
+      await timed("clerk: 2nd factor prepare", fapi(`/client/sign_ins/${id}/prepare_second_factor`, db), {
+        method: "POST",
+        headers: clerkHeaders,
+        body: new URLSearchParams({ strategy: "email_code", email_address_id: factor.email_address_id }),
+      });
+      const att = await timed("clerk: 2nd factor attempt", fapi(`/client/sign_ins/${id}/attempt_second_factor`, db), {
+        method: "POST",
+        headers: clerkHeaders,
+        body: new URLSearchParams({ strategy: "email_code", code: "424242" }),
+      });
+      res = json(att.body);
+    }
+  }
   const outcome = res?.response?.status ?? res?.errors?.[0]?.code ?? `http ${si.status}`;
   signInOutcomes[outcome] = (signInOutcomes[outcome] || 0) + 1;
   const sid = res?.response?.created_session_id;
