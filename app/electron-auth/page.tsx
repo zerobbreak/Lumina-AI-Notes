@@ -14,17 +14,26 @@ import { PaperSurface } from "@/components/paper/PaperSurface";
  */
 export default function ElectronAuthPage() {
   const { isLoaded, isSignedIn } = useAuth();
+  const [authState, setAuthState] = useState<string | null>();
   const [status, setStatus] = useState<"loading" | "redirecting" | "error">("loading");
 
   useEffect(() => {
+    const state = new URLSearchParams(window.location.search).get("state");
+    setAuthState(state);
+    if (!state) setStatus("error");
+  }, []);
+
+  useEffect(() => {
     async function handleAuth() {
-      if (isLoaded && isSignedIn) {
+      if (isLoaded && isSignedIn && authState) {
         setStatus("redirecting");
         try {
           const res = await fetch("/api/electron/ticket", { method: "POST" });
           if (!res.ok) throw new Error("Failed to mint sign-in ticket");
           const { ticket } = await res.json();
-          window.location.href = `lumina-notes://auth?ticket=${encodeURIComponent(ticket)}`;
+          window.location.href =
+            `lumina-notes://auth?ticket=${encodeURIComponent(ticket)}` +
+            `&state=${encodeURIComponent(authState)}`;
 
           setTimeout(() => {
             setStatus("redirecting");
@@ -37,9 +46,9 @@ export default function ElectronAuthPage() {
     }
 
     handleAuth();
-  }, [isLoaded, isSignedIn]);
+  }, [authState, isLoaded, isSignedIn]);
 
-  if (!isLoaded) {
+  if (!isLoaded || authState === undefined) {
     return (
       <PaperSurface className="grain flex min-h-screen items-center justify-center p-4">
         <div className="card w-full max-w-md space-y-5 p-8 text-center">
@@ -47,6 +56,21 @@ export default function ElectronAuthPage() {
           <h1 className="display text-[1.6rem]">Loading…</h1>
           <p className="text-[0.93rem]" style={{ color: "var(--ink-soft)" }}>
             Preparing secure sign-in for Lumina.
+          </p>
+        </div>
+      </PaperSurface>
+    );
+  }
+
+  if (!authState) {
+    return (
+      <PaperSurface className="grain flex min-h-screen items-center justify-center p-4">
+        <div className="card w-full max-w-md space-y-5 p-8 text-center">
+          <h1 className="display text-[1.6rem]" style={{ color: "var(--vermilion)" }}>
+            Authentication link expired
+          </h1>
+          <p className="text-[0.93rem]" style={{ color: "var(--ink-soft)" }}>
+            Start sign-in again from the Lumina desktop app.
           </p>
         </div>
       </PaperSurface>
@@ -62,8 +86,8 @@ export default function ElectronAuthPage() {
           </p>
           <SignIn
             appearance={clerkAuthAppearance}
-            forceRedirectUrl="/electron-auth"
-            fallbackRedirectUrl="/electron-auth"
+            forceRedirectUrl={`/electron-auth?state=${encodeURIComponent(authState)}`}
+            fallbackRedirectUrl={`/electron-auth?state=${encodeURIComponent(authState)}`}
           />
         </div>
       </PaperSurface>

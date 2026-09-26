@@ -42,7 +42,7 @@ export default function SmartFolderHub() {
   const summary = home.data;
   const [mountedAt] = useState(() => Date.now());
   const now = summary?.generatedAt ?? mountedAt;
-  const checklist = usePlanChecklist(summary?.plan ?? [], now);
+  const checklist = usePlanChecklist(summary?.plan ?? [], now, userData?._id);
 
   const router = useRouter();
   const searchParams = useSearchParams();

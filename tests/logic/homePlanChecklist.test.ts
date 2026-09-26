@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayKey, mergeChecklist } from "@/lib/home/planChecklist";
+import { checklistStorageKey, dayKey, mergeChecklist } from "@/lib/home/planChecklist";
 import { prepDays } from "@/components/dashboard/home/RunwayStrip";
 import type { PlanItemDto } from "@/types/api/home";
 
@@ -42,6 +42,12 @@ describe("mergeChecklist", () => {
 describe("dayKey", () => {
   it("names the local day", () => {
     expect(dayKey(new Date(2026, 8, 4, 23, 59).getTime())).toBe("2026-09-04");
+  });
+
+  it("scopes stored checklist details to the signed-in user", () => {
+    const now = new Date(2026, 8, 4, 12).getTime();
+    expect(checklistStorageKey("user-a", now)).not.toBe(checklistStorageKey("user-b", now));
+    expect(checklistStorageKey("user-a", now)).toBe("lumina:home-plan-done:user-a:2026-09-04");
   });
 });
 
