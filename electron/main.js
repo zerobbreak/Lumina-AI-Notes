@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, shell, Menu } = require('electron');
+const { randomBytes } = require('crypto');
 const path = require('path');
 
 const isDev = process.env.NODE_ENV === 'development';
@@ -23,6 +24,11 @@ if (process.defaultApp) {
 }
 
 let mainWindow;
+const AUTH_STATE_TTL_MS = 10 * 60 * 1000;
+// OAuth-style state proving a callback belongs to a browser login started by
+// this app instance. Without it, an attacker can send their own Clerk ticket
+// in a deep link and make a victim work inside the attacker's account.
+let pendingAuthState = null;
 // A sign-in ticket from a lumina-notes://auth deep link, held until the page's
 // ElectronAuthBridge takes it. Clerk may still be loading when the link arrives
 // (or the link launched the app), so a plain push would be dropped.
@@ -98,7 +104,17 @@ function handleAuthUrl(url) {
   if (parsedUrl.hostname !== 'auth') return;
 
   const ticket = parsedUrl.searchParams.get('ticket');
-  if (!ticket) return;
+  const state = parsedUrl.searchParams.get('state');
+  if (
+    !ticket ||
+    !state ||
+    !pendingAuthState ||
+    pendingAuthState.expiresAt < Date.now() ||
+    state !== pendingAuthState.value
+  ) {
+    return;
+  }
+  pendingAuthState = null;
   pendingTicket = ticket;
   mainWindow?.webContents.send('auth-ticket-available');
 }
@@ -153,5 +169,7 @@ ipcMain.handle('take-auth-ticket', () => {
 });
 
 ipcMain.on('login-in-browser', () => {
-  shell.openExternal(`${appUrl}/electron-auth`);
+  const state = randomBytes(32).toString('base64url');
+  pendingAuthState = { value: state, expiresAt: Date.now() + AUTH_STATE_TTL_MS };
+  shell.openExternal(`${appUrl}/electron-auth?state=${encodeURIComponent(state)}`);
 });
