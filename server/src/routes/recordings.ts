@@ -9,13 +9,9 @@ import { HttpError } from "../middleware/errors.js";
 import { currentUser } from "../middleware/user.js";
 import { updateStudyStreak } from "../gamification/streaks.js";
 import { requireNote } from "../notes/access.js";
+import { limitsFor } from "../plans/limits.js";
 import type { JobQueue } from "../queue/queues.js";
-import {
-  AUDIO_LIMIT_MINUTES,
-  audioQuotaExhausted,
-  checkAndUpdateAudioUsage,
-  getUserUsage,
-} from "../recordings/usage.js";
+import { audioQuotaExhausted, checkAndUpdateAudioUsage, getUserUsage } from "../recordings/usage.js";
 import { isOwnedKey, type Storage } from "../storage/s3.js";
 import { enqueueOrFail, toJobResponse } from "./jobs.js";
 import { parse, tzOffsetMinutes } from "./validation.js";
@@ -76,7 +72,8 @@ const processBody = z
   });
 
 const audioLimitQuery = z.object({
-  estimatedMinutes: z.coerce.number().finite().min(0).max(AUDIO_LIMIT_MINUTES).optional(),
+  // A sanity bound; the user's own limit is checked in the handler.
+  estimatedMinutes: z.coerce.number().finite().min(0).max(24 * 60).optional(),
 });
 
 /** Port of convex/recordings.ts. Upload URLs live under /uploads. */
@@ -111,7 +108,7 @@ export function createRecordingsRouter(db: Db, storage: Storage, queue: JobQueue
     const user = currentUser(res);
     const { estimatedMinutes = 0 } = parse(audioLimitQuery, req.query);
     const usage = await getUserUsage(db, user.id);
-    const limit = AUDIO_LIMIT_MINUTES;
+    const limit = limitsFor(user).audioMinutesPerMonth;
     const remaining = Math.max(0, limit - usage.audioMinutesUsed);
     const allowed = remaining >= estimatedMinutes;
 
@@ -219,7 +216,7 @@ export function createRecordingsRouter(db: Db, storage: Storage, queue: JobQueue
 
     const durationMinutes = (body.duration ?? 0) / 60;
     if (durationMinutes > 0) {
-      const usageCheck = await checkAndUpdateAudioUsage(db, user.id, durationMinutes);
+      const usageCheck = await checkAndUpdateAudioUsage(db, user.id, durationMinutes, limitsFor(user).audioMinutesPerMonth);
       if (!usageCheck.allowed) {
         throw new HttpError(403, usageCheck.error ?? "Audio limit exceeded", "audio_limit_exceeded");
       }
@@ -258,7 +255,7 @@ export function createRecordingsRouter(db: Db, storage: Storage, queue: JobQueue
       if (!isOwnedKey(user.clerkUserId, body.storageKey)) {
         throw new HttpError(404, "Upload not found", "not_found");
       }
-      const outOfMinutes = await audioQuotaExhausted(db, user.id);
+      const outOfMinutes = await audioQuotaExhausted(db, user.id, limitsFor(user).audioMinutesPerMonth);
       if (outOfMinutes) throw new HttpError(403, outOfMinutes, "audio_limit_exceeded");
       if (!(await storage.stat(body.storageKey))) {
         throw new HttpError(400, "Upload not found in storage; PUT the file first", "upload_missing");
@@ -276,7 +273,7 @@ export function createRecordingsRouter(db: Db, storage: Storage, queue: JobQueue
         .where(and(eq(files.id, body.pinnedFileId), eq(files.userId, user.id)));
       if (!file) throw new HttpError(404, "Pinned document not found", "not_found");
     }
-    await consumeAiQuota(db, user.id);
+    await consumeAiQuota(db, user);
 
     const input: RecordingJobInput = {
       title: body.title,
@@ -356,7 +353,7 @@ export function createRecordingsRouter(db: Db, storage: Storage, queue: JobQueue
 
     const durationMinutes = (body.duration ?? 0) / 60;
     if (durationMinutes > 0) {
-      const usageCheck = await checkAndUpdateAudioUsage(db, user.id, durationMinutes);
+      const usageCheck = await checkAndUpdateAudioUsage(db, user.id, durationMinutes, limitsFor(user).audioMinutesPerMonth);
       if (!usageCheck.allowed) {
         throw new HttpError(403, usageCheck.error ?? "Audio limit exceeded", "audio_limit_exceeded");
       }

@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSetDailyGoals } from "@/lib/mutations/users/useSetDailyGoals";
 import { useGamification } from "@/lib/queries/users/useGamification";
+import { dispatchAppCommand } from "@/lib/appCommands";
 import { useUsage } from "@/lib/queries/users/useUsage";
-import { cn } from "@/lib/utils";
+import { cn, formatBytes } from "@/lib/utils";
 
 // Same bounds the API enforces.
 const MINUTES = { min: 1, max: 600 };
@@ -143,7 +144,17 @@ function UsageCard() {
           <h3 className="text-lg font-semibold text-foreground">Usage</h3>
         </div>
         <p className="text-sm text-muted-foreground">
-          Fair-use limits that keep Lumina free for everyone.
+          Lumina is free during the beta. These limits keep it that way.
+          {" "}
+          Need more?{" "}
+          <button
+            type="button"
+            onClick={() => dispatchAppCommand("feedback:more")}
+            className="text-primary underline-offset-2 hover:underline"
+          >
+            Tell us
+          </button>
+          .
         </p>
       </div>
 
@@ -172,6 +183,13 @@ function UsageCard() {
             limit={usage.ai.dailyLimit}
             note="Resets at midnight UTC"
           />
+          <UsageMeter
+            label="Storage"
+            used={usage.storage.usedBytes}
+            limit={usage.storage.limitBytes}
+            format={formatBytes}
+            note="Uploads and recordings. Deleting them frees space."
+          />
         </div>
       )}
     </div>
@@ -183,25 +201,27 @@ function UsageMeter({
   used,
   limit,
   unit,
+  format,
   note,
 }: {
   label: string;
   used: number;
   limit: number;
   unit?: string;
+  /** Replaces the rounded number and unit, e.g. for byte sizes. */
+  format?: (value: number) => string;
   note: string;
 }) {
   const ratio = limit > 0 ? Math.min(1, used / limit) : 0;
   const suffix = unit ? ` ${unit}` : "";
+  const show = format ?? ((value: number) => `${Math.round(value)}${suffix}`);
 
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-3 text-sm">
         <span className="font-medium text-foreground">{label}</span>
         <span className="tabular-nums text-muted-foreground">
-          {Math.round(used)}
-          {suffix} / {limit}
-          {suffix}
+          {show(used)} / {show(limit)}
         </span>
       </div>
       <div

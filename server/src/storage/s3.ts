@@ -3,6 +3,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   NotFound,
   PutObjectCommand,
   S3Client,
@@ -117,6 +118,21 @@ export function createStorage(config: StorageConfig) {
         throw new Error(`Empty body for ${key}`);
       }
       return res.Body.transformToByteArray();
+    },
+
+    /**
+     * Total bytes stored under `prefix`. Walks the listing a page (1000 keys)
+     * at a time, so it's cheap for one user's folder, not the whole bucket.
+     */
+    async usedBytes(prefix: string): Promise<number> {
+      let total = 0;
+      let ContinuationToken: string | undefined;
+      do {
+        const page = await client.send(new ListObjectsV2Command({ Bucket, Prefix: prefix, ContinuationToken }));
+        for (const object of page.Contents ?? []) total += object.Size ?? 0;
+        ContinuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+      } while (ContinuationToken);
+      return total;
     },
 
     /** Idempotent: deleting a missing key succeeds. */

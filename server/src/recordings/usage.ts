@@ -1,8 +1,10 @@
 import { eq } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { users, type MonthlyUsage } from "../db/schema/index.js";
+import { PLANS } from "../plans/limits.js";
 
-export const AUDIO_LIMIT_MINUTES = 300;
+/** The default plan's monthly minutes; a user's own come from limitsFor. */
+export const AUDIO_LIMIT_MINUTES = PLANS.beta.audioMinutesPerMonth;
 
 /** Largest audio file the transcription routes will read into memory and send to Gemini. */
 export const MAX_TRANSCRIBE_BYTES = 50 * 1024 * 1024;
@@ -33,9 +35,9 @@ export async function checkAndUpdateAudioUsage(
   db: Db,
   userId: string,
   durationMinutes: number,
+  limit: number,
 ): Promise<{ allowed: boolean; error?: string; remaining?: number }> {
   const usage = await getUserUsage(db, userId);
-  const limit = AUDIO_LIMIT_MINUTES;
 
   if (limit !== Infinity) {
     const newTotal = usage.audioMinutesUsed + durationMinutes;
@@ -83,9 +85,7 @@ export async function chargeAudioMinutes(db: Db, userId: string, durationMinutes
  * null. Minutes are only counted when a recording is saved, so this can't
  * stop the one transcription that tips a user over; it stops the ones after.
  */
-export async function audioQuotaExhausted(db: Db, userId: string): Promise<string | null> {
+export async function audioQuotaExhausted(db: Db, userId: string, limit: number): Promise<string | null> {
   const usage = await getUserUsage(db, userId);
-  return usage.audioMinutesUsed >= AUDIO_LIMIT_MINUTES
-    ? `You've used all ${AUDIO_LIMIT_MINUTES} audio minutes for this month.`
-    : null;
+  return usage.audioMinutesUsed >= limit ? `You've used all ${limit} audio minutes for this month.` : null;
 }

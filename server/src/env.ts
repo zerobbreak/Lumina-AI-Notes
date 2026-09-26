@@ -1,5 +1,6 @@
 import { createPublicKey } from "node:crypto";
 import { z } from "zod";
+import { parseFormPrefillUrl } from "./feedback/googleForm.js";
 import { parseKey } from "./integrations/secretBox.js";
 
 function isPublicKey(pem: string) {
@@ -88,6 +89,16 @@ const envSchema = z.object({
   LMS_ENCRYPTION_KEY: z
     .string()
     .refine((value) => parseKey(value) !== null, { message: "Must be 32 bytes, base64-encoded" })
+    .optional(),
+
+  // Where in-app feedback goes: a Google Form's pre-filled link with each
+  // field's key typed as its answer (see feedback/googleForm.ts). Optional;
+  // without it feedback is only stored in Postgres.
+  FEEDBACK_FORM_URL: z
+    .string()
+    .refine((value) => parseFormPrefillUrl(value) !== null, {
+      message: "Must be a Google Form pre-filled link (docs.google.com/forms/d/e/.../viewform) with a field answered \"message\"",
+    })
     .optional(),
 
   // Job queue (BullMQ). On Railway, reference ${{Redis.REDIS_URL}} (private

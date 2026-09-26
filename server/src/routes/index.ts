@@ -1,7 +1,8 @@
 import { Router } from "express";
+import { featureName, withAiUsageScope } from "../ai/usageContext.js";
 import type { AppDeps } from "../app.js";
 import { authenticate } from "../middleware/auth.js";
-import { loadUser } from "../middleware/user.js";
+import { currentUser, loadUser } from "../middleware/user.js";
 import { createAccountRouter } from "./account.js";
 import { createAiRouter } from "./ai.js";
 import { createAnnouncementsRouter } from "./announcements.js";
@@ -12,6 +13,7 @@ import { createChatsRouter } from "./chats.js";
 import { createCollaborationRouter } from "./collaboration.js";
 import { createDeadlinesRouter } from "./deadlines.js";
 import { createCoursesRouter } from "./courses.js";
+import { createFeedbackRouter } from "./feedback.js";
 import { createFilesRouter } from "./files.js";
 import { createFlashcardsRouter } from "./flashcards.js";
 import { createHomeRouter } from "./home.js";
@@ -39,6 +41,11 @@ export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken, 
   const router = Router();
 
   router.use(authenticate(verifyToken), loadUser(db, clerkProfiles));
+  // Any Gemini call made for this request, including background work it
+  // starts, is recorded against the caller and the route.
+  router.use((req, res, next) => {
+    withAiUsageScope({ db, userId: currentUser(res).id, feature: featureName(req.method, req.originalUrl) }, next);
+  });
 
   router.use("/analytics", createAnalyticsRouter(db));
   router.use("/announcements", createAnnouncementsRouter(db));
@@ -47,6 +54,7 @@ export function createApiRouter({ env, db, storage, clerkProfiles, verifyToken, 
       maxUploadBytes: env.MAX_UPLOAD_BYTES,
       maxBytesPerDay: env.UPLOAD_BYTES_PER_DAY,
     }));
+  router.use("/feedback", createFeedbackRouter(db, env.FEEDBACK_FORM_URL));
   router.use("/files", createFilesRouter(db, storage, queue));
   router.use("/flashcards", createFlashcardsRouter(db));
   router.use("/home", createHomeRouter(db));

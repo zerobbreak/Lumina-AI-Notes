@@ -271,7 +271,7 @@ export function createSearchRouter(db: Db, storage: Storage, geminiApiKey?: stri
 
     const user = currentUser(res);
     // Embedding the query is a Gemini call.
-    await consumeAiQuota(db, user.id);
+    await consumeAiQuota(db, user);
     const genAI = new GoogleGenerativeAI(geminiApiKey);
     const queryEmbedding = await embedTextForVectorSearch(genAI, args.query, TaskType.RETRIEVAL_QUERY);
     if (!queryEmbedding) {

@@ -98,7 +98,7 @@ export function createFilesRouter(db: Db, storage: Storage, queue: JobQueue) {
 
     // Recording a PDF starts a Gemini run, so it spends AI quota. Checked
     // before the row exists, so a refused upload can simply be sent again.
-    if (isPdf) await consumeAiQuota(db, user.id);
+    if (isPdf) await consumeAiQuota(db, user);
 
     const now = new Date();
     const [file] = await db
@@ -226,7 +226,7 @@ export function createFilesRouter(db: Db, storage: Storage, queue: JobQueue) {
     if (file.processingStatus === "processing" && startedAt && Date.now() - startedAt < STALE_PROCESSING_MS) {
       throw new HttpError(409, "This file is already being processed", "already_processing");
     }
-    await consumeAiQuota(db, user.id);
+    await consumeAiQuota(db, user);
     await db
       .update(files)
       .set({ processingStatus: "pending", progressPercent: 0, errorMessage: null, queuePosition: null })

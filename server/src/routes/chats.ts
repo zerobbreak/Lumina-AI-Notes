@@ -228,7 +228,7 @@ export function createChatsRouter(db: Db, geminiApiKey?: string) {
     const body = parse(replyBody, req.body);
     // 404 for someone else's session before it can cost anyone quota.
     await requireSessionOwner(db, req.params.id, user.id);
-    await consumeAiQuota(db, user.id);
+    await consumeAiQuota(db, user);
     try {
       const result = await generateAssistantReply(db, geminiApiKey, user.id, {
         sessionId: req.params.id,

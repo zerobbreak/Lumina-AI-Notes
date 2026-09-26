@@ -70,7 +70,7 @@ export function createJobsRouter(db: Db, queue: JobQueue) {
     if (!job.noteId) {
       throw new HttpError(409, "The note for this job was deleted", "note_deleted");
     }
-    await consumeAiQuota(db, user.id);
+    await consumeAiQuota(db, user);
 
     const [updated] = await db.transaction(async (tx) => {
       // Locks the note again, in case the failure was dismissed.
