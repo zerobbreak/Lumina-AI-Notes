@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { usePlanChecklist } from "@/lib/home/planChecklist";
 import { planAction, timeAgo } from "@/lib/home/planCopy";
 import { useCourseOverview } from "@/lib/queries/home/useCourseOverview";
+import { useCurrentUser } from "@/lib/queries/users/useCurrentUser";
 import type { Course } from "@/types";
 import type { PlanItemDto } from "@/types/api/home";
 import { ExamPrepPanel } from "./ExamPrepPanel";
@@ -70,9 +71,10 @@ function actionOnPage(courseId: string) {
  */
 export function CourseOverview({ course }: { course: Course }) {
   const { data, isPending, isError, refetch } = useCourseOverview(course.id);
+  const { data: user } = useCurrentUser();
   const now = data?.generatedAt ?? 0;
   // Before data arrives the plan is empty, so the placeholder day never stores a tick.
-  const checklist = usePlanChecklist(data?.plan ?? [], now, belongsTo(course.id));
+  const checklist = usePlanChecklist(data?.plan ?? [], now, user?._id, belongsTo(course.id));
   const [examHidden, setExamHidden] = useHiddenExam(data?.examPrep?.exam.id);
 
   if (isPending) {
