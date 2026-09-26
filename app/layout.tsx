@@ -7,7 +7,19 @@ import { AppearanceToaster } from "@/components/providers/AppearanceToaster";
 import { fontVariables } from "@/lib/appearance/fonts";
 import { appearanceScript } from "@/lib/appearance/script";
 
+/**
+ * Where the site is served, so share previews get absolute URLs. Railway
+ * provides RAILWAY_PUBLIC_DOMAIN at build time; NEXT_PUBLIC_SITE_URL wins
+ * once there's a custom domain.
+ */
+function siteUrl(): URL {
+  if (process.env.NEXT_PUBLIC_SITE_URL) return new URL(process.env.NEXT_PUBLIC_SITE_URL);
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) return new URL(`https://${process.env.RAILWAY_PUBLIC_DOMAIN}`);
+  return new URL("http://localhost:3000");
+}
+
 export const metadata: Metadata = {
+  metadataBase: siteUrl(),
   title: "Lumina AI - Student Command Center",
   description:
     "Turn raw lecture audio into a high-fidelity knowledge base. Organize courses, summarize lectures, and ace exams with AI-powered notes.",
@@ -22,26 +34,19 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://luminanotes.ai", // Replace with actual URL when deployed
+    url: "/",
     title: "Lumina AI - Master Your Degree",
     description:
       "The ultimate AI workspace for students. Turn lectures into summaries, flashcards, and quizzes instantly.",
     siteName: "Lumina Notes AI",
-    images: [
-      {
-        url: "/og-image.jpg", // Ensure you have an image at public/og-image.jpg or change this
-        width: 1200,
-        height: 630,
-        alt: "Lumina AI Dashboard",
-      },
-    ],
+    // No image yet: public/og-image.jpg never existed, so previews linked a 404.
+    // Add app/opengraph-image.(png|tsx) and Next picks it up for both cards.
   },
   twitter: {
     card: "summary_large_image",
     title: "Lumina AI - Student Command Center",
     description:
       "Stop drowning in notes. Let AI organize and summarize your lectures for you.",
-    images: ["/twitter-image.jpg"], // Ensure this exists or use og-image
   },
 };
 
