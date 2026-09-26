@@ -1,0 +1,31 @@
+name: Load test (production)
+
+# Unauthenticated pages only; no AI endpoints (they cost money).
+on:
+  push:
+    branches: [loadtest]
+  workflow_dispatch:
+
+jobs:
+  loadtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Runner location
+        run: curl -s https://ipinfo.io | grep -E '"(city|region|country|org)"' || true
+      - name: 50 first-time visitors (with JS/CSS)
+        run: node scripts/loadtest/load.mjs 50 120 1000 3000 | tee -a out.txt
+      - name: 50 users, no assets
+        run: NOASSETS=1 node scripts/loadtest/load.mjs 50 90 1000 3000 | tee -a out.txt
+      - name: 50 users, zero think time (stress)
+        run: NOASSETS=1 node scripts/loadtest/load.mjs 50 45 0 0 | tee -a out.txt
+      - name: Summary
+        if: always()
+        run: |
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat out.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
