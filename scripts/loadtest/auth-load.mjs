@@ -66,9 +66,9 @@ async function clerk(name, path, db, body) {
       headers: clerkHeaders,
       body: body ? new URLSearchParams(body) : undefined,
     });
-    if (r.status !== 429 || attempt >= 12) return json(r.body);
+    if (r.status !== 429 || attempt >= 8) return json(r.body);
     throttled++;
-    await sleep((Number(r.headers.get("retry-after")) || 2 + attempt * 2) * 1000 + Math.random() * 1000);
+    await sleep((Number(r.headers.get("retry-after")) || 2 * (attempt + 1)) * 1000);
   }
 }
 
@@ -172,14 +172,16 @@ function report(title, wall) {
 }
 
 // ---- run -----------------------------------------------------------------
-// 1. Sign everyone in, a few at a time.
+// 1. Sign everyone in, one at a time (bursts trip Clerk's per-IP limit harder).
 let t0 = performance.now();
 const sessions = [];
-for (let i = 0; i < users; i += 5) {
-  const batch = await Promise.all(
-    Array.from({ length: Math.min(5, users - i) }, (_, j) => signIn(accounts[(i + j) % accounts.length])),
-  );
-  sessions.push(...batch.filter(Boolean));
+for (let i = 0; i < users; i++) {
+  const s = await signIn(accounts[i % accounts.length]);
+  if (s) sessions.push(s);
+  if ((i + 1) % 5 === 0) {
+    console.log(`  sign-in ${i + 1}/${users}: ${sessions.length} ok, ${throttled} throttled so far, ${((performance.now() - t0) / 1000).toFixed(0)}s`);
+  }
+  await sleep(250);
 }
 console.log(`\n${users} users on ${accounts.length} account(s)`);
 console.log(`signed in: ${sessions.length}/${users}  outcomes: ${JSON.stringify(signInOutcomes)}  429 retries (CI-IP throttling): ${throttled}`);
