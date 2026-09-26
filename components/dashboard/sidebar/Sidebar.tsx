@@ -4,6 +4,7 @@ import {
   Calendar,
   Layers,
   Loader2,
+  MessageSquarePlus,
   PanelLeft,
   PanelLeftClose,
   PanelLeftOpen,
@@ -31,7 +32,7 @@ import { DASHBOARD_NAV, activeDashboardNavId } from "@/constants/dashboardNav";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useCreateNoteFlow } from "@/hooks/useCreateNoteFlow";
 import { formatShortcut } from "@/hooks/useKeyboardShortcut";
-import { useAppCommand, useAppCommands } from "@/lib/appCommands";
+import { dispatchAppCommand, useAppCommand, useAppCommands } from "@/lib/appCommands";
 import { shortcutFor } from "@/constants/shortcuts";
 import { AppearanceSwitcher } from "@/components/shared/AppearanceSwitcher";
 import { SpotlightCard } from "@/components/dashboard/announcements/SpotlightCard";
@@ -40,6 +41,7 @@ import type { AnnouncementAction } from "@/lib/announcements/registry";
 import { CourseAccentSync } from "./CourseAccentSync";
 import { SearchDialog } from "@/components/dashboard/search/SearchDialog";
 import { RenameDialog } from "@/components/dashboard/dialogs/RenameDialog";
+import { FeedbackDialog } from "@/components/dashboard/dialogs/FeedbackDialog";
 import { SettingsDialog } from "@/components/dashboard/dialogs/SettingsDialog";
 import { UploadDialog } from "@/components/dashboard/dialogs/UploadDialog";
 import { TagManagerDialog } from "@/components/dashboard/tags/TagManagerDialog";
@@ -597,6 +599,12 @@ export function Sidebar() {
           <div className="my-1">{avatar("h-7 w-7")}</div>
           <SidebarRow
             isRail
+            label="Send feedback"
+            icon={<MessageSquarePlus className="h-[15px] w-[15px]" />}
+            onClick={() => dispatchAppCommand("feedback")}
+          />
+          <SidebarRow
+            isRail
             label="Settings"
             icon={<Settings className="h-[15px] w-[15px]" />}
             onClick={() => openSettings()}
@@ -619,6 +627,20 @@ export function Sidebar() {
           </div>
           <WhatsNew isRail={false} onAction={runAnnouncementAction} />
           <AppearanceSwitcher onOpenSettings={() => openSettings("appearance")} />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 rounded-md text-muted-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+                onClick={() => dispatchAppCommand("feedback")}
+                aria-label="Send feedback"
+              >
+                <MessageSquarePlus className="h-[14px] w-[14px]" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Send feedback</TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -735,6 +757,7 @@ export function Sidebar() {
       <SearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
       <CourseAccentSync />
       <SpotlightCard onAction={runAnnouncementAction} />
+      <FeedbackDialog />
       <SettingsDialog
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}

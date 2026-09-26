@@ -12,6 +12,7 @@ import {
 } from "../../db/schema/index.js";
 import { clientMessage, UserFacingError } from "../../ai/errors.js";
 import { normalizeTranscriptForPrompt } from "../../ai/transcript.js";
+import { setAiUsageUser } from "../../ai/usageContext.js";
 import { isTransientError } from "../../queue/errors.js";
 import { chargeAudioMinutes } from "../../recordings/usage.js";
 import type { Storage } from "../../storage/s3.js";
@@ -59,6 +60,7 @@ export async function processRecordingJob(
     return;
   }
   if (job.status === "succeeded" || job.status === "failed") return;
+  setAiUsageUser(job.userId);
 
   const setJob = (patch: Partial<typeof processingJobs.$inferInsert>) =>
     db.update(processingJobs).set(patch).where(eq(processingJobs.id, job.id));

@@ -80,8 +80,10 @@ describe("GET /api/v1/users/me/usage", () => {
     const res = await as(ALICE).get("/api/v1/users/me/usage");
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
+      plan: "beta",
       audio: { usedMinutes: 42, limitMinutes: AUDIO_LIMIT_MINUTES },
       ai: { usedToday: 7, dailyLimit: MAX_AI_CALLS_PER_DAY },
+      storage: { usedBytes: 0 },
     });
     expect(res.body.audio.resetsAt).toBeGreaterThan(Date.now());
   });

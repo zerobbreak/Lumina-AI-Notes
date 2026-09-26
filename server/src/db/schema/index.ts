@@ -13,4 +13,5 @@ export * from "./deadlines.js";
 export * from "./integrations.js";
 export * from "./jobs.js";
 export * from "./announcements.js";
+export * from "./feedback.js";
 export * from "./relations.js";

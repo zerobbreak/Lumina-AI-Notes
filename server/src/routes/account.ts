@@ -9,6 +9,7 @@ import {
   chatSessions,
   deadlines,
   documents,
+  feedback,
   files,
   flashcardDecks,
   flashcards,
@@ -21,10 +22,10 @@ import {
   tags,
   users,
 } from "../db/schema/index.js";
-import { MAX_AI_CALLS_PER_DAY } from "../middleware/ai-rate-limit.js";
 import { currentUser } from "../middleware/user.js";
-import { AUDIO_LIMIT_MINUTES, getUserUsage } from "../recordings/usage.js";
-import type { Storage } from "../storage/s3.js";
+import { limitsFor } from "../plans/limits.js";
+import { getUserUsage } from "../recordings/usage.js";
+import { userPrefix, type Storage } from "../storage/s3.js";
 import { normalizeAppearance } from "../users/appearance.js";
 import { parse } from "./validation.js";
 
@@ -66,18 +67,24 @@ export function createAccountRouter(db: Db, storage: Storage, clerkProfiles: Cle
   router.get("/me/usage", async (_req, res) => {
     const user = currentUser(res);
     const now = Date.now();
-    const usage = await getUserUsage(db, user.id, now);
-    const [today] = await db
-      .select({ count: aiDailyUsage.count })
-      .from(aiDailyUsage)
-      .where(and(eq(aiDailyUsage.userId, user.id), eq(aiDailyUsage.day, utcDay(now))));
+    const limits = limitsFor(user);
+    const [usage, [today], storedBytes] = await Promise.all([
+      getUserUsage(db, user.id, now),
+      db
+        .select({ count: aiDailyUsage.count })
+        .from(aiDailyUsage)
+        .where(and(eq(aiDailyUsage.userId, user.id), eq(aiDailyUsage.day, utcDay(now)))),
+      storage.usedBytes(userPrefix(user.clerkUserId)),
+    ]);
     res.json({
+      plan: limits.plan,
       audio: {
         usedMinutes: usage.audioMinutesUsed,
-        limitMinutes: AUDIO_LIMIT_MINUTES,
+        limitMinutes: limits.audioMinutesPerMonth,
         resetsAt: nextMonthStart(now),
       },
-      ai: { usedToday: today?.count ?? 0, dailyLimit: MAX_AI_CALLS_PER_DAY },
+      ai: { usedToday: today?.count ?? 0, dailyLimit: limits.aiCallsPerDay },
+      storage: { usedBytes: storedBytes, limitBytes: limits.storageBytes },
     });
   });
 
@@ -105,6 +112,7 @@ export function createAccountRouter(db: Db, storage: Storage, clerkProfiles: Cle
       messageRows,
       recordingRows,
       fileRows,
+      feedbackRows,
     ] = await Promise.all([
       db.select().from(notes).where(eq(notes.userId, uid)),
       db.select().from(tags).where(eq(tags.userId, uid)),
@@ -119,6 +127,7 @@ export function createAccountRouter(db: Db, storage: Storage, clerkProfiles: Cle
       db.select().from(chatMessages).where(inArray(chatMessages.sessionId, ownedChats)),
       db.select().from(recordings).where(eq(recordings.userId, uid)),
       db.select().from(files).where(eq(files.userId, uid)),
+      db.select().from(feedback).where(eq(feedback.userId, uid)),
     ]);
 
     const exported = {
@@ -156,6 +165,7 @@ export function createAccountRouter(db: Db, storage: Storage, clerkProfiles: Cle
       })),
       recordings: recordingRows.map(strip),
       files: fileRows.map(strip),
+      feedback: feedbackRows.map(strip),
     };
 
     res.setHeader("Content-Disposition", `attachment; filename="lumina-export-${utcDay(Date.now())}.json"`);

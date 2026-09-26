@@ -5,7 +5,8 @@ import type { Db } from "../db/client.js";
 import { uploadDailyUsage } from "../db/schema/index.js";
 import { HttpError } from "../middleware/errors.js";
 import { currentUser } from "../middleware/user.js";
-import { isOwnedKey, newObjectKey, type Storage } from "../storage/s3.js";
+import { limitsFor } from "../plans/limits.js";
+import { isOwnedKey, newObjectKey, userPrefix, type Storage } from "../storage/s3.js";
 import { parse } from "./validation.js";
 
 /**
@@ -73,6 +74,17 @@ export function createUploadsRouter(
         "file_too_large",
       );
     }
+    // Checked before the daily allowance, so a refused upload doesn't spend it.
+    // Two uploads signed at once can both fit; the daily cap bounds that overshoot.
+    const { storageBytes } = limitsFor(currentUser(res));
+    const stored = await storage.usedBytes(userPrefix(userId));
+    if (stored + body.size > storageBytes) {
+      throw new HttpError(
+        403,
+        `This upload would take you past your ${formatBytes(storageBytes)} of storage (${formatBytes(stored)} used). Delete some files or recordings to make room.`,
+        "storage_limit_reached",
+      );
+    }
     if (!(await reserveBytes(currentUser(res).id, body.size))) {
       throw new HttpError(
         429,
@@ -115,4 +127,10 @@ function ownedKey(query: unknown, userId: string) {
     throw new HttpError(404, "Upload not found", "not_found");
   }
   return { key };
+}
+
+/** "1 GB", "250 MB": whole units, which is all the limit messages need. */
+export function formatBytes(bytes: number): string {
+  const gb = bytes / 1024 ** 3;
+  return gb >= 1 ? `${Number(gb.toFixed(1))} GB` : `${Math.round(bytes / 1024 ** 2)} MB`;
 }

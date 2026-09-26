@@ -1,4 +1,5 @@
 import { boolean, index, integer, jsonb, pgTable, text } from "drizzle-orm/pg-core";
+import type { LimitOverrides } from "../../plans/limits.js";
 import type { Appearance } from "../../users/appearance.js";
 import type { CourseColor } from "../../users/courseColors.js";
 import { createdAt, id, timestamptz, updatedAt } from "./columns.js";
@@ -53,6 +54,10 @@ export const users = pgTable(
 
     // Usage tracking
     monthlyUsage: jsonb().$type<MonthlyUsage>(),
+    /** A plans/limits.ts PlanId; read it through limitsFor. */
+    plan: text().notNull().default("beta"),
+    /** Per-user limit changes on top of the plan, set with `npm run limits:set`. */
+    limitOverrides: jsonb().$type<LimitOverrides>(),
 
     // Study streaks and gamification
     currentStreak: integer(),

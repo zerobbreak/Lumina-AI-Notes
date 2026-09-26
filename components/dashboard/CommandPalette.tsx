@@ -26,6 +26,7 @@ import {
   ArrowUp,
   ArrowDown,
   Compass,
+  MessageSquarePlus,
 } from "lucide-react";
 import { DASHBOARD_NAV } from "@/constants/dashboardNav";
 import { NOTE_COMMANDS, SHORTCUTS, shortcutFor } from "@/constants/shortcuts";
@@ -206,6 +207,15 @@ export function CommandPalette({ open, onOpenChange, initialQuery = "" }: Comman
         router.push(`/dashboard?view=home&tour=${Date.now()}`);
       },
       keywords: ["tour", "walkthrough", "help", "guide", "onboarding", "tutorial", "how"],
+    });
+    cmds.push({
+      id: "feedback",
+      title: "Send Feedback",
+      subtitle: "Report a bug, suggest an idea or ask for higher limits",
+      icon: MessageSquarePlus,
+      category: "actions",
+      action: run("feedback"),
+      keywords: ["feedback", "bug", "report", "idea", "suggest", "help", "contact", "limit", "beta"],
     });
     if (openNote) {
       cmds.push({

@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, type GenerationConfig, type GenerativeModel } from "@google/generative-ai";
+import { recordAiUsage } from "./usageContext.js";
 
 /**
  * Tried in order. gemini-2.5-flash is legacy (access limited to prior users)
@@ -35,6 +36,9 @@ export function shouldFallBack(error: unknown): boolean {
  * Each call walks the model chain, moving on only for errors another model
  * could avoid; anything else (bad request, safety block) throws immediately.
  * A stream falls back only if it fails to start, not partway through.
+ *
+ * Every answered call records its token usage against the current request or
+ * job (see usageContext.ts).
  */
 export const getGeminiModel = (
   apiKey: string | undefined,
@@ -47,10 +51,16 @@ export const getGeminiModel = (
   const genAI = new GoogleGenerativeAI(apiKey);
   const chain = models.map((model) => genAI.getGenerativeModel({ model, generationConfig: config }));
 
-  async function withFallback<T>(call: (model: GenerativeModel) => Promise<T>): Promise<T> {
+  async function withFallback<T>(call: (model: GenerativeModel) => Promise<T>, onAnswer: (result: T, model: string) => void): Promise<T> {
     for (let i = 0; ; i++) {
       try {
-        return await call(chain[i]);
+        const result = await call(chain[i]);
+        try {
+          onAnswer(result, models[i]);
+        } catch {
+          // Usage tracking must never fail a call that already succeeded.
+        }
+        return result;
       } catch (error) {
         if (i === chain.length - 1 || !shouldFallBack(error)) throw error;
         console.warn(`[gemini] ${models[i]} unavailable, falling back to ${models[i + 1]}:`, (error as Error).message);
@@ -59,7 +69,20 @@ export const getGeminiModel = (
   }
 
   return {
-    generateContent: (...args) => withFallback((model) => model.generateContent(...args)),
-    generateContentStream: (...args) => withFallback((model) => model.generateContentStream(...args)),
+    generateContent: (...args) =>
+      withFallback(
+        (model) => model.generateContent(...args),
+        (result, model) => recordAiUsage(model, result.response?.usageMetadata),
+      ),
+    generateContentStream: (...args) =>
+      withFallback(
+        (model) => model.generateContentStream(...args),
+        // Usage arrives with the last chunk; a stream that dies midway records nothing.
+        (result, model) => {
+          Promise.resolve(result.response)
+            .then((response) => recordAiUsage(model, response?.usageMetadata))
+            .catch(() => {});
+        },
+      ),
   };
 };

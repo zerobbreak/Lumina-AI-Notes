@@ -2,30 +2,33 @@ import { lt, sql } from "drizzle-orm";
 import type { RequestHandler } from "express";
 import type { Db } from "../db/client.js";
 import { aiDailyUsage, aiRateLimitWindows } from "../db/schema/index.js";
+import { limitsFor, PLANS } from "../plans/limits.js";
 import { HttpError } from "./errors.js";
-import { currentUser } from "./user.js";
+import { currentUser, type User } from "./user.js";
 
 const WINDOW_MS = 60_000;
-export const MAX_AI_CALLS_PER_MINUTE = 20;
-/** Generous for a student's day of studying; stops one account running up the bill. */
-export const MAX_AI_CALLS_PER_DAY = 300;
+/** The default plan's limits; a user's own come from limitsFor. */
+export const MAX_AI_CALLS_PER_MINUTE = PLANS.beta.aiCallsPerMinute;
+export const MAX_AI_CALLS_PER_DAY = PLANS.beta.aiCallsPerDay;
 /** How long a stale window is kept around before the sweep drops it. */
 const SWEEP_AGE_MS = 5 * WINDOW_MS;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /**
  * Counts one Gemini-backed call against the user's per-minute and per-day
- * limits, throwing a 429 when either is spent. Convex had no app-level limit
- * (only translated Gemini's own quota error), but these are now plain HTTP
+ * limits (their plan's, see plans/limits.ts), throwing a 429 when either is
+ * spent. Convex had no app-level limit (only translated Gemini's own quota
+ * error), but these are now plain HTTP
  * endpoints that cost real Gemini spend per call. Counters live in Postgres so
  * they hold correctly if Railway ever scales to multiple instances.
  *
  * Call it before any work that reaches Gemini, including work that runs in
  * the background after the response is sent.
  */
-export async function consumeAiQuota(db: Db, userId: string): Promise<void> {
+export async function consumeAiQuota(db: Db, user: Pick<User, "id" | "plan" | "limitOverrides">): Promise<void> {
+  const userId = user.id;
+  const limits = limitsFor(user);
   const now = Date.now();
   const windowStart = new Date(Math.floor(now / WINDOW_MS) * WINDOW_MS);
 
@@ -38,15 +41,13 @@ export async function consumeAiQuota(db: Db, userId: string): Promise<void> {
     })
     .returning();
 
-  // Best-effort sweeps of old counters; never block the request on failure.
+  // Best-effort sweep of old windows; never block the request on failure.
+  // Daily rows are kept: they're the usage history plan limits are set from.
   db.delete(aiRateLimitWindows)
     .where(lt(aiRateLimitWindows.windowStart, new Date(now - SWEEP_AGE_MS)))
     .catch(() => {});
-  db.delete(aiDailyUsage)
-    .where(lt(aiDailyUsage.day, utcDay(now - 2 * DAY_MS)))
-    .catch(() => {});
 
-  if (minute.count > MAX_AI_CALLS_PER_MINUTE) {
+  if (minute.count > limits.aiCallsPerMinute) {
     // Refused before touching the daily count, so a client hammering the
     // per-minute limit doesn't also burn through its day.
     throw new HttpError(429, "Too many AI requests. Try again in a moment.", "rate_limited");
@@ -61,10 +62,10 @@ export async function consumeAiQuota(db: Db, userId: string): Promise<void> {
     })
     .returning();
 
-  if (day.count > MAX_AI_CALLS_PER_DAY) {
+  if (day.count > limits.aiCallsPerDay) {
     throw new HttpError(
       429,
-      "You've reached today's AI usage limit. It resets at midnight UTC.",
+      `You've used all ${limits.aiCallsPerDay} AI requests for today. They reset at midnight UTC.`,
       "daily_limit_reached",
     );
   }
@@ -73,7 +74,7 @@ export async function consumeAiQuota(db: Db, userId: string): Promise<void> {
 /** Per-user limit on every route behind it; see consumeAiQuota. */
 export function aiRateLimit(db: Db): RequestHandler {
   return async (_req, res, next) => {
-    await consumeAiQuota(db, currentUser(res).id);
+    await consumeAiQuota(db, currentUser(res));
     next();
   };
 }

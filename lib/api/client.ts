@@ -1,5 +1,6 @@
 import { getApiBaseUrl } from "./config";
 import { ApiError } from "./errors";
+import { notifyLimitReached } from "./limits";
 import { queryString, type ApiPath, type QueryParams } from "./path";
 import { freshToken, REJECTED_TOKEN_CODES, sessionLost } from "./session";
 
@@ -82,7 +83,9 @@ export async function toApiError(res: Response): Promise<ApiError> {
   } catch {
     // Non-JSON error body
   }
-  return new ApiError(message, res.status, code);
+  const error = new ApiError(message, res.status, code);
+  notifyLimitReached(error);
+  return error;
 }
 
 export async function apiFetch<T>(path: ApiPath, options: ApiFetchOptions = {}): Promise<T> {

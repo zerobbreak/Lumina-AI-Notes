@@ -205,3 +205,38 @@ describe("daily upload allowance", () => {
     expect(results.filter((r) => r.status === 429)).toHaveLength(3);
   });
 });
+
+describe("total storage limit", () => {
+  const GB = 1024 ** 3;
+  const sign = (user: string, size: number) =>
+    request(app)
+      .post("/api/v1/uploads")
+      .set("Authorization", bearer(user))
+      .send({ filename: "lecture.webm", contentType: "audio/webm", size });
+
+  beforeEach(() => {
+    // Big per-file and per-day caps, so only the storage limit is in play.
+    app = buildApp({ storage: fake.storage, db, env: { ...testEnv, MAX_UPLOAD_BYTES: 2 * GB, UPLOAD_BYTES_PER_DAY: 10 * GB } });
+  });
+
+  it("refuses an upload that would pass the plan's storage, counting what's already stored", async () => {
+    const user = `${ALICE}_storage`;
+    fake.objects.set(`users/${user}/old/lecture.webm`, { size: GB - 1000, contentType: "audio/webm" });
+    fake.objects.set(`users/${BOB}/old/lecture.webm`, { size: GB, contentType: "audio/webm" });
+
+    const refused = await sign(user, 1001);
+    expect(refused.status).toBe(403);
+    expect(refused.body.error.code).toBe("storage_limit_reached");
+    expect(refused.body.error.message).toMatch(/1 GB of storage/);
+    expect((await sign(user, 1000)).status).toBe(201);
+  });
+
+  it("doesn't spend the daily allowance on a refused upload", async () => {
+    app = buildApp({ storage: fake.storage, db, env: { ...testEnv, MAX_UPLOAD_BYTES: 2 * GB, UPLOAD_BYTES_PER_DAY: 3000 } });
+    const user = `${ALICE}_storage_day`;
+    fake.objects.set(`users/${user}/old/lecture.webm`, { size: GB, contentType: "audio/webm" });
+    expect((await sign(user, 2000)).status).toBe(403);
+    fake.objects.clear();
+    expect((await sign(user, 3000)).status).toBe(201);
+  });
+});

@@ -27,7 +27,10 @@ export type AppCommandId =
   | "note:pin"
   | "editor:ask-ai"
   /** Replays the note-screen walkthrough. */
-  | "tour:note";
+  | "tour:note"
+  /** Opens the feedback dialog; "feedback:more" starts it as a request for higher limits. */
+  | "feedback"
+  | "feedback:more";
 
 const APP_COMMAND_EVENT = "lumina:command";
 

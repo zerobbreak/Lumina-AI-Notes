@@ -106,6 +106,9 @@ export function fakeStorage() {
     delete: vi.fn(async (key: string) => {
       objects.delete(key);
     }),
+    usedBytes: vi.fn(async (prefix: string) =>
+      [...objects].reduce((sum, [key, object]) => (key.startsWith(prefix) ? sum + object.size : sum), 0),
+    ),
   };
   return { storage: storage as unknown as Storage, mock: storage, objects };
 }

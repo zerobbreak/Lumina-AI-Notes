@@ -22,7 +22,9 @@
     "db:migrate:dev": "tsx --env-file-if-exists=.env src/db/migrate.ts",
     "db:studio": "drizzle-kit studio",
     "storage:check": "tsx scripts/storage-check.ts",
-    "storage:cors": "tsx scripts/storage-cors.ts"
+    "storage:cors": "tsx scripts/storage-cors.ts",
+    "limits:set": "tsx scripts/limits-set.ts",
+    "usage:report": "tsx scripts/usage-report.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1137.0",
