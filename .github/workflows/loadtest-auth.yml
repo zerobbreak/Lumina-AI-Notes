@@ -21,6 +21,8 @@ jobs:
         with:
           node-version: 22
       - name: 50 signed-in users on the dashboard (normal pace, then stress)
+        # "shell: bash" adds pipefail, so a failed test fails the job despite tee.
+        shell: bash
         run: node scripts/loadtest/auth-load.mjs 50 120 60 | tee out.txt
       - name: Summary
         if: always()
