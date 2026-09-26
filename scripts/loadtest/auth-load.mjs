@@ -131,7 +131,26 @@ const DASHBOARD_CALLS = [
   "/announcements/events",
 ];
 
+// The bundle a bare /dashboard asks for (lib/api/dashboardBundle.ts), with UTC as the timezone.
+const BUNDLE_PATHS = [
+  "/users/me",
+  "/notes/quick?limit=10",
+  "/notes/pinned?limit=20",
+  "/tags",
+  "/files?limit=10",
+  "/flashcards/today-queue",
+  "/deadlines/upcoming?limit=1",
+  "/announcements/events",
+  "/notes/resume-target",
+  "/home?tzOffsetMinutes=0",
+  "/users/me/gamification",
+  "/notes/recent?limit=5",
+  "/deadlines/upcoming?limit=6&windowDays=30",
+];
+
 let dashboardLoads = [];
+/** "bundle": the app today. "separate": one GET per call, as before the bundle. */
+let mode = "bundle";
 async function dashboard(session) {
   // Clerk session tokens live 60s; the browser refreshes ~every 50s.
   if (Date.now() - session.refreshedAt > 45000) await refresh(session);
@@ -139,9 +158,25 @@ async function dashboard(session) {
   const cookie = `__session=${session.jwt}; __client_uat=${session.uat}; __clerk_db_jwt=${session.db}`;
   await timed("web: GET /dashboard (signed in)", `${WEB}/dashboard`, { headers: { cookie } });
   const auth = { headers: { Authorization: `Bearer ${session.jwt}` } };
-  const results = await Promise.all(DASHBOARD_CALLS.map((p) => timed(`api: GET ${p}`, `${WEB}/api/v1${p}`, auth)));
+  let recentBody;
+  if (mode === "bundle") {
+    // What the app does since 7a8ef1e: one request for the opening reads.
+    const r = await timed("api: POST /dashboard/bundle", `${WEB}/api/v1/dashboard/bundle`, {
+      method: "POST",
+      headers: { ...auth.headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ paths: BUNDLE_PATHS }),
+    });
+    const results = json(r.body)?.results ?? {};
+    for (const [path, entry] of Object.entries(results)) {
+      if (entry.status >= 400) rec(`  bundle entry ${path}`, 0, entry.status);
+    }
+    recentBody = JSON.stringify(results["/notes/recent?limit=5"]?.body ?? []);
+  } else {
+    const results = await Promise.all(DASHBOARD_CALLS.map((p) => timed(`api: GET ${p}`, `${WEB}/api/v1${p}`, auth)));
+    recentBody = results[DASHBOARD_CALLS.indexOf("/notes/recent")].body;
+  }
   // Then open a note, like resuming where you left off
-  const recent = json(results[DASHBOARD_CALLS.indexOf("/notes/recent")].body);
+  const recent = json(recentBody);
   const list = Array.isArray(recent) ? recent : recent?.notes ?? recent?.items ?? [];
   const note = list[Math.floor(Math.random() * list.length)];
   const noteId = note?._id ?? note?.id;
@@ -164,7 +199,7 @@ function report(title, wall) {
   }
   if (dashboardLoads.length) {
     const d = dashboardLoads.sort((x, y) => x - y);
-    console.log(`whole dashboard load (page + 13 calls in parallel + open a note): n=${d.length} p50 ${f(pct(d, 50))} p95 ${f(pct(d, 95))} p99 ${f(pct(d, 99))} max ${f(d[d.length - 1])}`);
+    console.log(`whole dashboard load (page + opening reads + open a note): n=${d.length} p50 ${f(pct(d, 50))} p95 ${f(pct(d, 95))} p99 ${f(pct(d, 99))} max ${f(d[d.length - 1])}`);
   }
   console.log(`total ${total} requests in ${wall.toFixed(1)}s = ${(total / wall).toFixed(1)} req/s, non-2xx/3xx: ${bad}`);
   stats = new Map();
@@ -208,3 +243,9 @@ report(`${sessions.length} concurrent users, normal pace (${THINK_MIN / 1000}-${
 t0 = performance.now();
 await phase(stressSeconds, 0, 0);
 report(`${sessions.length} concurrent users, stress (no pause), ${stressSeconds}s`, (performance.now() - t0) / 1000);
+
+// Same stress, the old way (13 separate GETs), to compare on the same deploy.
+mode = "separate";
+t0 = performance.now();
+await phase(stressSeconds, 0, 0);
+report(`${sessions.length} concurrent users, stress, separate GETs (pre-bundle client), ${stressSeconds}s`, (performance.now() - t0) / 1000);
