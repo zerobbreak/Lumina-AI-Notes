@@ -20,10 +20,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: 50 users, normal pace (2-6s between dashboard loads)
-        run: node scripts/loadtest/auth-load.mjs 50 120 2000 6000 | tee -a out.txt
-      - name: 50 users, zero think time (stress)
-        run: RAMP_MS=10000 node scripts/loadtest/auth-load.mjs 50 60 0 0 | tee -a out.txt
+      - name: 50 signed-in users on the dashboard (normal pace, then stress)
+        run: node scripts/loadtest/auth-load.mjs 50 120 60 | tee out.txt
       - name: Summary
         if: always()
         run: |

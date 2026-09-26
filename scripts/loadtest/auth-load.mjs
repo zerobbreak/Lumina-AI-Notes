@@ -1,16 +1,21 @@
 // Signed-in load test: N virtual users sign in through Clerk (like the browser
-// does) and then keep loading the dashboard.
+// does), then all load the dashboard at once: first at a normal pace, then with
+// no pause between loads (stress).
 //
-//   LOADTEST_ACCOUNTS="email,password\nemail2,password2" node auth-load.mjs <users> <seconds> <thinkMinMs> <thinkMaxMs>
+//   LOADTEST_ACCOUNTS="user,password\nuser2,password2" node auth-load.mjs <users> <paceSeconds> <stressSeconds>
 //
-// Accounts are "email-or-username,password", shared round-robin, so 50 users can run on a few test accounts
-// (each virtual user gets its own Clerk client + session). Read-only: no AI
-// calls, no writes to notes.
+// Accounts are "email-or-username,password", shared round-robin (each virtual
+// user gets its own Clerk client + session). Read-only: no AI calls, no writes.
+//
+// Every sign-in comes from one CI machine, so Clerk throttles them per IP; that
+// is a test-harness limit, not something real users (on their own devices) hit.
+// Sign-ins are paced and retried on 429, and the load only starts once all
+// users are in.
 const WEB = process.env.WEB_URL ?? "https://lumina-web-production-e6ce.up.railway.app";
 const FAPI = process.env.CLERK_FAPI ?? "https://settling-dinosaur-13.clerk.accounts.dev";
-const [users = 50, seconds = 120, thinkMin = 2000, thinkMax = 6000] = process.argv.slice(2).map(Number);
-// Spread sign-ins over this long, so we measure a busy morning, not a single-IP burst Clerk may throttle.
-const RAMP_MS = Number(process.env.RAMP_MS ?? 30000);
+const [users = 50, paceSeconds = 120, stressSeconds = 60] = process.argv.slice(2).map(Number);
+const THINK_MIN = 2000;
+const THINK_MAX = 6000;
 
 const accounts = (process.env.LOADTEST_ACCOUNTS ?? "")
   .split(/\r?\n/)
@@ -26,74 +31,87 @@ if (accounts.length === 0 || accounts.some((a) => !a.email || !a.password)) {
 }
 
 // ---- stats ---------------------------------------------------------------
-const stats = new Map();
+let stats = new Map();
 function rec(name, ms, status) {
   let s = stats.get(name);
   if (!s) stats.set(name, (s = { lat: [], codes: {} }));
   s.lat.push(ms);
   s.codes[status] = (s.codes[status] || 0) + 1;
 }
-async function timed(name, url, init = {}, ok = (r) => r.status) {
+async function timed(name, url, init = {}) {
   const t = performance.now();
   try {
     const r = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(30000), ...init });
     const body = await r.text();
-    rec(name, performance.now() - t, ok(r));
-    return { status: r.status, body };
+    rec(name, performance.now() - t, r.status);
+    return { status: r.status, body, headers: r.headers };
   } catch (e) {
     rec(name, performance.now() - t, e.name === "TimeoutError" ? "timeout" : "neterr");
-    return { status: 0, body: "" };
+    return { status: 0, body: "", headers: new Headers() };
   }
 }
 const json = (s) => { try { return JSON.parse(s); } catch { return null; } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const think = () => sleep(thinkMin + Math.random() * (thinkMax - thinkMin));
 
 // ---- Clerk frontend API (dev instance) -----------------------------------
 const clerkHeaders = { Origin: WEB, "Content-Type": "application/x-www-form-urlencoded" };
-const fapi = (path, db) => `${FAPI}/v1${path}?_clerk_js_version=5${db ? `&__clerk_db_jwt=${db}` : ""}`;
+const fapiUrl = (path, db) => `${FAPI}/v1${path}?_clerk_js_version=5${db ? `&__clerk_db_jwt=${db}` : ""}`;
+
+let throttled = 0;
+/** POST to Clerk, waiting out 429s (per-IP throttling of our single CI machine). */
+async function clerk(name, path, db, body) {
+  for (let attempt = 0; ; attempt++) {
+    const r = await timed(name, fapiUrl(path, db), {
+      method: "POST",
+      headers: clerkHeaders,
+      body: body ? new URLSearchParams(body) : undefined,
+    });
+    if (r.status !== 429 || attempt >= 12) return json(r.body);
+    throttled++;
+    await sleep((Number(r.headers.get("retry-after")) || 2 + attempt * 2) * 1000 + Math.random() * 1000);
+  }
+}
 
 const signInOutcomes = {};
 async function signIn(account) {
-  const dev = await timed("clerk: dev browser", fapi("/dev_browser"), { method: "POST", headers: clerkHeaders });
-  const db = json(dev.body)?.token;
+  const db = (await clerk("clerk: dev browser", "/dev_browser"))?.token;
   if (!db) return null;
-  const body = new URLSearchParams({ strategy: "password", identifier: account.email, password: account.password });
-  const si = await timed("clerk: sign in (password)", fapi("/client/sign_ins", db), { method: "POST", headers: clerkHeaders, body });
-  let res = json(si.body);
+  let res = await clerk("clerk: sign in (password)", "/client/sign_ins", db, {
+    strategy: "password",
+    identifier: account.email,
+    password: account.password,
+  });
   // Clerk asks for an email code on a new device. +clerk_test addresses get no
   // real mail and accept Clerk's fixed test code.
   if (res?.response?.status === "needs_second_factor") {
     const id = res.response.id;
     const factor = res.response.supported_second_factors?.find((x) => x.strategy === "email_code");
     if (factor) {
-      await timed("clerk: 2nd factor prepare", fapi(`/client/sign_ins/${id}/prepare_second_factor`, db), {
-        method: "POST",
-        headers: clerkHeaders,
-        body: new URLSearchParams({ strategy: "email_code", email_address_id: factor.email_address_id }),
+      await clerk("clerk: 2nd factor prepare", `/client/sign_ins/${id}/prepare_second_factor`, db, {
+        strategy: "email_code",
+        email_address_id: factor.email_address_id,
       });
-      const att = await timed("clerk: 2nd factor attempt", fapi(`/client/sign_ins/${id}/attempt_second_factor`, db), {
-        method: "POST",
-        headers: clerkHeaders,
-        body: new URLSearchParams({ strategy: "email_code", code: "424242" }),
+      res = await clerk("clerk: 2nd factor attempt", `/client/sign_ins/${id}/attempt_second_factor`, db, {
+        strategy: "email_code",
+        code: "424242",
       });
-      res = json(att.body);
     }
   }
-  const outcome = res?.response?.status ?? res?.errors?.[0]?.code ?? `http ${si.status}`;
+  const outcome = res?.response?.status ?? res?.errors?.[0]?.code ?? "no response";
   signInOutcomes[outcome] = (signInOutcomes[outcome] || 0) + 1;
   const sid = res?.response?.created_session_id;
   if (!sid) return null;
-  const session = { db, sid, jwt: null };
+  // The browser's __client_uat cookie is the client's last-updated time; a
+  // session token older than it makes Clerk's middleware redirect.
+  const session = { db, sid, jwt: null, uat: Math.floor(Date.now() / 1000) - 5, refreshedAt: 0 };
   return (await refresh(session)) ? session : null;
 }
 async function refresh(session) {
-  const r = await timed("clerk: session token", fapi(`/client/sessions/${session.sid}/tokens`, session.db), {
-    method: "POST",
-    headers: clerkHeaders,
-  });
-  session.jwt = json(r.body)?.jwt ?? session.jwt;
-  return !!json(r.body)?.jwt;
+  const r = await clerk("clerk: session token", `/client/sessions/${session.sid}/tokens`, session.db);
+  if (!r?.jwt) return false;
+  session.jwt = r.jwt;
+  session.refreshedAt = Date.now();
+  return true;
 }
 
 // ---- dashboard load, as the browser does it (API via the web origin) -----
@@ -112,57 +130,79 @@ const DASHBOARD_CALLS = [
   "/deadlines/upcoming",
   "/announcements/events",
 ];
-const apiOk = (r) => r.status; // 2xx expected; anything else shows in the status column
 
+let dashboardLoads = [];
 async function dashboard(session) {
-  const cookie = `__session=${session.jwt}; __client_uat=${Math.floor(Date.now() / 1000)}; __clerk_db_jwt=${session.db}`;
+  // Clerk session tokens live 60s; the browser refreshes ~every 50s.
+  if (Date.now() - session.refreshedAt > 45000) await refresh(session);
+  const t = performance.now();
+  const cookie = `__session=${session.jwt}; __client_uat=${session.uat}; __clerk_db_jwt=${session.db}`;
   await timed("web: GET /dashboard (signed in)", `${WEB}/dashboard`, { headers: { cookie } });
   const auth = { headers: { Authorization: `Bearer ${session.jwt}` } };
-  const results = await Promise.all(
-    DASHBOARD_CALLS.map((p) => timed(`api: GET ${p}`, `${WEB}/api/v1${p}`, auth, apiOk).then((r) => [p, r])),
-  );
+  const results = await Promise.all(DASHBOARD_CALLS.map((p) => timed(`api: GET ${p}`, `${WEB}/api/v1${p}`, auth)));
   // Then open a note, like resuming where you left off
-  const recent = json(Object.fromEntries(results)["/notes/recent"]?.body);
+  const recent = json(results[DASHBOARD_CALLS.indexOf("/notes/recent")].body);
   const list = Array.isArray(recent) ? recent : recent?.notes ?? recent?.items ?? [];
-  const noteId = list[Math.floor(Math.random() * list.length)]?._id ?? list[0]?.id;
-  if (noteId) await timed("api: GET /notes/:id", `${WEB}/api/v1/notes/${noteId}`, auth, apiOk);
+  const note = list[Math.floor(Math.random() * list.length)];
+  const noteId = note?._id ?? note?.id;
+  if (noteId) await timed("api: GET /notes/:id", `${WEB}/api/v1/notes/${noteId}`, auth);
+  dashboardLoads.push(performance.now() - t);
 }
-
-// ---- run -----------------------------------------------------------------
-let signedIn = 0;
-const end = Date.now() + RAMP_MS + seconds * 1000;
-async function user(i) {
-  await sleep((RAMP_MS * i) / users);
-  const session = await signIn(accounts[i % accounts.length]);
-  if (!session) return;
-  signedIn++;
-  let lastRefresh = Date.now();
-  while (Date.now() < end) {
-    // Clerk session tokens live 60s; the browser refreshes ~every 50s.
-    if (Date.now() - lastRefresh > 45000) {
-      await refresh(session);
-      lastRefresh = Date.now();
-    }
-    await dashboard(session);
-    await think();
-  }
-}
-const t0 = performance.now();
-await Promise.all(Array.from({ length: users }, (_, i) => user(i)));
-const wall = (performance.now() - t0) / 1000;
 
 // ---- report --------------------------------------------------------------
 const pct = (a, p) => a[Math.min(a.length - 1, Math.floor((p / 100) * a.length))];
 const f = (v) => (v / 1000).toFixed(2) + "s";
-let total = 0, bad = 0;
-console.log(`\n${users} users on ${accounts.length} account(s), sign-ins over ${RAMP_MS / 1000}s, then ${seconds}s of dashboard loads, think ${thinkMin}-${thinkMax}ms`);
-console.log(`signed in: ${signedIn}/${users}  sign-in outcomes: ${JSON.stringify(signInOutcomes)}`);
-console.log("endpoint".padEnd(38), "n".padStart(6), "p50".padStart(7), "p95".padStart(7), "p99".padStart(7), "max".padStart(7), " status");
-for (const [name, s] of [...stats].sort(([a], [b]) => a.localeCompare(b))) {
-  const a = s.lat.sort((x, y) => x - y);
-  total += a.length;
-  for (const [c, n] of Object.entries(s.codes)) if (!/^[23]/.test(c)) bad += n;
-  console.log(name.padEnd(38), String(a.length).padStart(6), f(pct(a, 50)).padStart(7), f(pct(a, 95)).padStart(7), f(pct(a, 99)).padStart(7), f(a[a.length - 1]).padStart(7), " " + JSON.stringify(s.codes));
+function report(title, wall) {
+  let total = 0, bad = 0;
+  console.log(`\n=== ${title} ===`);
+  console.log("endpoint".padEnd(38), "n".padStart(6), "p50".padStart(7), "p95".padStart(7), "p99".padStart(7), "max".padStart(7), " status");
+  for (const [name, s] of [...stats].sort(([a], [b]) => a.localeCompare(b))) {
+    const a = s.lat.sort((x, y) => x - y);
+    total += a.length;
+    for (const [c, n] of Object.entries(s.codes)) if (!/^[23]/.test(c)) bad += n;
+    console.log(name.padEnd(38), String(a.length).padStart(6), f(pct(a, 50)).padStart(7), f(pct(a, 95)).padStart(7), f(pct(a, 99)).padStart(7), f(a[a.length - 1]).padStart(7), " " + JSON.stringify(s.codes));
+  }
+  if (dashboardLoads.length) {
+    const d = dashboardLoads.sort((x, y) => x - y);
+    console.log(`whole dashboard load (page + 13 calls in parallel + open a note): n=${d.length} p50 ${f(pct(d, 50))} p95 ${f(pct(d, 95))} p99 ${f(pct(d, 99))} max ${f(d[d.length - 1])}`);
+  }
+  console.log(`total ${total} requests in ${wall.toFixed(1)}s = ${(total / wall).toFixed(1)} req/s, non-2xx/3xx: ${bad}`);
+  stats = new Map();
+  dashboardLoads = [];
 }
-console.log(`\ntotal ${total} requests in ${wall.toFixed(1)}s = ${(total / wall).toFixed(1)} req/s, non-2xx/3xx: ${bad}`);
-if (signedIn === 0) process.exit(1);
+
+// ---- run -----------------------------------------------------------------
+// 1. Sign everyone in, a few at a time.
+let t0 = performance.now();
+const sessions = [];
+for (let i = 0; i < users; i += 5) {
+  const batch = await Promise.all(
+    Array.from({ length: Math.min(5, users - i) }, (_, j) => signIn(accounts[(i + j) % accounts.length])),
+  );
+  sessions.push(...batch.filter(Boolean));
+}
+console.log(`\n${users} users on ${accounts.length} account(s)`);
+console.log(`signed in: ${sessions.length}/${users}  outcomes: ${JSON.stringify(signInOutcomes)}  429 retries (CI-IP throttling): ${throttled}`);
+report("sign-in (Clerk, paced, includes retries)", (performance.now() - t0) / 1000);
+if (sessions.length === 0) process.exit(1);
+
+// 2. Everyone on the dashboard at once, normal pace, then flat out.
+async function phase(seconds, thinkMin, thinkMax) {
+  const end = Date.now() + seconds * 1000;
+  await Promise.all(
+    sessions.map(async (s, i) => {
+      await sleep(Math.random() * 2000); // not all on the same millisecond
+      while (Date.now() < end) {
+        await dashboard(s);
+        await sleep(thinkMin + Math.random() * (thinkMax - thinkMin));
+      }
+    }),
+  );
+}
+t0 = performance.now();
+await phase(paceSeconds, THINK_MIN, THINK_MAX);
+report(`${sessions.length} concurrent users, normal pace (${THINK_MIN / 1000}-${THINK_MAX / 1000}s between dashboard loads), ${paceSeconds}s`, (performance.now() - t0) / 1000);
+
+t0 = performance.now();
+await phase(stressSeconds, 0, 0);
+report(`${sessions.length} concurrent users, stress (no pause), ${stressSeconds}s`, (performance.now() - t0) / 1000);
